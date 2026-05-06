@@ -1,10 +1,10 @@
 import { AuthGate } from "./components/auth/AuthGate";
-import { HomePage } from "./pages/HomePage";
+import { MeetingsPage } from "./pages/MeetingsPage";
 
 export default function App() {
   return (
     <AuthGate>
-      <HomePage />
+      <MeetingsPage />
     </AuthGate>
   );
 }
