@@ -4,55 +4,62 @@
 
 ## 현재 상태
 
-**V0.0 완전 완료** (2026-05-06). 빈 React PWA가 Vercel 도메인에 떠있고, Google OAuth로 로그인 → "여기 시간이 흐릅니다." 화면까지 작동. iPhone PWA 홈 화면 설치 + 로그인 흐름도 통과.
+**V0.1 코드 완료 (2026-05-06)** — meetings CRUD + 자동 저장 + AI 요약 + 마크다운 복사 전부 구현 + Edge Function 배포 + typecheck/lint/test 통과 + production build 통과. 단, 사용자 manual 단계 2개 남음 (아래 "남은 manual 단계").
 
-- Repo: `git@github.com-goodsoo:goodsoo/work.git` (main에 1 commit, `2689bf3`)
-- Local: `/Users/ham/Projects/goodsoob-work`
-- Stack 작동 확인: Vite + React 19 + TS + Tailwind v4 + Supabase + TanStack Query + vite-plugin-pwa
-- Supabase URL: `https://ycrcmjhybsakqbbkbszc.supabase.co` (프로젝트 ID `ycrcmjhybsakqbbkbszc`)
-- Vercel 배포 + 환경변수 등록 + iPhone PWA 테스트 통과 (사용자 직접 확인)
+### 이번 세션에서 ship된 것
+- `supabase/migrations/20260506210000_create_meetings.sql` apply됨 (Supabase remote DB에 meetings 테이블 + RLS + index + updated_at trigger)
+- `supabase gen types` 로 `src/lib/database.types.ts` 갱신
+- `src/api/meetings.ts` (CRUD wrappers) — `Meeting` 타입은 `action_items: string[] | null` 로 캐스팅
+- `src/hooks/useMeetings.ts` (TanStack: useMeetings, useMeeting, useCreate/Update/DeleteMeeting — optimistic cache 갱신)
+- `src/hooks/useDebouncedSave.ts` (1초 debounce + saving/saved/error 상태 + flush + queue coalescing)
+- `src/lib/markdown.ts` + `src/lib/markdown.test.ts` (Vitest 3개 통과)
+- `src/components/meetings/`: `MeetingsList.tsx`, `MeetingForm.tsx`, `SummarizeButton.tsx`, `CopyButton.tsx`
+- `src/pages/MeetingsPage.tsx` (기존 HomePage 대체. `App.tsx` 도 업데이트, HomePage.tsx 제거됨)
+- 라우팅: 라이브러리 없이 `selectedId` state + `history.pushState` 로 브라우저 back 버튼 지원
+- `supabase/functions/summarize/index.ts` 배포됨 (Anthropic Haiku 4.5 + tool_use 로 `{summary, action_items}` 강제)
+- `supabase/functions/summarize/smoke.ts` (deploy 후 1회 manual 검증 스크립트)
+- ESLint config: `supabase/functions/**` ignore 추가 (Deno 코드는 별 환경)
 
-## 다음 작업: V0.1 회의록 + AI 요약 + 마크다운 복사
+## 남은 manual 단계 (사용자가 해야 함)
 
-V0.1 작업 단위 (1주 목표):
-- [ ] `meetings` 테이블 마이그레이션 작성 + apply
-  - 스키마: 디자인 doc 참조 — `id, user_id, title, date, attendees, content, summary, action_items jsonb, created_at, updated_at`
-  - **`grant select, insert, update, delete on meetings to authenticated;`** 명시 필요 (Supabase 셋업에서 auto-expose OFF 했음)
-  - **RLS는 `enable automatic RLS` ON이라 자동 활성화** — `policy meetings_owner using (auth.uid() = user_id) with check (auth.uid() = user_id)` 만 추가
-  - 인덱스 `meetings_user_date_idx on meetings (user_id, date desc)`
-- [ ] `api/meetings.ts` (CRUD wrappers) + `hooks/useMeetings.ts` / `useMeeting.ts` (TanStack queries)
-- [ ] `hooks/useDebouncedMutation.ts` (1초 debounce 자동 저장 헬퍼)
-- [ ] 회의록 CRUD UI: 목록 → 상세/편집 (`pages/MeetingsPage.tsx`, `components/meetings/MeetingForm.tsx`)
-- [ ] State 명세 따라 구현: empty/loading/error/success (디자인 doc 표 참조)
-- [ ] Edge Function `summarize` 작성 (Deno + `npm:@anthropic-ai/sdk`)
-  - tool_use로 `{summary: string[3], action_items: string[]}` 구조화 강제
-  - 환경 변수 `ANTHROPIC_API_KEY` Supabase Edge Functions secrets에 등록
-- [ ] `components/meetings/SummarizeButton.tsx` (RED outlined, pending state)
-- [ ] `lib/markdown.ts` `meetingToMarkdown(meeting)` + 클립보드 복사 (`components/meetings/CopyButton.tsx`)
-- [ ] **테스트**: Vitest 셋업 검증 (이미 vite.config.ts에 통합됨) + `lib/markdown.test.ts` (3 unit: full / empty action_items / null summary) + `supabase/functions/summarize/smoke.ts` (deploy 전 manual)
-- [ ] 본인 다음 회의에서 실사용 → 피드백
+### 1. ANTHROPIC_API_KEY 시크릿 등록 (필수, AI 요약 작동 위해)
+```
+supabase secrets set ANTHROPIC_API_KEY=sk-ant-xxxx
+```
+또는 https://supabase.com/dashboard/project/ycrcmjhybsakqbbkbszc/settings/functions 에서 등록. 등록 후 Edge Function 재배포 불필요 (런타임 환경변수).
 
-V0.1 ship 성공 기준 (디자인 doc): 회의록 작성 → AI 요약 → 마크다운 복사 → Notion/Obsidian 붙여넣기까지 1분 이내.
+### 2. P1 검증 (실사용 1회)
+- 다음 회의에서 본인이 직접: 작성 → AI 요약 → 마크다운 복사 → Notion 붙여넣기까지 1분 이내
+- 안 되면 어디서 막히는지 메모해서 다음 세션에 가져오기
+
+### 3. (선택) 사전 smoke test
+키 등록 후, deploy 안정성 한번 확인하고 싶으면:
+```
+SUMMARIZE_URL=https://ycrcmjhybsakqbbkbszc.supabase.co/functions/v1/summarize \
+SUPABASE_ANON_KEY=sb_publishable_uBf5D54I0MKAWyxczYxYIw_FEjuWeEf \
+deno run --allow-env --allow-net supabase/functions/summarize/smoke.ts
+```
 
 ## 알아야 할 컨텍스트
 
-- **Supabase 프로젝트 셋업 옵션**: `Enable Data API` ON, `Auto-expose new tables` **OFF** (defense in depth), `Auto RLS` **ON**. 이 결정이 V0.1 마이그레이션 SQL에 영향 — `grant ... to authenticated` 한 줄 매번 추가해야 함.
-- **API key 형식**: 새 형식 `sb_publishable_...` 사용 중 (legacy `eyJ...` 아님). supabase-js v2가 둘 다 지원해서 OK.
-- **마크다운 = 표준 CommonMark + GFM**, ❌ "Notion 호환" 표현 안 씀. 함수명 `meetingToMarkdown` (NotionMarkdown 아님).
-- **Anthropic SDK는 클라이언트 import 금지** — Supabase Edge Function (Deno) 안에서 `npm:@anthropic-ai/sdk`로만 사용.
-- **Server state는 TanStack Query 일관**. `useEffect + supabase.from()` 직접 호출 금지. 모든 fetch는 훅 패턴.
-- **자동 저장 = debounce 1초 + TanStack mutation**. 명시적 "저장" 버튼 없음. V0.2 일기에도 같은 훅 재사용.
-- **Design**: monotone zinc + RED-600 accent. RED은 의미 있는 1군데에만(오늘/primary CTA/활성 탭/pending Todo 체크박스 border).
-- **iOS PWA OAuth footgun**: redirect URL 정확히. PWA 첫 로그인이 안 풀리면 Safari로 한 번 로그인 후 PWA 추가하면 풀림.
+- **Supabase 셋업 옵션**: `Auto-expose new tables` **OFF**, `Auto RLS` **ON**. 마이그레이션마다 `grant select, insert, update, delete on <table> to authenticated;` 명시 필요. RLS는 자동 enable.
+- **마크다운 = 표준 CommonMark + GFM**. `meetingToMarkdown()` 출력. `## 본문 / ## 요약 / ## 액션아이템` 섹션, `- [ ]` GFM checkbox.
+- **Anthropic SDK는 클라이언트 import 금지**. Edge Function에서 `npm:@anthropic-ai/sdk@0.39.0`. Edge Function 모델은 `claude-haiku-4-5-20251001` (빠르고 저렴).
+- **자동 저장 = `useDebouncedSave` (1초)**. textarea/input change 마다 `schedule(form)`. unmount + beforeunload 시 `flush`. 동일 훅을 V0.2 일기 본문에서도 재사용 예정.
+- **새 회의록 생성 흐름**: "+ 새 회의록" 클릭 시 즉시 `createMeeting({date: today, content: ""})` POST → 받은 id로 폼 진입. 빈 회의록이 list에 즉시 보임 ("(제목 없음)"). 본인이 작성 시작하면 1초 후 자동 저장.
+- **Design**: monotone zinc + RED-600. RED은 primary CTA / pending 체크박스 border / 활성 탭 / 오늘 marker / 에러 left-border 5군데에만.
+- **iOS PWA OAuth footgun**: PWA 첫 로그인 안 풀리면 Safari로 한 번 로그인 후 PWA 설치하면 풀림.
+- **권한 footgun**: settings.local.json `Bash(supabase functions *)` 패턴이 있어도 `supabase ... 2>&1 | tail` 같은 파이프 추가하면 매칭 깨져 다시 prompt 뜸. 명령어 단순하게 실행.
 
 ## 선택 미해결 / 나중에
 
-- **Favicon 본인 브랜드로 교체**: `public/favicon.svg` 수정 후 `bun run icons` 재실행하면 PNG 자동 재생성. V0.1 중에 짬 날 때.
-- **CLAUDE.md `## Testing` 섹션 추가**: V0.1에서 Vitest 실제로 처음 돌릴 때 명령어 + 패턴 명시. (지금은 README에만 있음)
-- **TODOS.md 만들지 안 만들지**: V0.4+ 미래 기능들(음성 입력, 자연어 입력, 주간 AI 회고)을 별도 파일로 빼면 좋을지 V0.1 끝날 때쯤 결정.
+- **Favicon 본인 브랜드로 교체**: `public/favicon.svg` 수정 후 `bun run icons` 재실행하면 PNG 자동 재생성.
+- **CLAUDE.md `## Testing` 섹션 추가**: 명령어 (`bun run test:run`) + 패턴 명시. 지금은 README에만.
+- **TODOS.md vs progress.md**: 미래 기능들(음성 입력, 자연어 입력, 주간 AI 회고)을 별도로 빼면 좋을지 V0.2 시작 시 결정.
+- **회의록 본문 매우 김 (10K+자) 가드**: design doc edge case로 메모됨. V0.1.1 또는 V0.2에서 본인 실사용 후 결정.
 
-## 살아있는 외부 자원 (다음 세션에서 참조)
+## 살아있는 외부 자원
 
-- Design doc: `~/.gstack/projects/goodsoob-work/ham-no-git-design-20260506-161246.md` — eng + design review 결정 다 통합됨
-- Test plan: `~/.gstack/projects/goodsoob-work/ham-no-git-eng-review-test-plan-20260506-170527.md` — `/qa`가 자동 사용
-- 메모리: `~/.claude/projects/-Users-ham-Projects-goodsoob-work/memory/` — 권한 확인 최소화 feedback 저장됨
+- Design doc: `~/.gstack/projects/goodsoob-work/ham-no-git-design-20260506-161246.md` — eng + design review 결정 통합
+- Test plan: `~/.gstack/projects/goodsoob-work/ham-no-git-eng-review-test-plan-20260506-170527.md` — `/qa` 자동 사용
+- 메모리: `~/.claude/projects/-Users-ham-Projects-goodsoob-work/memory/`
