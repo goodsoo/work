@@ -32,6 +32,8 @@
     --safe-bottom: env(safe-area-inset-bottom);
     --safe-left: env(safe-area-inset-left);
     --safe-right: env(safe-area-inset-right);
+    /* AppShell 상단바의 실측 높이 (py-3 + 로그아웃 버튼 min-h-44 + border) */
+    --app-header-h: 4.25rem;
   }
 
   /* Italic Pretendard fallback for serif-styled headings */

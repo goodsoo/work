@@ -45,6 +45,22 @@ export function useUpdateMeeting(id: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (patch: MeetingUpdate) => updateMeeting(id, patch),
+    onMutate: async (patch) => {
+      await qc.cancelQueries({ queryKey: meetingKey(id) });
+      const prevDetail = qc.getQueryData<Meeting>(meetingKey(id));
+      const prevList = qc.getQueryData<Meeting[]>(meetingsKey);
+      if (prevDetail) {
+        qc.setQueryData(meetingKey(id), { ...prevDetail, ...patch } as Meeting);
+      }
+      qc.setQueryData<Meeting[]>(meetingsKey, (curr) =>
+        curr?.map((m) => (m.id === id ? ({ ...m, ...patch } as Meeting) : m)),
+      );
+      return { prevDetail, prevList };
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.prevDetail) qc.setQueryData(meetingKey(id), ctx.prevDetail);
+      if (ctx?.prevList) qc.setQueryData(meetingsKey, ctx.prevList);
+    },
     onSuccess: (updated) => {
       qc.setQueryData(meetingKey(id), updated);
       qc.setQueryData<Meeting[]>(meetingsKey, (prev) =>

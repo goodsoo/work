@@ -1,6 +1,7 @@
 import { Plus } from "lucide-react";
 import { useMeetings } from "../../hooks/useMeetings";
 import type { Meeting } from "../../api/meetings";
+import { PageHeader } from "../nav/PageHeader";
 
 type Props = {
   onSelect: (id: string) => void;
@@ -32,39 +33,53 @@ export function MeetingsList({ onSelect, onCreate, creating }: Props) {
   const { data, isLoading, error, refetch, isFetching } = useMeetings();
 
   return (
-    <div className="mx-auto w-full max-w-2xl px-4 pb-24 pt-6 md:px-6">
-      <div className="mb-6 flex items-baseline justify-between">
-        <h2 className="font-serif text-2xl text-zinc-900 dark:text-zinc-100">
-          회의록
-        </h2>
-        <button
-          type="button"
-          onClick={onCreate}
-          disabled={creating}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-red-700 disabled:opacity-50 dark:bg-red-500 dark:hover:bg-red-600 dark:text-zinc-950"
-        >
-          <Plus className="h-4 w-4" />
-          새 회의록
-        </button>
+    <>
+      <PageHeader
+        left={
+          <h2 className="font-serif text-2xl text-zinc-900 dark:text-zinc-100">
+            회의록
+          </h2>
+        }
+        right={
+          <button
+            type="button"
+            onClick={onCreate}
+            disabled={creating}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-red-700 disabled:opacity-50 dark:bg-red-500 dark:hover:bg-red-600 dark:text-zinc-950"
+          >
+            <Plus className="h-4 w-4" />
+            새 회의록
+          </button>
+        }
+      />
+      <div className="mx-auto w-full max-w-2xl px-4 pb-24 pt-6 md:px-6">
+        {error ? (
+          <ErrorState
+            message={(error as Error).message}
+            onRetry={() => void refetch()}
+          />
+        ) : isLoading ? (
+          <SkeletonList />
+        ) : !data || data.length === 0 ? (
+          <EmptyState onCreate={onCreate} />
+        ) : (
+          <ul className="space-y-3">
+            {data.map((m) => (
+              <MeetingCard
+                key={m.id}
+                meeting={m}
+                onClick={() => onSelect(m.id)}
+              />
+            ))}
+            {isFetching ? (
+              <li className="pt-2 text-center text-xs text-zinc-400">
+                새로고침 중...
+              </li>
+            ) : null}
+          </ul>
+        )}
       </div>
-
-      {error ? (
-        <ErrorState message={(error as Error).message} onRetry={() => void refetch()} />
-      ) : isLoading ? (
-        <SkeletonList />
-      ) : !data || data.length === 0 ? (
-        <EmptyState onCreate={onCreate} />
-      ) : (
-        <ul className="space-y-3">
-          {data.map((m) => (
-            <MeetingCard key={m.id} meeting={m} onClick={() => onSelect(m.id)} />
-          ))}
-          {isFetching ? (
-            <li className="pt-2 text-center text-xs text-zinc-400">새로고침 중...</li>
-          ) : null}
-        </ul>
-      )}
-    </div>
+    </>
   );
 }
 

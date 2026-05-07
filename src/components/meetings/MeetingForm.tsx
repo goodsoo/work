@@ -1,105 +1,179 @@
 import { useEffect, useMemo, useState } from "react";
-import { ChevronLeft, Trash2, AlertCircle } from "lucide-react";
-import { useMeeting, useUpdateMeeting, useDeleteMeeting } from "../../hooks/useMeetings";
-import { useDebouncedSave, type SaveStatus } from "../../hooks/useDebouncedSave";
-import type { MeetingUpdate } from "../../api/meetings";
-import { SummarizeButton, type SummaryResult } from "./SummarizeButton";
+import {
+  ChevronLeft,
+  Trash2,
+  AlertCircle,
+  ListPlus,
+  Check,
+  Undo2,
+  Redo2,
+} from "lucide-react";
+import {
+  useMeeting,
+  useMeetings,
+  useUpdateMeeting,
+  useDeleteMeeting,
+} from "../../hooks/useMeetings";
+import { useStateHistory } from "../../hooks/useStateHistory";
+import { useCreateTodo } from "../../hooks/useTodos";
+import type { Meeting, MeetingUpdate } from "../../api/meetings";
+import { SummarizeButton } from "./SummarizeButton";
 import { CopyButton } from "./CopyButton";
+import { EditableList } from "./EditableList";
+import { AttendeeTagInput } from "./AttendeeTagInput";
+import { MarkdownView } from "./MarkdownView";
+import { parseAttendees } from "../../lib/attendees";
+import { PageHeader } from "../nav/PageHeader";
 
 type Props = {
   meetingId: string;
   onBack: () => void;
 };
 
-type FormFields = {
+type MeetingDoc = {
   title: string;
   date: string;
   time: string;
   attendees: string;
   content: string;
+  discussion_items: string[];
+  decisions: string[];
+  action_items: string[];
 };
 
-function emptyForm(): FormFields {
-  return { title: "", date: "", time: "", attendees: "", content: "" };
+const EMPTY_DOC: MeetingDoc = {
+  title: "",
+  date: "",
+  time: "",
+  attendees: "",
+  content: "",
+  discussion_items: [],
+  decisions: [],
+  action_items: [],
+};
+
+function makeDocFromMeeting(m: Meeting | null | undefined): MeetingDoc {
+  if (!m) return EMPTY_DOC;
+  return {
+    title: m.title ?? "",
+    date: m.date ?? "",
+    time: m.time ?? "",
+    attendees: m.attendees ?? "",
+    content: m.content ?? "",
+    discussion_items: m.discussion_items ?? [],
+    decisions: m.decisions ?? [],
+    action_items: m.action_items ?? [],
+  };
 }
 
-type SummaryOverride = SummaryResult | null;
+function docToPatch(doc: MeetingDoc): MeetingUpdate {
+  return {
+    title: doc.title.trim() || null,
+    date: doc.date || null,
+    time: doc.time.trim() || null,
+    attendees: doc.attendees.trim() || null,
+    content: doc.content,
+    discussion_items: doc.discussion_items.length === 0 ? null : doc.discussion_items,
+    decisions: doc.decisions.length === 0 ? null : doc.decisions,
+    action_items: doc.action_items.length === 0 ? null : doc.action_items,
+  };
+}
+
+function arraysEqual(a: string[], b: string[]): boolean {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
+}
+
+function docsEqual(a: MeetingDoc, b: MeetingDoc): boolean {
+  return (
+    a.title === b.title &&
+    a.date === b.date &&
+    a.time === b.time &&
+    a.attendees === b.attendees &&
+    a.content === b.content &&
+    arraysEqual(a.discussion_items, b.discussion_items) &&
+    arraysEqual(a.decisions, b.decisions) &&
+    arraysEqual(a.action_items, b.action_items)
+  );
+}
 
 export function MeetingForm({ meetingId, onBack }: Props) {
   const { data, isLoading, error, refetch } = useMeeting(meetingId);
+  const meetingsQ = useMeetings();
   const updateMutation = useUpdateMeeting(meetingId);
   const deleteMutation = useDeleteMeeting();
+  const createTodoMutation = useCreateTodo();
 
-  // Initialize form from server data once per meeting id.
-  const [formForId, setFormForId] = useState<string | null>(null);
-  const [form, setForm] = useState<FormFields>(emptyForm);
-  if (data && formForId !== data.id) {
-    setFormForId(data.id);
-    setForm({
-      title: data.title ?? "",
-      date: data.date ?? "",
-      time: data.time ?? "",
-      attendees: data.attendees ?? "",
-      content: data.content ?? "",
-    });
-  }
+  const attendeeSuggestions = useMemo(() => {
+    const set = new Set<string>();
+    for (const m of meetingsQ.data ?? []) {
+      if (!m.attendees) continue;
+      for (const tag of parseAttendees(m.attendees)) set.add(tag);
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b, "ko"));
+  }, [meetingsQ.data]);
 
-  // Reset summary override when switching meetings.
-  const [overrideForId, setOverrideForId] = useState(meetingId);
-  const [overrideSummary, setOverrideSummary] = useState<SummaryOverride>(null);
-  if (overrideForId !== meetingId) {
-    setOverrideForId(meetingId);
-    setOverrideSummary(null);
-  }
+  const docInitial = useMemo(() => makeDocFromMeeting(data), [data]);
 
-  const [actionError, setActionError] = useState<string | null>(null);
-
-  const persistedDiscussion = data?.discussion_items ?? null;
-  const persistedDecisions = data?.decisions ?? null;
-  const persistedActions = data?.action_items ?? null;
-  const discussionItems =
-    overrideSummary?.discussion_items ?? persistedDiscussion ?? [];
-  const decisions = overrideSummary?.decisions ?? persistedDecisions ?? [];
-  const actionItems = overrideSummary?.action_items ?? persistedActions ?? [];
-  const hasAnySummary =
-    discussionItems.length + decisions.length + actionItems.length > 0;
-
-  const save = useMemo(
-    () => async (next: FormFields) => {
-      const patch: MeetingUpdate = {
-        title: next.title.trim() || null,
-        date: next.date || null,
-        time: next.time.trim() || null,
-        attendees: next.attendees.trim() || null,
-        content: next.content,
-      };
-      await updateMutation.mutateAsync(patch);
+  const history = useStateHistory<MeetingDoc>({
+    initial: docInitial,
+    reKey: data?.id ?? meetingId,
+    commitMs: 1000,
+    isEqual: docsEqual,
+    onCommit: (doc) => {
+      updateMutation.mutate(docToPatch(doc));
     },
-    [updateMutation]
-  );
-
-  const { status, schedule, flush, error: saveError } = useDebouncedSave<FormFields>({
-    save,
-    delay: 1000,
   });
 
+  const doc = history.value;
+
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [bodyMode, setBodyMode] = useState<"edit" | "split" | "preview">("edit");
+  const [addedTodoIndices, setAddedTodoIndices] = useState<Set<number>>(
+    () => new Set(),
+  );
+
+  // Reset "added to todos" tracking when meeting or action items content changes.
+  const addedKey = `${meetingId}|${doc.action_items.join("\n")}`;
+  const [trackedAddedKey, setTrackedAddedKey] = useState(addedKey);
+  if (trackedAddedKey !== addedKey) {
+    setTrackedAddedKey(addedKey);
+    setAddedTodoIndices(new Set());
+  }
+
+  // Flush pending edits on unmount or page navigation.
   useEffect(() => {
     function onBeforeUnload() {
-      void flush();
+      history.flush();
     }
     window.addEventListener("beforeunload", onBeforeUnload);
     return () => {
       window.removeEventListener("beforeunload", onBeforeUnload);
-      void flush();
+      history.flush();
     };
-  }, [flush]);
+  }, [history]);
 
-  function update<K extends keyof FormFields>(key: K, value: FormFields[K]) {
-    setForm((prev) => {
-      const next = { ...prev, [key]: value };
-      schedule(next);
-      return next;
-    });
+  function updateField<K extends keyof MeetingDoc>(key: K, value: MeetingDoc[K]) {
+    history.set({ ...doc, [key]: value });
+  }
+
+  function onFormKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
+    const isUndo =
+      (e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === "z";
+    const isRedo =
+      ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "y") ||
+      ((e.metaKey || e.ctrlKey) &&
+        e.shiftKey &&
+        e.key.toLowerCase() === "z");
+    if (isUndo) {
+      e.preventDefault();
+      history.undo();
+    } else if (isRedo) {
+      e.preventDefault();
+      history.redo();
+    }
   }
 
   async function handleDelete() {
@@ -113,290 +187,401 @@ export function MeetingForm({ meetingId, onBack }: Props) {
     }
   }
 
-  async function retrySave() {
-    schedule(form);
-    await flush();
+  async function addActionItemAsTodo(index: number, text: string) {
+    if (addedTodoIndices.has(index)) return;
+    try {
+      await createTodoMutation.mutateAsync({
+        title: text,
+        priority: "medium",
+        due_date: null,
+        linked_meeting_id: meetingId,
+      });
+      setAddedTodoIndices((prev) => {
+        const next = new Set(prev);
+        next.add(index);
+        return next;
+      });
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : String(e));
+    }
   }
+
+  function retrySave() {
+    history.flush();
+    if (history.canUndo === false && !updateMutation.isPending) {
+      // No pending edit and not currently saving — re-fire last commit.
+      updateMutation.mutate(docToPatch(doc));
+    }
+  }
+
+  const headerLeft = (
+    <button
+      type="button"
+      onClick={onBack}
+      className="inline-flex items-center gap-1 text-sm text-zinc-500 transition hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+    >
+      <ChevronLeft className="h-4 w-4" />
+      목록
+    </button>
+  );
+
+  const undoRedoButtons = (
+    <div
+      className="inline-flex overflow-hidden rounded-lg border border-zinc-200 text-xs dark:border-zinc-800"
+      aria-label="실행 취소 / 다시 실행"
+    >
+      <button
+        type="button"
+        onClick={history.undo}
+        disabled={!history.canUndo}
+        aria-label="실행 취소 (Ctrl/⌘+Z)"
+        title="실행 취소 (Ctrl/⌘+Z)"
+        className="px-2 py-1 text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-900 disabled:cursor-not-allowed disabled:opacity-30 dark:text-zinc-400 dark:hover:bg-zinc-900 dark:hover:text-zinc-100"
+        style={{ minHeight: 28 }}
+      >
+        <Undo2 className="h-3.5 w-3.5" />
+      </button>
+      <button
+        type="button"
+        onClick={history.redo}
+        disabled={!history.canRedo}
+        aria-label="다시 실행 (Ctrl/⌘+Shift+Z)"
+        title="다시 실행 (Ctrl/⌘+Shift+Z)"
+        className="border-l border-zinc-200 px-2 py-1 text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-900 disabled:cursor-not-allowed disabled:opacity-30 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-900 dark:hover:text-zinc-100"
+        style={{ minHeight: 28 }}
+      >
+        <Redo2 className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  );
 
   if (error) {
     return (
-      <div className="mx-auto w-full max-w-2xl px-4 pb-24 pt-6 md:px-6">
-        <BackHeader onBack={onBack} status="idle" />
-        <div className="mt-8 rounded-lg border-l-4 border-red-600 bg-red-50 p-4 text-sm text-red-900 dark:border-red-500 dark:bg-red-950/30 dark:text-red-200">
-          <div className="font-medium">회의록을 불러오지 못했어요</div>
-          <div className="mt-1 font-mono text-xs opacity-80">
-            {(error as Error).message}
+      <>
+        <PageHeader left={headerLeft} />
+        <div className="mx-auto w-full max-w-2xl px-4 pb-24 pt-6 md:px-6">
+          <div className="mt-2 rounded-lg border-l-4 border-red-600 bg-red-50 p-4 text-sm text-red-900 dark:border-red-500 dark:bg-red-950/30 dark:text-red-200">
+            <div className="font-medium">회의록을 불러오지 못했어요</div>
+            <div className="mt-1 font-mono text-xs opacity-80">
+              {(error as Error).message}
+            </div>
+            <button
+              type="button"
+              onClick={() => void refetch()}
+              className="mt-3 text-xs underline underline-offset-2"
+            >
+              다시 시도
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={() => void refetch()}
-            className="mt-3 text-xs underline underline-offset-2"
-          >
-            다시 시도
-          </button>
         </div>
-      </div>
+      </>
     );
   }
 
   if (isLoading || !data) {
     return (
-      <div className="mx-auto w-full max-w-2xl px-4 pb-24 pt-6 md:px-6">
-        <BackHeader onBack={onBack} status="idle" />
-        <div className="mt-8 space-y-4" aria-hidden>
-          <div className="h-10 animate-pulse rounded-lg bg-zinc-100 dark:bg-zinc-900" />
-          <div className="h-10 animate-pulse rounded-lg bg-zinc-100 dark:bg-zinc-900" />
-          <div className="h-48 animate-pulse rounded-lg bg-zinc-100 dark:bg-zinc-900" />
+      <>
+        <PageHeader left={headerLeft} />
+        <div className="mx-auto w-full max-w-2xl px-4 pb-24 pt-6 md:px-6">
+          <div className="mt-2 space-y-4" aria-hidden>
+            <div className="h-10 animate-pulse rounded-lg bg-zinc-100 dark:bg-zinc-900" />
+            <div className="h-10 animate-pulse rounded-lg bg-zinc-100 dark:bg-zinc-900" />
+            <div className="h-48 animate-pulse rounded-lg bg-zinc-100 dark:bg-zinc-900" />
+          </div>
         </div>
-      </div>
+      </>
     );
   }
 
+  const hasAnySummary =
+    doc.discussion_items.length + doc.decisions.length + doc.action_items.length > 0;
+
   const meetingForCopy = {
-    title: form.title || null,
-    date: form.date || null,
-    time: form.time || null,
-    attendees: form.attendees || null,
-    discussion_items: discussionItems,
-    decisions,
-    action_items: actionItems,
+    title: doc.title || null,
+    date: doc.date || null,
+    time: doc.time || null,
+    attendees: doc.attendees || null,
+    discussion_items: doc.discussion_items,
+    decisions: doc.decisions,
+    action_items: doc.action_items,
   };
 
   return (
-    <div className="mx-auto w-full max-w-2xl px-4 pb-24 pt-6 md:px-6">
-      <BackHeader
-        onBack={onBack}
-        status={status}
-        onRetry={saveError ? () => void retrySave() : undefined}
+    <>
+      <PageHeader
+        left={headerLeft}
+        right={
+          <>
+            {undoRedoButtons}
+            <SaveIndicator
+              isPending={updateMutation.isPending}
+              isError={updateMutation.isError}
+              hasPendingEdit={history.canUndo && !updateMutation.isPending && !updateMutation.isError}
+              onRetry={retrySave}
+            />
+          </>
+        }
       />
-
-      {saveError ? (
-        <div className="mt-4 flex items-start gap-2 rounded-lg border-l-4 border-red-600 bg-red-50 p-3 text-sm text-red-900 dark:border-red-500 dark:bg-red-950/30 dark:text-red-200">
-          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-          <div className="flex-1">
-            <div className="font-medium">자동 저장 실패</div>
-            <div className="mt-0.5 font-mono text-xs opacity-80">{saveError.message}</div>
+      <div
+        onKeyDown={onFormKeyDown}
+        className="mx-auto w-full max-w-2xl px-4 pb-24 pt-6 md:px-6"
+      >
+        {updateMutation.isError ? (
+          <div className="mt-2 flex items-start gap-2 rounded-lg border-l-4 border-red-600 bg-red-50 p-3 text-sm text-red-900 dark:border-red-500 dark:bg-red-950/30 dark:text-red-200">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+            <div className="flex-1">
+              <div className="font-medium">자동 저장 실패</div>
+              <div className="mt-0.5 font-mono text-xs opacity-80">
+                {(updateMutation.error as Error)?.message}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={retrySave}
+              className="text-xs underline underline-offset-2"
+            >
+              재시도
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={() => void retrySave()}
-            className="text-xs underline underline-offset-2"
-          >
-            재시도
-          </button>
-        </div>
-      ) : null}
+        ) : null}
 
-      {actionError ? (
-        <div className="mt-4 rounded-lg border-l-4 border-red-600 bg-red-50 p-3 text-sm text-red-900 dark:border-red-500 dark:bg-red-950/30 dark:text-red-200">
-          {actionError}
-        </div>
-      ) : null}
+        {actionError ? (
+          <div className="mt-4 rounded-lg border-l-4 border-red-600 bg-red-50 p-3 text-sm text-red-900 dark:border-red-500 dark:bg-red-950/30 dark:text-red-200">
+            {actionError}
+          </div>
+        ) : null}
 
-      <div className="mt-6 space-y-4">
-        <input
-          type="text"
-          value={form.title}
-          onChange={(e) => update("title", e.target.value)}
-          placeholder="제목 (선택)"
-          autoFocus={!data.title}
-          className="w-full border-0 border-b border-zinc-200 bg-transparent pb-2 font-serif text-2xl text-zinc-900 outline-none placeholder:text-zinc-300 focus:border-zinc-400 dark:border-zinc-800 dark:text-zinc-100 dark:placeholder:text-zinc-700 dark:focus:border-zinc-600"
-        />
-
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <label className="flex flex-col gap-1">
-            <span className="text-xs text-zinc-500">날짜</span>
-            <input
-              type="date"
-              value={form.date}
-              onChange={(e) => update("date", e.target.value)}
-              className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-400 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100 dark:focus:border-zinc-600"
-            />
-          </label>
-          <label className="flex flex-col gap-1">
-            <span className="text-xs text-zinc-500">시간</span>
-            <input
-              type="text"
-              value={form.time}
-              onChange={(e) => update("time", e.target.value)}
-              placeholder="14:00 또는 오후 2시"
-              className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-zinc-400 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100 dark:placeholder:text-zinc-600 dark:focus:border-zinc-600"
-            />
-          </label>
-          <label className="flex flex-col gap-1 sm:col-span-1">
-            <span className="text-xs text-zinc-500">참석</span>
-            <input
-              type="text"
-              value={form.attendees}
-              onChange={(e) => update("attendees", e.target.value)}
-              placeholder="이름들 쉼표로"
-              className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-zinc-400 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100 dark:placeholder:text-zinc-600 dark:focus:border-zinc-600"
-            />
-          </label>
-        </div>
-
-        <label className="flex flex-col gap-1">
-          <span className="text-xs text-zinc-500">본문</span>
-          <textarea
-            value={form.content}
-            onChange={(e) => update("content", e.target.value)}
-            placeholder="회의 내용을 적어주세요"
-            rows={12}
-            className="min-h-64 resize-y rounded-lg border border-zinc-200 bg-white px-3 py-3 text-base leading-relaxed text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-zinc-400 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100 dark:placeholder:text-zinc-600 dark:focus:border-zinc-600"
+        <div className="mt-4 space-y-4">
+          <input
+            type="text"
+            value={doc.title}
+            onChange={(e) => updateField("title", e.target.value)}
+            placeholder="제목 (선택)"
+            autoFocus={!data.title}
+            className="w-full border-0 border-b border-zinc-200 bg-transparent pb-2 font-serif text-2xl text-zinc-900 outline-none placeholder:text-zinc-300 focus:border-zinc-400 dark:border-zinc-800 dark:text-zinc-100 dark:placeholder:text-zinc-700 dark:focus:border-zinc-600"
           />
-        </label>
-      </div>
 
-      <section className="mt-8 border-t border-zinc-200 pt-6 dark:border-zinc-800">
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="font-serif text-lg text-zinc-900 dark:text-zinc-100">
-            요약
-          </h3>
-          <SummarizeButton
-            meetingId={data.id}
-            title={form.title || null}
-            date={form.date || null}
-            time={form.time || null}
-            attendees={form.attendees || null}
-            content={form.content}
-            hasResult={hasAnySummary}
-            onResult={async (result) => {
-              setOverrideSummary(result);
-              try {
-                await updateMutation.mutateAsync({
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <label className="flex flex-col gap-1">
+              <span className="text-xs text-zinc-500">날짜</span>
+              <input
+                type="date"
+                value={doc.date}
+                onChange={(e) => updateField("date", e.target.value)}
+                className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-400 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100 dark:focus:border-zinc-600"
+              />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-xs text-zinc-500">시간</span>
+              <input
+                type="text"
+                value={doc.time}
+                onChange={(e) => updateField("time", e.target.value)}
+                placeholder="14:00 또는 오후 2시"
+                className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-zinc-400 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100 dark:placeholder:text-zinc-600 dark:focus:border-zinc-600"
+              />
+            </label>
+            <label className="flex flex-col gap-1 sm:col-span-1">
+              <span className="text-xs text-zinc-500">참석</span>
+              <AttendeeTagInput
+                value={doc.attendees}
+                onChange={(next) => updateField("attendees", next)}
+                suggestions={attendeeSuggestions}
+              />
+            </label>
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <span className="text-xs text-zinc-500">본문 (Markdown)</span>
+              <div
+                className="inline-flex overflow-hidden rounded-lg border border-zinc-200 text-xs dark:border-zinc-800"
+                role="tablist"
+                aria-label="본문 보기 모드"
+              >
+                {(["edit", "split", "preview"] as const).map((m) => {
+                  const label =
+                    m === "edit" ? "편집" : m === "split" ? "분할" : "미리보기";
+                  const active = bodyMode === m;
+                  return (
+                    <button
+                      key={m}
+                      type="button"
+                      role="tab"
+                      aria-selected={active}
+                      onClick={() => setBodyMode(m)}
+                      className={`px-3 py-1 transition ${
+                        active
+                          ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
+                          : "text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
+                      }`}
+                      style={{ minHeight: 28 }}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            {bodyMode === "edit" ? (
+              <textarea
+                value={doc.content}
+                onChange={(e) => updateField("content", e.target.value)}
+                placeholder="회의 내용을 적어주세요. # 제목, **굵게**, - 목록, [ ] 체크박스 등 마크다운 사용 가능."
+                rows={12}
+                className="min-h-64 resize-y rounded-lg border border-zinc-200 bg-white px-3 py-3 font-mono text-sm leading-relaxed text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-zinc-400 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100 dark:placeholder:text-zinc-600 dark:focus:border-zinc-600"
+              />
+            ) : bodyMode === "preview" ? (
+              <div className="min-h-64 rounded-lg border border-zinc-200 bg-white p-3 dark:border-zinc-800 dark:bg-zinc-950">
+                <MarkdownView content={doc.content} />
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <textarea
+                  value={doc.content}
+                  onChange={(e) => updateField("content", e.target.value)}
+                  placeholder="회의 내용을 적어주세요. 마크다운 사용 가능."
+                  rows={12}
+                  className="h-96 resize-y rounded-lg border border-zinc-200 bg-white px-3 py-3 font-mono text-sm leading-relaxed text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-zinc-400 md:h-[32rem] dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100 dark:placeholder:text-zinc-600 dark:focus:border-zinc-600"
+                  aria-label="본문 편집"
+                />
+                <div
+                  className="h-96 overflow-auto rounded-lg border border-zinc-200 bg-white p-3 md:h-[32rem] dark:border-zinc-800 dark:bg-zinc-950"
+                  aria-label="본문 미리보기"
+                >
+                  <MarkdownView content={doc.content} />
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <section className="mt-8 border-t border-zinc-200 pt-6 dark:border-zinc-800">
+          <div className="mb-4 flex items-center justify-between">
+            <h3 className="font-serif text-lg text-zinc-900 dark:text-zinc-100">
+              요약
+            </h3>
+            <SummarizeButton
+              meetingId={data.id}
+              title={doc.title || null}
+              date={doc.date || null}
+              time={doc.time || null}
+              attendees={doc.attendees || null}
+              content={doc.content}
+              hasResult={hasAnySummary}
+              onResult={(result) => {
+                history.set({
+                  ...doc,
                   discussion_items: result.discussion_items,
                   decisions: result.decisions,
                   action_items: result.action_items,
                 });
-                setOverrideSummary(null);
+                history.flush();
                 setActionError(null);
-              } catch (e) {
-                setActionError(e instanceof Error ? e.message : String(e));
-              }
-            }}
-            onError={setActionError}
-          />
-        </div>
-
-        {hasAnySummary ? (
-          <div className="space-y-5">
-            <SummarySection title="논의 사항" items={discussionItems} />
-            <SummarySection title="결정 사항" items={decisions} />
-            <SummarySection
-              title="액션 아이템"
-              items={actionItems}
-              redCheckbox
+              }}
+              onError={setActionError}
             />
           </div>
-        ) : (
-          <p className="text-sm text-zinc-400">
-            본문을 입력하고 AI 요약을 눌러주세요.
-          </p>
-        )}
-      </section>
 
-      <div className="mt-8 flex flex-wrap items-center justify-between gap-3">
-        <CopyButton meeting={meetingForCopy} onError={setActionError} />
-        <button
-          type="button"
-          onClick={handleDelete}
-          disabled={deleteMutation.isPending}
-          className="inline-flex items-center gap-1.5 text-sm text-zinc-500 transition hover:text-red-600 disabled:opacity-50 dark:text-zinc-500 dark:hover:text-red-500"
-        >
-          <Trash2 className="h-4 w-4" />
-          삭제
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function SummarySection({
-  title,
-  items,
-  redCheckbox,
-}: {
-  title: string;
-  items: string[];
-  redCheckbox?: boolean;
-}) {
-  if (items.length === 0) return null;
-  return (
-    <div>
-      <h4 className="mb-2 text-sm font-medium text-zinc-500 dark:text-zinc-400">
-        {title}
-      </h4>
-      <ul className="space-y-1.5 text-sm text-zinc-800 dark:text-zinc-200">
-        {items.map((it, i) => (
-          <li key={i} className="flex items-start gap-2">
-            <span
-              className={
-                redCheckbox
-                  ? "mt-1 inline-block h-3.5 w-3.5 shrink-0 rounded border-2 border-red-600 dark:border-red-500"
-                  : "mt-2 inline-block h-1 w-1 shrink-0 rounded-full bg-zinc-400"
+          {!hasAnySummary ? (
+            <p className="mb-4 text-sm text-zinc-400">
+              본문을 입력하고 AI 요약을 누르거나 직접 항목을 추가해주세요.
+            </p>
+          ) : null}
+          <div className="space-y-5">
+            <EditableList
+              title="논의 사항"
+              items={doc.discussion_items}
+              onSave={(next) => updateField("discussion_items", next)}
+              bullet="dot"
+            />
+            <EditableList
+              title="결정 사항"
+              items={doc.decisions}
+              onSave={(next) => updateField("decisions", next)}
+              bullet="dot"
+            />
+            <EditableList
+              title="액션 아이템"
+              items={doc.action_items}
+              bullet="redCheckbox"
+              onSave={(next) => updateField("action_items", next)}
+              itemActions={(i, text) =>
+                addedTodoIndices.has(i) ? (
+                  <span
+                    className="inline-flex items-center gap-1 text-xs text-zinc-400"
+                    aria-label="할 일로 추가됨"
+                    style={{ minHeight: 0 }}
+                  >
+                    <Check className="h-3 w-3" />
+                    추가됨
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => addActionItemAsTodo(i, text)}
+                    disabled={createTodoMutation.isPending}
+                    className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-900 disabled:opacity-40 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+                    style={{ minHeight: 0 }}
+                  >
+                    <ListPlus className="h-3 w-3" />
+                    할 일로
+                  </button>
+                )
               }
             />
-            <span className="whitespace-pre-wrap leading-relaxed">{it}</span>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
+          </div>
+        </section>
 
-function BackHeader({
-  onBack,
-  status,
-  onRetry,
-}: {
-  onBack: () => void;
-  status: SaveStatus;
-  onRetry?: () => void;
-}) {
-  return (
-    <div className="flex items-center justify-between">
-      <button
-        type="button"
-        onClick={onBack}
-        className="inline-flex items-center gap-1 text-sm text-zinc-500 transition hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
-      >
-        <ChevronLeft className="h-4 w-4" />
-        목록
-      </button>
-      <SaveIndicator status={status} onRetry={onRetry} />
-    </div>
+        <div className="mt-8 flex flex-wrap items-center justify-between gap-3">
+          <CopyButton meeting={meetingForCopy} onError={setActionError} />
+          <button
+            type="button"
+            onClick={handleDelete}
+            disabled={deleteMutation.isPending}
+            className="inline-flex items-center gap-1.5 text-sm text-zinc-500 transition hover:text-red-600 disabled:opacity-50 dark:text-zinc-500 dark:hover:text-red-500"
+          >
+            <Trash2 className="h-4 w-4" />
+            삭제
+          </button>
+        </div>
+      </div>
+    </>
   );
 }
 
 function SaveIndicator({
-  status,
+  isPending,
+  isError,
+  hasPendingEdit,
   onRetry,
 }: {
-  status: SaveStatus;
-  onRetry?: () => void;
+  isPending: boolean;
+  isError: boolean;
+  hasPendingEdit: boolean;
+  onRetry: () => void;
 }) {
-  if (status === "error" && onRetry) {
+  if (isError) {
     return (
       <button
         type="button"
         onClick={onRetry}
         className="text-sm text-red-600 underline underline-offset-2 dark:text-red-500"
+        style={{ minHeight: 28 }}
       >
         저장 실패 · 재시도
       </button>
     );
   }
-  let label = "";
-  if (status === "pending" || status === "saving") label = "저장 중...";
-  else if (status === "saved") label = "저장됨";
-  return (
-    <span
-      className={`text-sm transition-opacity duration-300 ${
-        label ? "opacity-100" : "opacity-0"
-      } text-zinc-500 dark:text-zinc-400`}
-      aria-hidden={!label}
-    >
-      {label || "."}
-    </span>
-  );
+  if (isPending) {
+    return (
+      <span className="text-sm text-zinc-500 dark:text-zinc-400">저장 중...</span>
+    );
+  }
+  if (hasPendingEdit) {
+    return (
+      <span className="text-sm text-zinc-400 dark:text-zinc-500">대기 중</span>
+    );
+  }
+  return null;
 }
