@@ -10,23 +10,29 @@
 
 해당 파일을 읽고 일하는 게 source of truth. 이 파일은 빠른 컨텍스트만.
 
-## 로드맵 (현재 V0.1 코드 완료)
+## 로드맵 (V0.5 코드 완료, 본인 실사용 검증 대기)
 
 - ✅ V0.0 — Vite + Supabase Auth + Hello world. PWA 셋업.
-- 🟡 V0.1 — 회의록 CRUD + AI 요약 + 마크다운 복사 (Edge Function `summarize`). 코드 + 배포 완료, **본인 P1 실사용 검증 대기**.
-- V0.2 — 일기 + 주간 캘린더.
-- V0.3 — Todo + 일정 + **통합 타임라인** (이 프로젝트의 진짜 design 도전).
-- V0.4+ — 액션아이템 → Todo 1-click 이동.
+- ✅ V0.1 — 회의록 CRUD + AI 요약 + 마크다운 복사.
+- ✅ V0.2 — 일기 (journals 테이블).
+- ✅ V0.3 — Todo + 일정 + 통합 타임라인 (CalendarPage = ±7일 윈도우 + 월간 그리드 토글).
+- ✅ V0.4 — 액션아이템 → Todo 1-click (`todos.linked_meeting_id`).
+- ✅ V0.5 — wishlist 4건: 요약 inline 편집 / 참석자 태그 자동완성 / 본문 마크다운 편집·미리보기 / 폼 전체 undo/redo
+- 🟡 V0.6 후보 — GitHub 커밋 기반 포트폴리오 탭 (큰 기능, 다음 세션 plan-eng-review로).
 
 ## 핵심 결정 (review 통과됨)
 
-- **Server state**: TanStack Query 일관 사용. 모든 fetch는 `useMeetings` 같은 훅 패턴. 회의록은 `src/api/meetings.ts` 가 supabase-js 호출 캡슐화 + `src/hooks/useMeetings.ts` 가 query/mutation 정의.
-- **Auto-save**: debounce 1초 + TanStack mutation. 회의록 / 일기 본문 둘 다. 헬퍼는 `src/hooks/useDebouncedSave.ts` (queue coalescing 포함).
+- **Server state**: TanStack Query 일관 사용. 모든 fetch는 `useMeetings` 같은 훅 패턴. `src/api/{meetings,journals,todos,schedules}.ts` 가 supabase-js 캡슐화 + `src/hooks/use*.ts` 가 query/mutation 정의. `useUpdateMeeting` 은 optimistic update (인라인 편집 즉시 반영).
+- **회의록 폼 상태**: `useStateHistory<MeetingDoc>` 단일 hook 이 제목/날짜/시간/참석자/본문/요약 3리스트 모두 관리. 1초 debounce 후 onCommit → `updateMutation`. undo/redo + Cmd/Ctrl+Z 키보드 + 폼 전체 적용.
+- **일기/캘린더 자동 저장**: `useDebouncedSave` (queue coalescing) — 일기 본문 등 텍스트 단일 필드용. 회의록은 위 useStateHistory가 대체.
 - **Edge Function 에러**: try/catch + toast + retry button + Anthropic SDK `tool_use` 구조화 출력 강제. 모델은 `claude-haiku-4-5-20251001`.
-- **회의록 AI 출력 schema**: `{discussion_items, decisions, action_items}` 3분리 (V0.1.1에서 사용자 spec 반영). action_items 형식 `[담당자] 할 일 — 기한`. 결정 사항은 합의/확정된 것만, 논의 중인 건 포함 금지.
-- **테스트**: Vitest. V0.1은 `lib/markdown.test.ts` (5 unit: meetingToMarkdown 3개 + formatMeetingDate 2개) + Edge Function smoke 1개. UI 회귀는 본인이 매일 사용으로 발견.
-- **Design**: Pretendard + zinc monotone + **red-600 accent** + rounded-lg. UI는 monotone, RED은 1군데에만 (오늘 marker / primary CTA / 활성 탭).
-- **마크다운 출력 포맷** (본인 회의록 spec): `## {title or "회의록"}` → `일시: YYYY.MM.DD (요일) [시간]` + `참석:` → `### 논의 사항` / `### 결정 사항` / `### 액션 아이템` 3섹션. 빈 섹션은 omit. `lib/markdown.ts` `meetingToMarkdown()` 가 단일 source. ❌ "Notion 호환" 표현 쓰지 말 것.
+- **회의록 AI 출력 schema**: `{discussion_items, decisions, action_items}` 3분리 (V0.1.1). action_items 형식 `[담당자] 할 일 — 기한`. 결정 사항은 합의/확정된 것만.
+- **테스트**: Vitest. `lib/markdown.test.ts` (5 unit) + `lib/dates.test.ts` (5 unit) + Edge Function smoke 1개. UI 회귀는 본인이 매일 사용으로 발견.
+- **Design**: Pretendard + zinc monotone + **red-600 accent** + rounded-lg. RED은 1군데에만 (오늘 marker / primary CTA / 활성 탭 / pending todo 체크박스 / error left-border).
+- **레이아웃**: AppShell 상단 sticky 헤더(`--app-header-h: 4.25rem`) + 페이지별 sticky `PageHeader` (top: var(--app-header-h)) + `<main>` paddingBottom: tab bar height + safe-bottom. 각 페이지 라우팅: URL hash 기반 (`#meetings` / `#calendar` / `#todos` / `#meeting-{id}`).
+- **통합 타임라인** (CalendarPage): ±7일 윈도우, M/J/T/S 글리프 블록, 그리드 view 토글 (월간 5-6주). centerDate state로 그리드 cell 탭 시 타임라인 점프. 일기는 today 또는 기존 entry 있는 날만 placeholder 표시.
+- **마크다운 출력 포맷** (본인 회의록 spec, 외부 복사용): `## {title or "회의록"}` → `일시: YYYY.MM.DD (요일) [시간]` + `참석:` → `### 논의 사항` / `### 결정 사항` / `### 액션 아이템` 3섹션. 빈 섹션 omit. `lib/markdown.ts` `meetingToMarkdown()` 가 단일 source. ❌ "Notion 호환" 표현 쓰지 말 것.
+- **본문 마크다운 미리보기** (편집 중 시각화): `react-markdown` + `remark-gfm`. `MarkdownView.tsx` 가 zinc/serif 톤 컴포넌트로 element 별 override.
 
 ## 빌더 모드 톤
 
@@ -58,6 +64,7 @@ results than an ad-hoc answer.
 - Tests: `bun run test:run` (one-off), `bun run test` (watch)
 - Build: `bun run build`
 - Typecheck: `bun run typecheck`
+- 마이그레이션: `supabase db push` (linked project로 적용) → `supabase gen types typescript --linked 2>/dev/null > src/lib/database.types.ts`. **stderr 분리 필수** — 안 그러면 CLI 업데이트 알림 줄이 types 파일에 섞여 들어가 typecheck 깨짐.
 
 ## 주의사항 / 알려진 footgun
 
