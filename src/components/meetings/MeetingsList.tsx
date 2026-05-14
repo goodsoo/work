@@ -36,7 +36,7 @@ export function MeetingsList({ onSelect, onCreate, creating }: Props) {
     <>
       <PageHeader
         left={
-          <h2 className="font-serif text-2xl text-zinc-900 dark:text-zinc-100">
+          <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
             회의록
           </h2>
         }
@@ -45,14 +45,14 @@ export function MeetingsList({ onSelect, onCreate, creating }: Props) {
             type="button"
             onClick={onCreate}
             disabled={creating}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-red-700 disabled:opacity-50 dark:bg-red-500 dark:hover:bg-red-600 dark:text-zinc-950"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
           >
             <Plus className="h-4 w-4" />
             새 회의록
           </button>
         }
       />
-      <div className="mx-auto w-full max-w-2xl px-4 pb-24 pt-6 md:px-6">
+      <div className="mx-auto w-full max-w-2xl px-5 pb-16 pt-5 lg:max-w-4xl">
         {error ? (
           <ErrorState
             message={(error as Error).message}
@@ -63,7 +63,7 @@ export function MeetingsList({ onSelect, onCreate, creating }: Props) {
         ) : !data || data.length === 0 ? (
           <EmptyState onCreate={onCreate} />
         ) : (
-          <ul className="space-y-3">
+          <ul className="space-y-3 lg:grid lg:grid-cols-2 lg:gap-3 lg:space-y-0">
             {data.map((m) => (
               <MeetingCard
                 key={m.id}
@@ -138,7 +138,7 @@ function SkeletonList() {
 function EmptyState({ onCreate }: { onCreate: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center gap-4 px-4 py-16 text-center">
-      <h3 className="font-serif text-2xl text-zinc-900 dark:text-zinc-100">
+      <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
         아직 회의록이 없어요
       </h3>
       <p className="text-sm text-zinc-500 dark:text-zinc-400">
@@ -147,7 +147,7 @@ function EmptyState({ onCreate }: { onCreate: () => void }) {
       <button
         type="button"
         onClick={onCreate}
-        className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600 dark:text-zinc-950"
+        className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
       >
         <Plus className="h-4 w-4" />새 회의록
       </button>

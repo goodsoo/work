@@ -3,8 +3,13 @@ import { AuthGate } from "./components/auth/AuthGate";
 import { AppShell } from "./components/nav/AppShell";
 import type { Tab } from "./components/nav/BottomTabs";
 import { MeetingsPage } from "./pages/MeetingsPage";
+import { MeetingForm } from "./components/meetings/MeetingForm";
+import { MeetingsSidePanel, CalendarDayPanel, TodosSidePanel } from "./components/nav/SidePanel";
+import type { TodoCategory } from "./api/todos";
+type TodosFilter = TodoCategory | "all" | "uncategorized";
 import { CalendarPage } from "./pages/CalendarPage";
 import { TodosPage } from "./pages/TodosPage";
+import { todayIso } from "./lib/dates";
 
 function readTabFromHash(): Tab {
   const h = window.location.hash;
@@ -25,6 +30,8 @@ export default function App() {
   const [selectedMeetingId, setSelectedMeetingId] = useState<string | null>(() =>
     readMeetingFromHash(),
   );
+  const [calendarDate, setCalendarDate] = useState<string>(todayIso());
+  const [todoCategory, setTodoCategory] = useState<TodosFilter>("all");
 
   useEffect(() => {
     function syncFromHash() {
@@ -63,21 +70,64 @@ export default function App() {
     }
   }
 
+  // Desktop side panel per tab
+  const sidePanel =
+    tab === "meetings" ? (
+      <MeetingsSidePanel selectedId={selectedMeetingId} onSelect={openMeeting} />
+    ) : tab === "calendar" ? (
+      <CalendarDayPanel
+        selectedDate={calendarDate}
+        onOpenMeeting={openMeeting}
+      />
+    ) : tab === "todos" ? (
+      <TodosSidePanel
+        activeCategory={todoCategory}
+        onCategoryChange={setTodoCategory}
+      />
+    ) : undefined;
+
   return (
     <AuthGate>
-      <AppShell activeTab={tab} onTabChange={changeTab}>
+      <AppShell activeTab={tab} onTabChange={changeTab} sidePanel={sidePanel}>
         {tab === "meetings" ? (
-          <MeetingsPage
-            selectedId={selectedMeetingId}
-            onOpenMeeting={openMeeting}
-            onCloseMeeting={closeMeeting}
-          />
+          <>
+            {/* Mobile: full MeetingsPage (list or form) */}
+            <div className="lg:hidden">
+              <MeetingsPage
+                selectedId={selectedMeetingId}
+                onOpenMeeting={openMeeting}
+                onCloseMeeting={closeMeeting}
+              />
+            </div>
+            {/* Desktop: only the form (list is in side panel) */}
+            <div className="hidden lg:block">
+              {selectedMeetingId ? (
+                <MeetingForm
+                  meetingId={selectedMeetingId}
+                  onBack={closeMeeting}
+                />
+              ) : (
+                <DesktopEmptyState message="왼쪽에서 회의록을 선택하세요" />
+              )}
+            </div>
+          </>
         ) : tab === "calendar" ? (
-          <CalendarPage onOpenMeeting={openMeeting} />
+          <CalendarPage
+            targetDate={calendarDate}
+            onSelectedDateChange={setCalendarDate}
+          />
         ) : (
-          <TodosPage />
+          <TodosPage categoryFilter={todoCategory} />
         )}
       </AppShell>
     </AuthGate>
+  );
+}
+
+function DesktopEmptyState({ message }: { message: string }) {
+  return (
+    <div className="flex h-[calc(100svh-3rem)] items-center justify-center">
+      <p className="text-sm text-zinc-400 dark:text-zinc-500">{message}</p>
+    </div>
   );
 }

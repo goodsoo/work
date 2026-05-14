@@ -43,7 +43,7 @@ export function MeetingsPage({ selectedId, onOpenMeeting, onCloseMeeting }: Prop
   return (
     <>
       {createError ? (
-        <div className="mx-auto mt-4 w-full max-w-2xl px-4 md:px-6">
+        <div className="mx-auto mt-4 w-full max-w-2xl px-5 lg:max-w-4xl">
           <div className="rounded-lg border-l-4 border-red-600 bg-red-50 p-3 text-sm text-red-900 dark:border-red-500 dark:bg-red-950/30 dark:text-red-200">
             새 회의록 생성 실패: {createError}
           </div>
