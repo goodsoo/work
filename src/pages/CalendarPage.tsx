@@ -1,62 +1,96 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Calendar, List } from "lucide-react";
+import {
+  useCallback,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useMeetings } from "../hooks/useMeetings";
 import { useJournals } from "../hooks/useJournals";
-import { useTodos, useUpdateTodo } from "../hooks/useTodos";
-import {
-  useCreateSchedule,
-  useDeleteSchedule,
-  useSchedules,
-} from "../hooks/useSchedules";
-import type { Todo } from "../api/todos";
-import {
-  addDaysIso,
-  formatDateLong,
-  isoDateRange,
-  isToday,
-  todayIso,
-} from "../lib/dates";
-import { JournalBlock } from "../components/timeline/JournalBlock";
-import { MeetingBlock } from "../components/timeline/MeetingBlock";
-import { TodoBlock } from "../components/timeline/TodoBlock";
-import { ScheduleBlock } from "../components/timeline/ScheduleBlock";
-import { AddScheduleForm } from "../components/timeline/AddScheduleForm";
+import { useTodos } from "../hooks/useTodos";
+import { useSchedules } from "../hooks/useSchedules";
+import { todayIso } from "../lib/dates";
 import { MonthGrid, type DayItems } from "../components/timeline/MonthGrid";
-import { PageHeader } from "../components/nav/PageHeader";
-
-const WINDOW_DAYS = 7;
 
 type Props = {
-  onOpenMeeting: (id: string) => void;
+  targetDate?: string | null;
+  onSelectedDateChange?: (date: string) => void;
 };
 
-const EMPTY: DayItems = {
-  schedules: [],
-  meetings: [],
-  todos: [],
-  journal: null,
-};
+/** Number of months rendered. Must be odd so there's a center. */
+const BUFFER = 7;
+const CENTER = Math.floor(BUFFER / 2); // 3
+
+function addMonths(year: number, month: number, offset: number) {
+  const d = new Date(year, month - 1 + offset, 1);
+  return { year: d.getFullYear(), month: d.getMonth() + 1 };
+}
 
 function timestampToLocalIsoDate(ts: string): string {
   return todayIso(new Date(ts));
 }
 
-export function CalendarPage({ onOpenMeeting }: Props) {
+export function CalendarPage({ targetDate, onSelectedDateChange }: Props) {
   const meetingsQ = useMeetings();
   const journalsQ = useJournals();
   const todosQ = useTodos();
   const schedulesQ = useSchedules();
 
-  const updateTodo = useUpdateTodo();
-  const createSchedule = useCreateSchedule();
-  const deleteSchedule = useDeleteSchedule();
-
   const today = todayIso();
-  const [view, setView] = useState<"timeline" | "grid">("timeline");
-  const [centerDate, setCenterDate] = useState<string>(today);
-  const [gridYear, setGridYear] = useState(new Date().getFullYear());
-  const [gridMonth, setGridMonth] = useState(new Date().getMonth() + 1);
+  const anchorYear = useRef(new Date().getFullYear());
+  const anchorMonth = useRef(new Date().getMonth() + 1);
 
+  const [centerOffset, setCenterOffset] = useState(0);
+  const [selectedDate, setSelectedDate] = useState<string>(today);
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  const isRebalancing = useRef(false);
+  const initialScrollDone = useRef(false);
+
+  // Scroll to center section (initial + after rebalance)
+  useLayoutEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    if (!initialScrollDone.current || isRebalancing.current) {
+      // Each section is 100% of container height
+      el.scrollTop = CENTER * el.clientHeight;
+      initialScrollDone.current = true;
+      isRebalancing.current = false;
+    }
+  }, [centerOffset]);
+
+  // External target date (from side panel)
+  const [lastTarget, setLastTarget] = useState<string | null>(null);
+  if (targetDate && targetDate !== lastTarget) {
+    setLastTarget(targetDate);
+    setSelectedDate(targetDate);
+    // Jump to target month
+    const [y, m] = targetDate.split("-").map(Number);
+    if (y && m) {
+      const offset =
+        (y - anchorYear.current) * 12 + (m - anchorMonth.current);
+      if (offset !== centerOffset) {
+        isRebalancing.current = true;
+        setCenterOffset(offset);
+      }
+    }
+  }
+
+  // Generate month list
+  const months = useMemo(() => {
+    const result: Array<{ year: number; month: number; key: string }> = [];
+    for (let i = -CENTER; i <= CENTER; i++) {
+      const ym = addMonths(
+        anchorYear.current,
+        anchorMonth.current,
+        centerOffset + i,
+      );
+      result.push({ ...ym, key: `${ym.year}-${ym.month}` });
+    }
+    return result;
+  }, [centerOffset]);
+
+  // Build byDate map
   const byDate = useMemo<Map<string, DayItems>>(() => {
     const map = new Map<string, DayItems>();
     function ensure(d: string): DayItems {
@@ -108,332 +142,84 @@ export function CalendarPage({ onOpenMeeting }: Props) {
     todosQ.isLoading ||
     schedulesQ.isLoading;
 
-  const firstError =
-    meetingsQ.error || journalsQ.error || todosQ.error || schedulesQ.error;
+  // Detect scroll-snap settle → rebalance if not center
+  const scrollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handleScroll = useCallback(() => {
+    if (isRebalancing.current) return;
+    if (scrollTimer.current) clearTimeout(scrollTimer.current);
+    scrollTimer.current = setTimeout(() => {
+      const el = containerRef.current;
+      if (!el || !el.clientHeight) return;
+      const idx = Math.round(el.scrollTop / el.clientHeight);
+      if (idx !== CENTER) {
+        const delta = idx - CENTER;
+        isRebalancing.current = true;
+        setCenterOffset((prev) => prev + delta);
+      }
+    }, 150);
+  }, []);
 
-  function handleToggleTodo(t: Todo) {
-    const nextDone = !t.done;
-    updateTodo.mutate({
-      id: t.id,
-      patch: {
-        done: nextDone,
-        done_at: nextDone ? new Date().toISOString() : null,
-      },
-    });
+  function handleDayClick(date: string) {
+    setSelectedDate(date);
+    onSelectedDateChange?.(date);
   }
 
   function jumpToToday() {
-    setCenterDate(today);
-    setView("timeline");
-    const now = new Date();
-    setGridYear(now.getFullYear());
-    setGridMonth(now.getMonth() + 1);
+    setSelectedDate(today);
+    onSelectedDateChange?.(today);
+    isRebalancing.current = true;
+    setCenterOffset(0);
   }
 
-  function gridPrev() {
-    if (gridMonth === 1) {
-      setGridMonth(12);
-      setGridYear((y) => y - 1);
-    } else {
-      setGridMonth((m) => m - 1);
-    }
-  }
+  // Is current center the "today" month?
+  const centerMonth = months[CENTER];
+  const todayMonth =
+    new Date().getFullYear() === centerMonth?.year &&
+    new Date().getMonth() + 1 === centerMonth?.month;
 
-  function gridNext() {
-    if (gridMonth === 12) {
-      setGridMonth(1);
-      setGridYear((y) => y + 1);
-    } else {
-      setGridMonth((m) => m + 1);
-    }
-  }
-
-  function handleDayClick(date: string) {
-    setCenterDate(date);
-    setView("timeline");
-  }
-
-  return (
-    <>
-      <PageHeader
-        left={
-          <h2 className="font-serif text-2xl text-zinc-900 dark:text-zinc-100">
-            캘린더
-          </h2>
-        }
-        right={
-          <>
-            <ViewToggle view={view} onChange={setView} />
-            <AddScheduleForm
-              defaultDate={view === "timeline" ? centerDate : today}
-              pending={createSchedule.isPending}
-              onCreate={(input) => createSchedule.mutate(input)}
-            />
-          </>
-        }
-      />
-      <div className="mx-auto w-full max-w-2xl px-4 pb-12 pt-6 md:px-6">
-          {firstError ? (
-          <div className="mb-6 rounded-lg border-l-4 border-red-600 bg-red-50 p-4 text-sm text-red-900 dark:border-red-500 dark:bg-red-950/30 dark:text-red-200">
-            <div className="font-medium">데이터를 불러오지 못했어요</div>
-            <div className="mt-1 font-mono text-xs opacity-80">
-              {(firstError as Error).message}
-            </div>
-          </div>
-        ) : null}
-
-        {isLoading ? (
-          <SkeletonTimeline />
-        ) : view === "timeline" ? (
-          <TimelineView
-            centerDate={centerDate}
-            today={today}
-            byDate={byDate}
-            onResetToToday={jumpToToday}
-            onOpenMeeting={onOpenMeeting}
-            onToggleTodo={handleToggleTodo}
-            onDeleteSchedule={(id) => deleteSchedule.mutate(id)}
-          />
-        ) : (
-          <MonthGrid
-            year={gridYear}
-            month={gridMonth}
-            byDate={byDate}
-            onPrev={gridPrev}
-            onNext={gridNext}
-            onToday={jumpToToday}
-            onDayClick={handleDayClick}
-          />
-        )}
+  if (isLoading) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-600" />
       </div>
-    </>
-  );
-}
-
-function ViewToggle({
-  view,
-  onChange,
-}: {
-  view: "timeline" | "grid";
-  onChange: (v: "timeline" | "grid") => void;
-}) {
-  return (
-    <div
-      className="inline-flex overflow-hidden rounded-lg border border-zinc-200 dark:border-zinc-800"
-      role="tablist"
-    >
-      <button
-        type="button"
-        role="tab"
-        aria-selected={view === "timeline"}
-        onClick={() => onChange("timeline")}
-        className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs transition ${
-          view === "timeline"
-            ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
-            : "text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
-        }`}
-        style={{ minHeight: 32 }}
-      >
-        <List className="h-3.5 w-3.5" />
-        타임라인
-      </button>
-      <button
-        type="button"
-        role="tab"
-        aria-selected={view === "grid"}
-        onClick={() => onChange("grid")}
-        className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs transition ${
-          view === "grid"
-            ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
-            : "text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
-        }`}
-        style={{ minHeight: 32 }}
-      >
-        <Calendar className="h-3.5 w-3.5" />
-        달력
-      </button>
-    </div>
-  );
-}
-
-function TimelineView({
-  centerDate,
-  today,
-  byDate,
-  onResetToToday,
-  onOpenMeeting,
-  onToggleTodo,
-  onDeleteSchedule,
-}: {
-  centerDate: string;
-  today: string;
-  byDate: Map<string, DayItems>;
-  onResetToToday: () => void;
-  onOpenMeeting: (id: string) => void;
-  onToggleTodo: (t: Todo) => void;
-  onDeleteSchedule: (id: string) => void;
-}) {
-  const startDate = addDaysIso(centerDate, -WINDOW_DAYS);
-  const endDate = addDaysIso(centerDate, WINDOW_DAYS);
-  const days = useMemo(
-    () => isoDateRange(startDate, endDate),
-    [startDate, endDate],
-  );
-
-  const centerRef = useRef<HTMLElement | null>(null);
-  const lastScrolledRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (lastScrolledRef.current === centerDate) return;
-    if (!centerRef.current) return;
-    centerRef.current.scrollIntoView({ block: "start", behavior: "auto" });
-    lastScrolledRef.current = centerDate;
-  }, [centerDate]);
+    );
+  }
 
   return (
-    <>
-      {centerDate !== today ? (
-        <div className="mb-4 flex items-center justify-between rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300">
-          <span>{formatDateLong(centerDate)} 기준 표시 중</span>
-          <button
-            type="button"
-            onClick={onResetToToday}
-            className="rounded text-zinc-700 underline underline-offset-2 hover:text-zinc-900 dark:text-zinc-200 dark:hover:text-zinc-100"
-            style={{ minHeight: 0 }}
+    <div className="relative h-[calc(100svh-var(--app-header-h)-72px)] lg:h-[calc(100svh-1.5rem)]">
+      <div
+        ref={containerRef}
+        onScroll={handleScroll}
+        className="h-full overflow-y-auto"
+        style={{ scrollSnapType: "y mandatory" }}
+      >
+        {months.map((m) => (
+          <div
+            key={m.key}
+            className="h-full"
+            style={{ scrollSnapAlign: "start" }}
           >
-            오늘로
-          </button>
-        </div>
-      ) : null}
-
-      <div className="space-y-8">
-        {days.map((d, idx) => {
-          const items = byDate.get(d) ?? EMPTY;
-          const todayMatch = isToday(d);
-          const isCenter = d === centerDate;
-          return (
-            <DaySection
-              key={d}
-              date={d}
-              items={items}
-              todayMatch={todayMatch}
-              isFirst={idx === 0}
-              onOpenMeeting={onOpenMeeting}
-              onToggleTodo={onToggleTodo}
-              onDeleteSchedule={onDeleteSchedule}
-              sectionRef={isCenter ? centerRef : undefined}
+            <MonthGrid
+              year={m.year}
+              month={m.month}
+              byDate={byDate}
+              onDayClick={handleDayClick}
+              selectedDate={selectedDate}
             />
-          );
-        })}
+          </div>
+        ))}
       </div>
-    </>
-  );
-}
 
-function DaySection({
-  date,
-  items,
-  todayMatch,
-  isFirst,
-  onOpenMeeting,
-  onToggleTodo,
-  onDeleteSchedule,
-  sectionRef,
-}: {
-  date: string;
-  items: DayItems;
-  todayMatch: boolean;
-  isFirst: boolean;
-  onOpenMeeting: (id: string) => void;
-  onToggleTodo: (t: Todo) => void;
-  onDeleteSchedule: (id: string) => void;
-  sectionRef?: React.MutableRefObject<HTMLElement | null>;
-}) {
-  const journalVisible = todayMatch || items.journal !== null;
-  const dayIsEmpty =
-    !journalVisible &&
-    items.schedules.length === 0 &&
-    items.meetings.length === 0 &&
-    items.todos.length === 0;
-
-  return (
-    <section
-      ref={sectionRef as React.RefObject<HTMLElement>}
-      className={isFirst ? "" : "border-t border-zinc-200 pt-6 dark:border-zinc-800"}
-    >
-      <DayHeader date={date} todayMatch={todayMatch} />
-
-      <div className="mt-4 space-y-4">
-        {items.schedules.map((s) => (
-          <ScheduleBlock
-            key={s.id}
-            schedule={s}
-            onDelete={() => onDeleteSchedule(s.id)}
-          />
-        ))}
-        {items.meetings.map((m) => (
-          <MeetingBlock
-            key={m.id}
-            meeting={m}
-            onOpen={() => onOpenMeeting(m.id)}
-          />
-        ))}
-        {items.todos.map((t) => (
-          <TodoBlock key={t.id} todo={t} onToggle={() => onToggleTodo(t)} />
-        ))}
-        {journalVisible ? (
-          <JournalBlock
-            date={date}
-            existing={items.journal}
-            emphasized={todayMatch}
-          />
-        ) : null}
-        {dayIsEmpty ? (
-          <p className="pl-8 text-sm text-zinc-400">이날은 비어있어요.</p>
-        ) : null}
-      </div>
-    </section>
-  );
-}
-
-function DayHeader({
-  date,
-  todayMatch,
-}: {
-  date: string;
-  todayMatch: boolean;
-}) {
-  return (
-    <h3
-      className={`flex items-baseline gap-2 font-serif text-2xl ${
-        todayMatch
-          ? "font-bold text-zinc-900 dark:text-zinc-100"
-          : "text-zinc-700 dark:text-zinc-300"
-      }`}
-    >
-      {todayMatch ? (
-        <span
-          aria-hidden
-          className="-ml-3 inline-block h-2 w-2 self-center rounded-full bg-red-600 dark:bg-red-500"
-        />
+      {/* Floating "오늘" button — visible when not on today's month */}
+      {!todayMonth ? (
+        <button
+          type="button"
+          onClick={jumpToToday}
+          className="absolute bottom-4 right-4 rounded-full bg-zinc-900 px-4 py-2 text-sm font-medium text-white shadow-lg transition hover:bg-zinc-800 lg:bottom-6 lg:right-6 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+        >
+          오늘
+        </button>
       ) : null}
-      <span>{formatDateLong(date)}</span>
-      {todayMatch ? (
-        <span className="text-sm font-normal not-italic text-zinc-500">· 오늘</span>
-      ) : null}
-    </h3>
-  );
-}
-
-function SkeletonTimeline() {
-  return (
-    <div className="space-y-8" aria-hidden>
-      {[0, 1, 2].map((i) => (
-        <section key={i} className="space-y-3">
-          <div className="h-7 w-40 animate-pulse rounded bg-zinc-100 dark:bg-zinc-900" />
-          <div className="h-12 animate-pulse rounded-lg bg-zinc-100 dark:bg-zinc-900" />
-          <div className="h-12 animate-pulse rounded-lg bg-zinc-100 dark:bg-zinc-900" />
-        </section>
-      ))}
     </div>
   );
 }
