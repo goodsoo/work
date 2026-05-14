@@ -154,6 +154,7 @@ export type Database = {
       }
       todos: {
         Row: {
+          category: string | null
           created_at: string
           done: boolean
           done_at: string | null
@@ -166,6 +167,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          category?: string | null
           created_at?: string
           done?: boolean
           done_at?: string | null
@@ -178,6 +180,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          category?: string | null
           created_at?: string
           done?: boolean
           done_at?: string | null

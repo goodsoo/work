@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { Trash2 } from "lucide-react";
-import type { Todo, TodoPriority } from "../../api/todos";
+import type { Todo, TodoPriority, TodoCategory } from "../../api/todos";
+import { TODO_CATEGORIES } from "../../api/todos";
 import { isPast, isToday, relativeDateLabel } from "../../lib/dates";
 
 type Props = {
   todo: Todo;
   onToggle: (todo: Todo) => void;
-  onUpdate: (todo: Todo, patch: { title?: string; priority?: TodoPriority; due_date?: string | null }) => void;
+  onUpdate: (todo: Todo, patch: { title?: string; priority?: TodoPriority; due_date?: string | null; category?: TodoCategory | null }) => void;
   onDelete: (todo: Todo) => void;
 };
 
@@ -104,6 +105,10 @@ export function TodoRow({ todo, onToggle, onUpdate, onDelete }: Props) {
             onChange={(d) => onUpdate(todo, { due_date: d })}
             done={todo.done}
           />
+          <CategorySelect
+            value={todo.category}
+            onChange={(c) => onUpdate(todo, { category: c })}
+          />
           {todo.linked_meeting_id ? (
             <span className="font-mono text-[10px] uppercase tracking-wide text-zinc-400">
               from meeting
@@ -154,12 +159,38 @@ function PrioritySelect({
         value={value}
         onChange={(e) => onChange(e.target.value as TodoPriority)}
         disabled={disabled}
-        className="bg-transparent text-xs text-zinc-500 outline-none disabled:opacity-60 dark:text-zinc-400"
-        style={{ minHeight: 0 }}
+        className="disabled:opacity-60"
       >
         {(Object.keys(PRIORITY_LABEL) as TodoPriority[]).map((p) => (
           <option key={p} value={p}>
             {PRIORITY_LABEL[p]}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function CategorySelect({
+  value,
+  onChange,
+}: {
+  value: TodoCategory | null;
+  onChange: (c: TodoCategory | null) => void;
+}) {
+  return (
+    <label className="inline-flex items-center gap-1">
+      <span className="sr-only">카테고리</span>
+      <select
+        value={value ?? ""}
+        onChange={(e) =>
+          onChange((e.target.value || null) as TodoCategory | null)
+        }
+      >
+        <option value="">없음</option>
+        {TODO_CATEGORIES.map((c) => (
+          <option key={c.id} value={c.id}>
+            {c.label}
           </option>
         ))}
       </select>
@@ -198,8 +229,6 @@ function DueDateInput({
         type="date"
         value={value ?? ""}
         onChange={(e) => onChange(e.target.value || null)}
-        className="bg-transparent text-xs text-zinc-400 outline-none"
-        style={{ minHeight: 0, maxWidth: value ? 24 : 96 }}
         aria-label="기한"
       />
       {value ? (

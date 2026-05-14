@@ -2,20 +2,34 @@ import { supabase } from "../lib/supabase";
 import type { Tables, TablesInsert, TablesUpdate } from "../lib/database.types";
 
 export type TodoPriority = "high" | "medium" | "low";
+export type TodoCategory = "work" | "meeting";
+export const TODO_CATEGORIES: Array<{ id: TodoCategory; label: string }> = [
+  { id: "work", label: "업무" },
+  { id: "meeting", label: "미팅" },
+];
 
 type Row = Tables<"todos">;
-export type Todo = Omit<Row, "priority"> & { priority: TodoPriority };
-
-export type TodoInsert = Omit<TablesInsert<"todos">, "user_id" | "priority"> & {
-  priority?: TodoPriority;
+export type Todo = Omit<Row, "priority" | "category"> & {
+  priority: TodoPriority;
+  category: TodoCategory | null;
 };
 
-export type TodoUpdate = Omit<TablesUpdate<"todos">, "priority"> & {
+export type TodoInsert = Omit<TablesInsert<"todos">, "user_id" | "priority" | "category"> & {
   priority?: TodoPriority;
+  category?: TodoCategory | null;
+};
+
+export type TodoUpdate = Omit<TablesUpdate<"todos">, "priority" | "category"> & {
+  priority?: TodoPriority;
+  category?: TodoCategory | null;
 };
 
 function fromRow(row: Row): Todo {
-  return { ...row, priority: row.priority as TodoPriority };
+  return {
+    ...row,
+    priority: row.priority as TodoPriority,
+    category: (row.category as TodoCategory) ?? null,
+  };
 }
 
 export async function listTodos(): Promise<Todo[]> {

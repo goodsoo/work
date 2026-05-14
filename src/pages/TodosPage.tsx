@@ -6,7 +6,7 @@ import {
   useTodos,
   useUpdateTodo,
 } from "../hooks/useTodos";
-import type { Todo, TodoPriority } from "../api/todos";
+import type { Todo, TodoPriority, TodoCategory } from "../api/todos";
 import { TodoAddBar } from "../components/todos/TodoAddBar";
 import { TodoRow } from "../components/todos/TodoRow";
 import { PageHeader } from "../components/nav/PageHeader";
@@ -17,7 +17,11 @@ const PRIORITY_RANK: Record<TodoPriority, number> = {
   low: 2,
 };
 
-export function TodosPage() {
+type Props = {
+  categoryFilter?: TodoCategory | "all" | "uncategorized";
+};
+
+export function TodosPage({ categoryFilter = "all" }: Props) {
   const { data, isLoading, error, refetch } = useTodos();
   const createMutation = useCreateTodo();
   const updateMutation = useUpdateTodo();
@@ -27,19 +31,29 @@ export function TodosPage() {
 
   const { pending, done } = useMemo(() => {
     const all = data ?? [];
-    const pending = all.filter((t) => !t.done).sort(comparePending);
-    const done = all
+    const filtered =
+      categoryFilter === "all"
+        ? all
+        : categoryFilter === "uncategorized"
+          ? all.filter((t) => !t.category)
+          : all.filter((t) => t.category === categoryFilter);
+    const pending = filtered.filter((t) => !t.done).sort(comparePending);
+    const done = filtered
       .filter((t) => t.done)
       .sort((a, b) => (a.done_at ?? a.updated_at) > (b.done_at ?? b.updated_at) ? -1 : 1);
     return { pending, done };
-  }, [data]);
+  }, [data, categoryFilter]);
 
   function handleAdd(input: {
     title: string;
     priority: TodoPriority;
     due_date: string | null;
+    category?: TodoCategory | null;
   }) {
-    createMutation.mutate(input);
+    createMutation.mutate({
+      ...input,
+      category: input.category ?? (categoryFilter !== "all" && categoryFilter !== "uncategorized" ? categoryFilter : null),
+    });
   }
 
   function handleToggle(todo: Todo) {
@@ -55,7 +69,7 @@ export function TodosPage() {
 
   function handleUpdate(
     todo: Todo,
-    patch: { title?: string; priority?: TodoPriority; due_date?: string | null },
+    patch: { title?: string; priority?: TodoPriority; due_date?: string | null; category?: TodoCategory | null },
   ) {
     updateMutation.mutate({ id: todo.id, patch });
   }
@@ -68,7 +82,7 @@ export function TodosPage() {
     <>
       <PageHeader
         left={
-          <h2 className="font-serif text-2xl text-zinc-900 dark:text-zinc-100">
+          <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
             할 일
           </h2>
         }
@@ -80,7 +94,7 @@ export function TodosPage() {
           ) : undefined
         }
       />
-      <div className="mx-auto w-full max-w-2xl px-4 pb-12 pt-6 md:px-6">
+      <div className="mx-auto w-full max-w-2xl px-5 pb-16 pt-5 lg:max-w-4xl">
         <TodoAddBar onAdd={handleAdd} disabled={createMutation.isPending} />
 
       {error ? (
@@ -191,7 +205,7 @@ function SkeletonList() {
 function EmptyState() {
   return (
     <div className="flex flex-col items-center justify-center gap-3 px-4 py-12 text-center">
-      <h3 className="font-serif text-2xl text-zinc-900 dark:text-zinc-100">
+      <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
         할 일이 비어있어요
       </h3>
       <p className="text-sm text-zinc-500 dark:text-zinc-400">
