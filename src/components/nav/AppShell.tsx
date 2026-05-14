@@ -52,8 +52,9 @@ export function AppShell({ activeTab, onTabChange, sidePanel, children }: Props)
 
       {/* Main content */}
       <main
+        key={activeTab}
         style={{ paddingBottom: "calc(var(--safe-bottom) + 72px)" }}
-        className={`lg:!pb-0 ${hasSidePanel ? "lg:pl-[21rem]" : "lg:pl-12"}`}
+        className={`animate-page-in lg:!pb-0 ${hasSidePanel ? "lg:pl-[21rem]" : "lg:pl-12"}`}
       >
         {children}
       </main>
