@@ -11,11 +11,15 @@
     "test": "vitest",
     "test:run": "vitest run",
     "icons": "bun run scripts/gen-icons.ts",
-    "typecheck": "tsc -b --noEmit"
+    "typecheck": "tsc -b --noEmit",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.105.3",
     "@tanstack/react-query": "^5.100.9",
+    "@tauri-apps/api": "^2.11.0",
     "date-fns": "^4.1.0",
     "lucide-react": "^1.14.0",
     "react": "^19.2.5",
@@ -26,6 +30,7 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@tailwindcss/vite": "^4.2.4",
+    "@tauri-apps/cli": "^2.11.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@types/node": "^25.6.0",
