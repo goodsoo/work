@@ -52,10 +52,13 @@ export function CalendarPage({ targetDate, onSelectedDateChange }: Props) {
     const el = containerRef.current;
     if (!el) return;
     if (!initialScrollDone.current || isRebalancing.current) {
-      // Each section is 100% of container height
-      el.scrollTop = CENTER * el.clientHeight;
-      initialScrollDone.current = true;
-      isRebalancing.current = false;
+      // Use rAF to ensure layout is settled and clientHeight is non-zero
+      requestAnimationFrame(() => {
+        if (!el.clientHeight) return;
+        el.scrollTop = CENTER * el.clientHeight;
+        initialScrollDone.current = true;
+        isRebalancing.current = false;
+      });
     }
   }, [centerOffset]);
 

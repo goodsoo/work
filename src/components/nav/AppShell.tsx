@@ -23,7 +23,7 @@ export function AppShell({ activeTab, onTabChange, sidePanel, children }: Props)
       <div className="hidden lg:fixed lg:inset-y-0 lg:left-0 lg:z-20 lg:flex">
         <ActivityBar activeTab={activeTab} onTabChange={onTabChange} />
         {hasSidePanel ? (
-          <div className="w-72 border-r border-zinc-100 bg-white dark:border-zinc-800/50 dark:bg-zinc-950">
+          <div className="w-72 border-r border-zinc-100 bg-white dark:border-zinc-800 dark:bg-zinc-900/50">
             {sidePanel}
           </div>
         ) : null}
