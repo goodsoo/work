@@ -149,7 +149,7 @@ export function MonthGrid({
                         ? "bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300"
                         : ev.done
                           ? "text-zinc-400 line-through dark:text-zinc-500"
-                          : "bg-red-50 text-red-700 dark:bg-red-950/30 dark:text-red-300"
+                          : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800/50 dark:text-zinc-400"
                     }`}
                   >
                     {ev.time ? (

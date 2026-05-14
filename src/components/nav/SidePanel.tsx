@@ -266,7 +266,7 @@ export function CalendarDayPanel({
                   key={s.id}
                   className="group flex items-start gap-2 rounded-md px-3 py-2 transition hover:bg-zinc-50 dark:hover:bg-zinc-900/50"
                 >
-                  <Calendar className="mt-0.5 h-3.5 w-3.5 shrink-0 text-red-500" />
+                  <Calendar className="mt-0.5 h-3.5 w-3.5 shrink-0 text-zinc-500" />
                   <div className="min-w-0 flex-1">
                     <div className="text-sm text-zinc-900 dark:text-zinc-100">
                       <span className="text-zinc-400 dark:text-zinc-500">
@@ -278,7 +278,7 @@ export function CalendarDayPanel({
                   <button
                     type="button"
                     onClick={() => deleteSchedule.mutate(s.id)}
-                    className="text-xs text-zinc-400 opacity-0 transition hover:text-red-500 group-hover:opacity-100"
+                    className="text-xs text-zinc-400 opacity-0 transition hover:text-zinc-700 group-hover:opacity-100"
                     style={{ minHeight: 0 }}
                   >
                     삭제
@@ -327,7 +327,7 @@ export function CalendarDayPanel({
                   className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border transition ${
                     t.done
                       ? "border-zinc-300 bg-zinc-200 text-zinc-500 dark:border-zinc-700 dark:bg-zinc-800"
-                      : "border-red-400 text-transparent hover:border-red-500 dark:border-red-600"
+                      : "border-zinc-400 text-transparent hover:border-zinc-500 dark:border-zinc-500"
                   }`}
                   style={{ minHeight: 0 }}
                 >
