@@ -7,8 +7,6 @@ import {
   Check,
   Undo2,
   Redo2,
-  Sparkles,
-  ChevronDown,
 } from "lucide-react";
 import {
   useMeeting,
@@ -133,8 +131,6 @@ export function MeetingForm({ meetingId, onBack }: Props) {
   const [addedTodoIndices, setAddedTodoIndices] = useState<Set<number>>(
     () => new Set(),
   );
-  const [summaryOpen, setSummaryOpen] = useState(true);
-
   const addedKey = `${meetingId}|${doc.action_items.join("\n")}`;
   const [trackedAddedKey, setTrackedAddedKey] = useState(addedKey);
   if (trackedAddedKey !== addedKey) {
@@ -314,9 +310,9 @@ export function MeetingForm({ meetingId, onBack }: Props) {
         </div>
       ) : null}
 
-      {/* Notion-style editor area */}
+      {/* Full-page editor */}
       <div className="mx-auto max-w-3xl px-6 pb-24 pt-8">
-        {/* Title */}
+        {/* Title — large, Notion-style */}
         <input
           type="text"
           value={doc.title}
@@ -327,7 +323,7 @@ export function MeetingForm({ meetingId, onBack }: Props) {
         />
 
         {/* Metadata — subtle, inline */}
-        <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-zinc-500">
+        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-zinc-500">
           <label className="inline-flex items-center gap-1.5">
             <span className="text-xs text-zinc-400">날짜</span>
             <input
@@ -359,114 +355,95 @@ export function MeetingForm({ meetingId, onBack }: Props) {
           </div>
         </div>
 
-        {/* Divider */}
-        <div className="my-6 border-t border-zinc-100 dark:border-zinc-800/50" />
-
-        {/* Body — full width textarea, no border */}
+        {/* Body — fills the viewport, no border, no chrome */}
         <textarea
           value={doc.content}
           onChange={(e) => updateField("content", e.target.value)}
           placeholder="내용을 입력하세요..."
-          className="w-full resize-none bg-transparent text-base leading-relaxed text-zinc-800 outline-none placeholder:text-zinc-300 dark:text-zinc-200 dark:placeholder:text-zinc-600"
-          style={{ minHeight: "24rem" }}
+          className="mt-6 w-full resize-none bg-transparent text-base leading-relaxed text-zinc-800 outline-none placeholder:text-zinc-300 dark:text-zinc-200 dark:placeholder:text-zinc-600"
+          style={{ minHeight: "calc(100svh - 14rem)" }}
           onInput={(e) => {
             const el = e.currentTarget;
             el.style.height = "auto";
-            el.style.height = el.scrollHeight + "px";
+            el.style.height = Math.max(el.scrollHeight, window.innerHeight - 224) + "px";
           }}
         />
 
-        {/* AI Summary — collapsible, clean */}
-        <div className="mt-8 border-t border-zinc-100 pt-6 dark:border-zinc-800/50">
-          <div className="flex items-center justify-between">
-            <button
-              type="button"
-              onClick={() => setSummaryOpen((v) => !v)}
-              className="inline-flex items-center gap-1.5 text-sm font-medium text-zinc-500 transition hover:text-zinc-900 dark:hover:text-zinc-100"
-              style={{ minHeight: 0 }}
-            >
-              <ChevronDown
-                className={`h-4 w-4 transition ${summaryOpen ? "" : "-rotate-90"}`}
-              />
-              <Sparkles className="h-3.5 w-3.5" />
-              AI 요약
-              {hasAnySummary ? (
-                <span className="ml-1 text-xs text-zinc-400">
-                  {doc.discussion_items.length + doc.decisions.length + doc.action_items.length}개
-                </span>
-              ) : null}
-            </button>
-            <SummarizeButton
-              meetingId={data.id}
-              title={doc.title || null}
-              date={doc.date || null}
-              time={doc.time || null}
-              attendees={doc.attendees || null}
-              content={doc.content}
-              hasResult={hasAnySummary}
-              onResult={(result) => {
-                history.set({
-                  ...doc,
-                  discussion_items: result.discussion_items,
-                  decisions: result.decisions,
-                  action_items: result.action_items,
-                });
-                history.flush();
-                setActionError(null);
-                setSummaryOpen(true);
-              }}
-              onError={setActionError}
-            />
+        {/* AI Summary — inline callout blocks, part of the document flow */}
+        {hasAnySummary ? (
+          <div className="mt-6 space-y-3">
+            {doc.discussion_items.length > 0 ? (
+              <div className="rounded-lg bg-zinc-50 px-4 py-3 dark:bg-zinc-900/40">
+                <EditableList
+                  title="논의 사항"
+                  items={doc.discussion_items}
+                  onSave={(next) => updateField("discussion_items", next)}
+                  bullet="dot"
+                />
+              </div>
+            ) : null}
+            {doc.decisions.length > 0 ? (
+              <div className="rounded-lg bg-zinc-50 px-4 py-3 dark:bg-zinc-900/40">
+                <EditableList
+                  title="결정 사항"
+                  items={doc.decisions}
+                  onSave={(next) => updateField("decisions", next)}
+                  bullet="dot"
+                />
+              </div>
+            ) : null}
+            {doc.action_items.length > 0 ? (
+              <div className="rounded-lg bg-zinc-50 px-4 py-3 dark:bg-zinc-900/40">
+                <EditableList
+                  title="액션 아이템"
+                  items={doc.action_items}
+                  bullet="redCheckbox"
+                  onSave={(next) => updateField("action_items", next)}
+                  itemActions={(i, text) =>
+                    addedTodoIndices.has(i) ? (
+                      <span className="inline-flex items-center gap-1 text-xs text-zinc-400" style={{ minHeight: 0 }}>
+                        <Check className="h-3 w-3" /> 추가됨
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => addActionItemAsTodo(i, text)}
+                        disabled={createTodoMutation.isPending}
+                        className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-900 disabled:opacity-40 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+                        style={{ minHeight: 0 }}
+                      >
+                        <ListPlus className="h-3 w-3" /> 할 일로
+                      </button>
+                    )
+                  }
+                />
+              </div>
+            ) : null}
           </div>
+        ) : null}
 
-          {summaryOpen ? (
-            <div className="mt-4 space-y-4">
-              {!hasAnySummary ? (
-                <p className="text-sm text-zinc-400">
-                  본문 입력 후 요약 버튼을 누르세요.
-                </p>
-              ) : null}
-              <EditableList
-                title="논의 사항"
-                items={doc.discussion_items}
-                onSave={(next) => updateField("discussion_items", next)}
-                bullet="dot"
-              />
-              <EditableList
-                title="결정 사항"
-                items={doc.decisions}
-                onSave={(next) => updateField("decisions", next)}
-                bullet="dot"
-              />
-              <EditableList
-                title="액션 아이템"
-                items={doc.action_items}
-                bullet="redCheckbox"
-                onSave={(next) => updateField("action_items", next)}
-                itemActions={(i, text) =>
-                  addedTodoIndices.has(i) ? (
-                    <span className="inline-flex items-center gap-1 text-xs text-zinc-400" style={{ minHeight: 0 }}>
-                      <Check className="h-3 w-3" /> 추가됨
-                    </span>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => addActionItemAsTodo(i, text)}
-                      disabled={createTodoMutation.isPending}
-                      className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-900 disabled:opacity-40 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
-                      style={{ minHeight: 0 }}
-                    >
-                      <ListPlus className="h-3 w-3" /> 할 일로
-                    </button>
-                  )
-                }
-              />
-            </div>
-          ) : null}
-        </div>
-
-        {/* Footer actions */}
-        <div className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-zinc-100 pt-4 dark:border-zinc-800/50">
+        {/* Inline actions — AI summarize + copy + delete */}
+        <div className="mt-6 flex flex-wrap items-center gap-3">
+          <SummarizeButton
+            meetingId={data.id}
+            title={doc.title || null}
+            date={doc.date || null}
+            time={doc.time || null}
+            attendees={doc.attendees || null}
+            content={doc.content}
+            hasResult={hasAnySummary}
+            onResult={(result) => {
+              history.set({
+                ...doc,
+                discussion_items: result.discussion_items,
+                decisions: result.decisions,
+                action_items: result.action_items,
+              });
+              history.flush();
+              setActionError(null);
+            }}
+            onError={setActionError}
+          />
           <CopyButton meeting={meetingForCopy} onError={setActionError} />
           <button
             type="button"
