@@ -10,15 +10,13 @@
 
 해당 파일을 읽고 일하는 게 source of truth. 이 파일은 빠른 컨텍스트만.
 
-## 로드맵 (V0.5 코드 완료, 본인 실사용 검증 대기)
+## 로드맵
 
-- ✅ V0.0 — Vite + Supabase Auth + Hello world. PWA 셋업.
-- ✅ V0.1 — 회의록 CRUD + AI 요약 + 마크다운 복사.
-- ✅ V0.2 — 일기 (journals 테이블).
-- ✅ V0.3 — Todo + 일정 + 통합 타임라인 (CalendarPage = ±7일 윈도우 + 월간 그리드 토글).
-- ✅ V0.4 — 액션아이템 → Todo 1-click (`todos.linked_meeting_id`).
-- ✅ V0.5 — wishlist 4건: 요약 inline 편집 / 참석자 태그 자동완성 / 본문 마크다운 편집·미리보기 / 폼 전체 undo/redo
-- 🟡 V0.6 후보 — GitHub 커밋 기반 포트폴리오 탭 (큰 기능, 다음 세션 plan-eng-review로).
+- ✅ V0.0~V0.5 — 기본 기능 완료 (메모 CRUD, AI 요약, 일기, Todo, 캘린더)
+- ✅ V0.5.1 — 데스크탑 3-pane 레이아웃 + 캘린더 리라이트 + 디자인 토큰 + 테마
+- 🟡 다음 — 메모장 뷰/편집 모드 전환 (MarkdownView ↔ textarea)
+- 🟡 V0.6 후보 — Server-side 메모 history
+- 🟡 V0.7 후보 — UI/UX 포트폴리오 자동 기록
 
 ## 핵심 결정 (review 통과됨)
 
@@ -28,11 +26,17 @@
 - **Edge Function 에러**: try/catch + toast + retry button + Anthropic SDK `tool_use` 구조화 출력 강제. 모델은 `claude-haiku-4-5-20251001`.
 - **회의록 AI 출력 schema**: `{discussion_items, decisions, action_items}` 3분리 (V0.1.1). action_items 형식 `[담당자] 할 일 — 기한`. 결정 사항은 합의/확정된 것만.
 - **테스트**: Vitest. `lib/markdown.test.ts` (5 unit) + `lib/dates.test.ts` (5 unit) + Edge Function smoke 1개. UI 회귀는 본인이 매일 사용으로 발견.
-- **Design**: Pretendard + zinc monotone + **red-600 accent** + rounded-lg. RED은 1군데에만 (오늘 marker / primary CTA / 활성 탭 / pending todo 체크박스 / error left-border).
-- **레이아웃**: AppShell 상단 sticky 헤더(`--app-header-h: 4.25rem`) + 페이지별 sticky `PageHeader` (top: var(--app-header-h)) + `<main>` paddingBottom: tab bar height + safe-bottom. 각 페이지 라우팅: URL hash 기반 (`#meetings` / `#calendar` / `#todos` / `#meeting-{id}`).
-- **통합 타임라인** (CalendarPage): ±7일 윈도우, M/J/T/S 글리프 블록, 그리드 view 토글 (월간 5-6주). centerDate state로 그리드 cell 탭 시 타임라인 점프. 일기는 today 또는 기존 entry 있는 날만 placeholder 표시.
+- **디자인 토큰**: 시맨틱 CSS custom property 기반 (18개 토큰). `DESIGN.md` 참조. 컴포넌트에서 `style={{ color: "var(--text-primary)" }}` 패턴. Tailwind `dark:` 색상 접두사 사용 금지.
+- **테마**: `useTheme` hook. 라이트/다크 2단계 토글. 첫 방문 시 OS 설정 → localStorage 저장. `.dark` class 기반 (`@custom-variant dark`).
+- **레이아웃 (데스크탑)**: Obsidian 스타일 3-pane. `ActivityBar` (48px 아이콘) + `SidePanel` (288px, 탭별 내용) + Main. 모바일: 하단 탭 + 단일 컬럼.
+- **"회의록" → "메모장"**: UI 전체 리네이밍 완료. 내부 코드는 `meetings` 유지.
+- **메모장 에디터**: Notion 스타일 풀페이지. 제목(3xl) → 메타데이터(인라인) → 본문(textarea, 전체 스크롤) → AI 요약(인라인 블록).
+- **캘린더**: 타임라인뷰 제거. 무한 스크롤 MonthGrid + snap. 셀 내 이벤트 타이틀 표시. 사이드 패널에 선택 날짜 상세.
+- **할 일 카테고리**: `todos.category` (work/meeting). 사이드바 필터 (전체/업무/미팅/미분류). 일정(schedules)과 통합 표시.
+- **라우팅**: URL hash 기반 (`#meetings` / `#calendar` / `#todos` / `#meeting-{id}`).
 - **마크다운 출력 포맷** (본인 회의록 spec, 외부 복사용): `## {title or "회의록"}` → `일시: YYYY.MM.DD (요일) [시간]` + `참석:` → `### 논의 사항` / `### 결정 사항` / `### 액션 아이템` 3섹션. 빈 섹션 omit. `lib/markdown.ts` `meetingToMarkdown()` 가 단일 source. ❌ "Notion 호환" 표현 쓰지 말 것.
-- **본문 마크다운 미리보기** (편집 중 시각화): `react-markdown` + `remark-gfm`. `MarkdownView.tsx` 가 zinc/serif 톤 컴포넌트로 element 별 override.
+- **마크다운 렌더링**: `react-markdown` + `remark-gfm`. `MarkdownView.tsx` — 디자인 토큰 기반 스타일링.
+- **Tauri**: 데스크탑 앱 셋업 완료 (`src-tauri/`). `bun run tauri:dev` / `tauri:build`. Vite 포트 1420 고정.
 
 ## 빌더 모드 톤
 
