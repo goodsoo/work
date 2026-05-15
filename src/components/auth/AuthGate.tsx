@@ -10,7 +10,11 @@ export function AuthGate({ children }: { children: ReactNode }) {
       <main className="flex min-h-svh items-center justify-center">
         <div
           aria-hidden="true"
-          className="size-6 animate-spin rounded-full border-2 border-zinc-300 border-t-red-600"
+          className="size-6 animate-spin rounded-full border-2"
+          style={{
+            borderColor: "var(--border-default)",
+            borderTopColor: "var(--accent-red)",
+          }}
         />
         <span className="sr-only">불러오는 중</span>
       </main>

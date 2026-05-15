@@ -15,9 +15,12 @@ export function MeetingBlock({ meeting, onOpen }: Props) {
   return (
     <TimelineBlock letter="M" onClick={onOpen}>
       <div>
-        <div className="text-base text-zinc-900 dark:text-zinc-100">{title}</div>
+        <div className="text-base" style={{ color: "var(--text-primary)" }}>{title}</div>
         {meta.length > 0 ? (
-          <div className="mt-0.5 text-sm text-zinc-500">
+          <div
+            className="mt-0.5 text-sm"
+            style={{ color: "var(--text-secondary)" }}
+          >
             {meta.join(" · ")}
           </div>
         ) : null}

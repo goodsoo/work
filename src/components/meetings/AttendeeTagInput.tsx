@@ -86,13 +86,21 @@ export function AttendeeTagInput({
   return (
     <div className="relative">
       <div
-        className="flex flex-wrap items-center gap-1 rounded-lg border border-zinc-200 bg-white px-2 py-1.5 transition focus-within:border-zinc-400 dark:border-zinc-800 dark:bg-zinc-900 dark:focus-within:border-zinc-600"
+        className="flex flex-wrap items-center gap-1 rounded-lg px-2 py-1.5 transition"
+        style={{
+          border: "1px solid var(--border-default)",
+          backgroundColor: "var(--bg-base)",
+        }}
         onClick={() => inputRef.current?.focus()}
       >
         {tags.map((tag, i) => (
           <span
             key={`${tag}-${i}`}
-            className="inline-flex items-center gap-1 rounded bg-zinc-100 px-2 py-0.5 text-sm text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200"
+            className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-sm"
+            style={{
+              backgroundColor: "var(--bg-surface)",
+              color: "var(--text-primary)",
+            }}
           >
             {tag}
             <button
@@ -102,8 +110,8 @@ export function AttendeeTagInput({
                 removeAt(i);
               }}
               aria-label={`${tag} 제거`}
-              className="rounded text-zinc-400 transition hover:text-red-600 dark:hover:text-red-500"
-              style={{ minHeight: 16, minWidth: 16 }}
+              className="rounded transition"
+              style={{ color: "var(--text-muted)", minHeight: 16, minWidth: 16 }}
             >
               <X className="h-3 w-3" />
             </button>
@@ -125,13 +133,17 @@ export function AttendeeTagInput({
           }}
           onKeyDown={onKeyDown}
           placeholder={tags.length === 0 ? placeholder ?? "이름 입력 후 Enter" : ""}
-          className="min-w-[6em] flex-1 bg-transparent px-1 py-0.5 text-sm outline-none placeholder:text-zinc-400"
-          style={{ minHeight: 0 }}
+          className="min-w-[6em] flex-1 bg-transparent px-1 py-0.5 text-sm outline-none"
+          style={{ color: "var(--text-primary)", minHeight: 0 }}
         />
       </div>
       {open && filtered.length > 0 ? (
         <ul
-          className="absolute left-0 right-0 top-full z-30 mt-1 max-h-48 overflow-auto rounded-lg border border-zinc-200 bg-white shadow-md dark:border-zinc-800 dark:bg-zinc-900"
+          className="absolute left-0 right-0 top-full z-30 mt-1 max-h-48 overflow-auto rounded-lg shadow-md"
+          style={{
+            border: "1px solid var(--border-default)",
+            backgroundColor: "var(--bg-base)",
+          }}
           role="listbox"
         >
           {filtered.map((s, i) => (
@@ -143,12 +155,12 @@ export function AttendeeTagInput({
                   addTag(s);
                 }}
                 onMouseEnter={() => setHighlight(i)}
-                className={`w-full px-3 py-1.5 text-left text-sm transition ${
-                  i === highlight
-                    ? "bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100"
-                    : "text-zinc-700 dark:text-zinc-300"
-                }`}
-                style={{ minHeight: 32 }}
+                className="w-full px-3 py-1.5 text-left text-sm transition"
+                style={{
+                  backgroundColor: i === highlight ? "var(--bg-surface)" : undefined,
+                  color: i === highlight ? "var(--text-primary)" : "var(--text-secondary)",
+                  minHeight: 32,
+                }}
               >
                 {s}
               </button>

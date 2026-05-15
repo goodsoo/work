@@ -82,13 +82,19 @@ export function TodosPage({ categoryFilter = "all" }: Props) {
     <>
       <PageHeader
         left={
-          <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+          <h2
+            className="text-lg font-semibold"
+            style={{ color: "var(--text-primary)" }}
+          >
             할 일
           </h2>
         }
         right={
           pending.length > 0 ? (
-            <span className="font-mono text-xs text-zinc-400">
+            <span
+              className="font-mono text-xs"
+              style={{ color: "var(--text-muted)" }}
+            >
               {pending.length}개 남음
             </span>
           ) : undefined
@@ -98,7 +104,14 @@ export function TodosPage({ categoryFilter = "all" }: Props) {
         <TodoAddBar onAdd={handleAdd} disabled={createMutation.isPending} />
 
       {error ? (
-        <div className="mt-6 rounded-lg border-l-4 border-red-600 bg-red-50 p-4 text-sm text-red-900 dark:border-red-500 dark:bg-red-950/30 dark:text-red-200">
+        <div
+          className="mt-6 rounded-lg p-4 text-sm"
+          style={{
+            borderLeft: "4px solid var(--accent-red)",
+            backgroundColor: "var(--accent-red-bg)",
+            color: "var(--accent-red-text)",
+          }}
+        >
           <div className="font-medium">목록을 불러오지 못했어요</div>
           <div className="mt-1 font-mono text-xs opacity-80">
             {(error as Error).message}
@@ -119,7 +132,10 @@ export function TodosPage({ categoryFilter = "all" }: Props) {
       ) : (
         <>
           {pending.length > 0 ? (
-            <ul className="mt-2 divide-y divide-zinc-100 dark:divide-zinc-900">
+            <ul
+              className="mt-2 divide-y"
+              style={{ borderColor: "var(--border-subtle)" }}
+            >
               {pending.map((t) => (
                 <TodoRow
                   key={t.id}
@@ -131,18 +147,24 @@ export function TodosPage({ categoryFilter = "all" }: Props) {
               ))}
             </ul>
           ) : (
-            <p className="mt-8 text-center text-sm text-zinc-500">
+            <p
+              className="mt-8 text-center text-sm"
+              style={{ color: "var(--text-secondary)" }}
+            >
               모두 완료. 할 일이 없어요.
             </p>
           )}
 
           {done.length > 0 ? (
-            <div className="mt-8 border-t border-zinc-200 pt-4 dark:border-zinc-800">
+            <div
+              className="mt-8 pt-4"
+              style={{ borderTop: "1px solid var(--border-default)" }}
+            >
               <button
                 type="button"
                 onClick={() => setShowDone((v) => !v)}
-                className="flex items-center gap-1 text-xs text-zinc-500 transition hover:text-zinc-900 dark:hover:text-zinc-100"
-                style={{ minHeight: 0 }}
+                className="flex items-center gap-1 text-xs transition"
+                style={{ color: "var(--text-secondary)", minHeight: 0 }}
               >
                 {showDone ? (
                   <ChevronDown className="h-3 w-3" />
@@ -152,7 +174,10 @@ export function TodosPage({ categoryFilter = "all" }: Props) {
                 완료 {done.length}
               </button>
               {showDone ? (
-                <ul className="mt-2 divide-y divide-zinc-100 dark:divide-zinc-900">
+                <ul
+                  className="mt-2 divide-y"
+                  style={{ borderColor: "var(--border-subtle)" }}
+                >
                   {done.map((t) => (
                     <TodoRow
                       key={t.id}
@@ -195,7 +220,8 @@ function SkeletonList() {
       {[0, 1, 2].map((i) => (
         <li
           key={i}
-          className="h-12 animate-pulse rounded-lg bg-zinc-100 dark:bg-zinc-900"
+          className="h-12 animate-pulse rounded-lg"
+          style={{ backgroundColor: "var(--bg-surface)" }}
         />
       ))}
     </ul>
@@ -205,10 +231,13 @@ function SkeletonList() {
 function EmptyState() {
   return (
     <div className="flex flex-col items-center justify-center gap-3 px-4 py-12 text-center">
-      <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+      <h3
+        className="text-lg font-semibold"
+        style={{ color: "var(--text-primary)" }}
+      >
         할 일이 비어있어요
       </h3>
-      <p className="text-sm text-zinc-500 dark:text-zinc-400">
+      <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
         오늘 가장 먼저 끝낼 한 가지를 적어보세요.
       </p>
     </div>

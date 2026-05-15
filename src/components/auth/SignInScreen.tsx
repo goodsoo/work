@@ -26,10 +26,13 @@ export function SignInScreen() {
     >
       <div className="w-full max-w-sm space-y-8 text-center">
         <div className="space-y-3">
-          <h1 className="font-serif text-3xl font-medium tracking-tight text-zinc-900 dark:text-zinc-100">
+          <h1
+            className="font-serif text-3xl font-medium tracking-tight"
+            style={{ color: "var(--text-primary)" }}
+          >
             goodsoob-work
           </h1>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
             본인 전용 시간축 통합 업무관리
           </p>
         </div>
@@ -38,7 +41,12 @@ export function SignInScreen() {
           type="button"
           onClick={handleSignIn}
           disabled={pending}
-          className="inline-flex w-full items-center justify-center rounded-lg border border-zinc-200 bg-white px-4 py-3 text-sm font-medium text-zinc-900 shadow-sm transition hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
+          className="inline-flex w-full items-center justify-center rounded-lg px-4 py-3 text-sm font-medium shadow-sm transition focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+          style={{
+            border: "1px solid var(--border-default)",
+            backgroundColor: "var(--bg-base)",
+            color: "var(--text-primary)",
+          }}
         >
           <GoogleIcon className="mr-3 size-5" />
           {pending ? "로그인 중..." : "Google로 시작하기"}
@@ -47,13 +55,18 @@ export function SignInScreen() {
         {error ? (
           <div
             role="alert"
-            className="rounded-lg border-l-4 border-red-600 bg-red-50 px-4 py-3 text-left text-sm text-red-900 dark:bg-red-950/40 dark:text-red-200"
+            className="rounded-lg px-4 py-3 text-left text-sm"
+            style={{
+              borderLeft: "4px solid var(--accent-red)",
+              backgroundColor: "var(--accent-red-bg)",
+              color: "var(--accent-red-text)",
+            }}
           >
             {error}
           </div>
         ) : null}
 
-        <p className="text-xs text-zinc-400 dark:text-zinc-400">
+        <p className="text-xs" style={{ color: "var(--text-muted)" }}>
           1회 로그인 후 자동 유지됩니다.
         </p>
       </div>

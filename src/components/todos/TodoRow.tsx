@@ -36,18 +36,20 @@ export function TodoRow({ todo, onToggle, onUpdate, onDelete }: Props) {
         type="button"
         aria-label={todo.done ? "완료 취소" : "완료"}
         onClick={() => onToggle(todo)}
-        className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 transition ${
-          todo.done
-            ? "border-zinc-300 bg-zinc-300 dark:border-zinc-600 dark:bg-zinc-600"
-            : "border-zinc-400 bg-white hover:bg-zinc-50 dark:border-zinc-500 dark:bg-zinc-900 dark:hover:bg-zinc-900"
-        }`}
-        style={{ minHeight: 20, minWidth: 20 }}
+        className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 transition"
+        style={{
+          borderColor: todo.done ? "var(--border-default)" : "var(--text-muted)",
+          backgroundColor: todo.done ? "var(--border-default)" : "var(--bg-base)",
+          minHeight: 20,
+          minWidth: 20,
+        }}
       >
         {todo.done ? (
           <svg
             viewBox="0 0 16 16"
             fill="none"
-            className="h-3 w-3 text-white"
+            className="h-3 w-3"
+            style={{ color: "var(--text-inverse)" }}
             aria-hidden
           >
             <path
@@ -82,19 +84,27 @@ export function TodoRow({ todo, onToggle, onUpdate, onDelete }: Props) {
             type="button"
             onClick={() => setEditingTitle(true)}
             className={`block w-full text-left text-base ${
-              todo.done
-                ? "text-zinc-400 line-through dark:text-zinc-400"
-                : "text-zinc-900 dark:text-zinc-100"
+              todo.done ? "line-through" : ""
             } ${
               priorityWeightClass(todo.priority, todo.done)
             }`}
-            style={{ minHeight: 0 }}
+            style={{
+              color: todo.done
+                ? "var(--text-muted)"
+                : todo.priority === "low"
+                  ? "var(--text-secondary)"
+                  : "var(--text-primary)",
+              minHeight: 0,
+            }}
           >
             {todo.title}
           </button>
         )}
 
-        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-500">
+        <div
+          className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs"
+          style={{ color: "var(--text-secondary)" }}
+        >
           <PrioritySelect
             value={todo.priority}
             onChange={(p) => onUpdate(todo, { priority: p })}
@@ -110,7 +120,10 @@ export function TodoRow({ todo, onToggle, onUpdate, onDelete }: Props) {
             onChange={(c) => onUpdate(todo, { category: c })}
           />
           {todo.linked_meeting_id ? (
-            <span className="font-mono text-[10px] uppercase tracking-wide text-zinc-400">
+            <span
+              className="font-mono text-[10px] uppercase tracking-wide"
+              style={{ color: "var(--text-muted)" }}
+            >
               from meeting
             </span>
           ) : null}
@@ -121,8 +134,8 @@ export function TodoRow({ todo, onToggle, onUpdate, onDelete }: Props) {
         type="button"
         aria-label="삭제"
         onClick={() => onDelete(todo)}
-        className="shrink-0 rounded p-1 text-zinc-400 transition hover:bg-zinc-100 hover:text-red-600 dark:hover:bg-zinc-900 dark:hover:text-red-500"
-        style={{ minHeight: 32, minWidth: 32 }}
+        className="shrink-0 rounded p-1 transition"
+        style={{ color: "var(--text-muted)", minHeight: 32, minWidth: 32 }}
       >
         <Trash2 className="h-4 w-4" />
       </button>
@@ -133,7 +146,7 @@ export function TodoRow({ todo, onToggle, onUpdate, onDelete }: Props) {
 function priorityWeightClass(p: TodoPriority, done: boolean): string {
   if (done) return "";
   if (p === "high") return "font-semibold";
-  if (p === "low") return "font-normal text-zinc-500 dark:text-zinc-400";
+  if (p === "low") return "font-normal";
   return "";
 }
 
@@ -214,13 +227,14 @@ function DueDateInput({
       <span className="sr-only">기한</span>
       {value ? (
         <span
-          className={`font-mono text-[11px] ${
-            overdue
-              ? "text-red-600 dark:text-red-500"
+          className="font-mono text-[11px]"
+          style={{
+            color: overdue
+              ? "var(--accent-red)"
               : today
-                ? "text-zinc-900 dark:text-zinc-100"
-                : "text-zinc-500"
-          }`}
+                ? "var(--text-primary)"
+                : "var(--text-secondary)",
+          }}
         >
           {relativeDateLabel(value)}
         </span>
@@ -235,9 +249,9 @@ function DueDateInput({
         <button
           type="button"
           onClick={() => onChange(null)}
-          className="text-[10px] text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
+          className="text-[10px]"
+          style={{ color: "var(--text-muted)", minHeight: 0 }}
           aria-label="기한 제거"
-          style={{ minHeight: 0 }}
         >
           ×
         </button>

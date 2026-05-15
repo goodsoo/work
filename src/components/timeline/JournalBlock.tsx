@@ -62,15 +62,19 @@ export function JournalBlock({ date, existing, emphasized }: Props) {
           onBlur={() => void flush()}
           placeholder={emphasized ? "오늘 어땠어요?" : "이날의 기억"}
           rows={1}
-          className={`block w-full resize-none bg-transparent py-1 font-serif italic leading-relaxed outline-none placeholder:not-italic placeholder:text-zinc-400 ${
+          className={`block w-full resize-none bg-transparent py-1 font-serif italic leading-relaxed outline-none placeholder:not-italic ${
             isEmpty
-              ? `rounded border border-dashed px-3 ${
-                  emphasized
-                    ? "border-zinc-300 dark:border-zinc-700"
-                    : "border-zinc-200 dark:border-zinc-800"
-                }`
-              : "text-zinc-700 dark:text-zinc-300"
+              ? "rounded border border-dashed px-3"
+              : ""
           }`}
+          style={
+            isEmpty
+              ? {
+                  borderColor: emphasized ? "var(--border-default)" : "var(--border-subtle)",
+                  color: "var(--text-secondary)",
+                }
+              : { color: "var(--text-secondary)" }
+          }
         />
         <SaveStatus status={status} error={error} />
       </div>
@@ -87,17 +91,30 @@ function SaveStatus({
 }) {
   if (status === "saving") {
     return (
-      <span className="mt-1 block text-[11px] text-zinc-400">저장 중…</span>
+      <span
+        className="mt-1 block text-[11px]"
+        style={{ color: "var(--text-muted)" }}
+      >
+        저장 중…
+      </span>
     );
   }
   if (status === "saved") {
     return (
-      <span className="mt-1 block text-[11px] text-zinc-400">저장됨</span>
+      <span
+        className="mt-1 block text-[11px]"
+        style={{ color: "var(--text-muted)" }}
+      >
+        저장됨
+      </span>
     );
   }
   if (status === "error") {
     return (
-      <span className="mt-1 block text-[11px] text-red-600 dark:text-red-500">
+      <span
+        className="mt-1 block text-[11px]"
+        style={{ color: "var(--accent-red)" }}
+      >
         저장 실패: {error?.message ?? "알 수 없음"}
       </span>
     );

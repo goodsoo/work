@@ -183,7 +183,13 @@ export function CalendarPage({ targetDate, onSelectedDateChange }: Props) {
   if (isLoading) {
     return (
       <div className="flex h-full items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-600" />
+        <div
+          className="h-8 w-8 animate-spin rounded-full border-2"
+          style={{
+            borderColor: "var(--border-default)",
+            borderTopColor: "var(--text-secondary)",
+          }}
+        />
       </div>
     );
   }
@@ -218,7 +224,11 @@ export function CalendarPage({ targetDate, onSelectedDateChange }: Props) {
         <button
           type="button"
           onClick={jumpToToday}
-          className="absolute bottom-4 right-4 rounded-full bg-zinc-900 px-4 py-2 text-sm font-medium text-white shadow-lg transition hover:bg-zinc-800 lg:bottom-6 lg:right-6 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+          className="absolute bottom-4 right-4 rounded-full px-4 py-2 text-sm font-medium shadow-lg transition lg:bottom-6 lg:right-6"
+          style={{
+            backgroundColor: "var(--btn-primary)",
+            color: "var(--btn-primary-text)",
+          }}
         >
           오늘
         </button>

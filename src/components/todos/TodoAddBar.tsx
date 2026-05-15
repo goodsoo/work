@@ -26,7 +26,13 @@ export function TodoAddBar({ onAdd, disabled }: Props) {
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-lg border border-zinc-100 bg-zinc-50/50 p-2.5 dark:border-zinc-800 dark:bg-zinc-900">
+    <div
+      className="flex flex-wrap items-center gap-2 rounded-lg p-2.5"
+      style={{
+        border: "1px solid var(--border-subtle)",
+        backgroundColor: "var(--bg-surface)",
+      }}
+    >
       <input
         type="text"
         value={title}
@@ -35,7 +41,8 @@ export function TodoAddBar({ onAdd, disabled }: Props) {
           if (e.key === "Enter") submit();
         }}
         placeholder="새 할 일"
-        className="min-w-0 flex-1 bg-transparent px-2 py-1 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 dark:text-zinc-100"
+        className="min-w-0 flex-1 bg-transparent px-2 py-1 text-sm outline-none"
+        style={{ color: "var(--text-primary)" }}
         aria-label="새 할 일"
       />
       <select
@@ -57,8 +64,12 @@ export function TodoAddBar({ onAdd, disabled }: Props) {
         type="button"
         onClick={submit}
         disabled={disabled || !title.trim()}
-        className="inline-flex items-center gap-1 rounded-lg bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:opacity-40 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
-        style={{ minHeight: 36 }}
+        className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-sm font-medium transition disabled:opacity-40"
+        style={{
+          backgroundColor: "var(--btn-primary)",
+          color: "var(--btn-primary-text)",
+          minHeight: 36,
+        }}
       >
         <Plus className="h-4 w-4" />
         추가

@@ -213,11 +213,19 @@ export function MeetingForm({ meetingId, onBack }: Props) {
         <button
           type="button"
           onClick={onBack}
-          className="mb-6 inline-flex items-center gap-1 text-sm text-zinc-500 lg:hidden"
+          className="mb-6 inline-flex items-center gap-1 text-sm lg:hidden"
+          style={{ color: "var(--text-secondary)" }}
         >
           <ChevronLeft className="h-4 w-4" /> 목록
         </button>
-        <div className="rounded-lg border-l-4 border-red-600 bg-red-50 p-4 text-sm text-red-900 dark:border-red-500 dark:bg-red-950/30 dark:text-red-200">
+        <div
+          className="rounded-lg p-4 text-sm"
+          style={{
+            borderLeft: "4px solid var(--accent-red)",
+            backgroundColor: "var(--accent-red-bg)",
+            color: "var(--accent-red-text)",
+          }}
+        >
           불러오지 못했어요. <button type="button" onClick={() => void refetch()} className="underline">재시도</button>
         </div>
       </div>
@@ -228,9 +236,9 @@ export function MeetingForm({ meetingId, onBack }: Props) {
     return (
       <div className="mx-auto w-full max-w-3xl px-6 py-16">
         <div className="space-y-4" aria-hidden>
-          <div className="h-10 w-48 animate-pulse rounded bg-zinc-100 dark:bg-zinc-900" />
-          <div className="h-6 w-32 animate-pulse rounded bg-zinc-100 dark:bg-zinc-900" />
-          <div className="h-64 animate-pulse rounded bg-zinc-100 dark:bg-zinc-900" />
+          <div className="h-10 w-48 animate-pulse rounded" style={{ backgroundColor: "var(--bg-surface)" }} />
+          <div className="h-6 w-32 animate-pulse rounded" style={{ backgroundColor: "var(--bg-surface)" }} />
+          <div className="h-64 animate-pulse rounded" style={{ backgroundColor: "var(--bg-surface)" }} />
         </div>
       </div>
     );
@@ -252,23 +260,30 @@ export function MeetingForm({ meetingId, onBack }: Props) {
   return (
     <div onKeyDown={onFormKeyDown} className="min-h-svh">
       {/* Top bar — compact, floating feel */}
-      <div className="sticky top-0 z-10 flex items-center justify-between bg-white/90 px-5 py-2 backdrop-blur lg:top-0 dark:bg-zinc-900/90">
+      <div
+        className="sticky top-0 z-10 flex items-center justify-between px-5 py-2 backdrop-blur lg:top-0"
+        style={{ backgroundColor: "var(--bg-overlay)" }}
+      >
         <button
           type="button"
           onClick={onBack}
-          className="inline-flex items-center gap-1 text-sm text-zinc-400 transition hover:text-zinc-700 lg:hidden dark:hover:text-zinc-300"
+          className="inline-flex items-center gap-1 text-sm transition lg:hidden"
+          style={{ color: "var(--text-muted)" }}
         >
           <ChevronLeft className="h-4 w-4" /> 목록
         </button>
         <div className="flex items-center gap-2">
-          <div className="inline-flex overflow-hidden rounded-md border border-zinc-100 dark:border-zinc-800">
+          <div
+            className="inline-flex overflow-hidden rounded-md"
+            style={{ border: "1px solid var(--border-subtle)" }}
+          >
             <button
               type="button"
               onClick={history.undo}
               disabled={!history.canUndo}
               title="실행 취소"
-              className="px-1.5 py-1 text-zinc-500 transition hover:bg-zinc-50 disabled:opacity-20 dark:hover:bg-zinc-900"
-              style={{ minHeight: 0 }}
+              className="px-1.5 py-1 transition disabled:opacity-20"
+              style={{ color: "var(--text-secondary)", minHeight: 0 }}
             >
               <Undo2 className="h-3.5 w-3.5" />
             </button>
@@ -277,8 +292,8 @@ export function MeetingForm({ meetingId, onBack }: Props) {
               onClick={history.redo}
               disabled={!history.canRedo}
               title="다시 실행"
-              className="border-l border-zinc-100 px-1.5 py-1 text-zinc-500 transition hover:bg-zinc-50 disabled:opacity-20 dark:border-zinc-800 dark:hover:bg-zinc-900"
-              style={{ minHeight: 0 }}
+              className="px-1.5 py-1 transition disabled:opacity-20"
+              style={{ color: "var(--text-secondary)", borderLeft: "1px solid var(--border-subtle)", minHeight: 0 }}
             >
               <Redo2 className="h-3.5 w-3.5" />
             </button>
@@ -296,14 +311,28 @@ export function MeetingForm({ meetingId, onBack }: Props) {
       {updateMutation.isError || actionError ? (
         <div className="mx-auto max-w-3xl px-6 pt-2">
           {updateMutation.isError ? (
-            <div className="flex items-start gap-2 rounded-lg border-l-4 border-red-600 bg-red-50 p-3 text-sm text-red-900 dark:border-red-500 dark:bg-red-950/30 dark:text-red-200">
+            <div
+              className="flex items-start gap-2 rounded-lg p-3 text-sm"
+              style={{
+                borderLeft: "4px solid var(--accent-red)",
+                backgroundColor: "var(--accent-red-bg)",
+                color: "var(--accent-red-text)",
+              }}
+            >
               <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
               <span className="flex-1">자동 저장 실패</span>
               <button type="button" onClick={retrySave} className="text-xs underline">재시도</button>
             </div>
           ) : null}
           {actionError ? (
-            <div className="mt-2 rounded-lg border-l-4 border-red-600 bg-red-50 p-3 text-sm text-red-900 dark:border-red-500 dark:bg-red-950/30 dark:text-red-200">
+            <div
+              className="mt-2 rounded-lg p-3 text-sm"
+              style={{
+                borderLeft: "4px solid var(--accent-red)",
+                backgroundColor: "var(--accent-red-bg)",
+                color: "var(--accent-red-text)",
+              }}
+            >
               {actionError}
             </div>
           ) : null}
@@ -319,13 +348,17 @@ export function MeetingForm({ meetingId, onBack }: Props) {
           onChange={(e) => updateField("title", e.target.value)}
           placeholder="제목 없음"
           autoFocus={!data.title}
-          className="w-full bg-transparent text-3xl font-bold text-zinc-900 outline-none placeholder:text-zinc-300 dark:text-zinc-100 dark:placeholder:text-zinc-600"
+          className="w-full bg-transparent text-3xl font-bold outline-none"
+          style={{ color: "var(--text-primary)" }}
         />
 
         {/* Metadata — subtle, inline */}
-        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-zinc-500">
+        <div
+          className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm"
+          style={{ color: "var(--text-secondary)" }}
+        >
           <label className="inline-flex items-center gap-1.5">
-            <span className="text-xs text-zinc-400">날짜</span>
+            <span className="text-xs" style={{ color: "var(--text-muted)" }}>날짜</span>
             <input
               type="date"
               value={doc.date}
@@ -333,17 +366,18 @@ export function MeetingForm({ meetingId, onBack }: Props) {
             />
           </label>
           <label className="inline-flex items-center gap-1.5">
-            <span className="text-xs text-zinc-400">시간</span>
+            <span className="text-xs" style={{ color: "var(--text-muted)" }}>시간</span>
             <input
               type="text"
               value={doc.time}
               onChange={(e) => updateField("time", e.target.value)}
               placeholder="14:00"
-              className="w-20 border-0 bg-transparent text-sm outline-none placeholder:text-zinc-300 dark:placeholder:text-zinc-600"
+              className="w-20 border-0 bg-transparent text-sm outline-none"
+              style={{ color: "var(--text-secondary)" }}
             />
           </label>
           <div className="inline-flex items-center gap-1.5">
-            <span className="text-xs text-zinc-400">참석</span>
+            <span className="text-xs" style={{ color: "var(--text-muted)" }}>참석</span>
             <div className="min-w-[12em]">
               <AttendeeTagInput
                 value={doc.attendees}
@@ -360,8 +394,8 @@ export function MeetingForm({ meetingId, onBack }: Props) {
           value={doc.content}
           onChange={(e) => updateField("content", e.target.value)}
           placeholder="내용을 입력하세요..."
-          className="mt-6 w-full resize-none overflow-hidden bg-transparent text-base leading-relaxed text-zinc-800 outline-none placeholder:text-zinc-300 dark:text-zinc-200 dark:placeholder:text-zinc-500"
-          style={{ minHeight: "60svh" }}
+          className="mt-6 w-full resize-none overflow-hidden bg-transparent text-base leading-relaxed outline-none"
+          style={{ color: "var(--text-primary)", minHeight: "60svh" }}
           onInput={(e) => {
             const el = e.currentTarget;
             el.style.height = "auto";
@@ -373,7 +407,10 @@ export function MeetingForm({ meetingId, onBack }: Props) {
         {hasAnySummary ? (
           <div className="mt-6 space-y-3">
             {doc.discussion_items.length > 0 ? (
-              <div className="rounded-lg bg-zinc-50 px-4 py-3 dark:bg-zinc-900">
+              <div
+                className="rounded-lg px-4 py-3"
+                style={{ backgroundColor: "var(--bg-surface)" }}
+              >
                 <EditableList
                   title="논의 사항"
                   items={doc.discussion_items}
@@ -383,7 +420,10 @@ export function MeetingForm({ meetingId, onBack }: Props) {
               </div>
             ) : null}
             {doc.decisions.length > 0 ? (
-              <div className="rounded-lg bg-zinc-50 px-4 py-3 dark:bg-zinc-900">
+              <div
+                className="rounded-lg px-4 py-3"
+                style={{ backgroundColor: "var(--bg-surface)" }}
+              >
                 <EditableList
                   title="결정 사항"
                   items={doc.decisions}
@@ -393,7 +433,10 @@ export function MeetingForm({ meetingId, onBack }: Props) {
               </div>
             ) : null}
             {doc.action_items.length > 0 ? (
-              <div className="rounded-lg bg-zinc-50 px-4 py-3 dark:bg-zinc-900">
+              <div
+                className="rounded-lg px-4 py-3"
+                style={{ backgroundColor: "var(--bg-surface)" }}
+              >
                 <EditableList
                   title="액션 아이템"
                   items={doc.action_items}
@@ -401,7 +444,10 @@ export function MeetingForm({ meetingId, onBack }: Props) {
                   onSave={(next) => updateField("action_items", next)}
                   itemActions={(i, text) =>
                     addedTodoIndices.has(i) ? (
-                      <span className="inline-flex items-center gap-1 text-xs text-zinc-400" style={{ minHeight: 0 }}>
+                      <span
+                        className="inline-flex items-center gap-1 text-xs"
+                        style={{ color: "var(--text-muted)", minHeight: 0 }}
+                      >
                         <Check className="h-3 w-3" /> 추가됨
                       </span>
                     ) : (
@@ -409,8 +455,8 @@ export function MeetingForm({ meetingId, onBack }: Props) {
                         type="button"
                         onClick={() => addActionItemAsTodo(i, text)}
                         disabled={createTodoMutation.isPending}
-                        className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-900 disabled:opacity-40 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
-                        style={{ minHeight: 0 }}
+                        className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs transition disabled:opacity-40"
+                        style={{ color: "var(--text-secondary)", minHeight: 0 }}
                       >
                         <ListPlus className="h-3 w-3" /> 할 일로
                       </button>
@@ -449,7 +495,8 @@ export function MeetingForm({ meetingId, onBack }: Props) {
             type="button"
             onClick={handleDelete}
             disabled={deleteMutation.isPending}
-            className="inline-flex items-center gap-1.5 text-sm text-zinc-400 transition hover:text-red-600 disabled:opacity-50 dark:hover:text-red-500"
+            className="inline-flex items-center gap-1.5 text-sm transition disabled:opacity-50"
+            style={{ color: "var(--text-muted)" }}
           >
             <Trash2 className="h-4 w-4" /> 삭제
           </button>
@@ -475,18 +522,18 @@ function SaveIndicator({
       <button
         type="button"
         onClick={onRetry}
-        className="text-xs text-red-600 underline dark:text-red-500"
-        style={{ minHeight: 0 }}
+        className="text-xs underline"
+        style={{ color: "var(--accent-red)", minHeight: 0 }}
       >
         저장 실패
       </button>
     );
   }
   if (isPending) {
-    return <span className="text-xs text-zinc-400">저장 중...</span>;
+    return <span className="text-xs" style={{ color: "var(--text-muted)" }}>저장 중...</span>;
   }
   if (hasPendingEdit) {
-    return <span className="text-xs text-zinc-300 dark:text-zinc-500">...</span>;
+    return <span className="text-xs" style={{ color: "var(--text-muted)" }}>...</span>;
   }
   return null;
 }

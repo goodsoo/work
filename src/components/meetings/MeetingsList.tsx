@@ -36,7 +36,10 @@ export function MeetingsList({ onSelect, onCreate, creating }: Props) {
     <>
       <PageHeader
         left={
-          <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+          <h2
+            className="text-lg font-semibold"
+            style={{ color: "var(--text-primary)" }}
+          >
             메모장
           </h2>
         }
@@ -45,7 +48,11 @@ export function MeetingsList({ onSelect, onCreate, creating }: Props) {
             type="button"
             onClick={onCreate}
             disabled={creating}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+            className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition disabled:opacity-50"
+            style={{
+              backgroundColor: "var(--btn-primary)",
+              color: "var(--btn-primary-text)",
+            }}
           >
             <Plus className="h-4 w-4" />
             새 메모장
@@ -72,7 +79,10 @@ export function MeetingsList({ onSelect, onCreate, creating }: Props) {
               />
             ))}
             {isFetching ? (
-              <li className="pt-2 text-center text-xs text-zinc-400">
+              <li
+                className="pt-2 text-center text-xs"
+                style={{ color: "var(--text-muted)" }}
+              >
                 새로고침 중...
               </li>
             ) : null}
@@ -89,18 +99,31 @@ function MeetingCard({ meeting, onClick }: { meeting: Meeting; onClick: () => vo
       <button
         type="button"
         onClick={onClick}
-        className="block w-full rounded-lg border border-zinc-200 bg-white p-4 text-left transition hover:border-zinc-300 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-800/40 dark:hover:border-zinc-700 dark:hover:bg-zinc-800/70"
+        className="block w-full rounded-lg p-4 text-left transition"
+        style={{
+          border: "1px solid var(--border-default)",
+          backgroundColor: "var(--bg-base)",
+        }}
       >
         <div className="flex items-baseline justify-between gap-3">
-          <span className="truncate text-base font-medium text-zinc-900 dark:text-zinc-100">
+          <span
+            className="truncate text-base font-medium"
+            style={{ color: "var(--text-primary)" }}
+          >
             {meeting.title?.trim() || "(제목 없음)"}
           </span>
-          <span className="shrink-0 font-mono text-xs text-zinc-500">
+          <span
+            className="shrink-0 font-mono text-xs"
+            style={{ color: "var(--text-secondary)" }}
+          >
             {formatDate(meeting.date)}
           </span>
         </div>
         {meeting.attendees ? (
-          <div className="mt-1 truncate text-xs text-zinc-500">
+          <div
+            className="mt-1 truncate text-xs"
+            style={{ color: "var(--text-secondary)" }}
+          >
             {meeting.attendees}
           </div>
         ) : null}
@@ -112,7 +135,10 @@ function MeetingCard({ meeting, onClick }: { meeting: Meeting; onClick: () => vo
             meeting.content ??
             null;
           return first ? (
-            <p className="mt-2 line-clamp-2 text-sm text-zinc-600 dark:text-zinc-400">
+            <p
+              className="mt-2 line-clamp-2 text-sm"
+              style={{ color: "var(--text-secondary)" }}
+            >
               {snippet(first, 140)}
             </p>
           ) : null;
@@ -128,7 +154,8 @@ function SkeletonList() {
       {[0, 1, 2].map((i) => (
         <li
           key={i}
-          className="h-24 animate-pulse rounded-lg bg-zinc-100 dark:bg-zinc-900"
+          className="h-24 animate-pulse rounded-lg"
+          style={{ backgroundColor: "var(--bg-surface)" }}
         />
       ))}
     </ul>
@@ -138,16 +165,23 @@ function SkeletonList() {
 function EmptyState({ onCreate }: { onCreate: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center gap-4 px-4 py-16 text-center">
-      <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+      <h3
+        className="text-lg font-semibold"
+        style={{ color: "var(--text-primary)" }}
+      >
         아직 메모장이 없어요
       </h3>
-      <p className="text-sm text-zinc-500 dark:text-zinc-400">
+      <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
         첫 회의를 기록해볼까요?
       </p>
       <button
         type="button"
         onClick={onCreate}
-        className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+        className="mt-2 inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition"
+        style={{
+          backgroundColor: "var(--btn-primary)",
+          color: "var(--btn-primary-text)",
+        }}
       >
         <Plus className="h-4 w-4" />새 메모장
       </button>
@@ -163,7 +197,14 @@ function ErrorState({
   onRetry: () => void;
 }) {
   return (
-    <div className="rounded-lg border-l-4 border-red-600 bg-red-50 p-4 text-sm text-red-900 dark:border-red-500 dark:bg-red-950/30 dark:text-red-200">
+    <div
+      className="rounded-lg p-4 text-sm"
+      style={{
+        borderLeft: "4px solid var(--accent-red)",
+        backgroundColor: "var(--accent-red-bg)",
+        color: "var(--accent-red-text)",
+      }}
+    >
       <div className="font-medium">목록을 불러오지 못했어요</div>
       <div className="mt-1 font-mono text-xs opacity-80">{message}</div>
       <button

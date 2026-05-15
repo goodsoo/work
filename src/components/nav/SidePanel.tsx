@@ -64,8 +64,14 @@ export function MeetingsSidePanel({ selectedId, onSelect }: MeetingsPanelProps) 
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex shrink-0 items-center justify-between border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
-        <h2 className="font-serif text-sm font-medium text-zinc-900 dark:text-zinc-100">
+      <div
+        className="flex shrink-0 items-center justify-between px-4 py-3"
+        style={{ borderBottom: "1px solid var(--border-default)" }}
+      >
+        <h2
+          className="font-serif text-sm font-medium"
+          style={{ color: "var(--text-primary)" }}
+        >
           메모장
         </h2>
         <button
@@ -73,15 +79,22 @@ export function MeetingsSidePanel({ selectedId, onSelect }: MeetingsPanelProps) 
           onClick={handleCreate}
           disabled={createMutation.isPending}
           title="새 메모장"
-          className="flex h-7 w-7 items-center justify-center rounded-md text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-900 disabled:opacity-50 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
-          style={{ minHeight: 0 }}
+          className="flex h-7 w-7 items-center justify-center rounded-md transition disabled:opacity-50"
+          style={{ color: "var(--text-secondary)", minHeight: 0 }}
         >
           <Plus className="h-4 w-4" />
         </button>
       </div>
 
       {createError ? (
-        <div className="mx-3 mt-2 rounded border-l-2 border-red-500 bg-red-50 px-2 py-1 text-xs text-red-700 dark:bg-red-950/30 dark:text-red-300">
+        <div
+          className="mx-3 mt-2 rounded px-2 py-1 text-xs"
+          style={{
+            borderLeft: "2px solid var(--accent-red)",
+            backgroundColor: "var(--accent-red-bg)",
+            color: "var(--accent-red-text)",
+          }}
+        >
           {createError}
         </div>
       ) : null}
@@ -92,12 +105,16 @@ export function MeetingsSidePanel({ selectedId, onSelect }: MeetingsPanelProps) 
             {[0, 1, 2].map((i) => (
               <div
                 key={i}
-                className="h-12 animate-pulse rounded-md bg-zinc-100 dark:bg-zinc-900"
+                className="h-12 animate-pulse rounded-md"
+                style={{ backgroundColor: "var(--bg-surface)" }}
               />
             ))}
           </div>
         ) : !data || data.length === 0 ? (
-          <div className="px-4 py-8 text-center text-sm text-zinc-400">
+          <div
+            className="px-4 py-8 text-center text-sm"
+            style={{ color: "var(--text-muted)" }}
+          >
             아직 메모장이 없어요
           </div>
         ) : (
@@ -131,17 +148,20 @@ function MeetingItem({
       <button
         type="button"
         onClick={onClick}
-        className={`w-full rounded-md px-3 py-2 text-left transition ${
-          active
-            ? "bg-zinc-200/80 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100"
-            : "text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800/50"
-        }`}
-        style={{ minHeight: 0 }}
+        className="w-full rounded-md px-3 py-2 text-left transition"
+        style={{
+          backgroundColor: active ? "var(--bg-surface-active)" : undefined,
+          color: active ? "var(--text-primary)" : "var(--text-secondary)",
+          minHeight: 0,
+        }}
       >
         <div className="truncate text-sm font-medium">
           {meeting.title?.trim() || "(제목 없음)"}
         </div>
-        <div className="mt-0.5 truncate text-xs text-zinc-500 dark:text-zinc-400">
+        <div
+          className="mt-0.5 truncate text-xs"
+          style={{ color: "var(--text-secondary)" }}
+        >
           {formatShort(meeting.date)}
           {meeting.attendees ? ` · ${meeting.attendees}` : ""}
         </div>
@@ -234,12 +254,21 @@ export function CalendarDayPanel({
   return (
     <div className="flex h-full flex-col">
       {/* Date header */}
-      <div className="shrink-0 border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
+      <div
+        className="shrink-0 px-4 py-3"
+        style={{ borderBottom: "1px solid var(--border-default)" }}
+      >
         <div className="flex items-center gap-2">
           {today ? (
-            <span className="h-2 w-2 rounded-full bg-red-600 dark:bg-red-500" />
+            <span
+              className="h-2 w-2 rounded-full"
+              style={{ backgroundColor: "var(--accent-red)" }}
+            />
           ) : null}
-          <h2 className="font-serif text-sm font-medium text-zinc-900 dark:text-zinc-100">
+          <h2
+            className="font-serif text-sm font-medium"
+            style={{ color: "var(--text-primary)" }}
+          >
             {formatDateLong(selectedDate)}
             {today ? " · 오늘" : ""}
           </h2>
@@ -249,7 +278,10 @@ export function CalendarDayPanel({
       {/* Items */}
       <div className="flex-1 overflow-y-auto">
         {!hasItems ? (
-          <div className="px-4 py-8 text-center text-sm text-zinc-400">
+          <div
+            className="px-4 py-8 text-center text-sm"
+            style={{ color: "var(--text-muted)" }}
+          >
             이날은 비어있어요
           </div>
         ) : (
@@ -264,12 +296,15 @@ export function CalendarDayPanel({
               return (
                 <div
                   key={s.id}
-                  className="group flex items-start gap-2 rounded-md px-3 py-2 transition hover:bg-zinc-50 dark:hover:bg-zinc-900/50"
+                  className="group flex items-start gap-2 rounded-md px-3 py-2 transition"
                 >
-                  <Calendar className="mt-0.5 h-3.5 w-3.5 shrink-0 text-zinc-500" />
+                  <Calendar
+                    className="mt-0.5 h-3.5 w-3.5 shrink-0"
+                    style={{ color: "var(--text-secondary)" }}
+                  />
                   <div className="min-w-0 flex-1">
-                    <div className="text-sm text-zinc-900 dark:text-zinc-100">
-                      <span className="text-zinc-400 dark:text-zinc-400">
+                    <div className="text-sm" style={{ color: "var(--text-primary)" }}>
+                      <span style={{ color: "var(--text-muted)" }}>
                         {time}
                       </span>{" "}
                       {s.title}
@@ -278,8 +313,8 @@ export function CalendarDayPanel({
                   <button
                     type="button"
                     onClick={() => deleteSchedule.mutate(s.id)}
-                    className="text-xs text-zinc-400 opacity-0 transition hover:text-zinc-700 group-hover:opacity-100"
-                    style={{ minHeight: 0 }}
+                    className="text-xs opacity-0 transition group-hover:opacity-100"
+                    style={{ color: "var(--text-muted)", minHeight: 0 }}
                   >
                     삭제
                   </button>
@@ -293,21 +328,24 @@ export function CalendarDayPanel({
                 key={m.id}
                 type="button"
                 onClick={() => onOpenMeeting(m.id)}
-                className="flex w-full items-start gap-2 rounded-md px-3 py-2 text-left transition hover:bg-zinc-50 dark:hover:bg-zinc-900/50"
+                className="flex w-full items-start gap-2 rounded-md px-3 py-2 text-left transition"
                 style={{ minHeight: 0 }}
               >
                 <ClipboardList className="mt-0.5 h-3.5 w-3.5 shrink-0 text-blue-500" />
                 <div className="min-w-0 flex-1">
-                  <div className="text-sm text-zinc-900 dark:text-zinc-100">
+                  <div className="text-sm" style={{ color: "var(--text-primary)" }}>
                     {m.time ? (
-                      <span className="text-zinc-400 dark:text-zinc-400">
+                      <span style={{ color: "var(--text-muted)" }}>
                         {m.time}
                       </span>
                     ) : null}{" "}
                     {m.title?.trim() || "(제목 없음)"}
                   </div>
                   {m.attendees ? (
-                    <div className="mt-0.5 truncate text-xs text-zinc-500">
+                    <div
+                      className="mt-0.5 truncate text-xs"
+                      style={{ color: "var(--text-secondary)" }}
+                    >
                       {m.attendees}
                     </div>
                   ) : null}
@@ -319,17 +357,18 @@ export function CalendarDayPanel({
             {todos.map((t) => (
               <div
                 key={t.id}
-                className="flex items-start gap-2 rounded-md px-3 py-2 transition hover:bg-zinc-50 dark:hover:bg-zinc-900/50"
+                className="flex items-start gap-2 rounded-md px-3 py-2 transition"
               >
                 <button
                   type="button"
                   onClick={() => handleToggle(t)}
-                  className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border transition ${
-                    t.done
-                      ? "border-zinc-300 bg-zinc-200 text-zinc-500 dark:border-zinc-700 dark:bg-zinc-800"
-                      : "border-zinc-400 text-transparent hover:border-zinc-500 dark:border-zinc-500"
-                  }`}
-                  style={{ minHeight: 0 }}
+                  className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border transition"
+                  style={{
+                    borderColor: t.done ? "var(--border-default)" : "var(--text-muted)",
+                    backgroundColor: t.done ? "var(--bg-surface-active)" : undefined,
+                    color: t.done ? "var(--text-secondary)" : "transparent",
+                    minHeight: 0,
+                  }}
                 >
                   {t.done ? (
                     <svg className="h-3 w-3" viewBox="0 0 12 12" fill="none">
@@ -344,11 +383,10 @@ export function CalendarDayPanel({
                   ) : null}
                 </button>
                 <span
-                  className={`flex-1 text-sm ${
-                    t.done
-                      ? "text-zinc-400 line-through dark:text-zinc-400"
-                      : "text-zinc-900 dark:text-zinc-100"
-                  }`}
+                  className={`flex-1 text-sm ${t.done ? "line-through" : ""}`}
+                  style={{
+                    color: t.done ? "var(--text-muted)" : "var(--text-primary)",
+                  }}
                 >
                   {t.title}
                 </span>
@@ -358,10 +396,21 @@ export function CalendarDayPanel({
             {/* Journal */}
             {journal ? (
               <div className="flex items-start gap-2 rounded-md px-3 py-2">
-                <BookOpen className="mt-0.5 h-3.5 w-3.5 shrink-0 text-zinc-400" />
+                <BookOpen
+                  className="mt-0.5 h-3.5 w-3.5 shrink-0"
+                  style={{ color: "var(--text-muted)" }}
+                />
                 <div className="min-w-0 flex-1">
-                  <div className="text-xs font-medium text-zinc-500">일기</div>
-                  <div className="mt-0.5 line-clamp-3 text-sm text-zinc-700 dark:text-zinc-300">
+                  <div
+                    className="text-xs font-medium"
+                    style={{ color: "var(--text-secondary)" }}
+                  >
+                    일기
+                  </div>
+                  <div
+                    className="mt-0.5 line-clamp-3 text-sm"
+                    style={{ color: "var(--text-secondary)" }}
+                  >
                     {journal.content?.slice(0, 200) || "(내용 없음)"}
                   </div>
                 </div>
@@ -413,8 +462,14 @@ export function TodosSidePanel({
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex shrink-0 items-center border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
-        <h2 className="font-serif text-sm font-medium text-zinc-900 dark:text-zinc-100">
+      <div
+        className="flex shrink-0 items-center px-4 py-3"
+        style={{ borderBottom: "1px solid var(--border-default)" }}
+      >
+        <h2
+          className="font-serif text-sm font-medium"
+          style={{ color: "var(--text-primary)" }}
+        >
           할 일
         </h2>
       </div>
@@ -427,19 +482,20 @@ export function TodosSidePanel({
               type="button"
               onClick={() => onCategoryChange(item.id)}
               className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-sm transition ${
-                active
-                  ? "bg-zinc-200/80 font-medium text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100"
-                  : "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800/50"
+                active ? "font-medium" : ""
               }`}
-              style={{ minHeight: 0 }}
+              style={{
+                backgroundColor: active ? "var(--bg-surface-active)" : undefined,
+                color: active ? "var(--text-primary)" : "var(--text-secondary)",
+                minHeight: 0,
+              }}
             >
               <span>{item.label}</span>
               <span
-                className={`font-mono text-xs ${
-                  active
-                    ? "text-zinc-600 dark:text-zinc-300"
-                    : "text-zinc-400 dark:text-zinc-400"
-                }`}
+                className="font-mono text-xs"
+                style={{
+                  color: active ? "var(--text-secondary)" : "var(--text-muted)",
+                }}
               >
                 {item.count}
               </span>

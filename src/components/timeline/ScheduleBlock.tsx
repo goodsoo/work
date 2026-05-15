@@ -23,11 +23,17 @@ export function ScheduleBlock({ schedule, onDelete }: Props) {
   return (
     <TimelineBlock letter="S">
       <div className="flex items-center gap-2">
-        <span className="font-mono text-sm tabular-nums text-red-600 dark:text-red-500">
+        <span
+          className="font-mono text-sm tabular-nums"
+          style={{ color: "var(--accent-red)" }}
+        >
           {time}
           {endTime ? `–${endTime}` : ""}
         </span>
-        <span className="flex-1 text-base text-zinc-900 dark:text-zinc-100">
+        <span
+          className="flex-1 text-base"
+          style={{ color: "var(--text-primary)" }}
+        >
           {schedule.title}
         </span>
         {confirming ? (
@@ -35,16 +41,16 @@ export function ScheduleBlock({ schedule, onDelete }: Props) {
             <button
               type="button"
               onClick={onDelete}
-              className="rounded px-2 py-0.5 text-red-600 hover:bg-red-50 dark:text-red-500 dark:hover:bg-red-950/30"
-              style={{ minHeight: 0 }}
+              className="rounded px-2 py-0.5"
+              style={{ color: "var(--accent-red)", minHeight: 0 }}
             >
               삭제
             </button>
             <button
               type="button"
               onClick={() => setConfirming(false)}
-              className="rounded px-2 py-0.5 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-900"
-              style={{ minHeight: 0 }}
+              className="rounded px-2 py-0.5"
+              style={{ color: "var(--text-secondary)", minHeight: 0 }}
             >
               취소
             </button>
@@ -54,8 +60,8 @@ export function ScheduleBlock({ schedule, onDelete }: Props) {
             type="button"
             onClick={() => setConfirming(true)}
             aria-label="일정 삭제"
-            className="rounded p-1 text-zinc-300 transition hover:bg-zinc-100 hover:text-red-600 dark:hover:bg-zinc-900 dark:hover:text-red-500"
-            style={{ minHeight: 28, minWidth: 28 }}
+            className="rounded p-1 transition"
+            style={{ color: "var(--text-muted)", minHeight: 28, minWidth: 28 }}
           >
             <X className="h-3.5 w-3.5" />
           </button>

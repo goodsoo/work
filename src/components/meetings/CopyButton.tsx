@@ -48,17 +48,21 @@ export function CopyButton({ meeting, onError }: Props) {
           onError?.("복사 실패. 권한 또는 환경을 확인해주세요.");
         }
       }}
-      className="inline-flex items-center gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-700 transition hover:bg-zinc-50 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-900"
+      className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition"
+      style={{
+        border: "1px solid var(--border-default)",
+        color: "var(--text-secondary)",
+      }}
       aria-label="마크다운 복사"
     >
       {copied ? (
         <>
-          <Check className="h-4 w-4 text-red-600 dark:text-red-500" />
+          <Check className="h-4 w-4" style={{ color: "var(--accent-red)" }} />
           <span>복사됨</span>
         </>
       ) : (
         <>
-          <ClipboardCopy className="h-4 w-4 text-zinc-500" />
+          <ClipboardCopy className="h-4 w-4" style={{ color: "var(--text-secondary)" }} />
           <span>마크다운 복사</span>
         </>
       )}

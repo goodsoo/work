@@ -14,18 +14,20 @@ export function TodoBlock({ todo, onToggle }: Props) {
           type="button"
           aria-label={todo.done ? "완료 취소" : "완료"}
           onClick={onToggle}
-          className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border-2 transition ${
-            todo.done
-              ? "border-zinc-300 bg-zinc-300 dark:border-zinc-600 dark:bg-zinc-600"
-              : "border-red-600 bg-white hover:bg-red-50 dark:border-red-500 dark:bg-zinc-900 dark:hover:bg-red-950/30"
-          }`}
-          style={{ minHeight: 16, minWidth: 16 }}
+          className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border-2 transition"
+          style={{
+            borderColor: todo.done ? "var(--border-default)" : "var(--accent-red)",
+            backgroundColor: todo.done ? "var(--border-default)" : "var(--bg-base)",
+            minHeight: 16,
+            minWidth: 16,
+          }}
         >
           {todo.done ? (
             <svg
               viewBox="0 0 16 16"
               fill="none"
-              className="h-2.5 w-2.5 text-white"
+              className="h-2.5 w-2.5"
+              style={{ color: "var(--text-inverse)" }}
               aria-hidden
             >
               <path
@@ -39,15 +41,17 @@ export function TodoBlock({ todo, onToggle }: Props) {
           ) : null}
         </button>
         <span
-          className={`text-base ${
-            todo.done
-              ? "text-zinc-400 line-through dark:text-zinc-400"
+          className={`text-base ${todo.done ? "line-through" : ""}`}
+          style={{
+            color: todo.done
+              ? "var(--text-muted)"
               : todo.priority === "high"
-                ? "font-semibold text-zinc-900 dark:text-zinc-100"
+                ? "var(--text-primary)"
                 : todo.priority === "low"
-                  ? "text-zinc-500 dark:text-zinc-400"
-                  : "text-zinc-900 dark:text-zinc-100"
-          }`}
+                  ? "var(--text-secondary)"
+                  : "var(--text-primary)",
+            fontWeight: !todo.done && todo.priority === "high" ? 600 : undefined,
+          }}
         >
           {todo.title}
         </span>

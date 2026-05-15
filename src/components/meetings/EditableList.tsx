@@ -80,15 +80,21 @@ export function EditableList({
 
   return (
     <div>
-      <h4 className="mb-2 text-sm font-medium text-zinc-500 dark:text-zinc-400">
+      <h4
+        className="mb-2 text-sm font-medium"
+        style={{ color: "var(--text-secondary)" }}
+      >
         {title}
       </h4>
       {items.length === 0 && !adding ? (
-        <p className="mb-2 pl-6 text-sm text-zinc-400">
+        <p className="mb-2 pl-6 text-sm" style={{ color: "var(--text-muted)" }}>
           {placeholder ?? "(없음)"}
         </p>
       ) : (
-        <ul className="space-y-1.5 text-sm text-zinc-800 dark:text-zinc-200">
+        <ul
+          className="space-y-1.5 text-sm"
+          style={{ color: "var(--text-primary)" }}
+        >
           {items.map((item, i) => (
             <li key={i} className="group flex items-start gap-2">
               <Bullet kind={bullet} />
@@ -103,7 +109,7 @@ export function EditableList({
                 <button
                   type="button"
                   onClick={() => startEdit(i)}
-                  className="flex-1 cursor-text rounded text-left whitespace-pre-wrap leading-relaxed transition hover:bg-zinc-50 hover:px-1 dark:hover:bg-zinc-900"
+                  className="flex-1 cursor-text rounded text-left whitespace-pre-wrap leading-relaxed transition"
                   style={{ minHeight: 0 }}
                 >
                   {item}
@@ -116,8 +122,8 @@ export function EditableList({
                     type="button"
                     onClick={() => deleteAt(i)}
                     aria-label="삭제"
-                    className="rounded p-1 text-zinc-300 transition hover:text-red-600 dark:hover:text-red-500"
-                    style={{ minHeight: 24, minWidth: 24 }}
+                    className="rounded p-1 transition"
+                    style={{ color: "var(--text-muted)", minHeight: 24, minWidth: 24 }}
                   >
                     <X className="h-3 w-3" />
                   </button>
@@ -143,8 +149,8 @@ export function EditableList({
         <button
           type="button"
           onClick={startAdd}
-          className="mt-2 inline-flex items-center gap-1 pl-6 text-xs text-zinc-400 transition hover:text-zinc-700 dark:hover:text-zinc-200"
-          style={{ minHeight: 0 }}
+          className="mt-2 inline-flex items-center gap-1 pl-6 text-xs transition"
+          style={{ color: "var(--text-muted)", minHeight: 0 }}
         >
           <Plus className="h-3 w-3" />
           항목 추가
@@ -157,11 +163,17 @@ export function EditableList({
 function Bullet({ kind }: { kind: BulletKind }) {
   if (kind === "redCheckbox") {
     return (
-      <span className="mt-1 inline-block h-3.5 w-3.5 shrink-0 rounded border-2 border-red-600 dark:border-red-500" />
+      <span
+        className="mt-1 inline-block h-3.5 w-3.5 shrink-0 rounded border-2"
+        style={{ borderColor: "var(--accent-red)" }}
+      />
     );
   }
   return (
-    <span className="mt-2 inline-block h-1 w-1 shrink-0 rounded-full bg-zinc-400" />
+    <span
+      className="mt-2 inline-block h-1 w-1 shrink-0 rounded-full"
+      style={{ backgroundColor: "var(--text-muted)" }}
+    />
   );
 }
 
@@ -220,7 +232,7 @@ function EditingRow({
         }
       }}
       rows={1}
-      className="flex-1 resize-none rounded bg-transparent px-1 py-0 leading-relaxed outline-none focus:bg-zinc-50 dark:focus:bg-zinc-900"
+      className="flex-1 resize-none rounded bg-transparent px-1 py-0 leading-relaxed outline-none"
     />
   );
 }

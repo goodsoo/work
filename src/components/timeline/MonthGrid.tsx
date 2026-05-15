@@ -69,21 +69,26 @@ export function MonthGrid({
     <div className="flex h-full flex-col px-3 lg:px-5">
       {/* Month label */}
       <div className="flex shrink-0 items-baseline gap-2 py-2">
-        <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+        <h3
+          className="text-sm font-semibold"
+          style={{ color: "var(--text-primary)" }}
+        >
           {year}년 {month}월
         </h3>
       </div>
 
       {/* Weekday headers */}
-      <div className="grid shrink-0 grid-cols-7 border-b border-zinc-100 dark:border-zinc-800">
+      <div
+        className="grid shrink-0 grid-cols-7"
+        style={{ borderBottom: "1px solid var(--border-subtle)" }}
+      >
         {WEEKDAYS.map((w, i) => (
           <div
             key={w}
             className={`py-1 text-center text-[11px] font-medium ${
-              i === 0
-                ? "text-red-500 dark:text-red-400"
-                : "text-zinc-500 dark:text-zinc-400"
+              i === 0 ? "text-red-500" : ""
             }`}
+            style={i === 0 ? undefined : { color: "var(--text-secondary)" }}
           >
             {w}
           </div>
@@ -108,32 +113,41 @@ export function MonthGrid({
               key={date}
               type="button"
               onClick={() => onDayClick(date)}
-              className={`flex flex-col overflow-hidden border-b border-r border-zinc-100 px-1 py-0.5 text-left transition dark:border-zinc-800 ${
-                selected
-                  ? "bg-zinc-100 dark:bg-zinc-900"
-                  : "hover:bg-zinc-50 dark:hover:bg-zinc-900/50"
-              } ${inMonth ? "" : "opacity-30"}`}
-              style={{ minHeight: 0 }}
+              className="flex flex-col overflow-hidden px-1 py-0.5 text-left transition"
+              style={{
+                borderBottom: "1px solid var(--border-subtle)",
+                borderRight: "1px solid var(--border-subtle)",
+                backgroundColor: selected ? "var(--bg-surface)" : undefined,
+                opacity: inMonth ? 1 : 0.3,
+                minHeight: 0,
+              }}
             >
               {/* Date number */}
               <div className="flex shrink-0 items-center gap-1">
                 {today ? (
-                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-[11px] font-bold text-white dark:bg-red-500">
+                  <span
+                    className="flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-bold"
+                    style={{
+                      backgroundColor: "var(--accent-red)",
+                      color: "var(--text-inverse)",
+                    }}
+                  >
                     {dayNum}
                   </span>
                 ) : (
                   <span
-                    className={`px-0.5 text-xs ${
-                      weekday === 0
-                        ? "text-red-500 dark:text-red-400"
-                        : "text-zinc-700 dark:text-zinc-300"
-                    }`}
+                    className={`px-0.5 text-xs ${weekday === 0 ? "text-red-500" : ""}`}
+                    style={weekday === 0 ? undefined : { color: "var(--text-secondary)" }}
                   >
                     {dayNum}
                   </span>
                 )}
                 {items?.journal ? (
-                  <span className="text-[10px] text-zinc-400" title="일기">
+                  <span
+                    className="text-[10px]"
+                    style={{ color: "var(--text-muted)" }}
+                    title="일기"
+                  >
                     ✎
                   </span>
                 ) : null}
@@ -145,12 +159,21 @@ export function MonthGrid({
                   <div
                     key={ev.key}
                     className={`truncate rounded-sm px-1 py-px text-[11px] leading-tight ${
-                      ev.type === "meeting"
-                        ? "bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300"
-                        : ev.done
-                          ? "text-zinc-400 line-through dark:text-zinc-400"
-                          : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
+                      ev.done ? "line-through" : ""
                     }`}
+                    style={
+                      ev.type === "meeting"
+                        ? {
+                            backgroundColor: "var(--accent-blue-bg)",
+                            color: "var(--accent-blue-text)",
+                          }
+                        : ev.done
+                          ? { color: "var(--text-muted)" }
+                          : {
+                              backgroundColor: "var(--bg-surface)",
+                              color: "var(--text-secondary)",
+                            }
+                    }
                   >
                     {ev.time ? (
                       <span className="opacity-60">{ev.time} </span>
@@ -159,7 +182,10 @@ export function MonthGrid({
                   </div>
                 ))}
                 {overflow > 0 ? (
-                  <div className="px-1 text-[10px] text-zinc-400">
+                  <div
+                    className="px-1 text-[10px]"
+                    style={{ color: "var(--text-muted)" }}
+                  >
                     +{overflow}
                   </div>
                 ) : null}

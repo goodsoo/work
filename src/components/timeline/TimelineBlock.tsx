@@ -14,14 +14,15 @@ export function TimelineBlock({ letter, children, onClick }: Props) {
       onClick={onClick}
       className={`flex w-full items-start gap-3 text-left ${
         onClick
-          ? "rounded-lg transition hover:bg-zinc-50 dark:hover:bg-zinc-900"
+          ? "rounded-lg transition"
           : ""
       }`}
       style={onClick ? { minHeight: 0, padding: "0.25rem 0" } : undefined}
     >
       <span
         aria-hidden
-        className="w-5 shrink-0 select-none pt-0.5 text-center font-mono text-xs text-zinc-400"
+        className="w-5 shrink-0 select-none pt-0.5 text-center font-mono text-xs"
+        style={{ color: "var(--text-muted)" }}
       >
         {letter}
       </span>

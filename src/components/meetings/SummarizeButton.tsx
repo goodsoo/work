@@ -65,7 +65,8 @@ export function SummarizeButton({
         type="button"
         onClick={run}
         disabled={disabled}
-        className="inline-flex items-center gap-1.5 text-xs text-zinc-500 underline-offset-2 transition hover:text-zinc-900 disabled:opacity-50 dark:text-zinc-400 dark:hover:text-zinc-100"
+        className="inline-flex items-center gap-1.5 text-xs underline-offset-2 transition disabled:opacity-50"
+        style={{ color: "var(--text-secondary)" }}
       >
         <RefreshCcw className="h-3 w-3" />
         다시 요약
@@ -78,7 +79,11 @@ export function SummarizeButton({
       type="button"
       onClick={run}
       disabled={disabled}
-      className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-700 transition hover:bg-zinc-900 hover:text-white disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-zinc-100 dark:hover:text-zinc-900"
+      className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition disabled:cursor-not-allowed disabled:opacity-50"
+      style={{
+        border: "1px solid var(--border-default)",
+        color: "var(--text-secondary)",
+      }}
     >
       {pending ? (
         <>

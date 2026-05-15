@@ -19,38 +19,45 @@ export function AppShell({ activeTab, onTabChange, sidePanel, children }: Props)
 
   return (
     <div
-      className="min-h-svh bg-white dark:bg-zinc-900"
-      style={{ paddingTop: "var(--safe-top)" }}
+      className="min-h-svh"
+      style={{ paddingTop: "var(--safe-top)", backgroundColor: "var(--bg-base)" }}
     >
-      {/* Desktop: Activity Bar + Side Panel (fixed) */}
+      {/* Desktop: Activity Bar + Side Panel */}
       <div className="hidden lg:fixed lg:inset-y-0 lg:left-0 lg:z-20 lg:flex">
         <ActivityBar activeTab={activeTab} onTabChange={onTabChange} />
         {hasSidePanel ? (
-          <div className="w-72 border-r border-zinc-100 bg-white dark:border-zinc-800 dark:bg-[#1e1e21]">
+          <div
+            className="w-72"
+            style={{ backgroundColor: "var(--bg-surface)", borderRight: "1px solid var(--border-default)" }}
+          >
             {sidePanel}
           </div>
         ) : null}
       </div>
 
       {/* Mobile header */}
-      <header className="sticky top-0 z-10 border-b border-zinc-100 bg-white/90 backdrop-blur lg:hidden dark:border-zinc-800 dark:bg-zinc-900/90">
+      <header
+        className="sticky top-0 z-10 backdrop-blur lg:hidden"
+        style={{ backgroundColor: "var(--bg-overlay)", borderBottom: "1px solid var(--border-default)" }}
+      >
         <div className="mx-auto flex w-full max-w-2xl items-center justify-between px-4 py-2.5">
-          <h1 className="text-sm font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">
+          <h1 className="text-sm font-semibold tracking-tight" style={{ color: "var(--text-primary)" }}>
             goodsoob
           </h1>
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={toggle}
-              className="flex h-8 w-8 items-center justify-center rounded-md text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
-              style={{ minHeight: 0 }}
+              className="flex h-8 w-8 items-center justify-center rounded-md transition"
+              style={{ color: "var(--text-muted)", minHeight: 0 }}
             >
               <ThemeIcon className="h-4 w-4" />
             </button>
             <button
               type="button"
               onClick={() => void signOut()}
-              className="text-xs text-zinc-400 transition hover:text-zinc-700 dark:hover:text-zinc-300"
+              className="text-xs transition"
+              style={{ color: "var(--text-muted)" }}
             >
               로그아웃
             </button>
