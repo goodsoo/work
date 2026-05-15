@@ -17,7 +17,7 @@ export const TABS: Array<{ id: Tab; label: string; icon: LucideIcon }> = [
 export function BottomTabs({ activeTab, onTabChange }: Props) {
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-20 border-t border-zinc-100 bg-white/95 backdrop-blur lg:hidden dark:border-zinc-800 dark:bg-zinc-950/95"
+      className="fixed inset-x-0 bottom-0 z-20 border-t border-zinc-100 bg-white/95 backdrop-blur lg:hidden dark:border-zinc-800 dark:bg-zinc-900/95"
       style={{ paddingBottom: "var(--safe-bottom)" }}
       aria-label="primary"
     >

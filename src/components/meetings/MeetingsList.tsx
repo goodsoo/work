@@ -89,7 +89,7 @@ function MeetingCard({ meeting, onClick }: { meeting: Meeting; onClick: () => vo
       <button
         type="button"
         onClick={onClick}
-        className="block w-full rounded-lg border border-zinc-200 bg-white p-4 text-left transition hover:border-zinc-300 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-zinc-700 dark:hover:bg-zinc-900"
+        className="block w-full rounded-lg border border-zinc-200 bg-white p-4 text-left transition hover:border-zinc-300 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-800/40 dark:hover:border-zinc-700 dark:hover:bg-zinc-800/70"
       >
         <div className="flex items-baseline justify-between gap-3">
           <span className="truncate text-base font-medium text-zinc-900 dark:text-zinc-100">

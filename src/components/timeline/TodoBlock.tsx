@@ -17,7 +17,7 @@ export function TodoBlock({ todo, onToggle }: Props) {
           className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border-2 transition ${
             todo.done
               ? "border-zinc-300 bg-zinc-300 dark:border-zinc-600 dark:bg-zinc-600"
-              : "border-red-600 bg-white hover:bg-red-50 dark:border-red-500 dark:bg-zinc-950 dark:hover:bg-red-950/30"
+              : "border-red-600 bg-white hover:bg-red-50 dark:border-red-500 dark:bg-zinc-900 dark:hover:bg-red-950/30"
           }`}
           style={{ minHeight: 16, minWidth: 16 }}
         >

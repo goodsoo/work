@@ -19,21 +19,21 @@ export function AppShell({ activeTab, onTabChange, sidePanel, children }: Props)
 
   return (
     <div
-      className="min-h-svh bg-white dark:bg-zinc-950"
+      className="min-h-svh bg-white dark:bg-zinc-900"
       style={{ paddingTop: "var(--safe-top)" }}
     >
       {/* Desktop: Activity Bar + Side Panel (fixed) */}
       <div className="hidden lg:fixed lg:inset-y-0 lg:left-0 lg:z-20 lg:flex">
         <ActivityBar activeTab={activeTab} onTabChange={onTabChange} />
         {hasSidePanel ? (
-          <div className="w-72 border-r border-zinc-100 bg-white dark:border-zinc-800 dark:bg-zinc-900/50">
+          <div className="w-72 border-r border-zinc-100 bg-white dark:border-zinc-800 dark:bg-[#1e1e21]">
             {sidePanel}
           </div>
         ) : null}
       </div>
 
       {/* Mobile header */}
-      <header className="sticky top-0 z-10 border-b border-zinc-100 bg-white/90 backdrop-blur lg:hidden dark:border-zinc-800 dark:bg-zinc-950/90">
+      <header className="sticky top-0 z-10 border-b border-zinc-100 bg-white/90 backdrop-blur lg:hidden dark:border-zinc-800 dark:bg-zinc-900/90">
         <div className="mx-auto flex w-full max-w-2xl items-center justify-between px-4 py-2.5">
           <h1 className="text-sm font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">
             goodsoob

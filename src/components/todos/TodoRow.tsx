@@ -39,7 +39,7 @@ export function TodoRow({ todo, onToggle, onUpdate, onDelete }: Props) {
         className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 transition ${
           todo.done
             ? "border-zinc-300 bg-zinc-300 dark:border-zinc-600 dark:bg-zinc-600"
-            : "border-zinc-400 bg-white hover:bg-zinc-50 dark:border-zinc-500 dark:bg-zinc-950 dark:hover:bg-zinc-900"
+            : "border-zinc-400 bg-white hover:bg-zinc-50 dark:border-zinc-500 dark:bg-zinc-900 dark:hover:bg-zinc-900"
         }`}
         style={{ minHeight: 20, minWidth: 20 }}
       >

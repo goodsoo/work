@@ -86,7 +86,7 @@ export function AttendeeTagInput({
   return (
     <div className="relative">
       <div
-        className="flex flex-wrap items-center gap-1 rounded-lg border border-zinc-200 bg-white px-2 py-1.5 transition focus-within:border-zinc-400 dark:border-zinc-800 dark:bg-zinc-950 dark:focus-within:border-zinc-600"
+        className="flex flex-wrap items-center gap-1 rounded-lg border border-zinc-200 bg-white px-2 py-1.5 transition focus-within:border-zinc-400 dark:border-zinc-800 dark:bg-zinc-900 dark:focus-within:border-zinc-600"
         onClick={() => inputRef.current?.focus()}
       >
         {tags.map((tag, i) => (
@@ -131,7 +131,7 @@ export function AttendeeTagInput({
       </div>
       {open && filtered.length > 0 ? (
         <ul
-          className="absolute left-0 right-0 top-full z-30 mt-1 max-h-48 overflow-auto rounded-lg border border-zinc-200 bg-white shadow-md dark:border-zinc-800 dark:bg-zinc-950"
+          className="absolute left-0 right-0 top-full z-30 mt-1 max-h-48 overflow-auto rounded-lg border border-zinc-200 bg-white shadow-md dark:border-zinc-800 dark:bg-zinc-900"
           role="listbox"
         >
           {filtered.map((s, i) => (

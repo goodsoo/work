@@ -252,7 +252,7 @@ export function MeetingForm({ meetingId, onBack }: Props) {
   return (
     <div onKeyDown={onFormKeyDown} className="min-h-svh">
       {/* Top bar — compact, floating feel */}
-      <div className="sticky top-0 z-10 flex items-center justify-between bg-white/90 px-5 py-2 backdrop-blur lg:top-0 dark:bg-zinc-950/90">
+      <div className="sticky top-0 z-10 flex items-center justify-between bg-white/90 px-5 py-2 backdrop-blur lg:top-0 dark:bg-zinc-900/90">
         <button
           type="button"
           onClick={onBack}
