@@ -17,7 +17,7 @@ export const TABS: Array<{ id: Tab; label: string; icon: LucideIcon }> = [
 export function BottomTabs({ activeTab, onTabChange }: Props) {
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-20 border-t border-zinc-100 bg-white/95 backdrop-blur lg:hidden dark:border-zinc-800/50 dark:bg-zinc-950/95"
+      className="fixed inset-x-0 bottom-0 z-20 border-t border-zinc-100 bg-white/95 backdrop-blur lg:hidden dark:border-zinc-800 dark:bg-zinc-950/95"
       style={{ paddingBottom: "var(--safe-bottom)" }}
       aria-label="primary"
     >
@@ -33,7 +33,7 @@ export function BottomTabs({ activeTab, onTabChange }: Props) {
               className={`relative flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[10px] transition ${
                 active
                   ? "text-zinc-900 dark:text-zinc-100"
-                  : "text-zinc-400 dark:text-zinc-500"
+                  : "text-zinc-400 dark:text-zinc-400"
               }`}
             >
               <Icon className="h-5 w-5" strokeWidth={active ? 2 : 1.5} />

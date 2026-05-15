@@ -269,7 +269,7 @@ export function CalendarDayPanel({
                   <Calendar className="mt-0.5 h-3.5 w-3.5 shrink-0 text-zinc-500" />
                   <div className="min-w-0 flex-1">
                     <div className="text-sm text-zinc-900 dark:text-zinc-100">
-                      <span className="text-zinc-400 dark:text-zinc-500">
+                      <span className="text-zinc-400 dark:text-zinc-400">
                         {time}
                       </span>{" "}
                       {s.title}
@@ -300,7 +300,7 @@ export function CalendarDayPanel({
                 <div className="min-w-0 flex-1">
                   <div className="text-sm text-zinc-900 dark:text-zinc-100">
                     {m.time ? (
-                      <span className="text-zinc-400 dark:text-zinc-500">
+                      <span className="text-zinc-400 dark:text-zinc-400">
                         {m.time}
                       </span>
                     ) : null}{" "}
@@ -346,7 +346,7 @@ export function CalendarDayPanel({
                 <span
                   className={`flex-1 text-sm ${
                     t.done
-                      ? "text-zinc-400 line-through dark:text-zinc-500"
+                      ? "text-zinc-400 line-through dark:text-zinc-400"
                       : "text-zinc-900 dark:text-zinc-100"
                   }`}
                 >
@@ -438,7 +438,7 @@ export function TodosSidePanel({
                 className={`font-mono text-xs ${
                   active
                     ? "text-zinc-600 dark:text-zinc-300"
-                    : "text-zinc-400 dark:text-zinc-500"
+                    : "text-zinc-400 dark:text-zinc-400"
                 }`}
               >
                 {item.count}

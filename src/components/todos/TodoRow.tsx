@@ -83,7 +83,7 @@ export function TodoRow({ todo, onToggle, onUpdate, onDelete }: Props) {
             onClick={() => setEditingTitle(true)}
             className={`block w-full text-left text-base ${
               todo.done
-                ? "text-zinc-400 line-through dark:text-zinc-500"
+                ? "text-zinc-400 line-through dark:text-zinc-400"
                 : "text-zinc-900 dark:text-zinc-100"
             } ${
               priorityWeightClass(todo.priority, todo.done)

@@ -319,7 +319,7 @@ export function MeetingForm({ meetingId, onBack }: Props) {
           onChange={(e) => updateField("title", e.target.value)}
           placeholder="제목 없음"
           autoFocus={!data.title}
-          className="w-full bg-transparent text-3xl font-bold text-zinc-900 outline-none placeholder:text-zinc-300 dark:text-zinc-100 dark:placeholder:text-zinc-700"
+          className="w-full bg-transparent text-3xl font-bold text-zinc-900 outline-none placeholder:text-zinc-300 dark:text-zinc-100 dark:placeholder:text-zinc-600"
         />
 
         {/* Metadata — subtle, inline */}
@@ -360,7 +360,7 @@ export function MeetingForm({ meetingId, onBack }: Props) {
           value={doc.content}
           onChange={(e) => updateField("content", e.target.value)}
           placeholder="내용을 입력하세요..."
-          className="mt-6 w-full resize-none overflow-hidden bg-transparent text-base leading-relaxed text-zinc-800 outline-none placeholder:text-zinc-300 dark:text-zinc-200 dark:placeholder:text-zinc-600"
+          className="mt-6 w-full resize-none overflow-hidden bg-transparent text-base leading-relaxed text-zinc-800 outline-none placeholder:text-zinc-300 dark:text-zinc-200 dark:placeholder:text-zinc-500"
           style={{ minHeight: "60svh" }}
           onInput={(e) => {
             const el = e.currentTarget;
@@ -373,7 +373,7 @@ export function MeetingForm({ meetingId, onBack }: Props) {
         {hasAnySummary ? (
           <div className="mt-6 space-y-3">
             {doc.discussion_items.length > 0 ? (
-              <div className="rounded-lg bg-zinc-50 px-4 py-3 dark:bg-zinc-900/40">
+              <div className="rounded-lg bg-zinc-50 px-4 py-3 dark:bg-zinc-900">
                 <EditableList
                   title="논의 사항"
                   items={doc.discussion_items}
@@ -383,7 +383,7 @@ export function MeetingForm({ meetingId, onBack }: Props) {
               </div>
             ) : null}
             {doc.decisions.length > 0 ? (
-              <div className="rounded-lg bg-zinc-50 px-4 py-3 dark:bg-zinc-900/40">
+              <div className="rounded-lg bg-zinc-50 px-4 py-3 dark:bg-zinc-900">
                 <EditableList
                   title="결정 사항"
                   items={doc.decisions}
@@ -393,7 +393,7 @@ export function MeetingForm({ meetingId, onBack }: Props) {
               </div>
             ) : null}
             {doc.action_items.length > 0 ? (
-              <div className="rounded-lg bg-zinc-50 px-4 py-3 dark:bg-zinc-900/40">
+              <div className="rounded-lg bg-zinc-50 px-4 py-3 dark:bg-zinc-900">
                 <EditableList
                   title="액션 아이템"
                   items={doc.action_items}
@@ -486,7 +486,7 @@ function SaveIndicator({
     return <span className="text-xs text-zinc-400">저장 중...</span>;
   }
   if (hasPendingEdit) {
-    return <span className="text-xs text-zinc-300 dark:text-zinc-600">...</span>;
+    return <span className="text-xs text-zinc-300 dark:text-zinc-500">...</span>;
   }
   return null;
 }

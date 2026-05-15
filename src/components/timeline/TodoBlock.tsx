@@ -41,7 +41,7 @@ export function TodoBlock({ todo, onToggle }: Props) {
         <span
           className={`text-base ${
             todo.done
-              ? "text-zinc-400 line-through dark:text-zinc-500"
+              ? "text-zinc-400 line-through dark:text-zinc-400"
               : todo.priority === "high"
                 ? "font-semibold text-zinc-900 dark:text-zinc-100"
                 : todo.priority === "low"

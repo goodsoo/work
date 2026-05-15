@@ -75,7 +75,7 @@ export function MonthGrid({
       </div>
 
       {/* Weekday headers */}
-      <div className="grid shrink-0 grid-cols-7 border-b border-zinc-100 dark:border-zinc-800/50">
+      <div className="grid shrink-0 grid-cols-7 border-b border-zinc-100 dark:border-zinc-800">
         {WEEKDAYS.map((w, i) => (
           <div
             key={w}
@@ -108,7 +108,7 @@ export function MonthGrid({
               key={date}
               type="button"
               onClick={() => onDayClick(date)}
-              className={`flex flex-col overflow-hidden border-b border-r border-zinc-100 px-1 py-0.5 text-left transition dark:border-zinc-800/50 ${
+              className={`flex flex-col overflow-hidden border-b border-r border-zinc-100 px-1 py-0.5 text-left transition dark:border-zinc-800 ${
                 selected
                   ? "bg-zinc-100 dark:bg-zinc-900"
                   : "hover:bg-zinc-50 dark:hover:bg-zinc-900/50"
@@ -148,8 +148,8 @@ export function MonthGrid({
                       ev.type === "meeting"
                         ? "bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300"
                         : ev.done
-                          ? "text-zinc-400 line-through dark:text-zinc-500"
-                          : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800/50 dark:text-zinc-400"
+                          ? "text-zinc-400 line-through dark:text-zinc-400"
+                          : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
                     }`}
                   >
                     {ev.time ? (

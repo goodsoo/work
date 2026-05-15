@@ -26,7 +26,7 @@ export function TodoAddBar({ onAdd, disabled }: Props) {
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-lg border border-zinc-100 bg-zinc-50/50 p-2.5 dark:border-zinc-800/50 dark:bg-zinc-900/30">
+    <div className="flex flex-wrap items-center gap-2 rounded-lg border border-zinc-100 bg-zinc-50/50 p-2.5 dark:border-zinc-800 dark:bg-zinc-900">
       <input
         type="text"
         value={title}

@@ -10,7 +10,7 @@ type Props = {
 export function ActivityBar({ activeTab, onTabChange }: Props) {
   const { user } = useAuth();
   return (
-    <div className="flex h-full w-12 flex-col items-center bg-zinc-50 py-4 dark:bg-zinc-900/40">
+    <div className="flex h-full w-12 flex-col items-center bg-zinc-50 py-4 dark:bg-zinc-900">
       <nav className="flex flex-col gap-1.5" aria-label="primary">
         {TABS.map(({ id, label, icon: Icon }) => {
           const active = id === activeTab;
@@ -24,7 +24,7 @@ export function ActivityBar({ activeTab, onTabChange }: Props) {
               className={`flex h-9 w-9 items-center justify-center rounded-lg transition ${
                 active
                   ? "bg-zinc-900 text-white dark:bg-zinc-700 dark:text-zinc-100"
-                  : "text-zinc-400 hover:bg-zinc-200/50 hover:text-zinc-700 dark:text-zinc-500 dark:hover:bg-zinc-800/50 dark:hover:text-zinc-300"
+                  : "text-zinc-400 hover:bg-zinc-200/50 hover:text-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800/50 dark:hover:text-zinc-300"
               }`}
             >
               <Icon className="h-[18px] w-[18px]" strokeWidth={active ? 2 : 1.5} />
@@ -43,7 +43,7 @@ export function ActivityBar({ activeTab, onTabChange }: Props) {
           type="button"
           onClick={() => void signOut()}
           title="로그아웃"
-          className="flex h-7 w-7 items-center justify-center rounded-lg text-zinc-300 transition hover:text-zinc-600 dark:text-zinc-600 dark:hover:text-zinc-400"
+          className="flex h-7 w-7 items-center justify-center rounded-lg text-zinc-300 transition hover:text-zinc-600 dark:text-zinc-500 dark:hover:text-zinc-400"
           style={{ minHeight: 0 }}
         >
           <LogOut className="h-3.5 w-3.5" />

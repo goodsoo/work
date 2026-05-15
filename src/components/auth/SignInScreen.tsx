@@ -53,7 +53,7 @@ export function SignInScreen() {
           </div>
         ) : null}
 
-        <p className="text-xs text-zinc-400 dark:text-zinc-500">
+        <p className="text-xs text-zinc-400 dark:text-zinc-400">
           1회 로그인 후 자동 유지됩니다.
         </p>
       </div>

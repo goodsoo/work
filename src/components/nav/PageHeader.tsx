@@ -9,7 +9,7 @@ type Props = {
 export function PageHeader({ left, right, secondaryRow }: Props) {
   return (
     <div
-      className="sticky z-10 border-b border-zinc-100 bg-white/90 backdrop-blur lg:top-0 dark:border-zinc-800/50 dark:bg-zinc-950/90"
+      className="sticky z-10 border-b border-zinc-100 bg-white/90 backdrop-blur lg:top-0 dark:border-zinc-800 dark:bg-zinc-950/90"
       style={{ top: "var(--app-header-h)" }}
     >
       <div className="mx-auto w-full max-w-2xl px-5 py-3 lg:max-w-4xl">
