@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
-import { useAuth, signOut } from "../../hooks/useAuth";
+import { Sun, Moon, Monitor } from "lucide-react";
+import { signOut } from "../../hooks/useAuth";
+import { useTheme } from "../../hooks/useTheme";
 import { BottomTabs, type Tab } from "./BottomTabs";
 import { ActivityBar } from "./ActivityBar";
 
@@ -11,8 +13,9 @@ type Props = {
 };
 
 export function AppShell({ activeTab, onTabChange, sidePanel, children }: Props) {
-  const { user } = useAuth();
+  const { theme, cycle } = useTheme();
   const hasSidePanel = sidePanel != null;
+  const ThemeIcon = theme === "light" ? Sun : theme === "dark" ? Moon : Monitor;
 
   return (
     <div
@@ -35,10 +38,15 @@ export function AppShell({ activeTab, onTabChange, sidePanel, children }: Props)
           <h1 className="text-sm font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">
             goodsoob
           </h1>
-          <div className="flex items-center gap-3">
-            <span className="hidden font-mono text-[11px] text-zinc-400 sm:inline">
-              {user?.email ?? user?.id}
-            </span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={cycle}
+              className="flex h-8 w-8 items-center justify-center rounded-md text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+              style={{ minHeight: 0 }}
+            >
+              <ThemeIcon className="h-4 w-4" />
+            </button>
             <button
               type="button"
               onClick={() => void signOut()}

@@ -1,5 +1,6 @@
-import { LogOut } from "lucide-react";
+import { LogOut, Sun, Moon, Monitor } from "lucide-react";
 import { useAuth, signOut } from "../../hooks/useAuth";
+import { useTheme } from "../../hooks/useTheme";
 import { TABS, type Tab } from "./BottomTabs";
 
 type Props = {
@@ -9,6 +10,12 @@ type Props = {
 
 export function ActivityBar({ activeTab, onTabChange }: Props) {
   const { user } = useAuth();
+  const { theme, cycle } = useTheme();
+
+  const ThemeIcon = theme === "light" ? Sun : theme === "dark" ? Moon : Monitor;
+  const themeLabel =
+    theme === "light" ? "라이트 모드" : theme === "dark" ? "다크 모드" : "시스템";
+
   return (
     <div className="flex h-full w-12 flex-col items-center bg-zinc-50 py-4 dark:bg-zinc-900">
       <nav className="flex flex-col gap-1.5" aria-label="primary">
@@ -33,6 +40,15 @@ export function ActivityBar({ activeTab, onTabChange }: Props) {
         })}
       </nav>
       <div className="mt-auto flex flex-col items-center gap-2">
+        <button
+          type="button"
+          onClick={cycle}
+          title={themeLabel}
+          className="flex h-7 w-7 items-center justify-center rounded-lg text-zinc-400 transition hover:bg-zinc-200/50 hover:text-zinc-700 dark:text-zinc-500 dark:hover:bg-zinc-800/50 dark:hover:text-zinc-300"
+          style={{ minHeight: 0 }}
+        >
+          <ThemeIcon className="h-3.5 w-3.5" />
+        </button>
         <div
           className="flex h-7 w-7 items-center justify-center rounded-full bg-zinc-200 text-[10px] font-semibold text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400"
           title={user?.email ?? user?.id ?? ""}

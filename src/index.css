@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* Tailwind v4: class-based dark mode */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --font-sans:
     "Pretendard Variable", "Pretendard", -apple-system, BlinkMacSystemFont,
@@ -20,10 +23,9 @@
     font-feature-settings: "ss10";
   }
 
-  @media (prefers-color-scheme: dark) {
-    body {
-      @apply bg-zinc-950 text-zinc-100;
-    }
+  .dark body,
+  body.dark {
+    @apply bg-zinc-950 text-zinc-100;
   }
 
   :root {
@@ -41,21 +43,18 @@
     }
   }
 
-  /* Clean heading style */
   .font-serif {
     font-weight: 600;
     letter-spacing: -0.01em;
   }
 
-  /* Tap target minimum */
   button,
   a {
     min-height: 44px;
   }
 
-  /* ── Custom form element styling ── */
+  /* ── Form elements ── */
 
-  /* Selects: consistent pill shape */
   select {
     appearance: none;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 5l3 3 3-3' stroke='%23a1a1aa' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
@@ -76,19 +75,16 @@
     border-color: #a1a1aa;
   }
 
-  @media (prefers-color-scheme: dark) {
-    select {
-      border-color: #3f3f46;
-      background-color: #18181b;
-      color: #d4d4d8;
-      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 5l3 3 3-3' stroke='%2571717a' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
-    }
-    select:focus {
-      border-color: #52525b;
-    }
+  :is(.dark, .dark *) select {
+    border-color: #3f3f46;
+    background-color: #18181b;
+    color: #d4d4d8;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 5l3 3 3-3' stroke='%2571717a' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  }
+  :is(.dark, .dark *) select:focus {
+    border-color: #52525b;
   }
 
-  /* Date/time inputs: consistent style */
   input[type="date"],
   input[type="time"] {
     border-radius: 6px;
@@ -106,27 +102,23 @@
     border-color: #a1a1aa;
   }
 
-  @media (prefers-color-scheme: dark) {
-    input[type="date"],
-    input[type="time"] {
-      border-color: #3f3f46;
-      background-color: #18181b;
-      color: #d4d4d8;
-    }
-    input[type="date"]:focus,
-    input[type="time"]:focus {
-      border-color: #52525b;
-    }
+  :is(.dark, .dark *) input[type="date"],
+  :is(.dark, .dark *) input[type="time"] {
+    border-color: #3f3f46;
+    background-color: #18181b;
+    color: #d4d4d8;
+  }
+  :is(.dark, .dark *) input[type="date"]:focus,
+  :is(.dark, .dark *) input[type="time"]:focus {
+    border-color: #52525b;
   }
 
-  /* Remove webkit date input default styling */
   input[type="date"]::-webkit-calendar-picker-indicator,
   input[type="time"]::-webkit-calendar-picker-indicator {
     opacity: 0.5;
     cursor: pointer;
   }
 
-  /* Page transition */
   @keyframes fade-in {
     from { opacity: 0; transform: translateY(4px); }
     to { opacity: 1; transform: translateY(0); }
