@@ -3,6 +3,8 @@ import {
   ClipboardList,
   BookOpen,
   Calendar,
+  HelpCircle,
+  X,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useMeetings, useCreateMeeting } from "../../hooks/useMeetings";
@@ -63,7 +65,7 @@ export function MeetingsSidePanel({ selectedId, onSelect }: MeetingsPanelProps) 
   }
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="relative flex h-full flex-col">
       <div
         className="flex shrink-0 items-center justify-between px-4 py-3"
         style={{ borderBottom: "1px solid var(--border-default)" }}
@@ -99,7 +101,7 @@ export function MeetingsSidePanel({ selectedId, onSelect }: MeetingsPanelProps) 
         </div>
       ) : null}
 
-      <div className="flex-1 overflow-y-auto">
+      <div className="min-h-0 flex-1 overflow-y-auto">
         {isLoading ? (
           <div className="space-y-2 p-3">
             {[0, 1, 2].map((i) => (
@@ -130,9 +132,72 @@ export function MeetingsSidePanel({ selectedId, onSelect }: MeetingsPanelProps) 
           </ul>
         )}
       </div>
+      <MarkdownHelp />
     </div>
   );
 }
+
+function MarkdownHelp() {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="flex shrink-0 items-center gap-1.5 px-4 py-2.5 text-xs transition"
+        style={{ color: "var(--text-muted)", borderTop: "1px solid var(--border-subtle)", minHeight: 0 }}
+      >
+        <HelpCircle className="h-3.5 w-3.5" />
+        마크다운 도움말
+      </button>
+      {open ? (
+        <div
+          className="absolute inset-0 z-30 flex flex-col overflow-y-auto"
+          style={{ backgroundColor: "var(--bg-surface)" }}
+        >
+          <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: "1px solid var(--border-default)" }}>
+            <span className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>마크다운 문법</span>
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              style={{ color: "var(--text-muted)", minHeight: 0 }}
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          <div className="space-y-3 px-4 py-4 text-sm" style={{ color: "var(--text-primary)" }}>
+            {MARKDOWN_HINTS.map((h) => (
+              <div key={h.syntax}>
+                <code
+                  className="rounded px-1.5 py-0.5 font-mono text-xs"
+                  style={{ backgroundColor: "var(--bg-surface-active)", color: "var(--text-secondary)" }}
+                >
+                  {h.syntax}
+                </code>
+                <span className="ml-2 text-xs" style={{ color: "var(--text-secondary)" }}>{h.desc}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+    </>
+  );
+}
+
+const MARKDOWN_HINTS = [
+  { syntax: "# 제목", desc: "큰 제목" },
+  { syntax: "## 소제목", desc: "중간 제목" },
+  { syntax: "**굵게**", desc: "굵은 글씨" },
+  { syntax: "*기울임*", desc: "기울인 글씨" },
+  { syntax: "- 항목", desc: "목록" },
+  { syntax: "1. 항목", desc: "번호 목록" },
+  { syntax: "[ ] 할 일", desc: "체크박스" },
+  { syntax: "[x] 완료", desc: "완료된 체크박스" },
+  { syntax: "> 인용", desc: "인용문" },
+  { syntax: "`코드`", desc: "인라인 코드" },
+  { syntax: "---", desc: "구분선" },
+  { syntax: "[텍스트](URL)", desc: "링크" },
+];
 
 function MeetingItem({
   meeting,
