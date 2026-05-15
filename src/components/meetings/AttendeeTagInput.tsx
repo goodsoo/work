@@ -57,6 +57,7 @@ export function AttendeeTagInput({
   }
 
   function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.nativeEvent.isComposing) return;
     if (e.key === "Enter") {
       e.preventDefault();
       if (open && filtered[highlight]) addTag(filtered[highlight]);
