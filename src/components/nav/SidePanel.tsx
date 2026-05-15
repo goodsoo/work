@@ -66,13 +66,13 @@ export function MeetingsSidePanel({ selectedId, onSelect }: MeetingsPanelProps) 
     <div className="flex h-full flex-col">
       <div className="flex shrink-0 items-center justify-between border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
         <h2 className="font-serif text-sm font-medium text-zinc-900 dark:text-zinc-100">
-          회의록
+          메모장
         </h2>
         <button
           type="button"
           onClick={handleCreate}
           disabled={createMutation.isPending}
-          title="새 회의록"
+          title="새 메모장"
           className="flex h-7 w-7 items-center justify-center rounded-md text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-900 disabled:opacity-50 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
           style={{ minHeight: 0 }}
         >
@@ -98,7 +98,7 @@ export function MeetingsSidePanel({ selectedId, onSelect }: MeetingsPanelProps) 
           </div>
         ) : !data || data.length === 0 ? (
           <div className="px-4 py-8 text-center text-sm text-zinc-400">
-            아직 회의록이 없어요
+            아직 메모장이 없어요
           </div>
         ) : (
           <ul className="p-2">

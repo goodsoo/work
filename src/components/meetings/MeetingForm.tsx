@@ -7,6 +7,8 @@ import {
   Check,
   Undo2,
   Redo2,
+  Sparkles,
+  ChevronDown,
 } from "lucide-react";
 import {
   useMeeting,
@@ -21,9 +23,7 @@ import { SummarizeButton } from "./SummarizeButton";
 import { CopyButton } from "./CopyButton";
 import { EditableList } from "./EditableList";
 import { AttendeeTagInput } from "./AttendeeTagInput";
-import { MarkdownView } from "./MarkdownView";
 import { parseAttendees } from "../../lib/attendees";
-import { PageHeader } from "../nav/PageHeader";
 
 type Props = {
   meetingId: string;
@@ -130,12 +130,11 @@ export function MeetingForm({ meetingId, onBack }: Props) {
   const doc = history.value;
 
   const [actionError, setActionError] = useState<string | null>(null);
-  const [bodyMode, setBodyMode] = useState<"edit" | "split" | "preview">("edit");
   const [addedTodoIndices, setAddedTodoIndices] = useState<Set<number>>(
     () => new Set(),
   );
+  const [summaryOpen, setSummaryOpen] = useState(true);
 
-  // Reset "added to todos" tracking when meeting or action items content changes.
   const addedKey = `${meetingId}|${doc.action_items.join("\n")}`;
   const [trackedAddedKey, setTrackedAddedKey] = useState(addedKey);
   if (trackedAddedKey !== addedKey) {
@@ -143,7 +142,6 @@ export function MeetingForm({ meetingId, onBack }: Props) {
     setAddedTodoIndices(new Set());
   }
 
-  // Flush pending edits on unmount or page navigation.
   useEffect(() => {
     function onBeforeUnload() {
       history.flush();
@@ -178,7 +176,7 @@ export function MeetingForm({ meetingId, onBack }: Props) {
 
   async function handleDelete() {
     if (!data) return;
-    if (!window.confirm("이 회의록을 삭제할까요?")) return;
+    if (!window.confirm("이 메모를 삭제할까요?")) return;
     try {
       await deleteMutation.mutateAsync(data.id);
       onBack();
@@ -209,87 +207,36 @@ export function MeetingForm({ meetingId, onBack }: Props) {
   function retrySave() {
     history.flush();
     if (history.canUndo === false && !updateMutation.isPending) {
-      // No pending edit and not currently saving — re-fire last commit.
       updateMutation.mutate(docToPatch(doc));
     }
   }
 
-  const headerLeft = (
-    <button
-      type="button"
-      onClick={onBack}
-      className="inline-flex items-center gap-1 text-sm text-zinc-500 transition hover:text-zinc-900 lg:hidden dark:text-zinc-400 dark:hover:text-zinc-100"
-    >
-      <ChevronLeft className="h-4 w-4" />
-      목록
-    </button>
-  );
-
-  const undoRedoButtons = (
-    <div
-      className="inline-flex overflow-hidden rounded-lg border border-zinc-200 text-xs dark:border-zinc-800"
-      aria-label="실행 취소 / 다시 실행"
-    >
-      <button
-        type="button"
-        onClick={history.undo}
-        disabled={!history.canUndo}
-        aria-label="실행 취소 (Ctrl/⌘+Z)"
-        title="실행 취소 (Ctrl/⌘+Z)"
-        className="px-2 py-1 text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-900 disabled:cursor-not-allowed disabled:opacity-30 dark:text-zinc-400 dark:hover:bg-zinc-900 dark:hover:text-zinc-100"
-        style={{ minHeight: 28 }}
-      >
-        <Undo2 className="h-3.5 w-3.5" />
-      </button>
-      <button
-        type="button"
-        onClick={history.redo}
-        disabled={!history.canRedo}
-        aria-label="다시 실행 (Ctrl/⌘+Shift+Z)"
-        title="다시 실행 (Ctrl/⌘+Shift+Z)"
-        className="border-l border-zinc-200 px-2 py-1 text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-900 disabled:cursor-not-allowed disabled:opacity-30 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-900 dark:hover:text-zinc-100"
-        style={{ minHeight: 28 }}
-      >
-        <Redo2 className="h-3.5 w-3.5" />
-      </button>
-    </div>
-  );
-
   if (error) {
     return (
-      <>
-        <PageHeader left={headerLeft} />
-        <div className="mx-auto w-full max-w-2xl px-5 pb-16 pt-5 lg:max-w-4xl">
-          <div className="mt-2 rounded-lg border-l-4 border-red-600 bg-red-50 p-4 text-sm text-red-900 dark:border-red-500 dark:bg-red-950/30 dark:text-red-200">
-            <div className="font-medium">회의록을 불러오지 못했어요</div>
-            <div className="mt-1 font-mono text-xs opacity-80">
-              {(error as Error).message}
-            </div>
-            <button
-              type="button"
-              onClick={() => void refetch()}
-              className="mt-3 text-xs underline underline-offset-2"
-            >
-              다시 시도
-            </button>
-          </div>
+      <div className="mx-auto w-full max-w-3xl px-6 py-16">
+        <button
+          type="button"
+          onClick={onBack}
+          className="mb-6 inline-flex items-center gap-1 text-sm text-zinc-500 lg:hidden"
+        >
+          <ChevronLeft className="h-4 w-4" /> 목록
+        </button>
+        <div className="rounded-lg border-l-4 border-red-600 bg-red-50 p-4 text-sm text-red-900 dark:border-red-500 dark:bg-red-950/30 dark:text-red-200">
+          불러오지 못했어요. <button type="button" onClick={() => void refetch()} className="underline">재시도</button>
         </div>
-      </>
+      </div>
     );
   }
 
   if (isLoading || !data) {
     return (
-      <>
-        <PageHeader left={headerLeft} />
-        <div className="mx-auto w-full max-w-2xl px-5 pb-16 pt-5 lg:max-w-4xl">
-          <div className="mt-2 space-y-4" aria-hidden>
-            <div className="h-10 animate-pulse rounded-lg bg-zinc-100 dark:bg-zinc-900" />
-            <div className="h-10 animate-pulse rounded-lg bg-zinc-100 dark:bg-zinc-900" />
-            <div className="h-48 animate-pulse rounded-lg bg-zinc-100 dark:bg-zinc-900" />
-          </div>
+      <div className="mx-auto w-full max-w-3xl px-6 py-16">
+        <div className="space-y-4" aria-hidden>
+          <div className="h-10 w-48 animate-pulse rounded bg-zinc-100 dark:bg-zinc-900" />
+          <div className="h-6 w-32 animate-pulse rounded bg-zinc-100 dark:bg-zinc-900" />
+          <div className="h-64 animate-pulse rounded bg-zinc-100 dark:bg-zinc-900" />
         </div>
-      </>
+      </div>
     );
   }
 
@@ -307,160 +254,148 @@ export function MeetingForm({ meetingId, onBack }: Props) {
   };
 
   return (
-    <>
-      <PageHeader
-        left={headerLeft}
-        right={
-          <>
-            {undoRedoButtons}
-            <SaveIndicator
-              isPending={updateMutation.isPending}
-              isError={updateMutation.isError}
-              hasPendingEdit={history.canUndo && !updateMutation.isPending && !updateMutation.isError}
-              onRetry={retrySave}
-            />
-          </>
-        }
-      />
-      <div
-        onKeyDown={onFormKeyDown}
-        className="mx-auto w-full max-w-2xl px-5 pb-16 pt-5 lg:max-w-4xl"
-      >
-        {updateMutation.isError ? (
-          <div className="mt-2 flex items-start gap-2 rounded-lg border-l-4 border-red-600 bg-red-50 p-3 text-sm text-red-900 dark:border-red-500 dark:bg-red-950/30 dark:text-red-200">
-            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-            <div className="flex-1">
-              <div className="font-medium">자동 저장 실패</div>
-              <div className="mt-0.5 font-mono text-xs opacity-80">
-                {(updateMutation.error as Error)?.message}
-              </div>
-            </div>
+    <div onKeyDown={onFormKeyDown} className="min-h-svh">
+      {/* Top bar — compact, floating feel */}
+      <div className="sticky top-0 z-10 flex items-center justify-between bg-white/90 px-5 py-2 backdrop-blur lg:top-0 dark:bg-zinc-950/90">
+        <button
+          type="button"
+          onClick={onBack}
+          className="inline-flex items-center gap-1 text-sm text-zinc-400 transition hover:text-zinc-700 lg:hidden dark:hover:text-zinc-300"
+        >
+          <ChevronLeft className="h-4 w-4" /> 목록
+        </button>
+        <div className="flex items-center gap-2">
+          <div className="inline-flex overflow-hidden rounded-md border border-zinc-100 dark:border-zinc-800">
             <button
               type="button"
-              onClick={retrySave}
-              className="text-xs underline underline-offset-2"
+              onClick={history.undo}
+              disabled={!history.canUndo}
+              title="실행 취소"
+              className="px-1.5 py-1 text-zinc-500 transition hover:bg-zinc-50 disabled:opacity-20 dark:hover:bg-zinc-900"
+              style={{ minHeight: 0 }}
             >
-              재시도
+              <Undo2 className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={history.redo}
+              disabled={!history.canRedo}
+              title="다시 실행"
+              className="border-l border-zinc-100 px-1.5 py-1 text-zinc-500 transition hover:bg-zinc-50 disabled:opacity-20 dark:border-zinc-800 dark:hover:bg-zinc-900"
+              style={{ minHeight: 0 }}
+            >
+              <Redo2 className="h-3.5 w-3.5" />
             </button>
           </div>
-        ) : null}
-
-        {actionError ? (
-          <div className="mt-4 rounded-lg border-l-4 border-red-600 bg-red-50 p-3 text-sm text-red-900 dark:border-red-500 dark:bg-red-950/30 dark:text-red-200">
-            {actionError}
-          </div>
-        ) : null}
-
-        <div className="mt-4 space-y-4">
-          <input
-            type="text"
-            value={doc.title}
-            onChange={(e) => updateField("title", e.target.value)}
-            placeholder="제목 (선택)"
-            autoFocus={!data.title}
-            className="w-full border-0 border-b border-zinc-100 bg-transparent pb-2 text-xl font-semibold text-zinc-900 outline-none placeholder:text-zinc-300 focus:border-zinc-300 dark:border-zinc-800/50 dark:text-zinc-100 dark:placeholder:text-zinc-700 dark:focus:border-zinc-600"
+          <SaveIndicator
+            isPending={updateMutation.isPending}
+            isError={updateMutation.isError}
+            hasPendingEdit={history.canUndo && !updateMutation.isPending && !updateMutation.isError}
+            onRetry={retrySave}
           />
+        </div>
+      </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <label className="flex flex-col gap-1">
-              <span className="text-xs text-zinc-500">날짜</span>
-              <input
-                type="date"
-                value={doc.date}
-                onChange={(e) => updateField("date", e.target.value)}
-                className="w-full rounded-lg px-3 py-2"
-              />
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className="text-xs text-zinc-500">시간</span>
-              <input
-                type="text"
-                value={doc.time}
-                onChange={(e) => updateField("time", e.target.value)}
-                placeholder="14:00 또는 오후 2시"
-                className="w-full rounded-lg border border-zinc-100 bg-zinc-50/50 px-3 py-2 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-zinc-300 dark:border-zinc-800/50 dark:bg-zinc-900/30 dark:text-zinc-100 dark:focus:border-zinc-600"
-              />
-            </label>
-            <label className="flex flex-col gap-1 sm:col-span-1">
-              <span className="text-xs text-zinc-500">참석</span>
+      {/* Error alerts */}
+      {updateMutation.isError || actionError ? (
+        <div className="mx-auto max-w-3xl px-6 pt-2">
+          {updateMutation.isError ? (
+            <div className="flex items-start gap-2 rounded-lg border-l-4 border-red-600 bg-red-50 p-3 text-sm text-red-900 dark:border-red-500 dark:bg-red-950/30 dark:text-red-200">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+              <span className="flex-1">자동 저장 실패</span>
+              <button type="button" onClick={retrySave} className="text-xs underline">재시도</button>
+            </div>
+          ) : null}
+          {actionError ? (
+            <div className="mt-2 rounded-lg border-l-4 border-red-600 bg-red-50 p-3 text-sm text-red-900 dark:border-red-500 dark:bg-red-950/30 dark:text-red-200">
+              {actionError}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
+      {/* Notion-style editor area */}
+      <div className="mx-auto max-w-3xl px-6 pb-24 pt-8">
+        {/* Title */}
+        <input
+          type="text"
+          value={doc.title}
+          onChange={(e) => updateField("title", e.target.value)}
+          placeholder="제목 없음"
+          autoFocus={!data.title}
+          className="w-full bg-transparent text-3xl font-bold text-zinc-900 outline-none placeholder:text-zinc-300 dark:text-zinc-100 dark:placeholder:text-zinc-700"
+        />
+
+        {/* Metadata — subtle, inline */}
+        <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-zinc-500">
+          <label className="inline-flex items-center gap-1.5">
+            <span className="text-xs text-zinc-400">날짜</span>
+            <input
+              type="date"
+              value={doc.date}
+              onChange={(e) => updateField("date", e.target.value)}
+            />
+          </label>
+          <label className="inline-flex items-center gap-1.5">
+            <span className="text-xs text-zinc-400">시간</span>
+            <input
+              type="text"
+              value={doc.time}
+              onChange={(e) => updateField("time", e.target.value)}
+              placeholder="14:00"
+              className="w-20 border-0 bg-transparent text-sm outline-none placeholder:text-zinc-300 dark:placeholder:text-zinc-600"
+            />
+          </label>
+          <div className="inline-flex items-center gap-1.5">
+            <span className="text-xs text-zinc-400">참석</span>
+            <div className="min-w-[12em]">
               <AttendeeTagInput
                 value={doc.attendees}
                 onChange={(next) => updateField("attendees", next)}
                 suggestions={attendeeSuggestions}
+                placeholder="이름"
               />
-            </label>
-          </div>
-
-          <div className="flex flex-col gap-1">
-            <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <span className="text-xs text-zinc-500">본문 (Markdown)</span>
-              <div
-                className="inline-flex overflow-hidden rounded-lg border border-zinc-200 text-xs dark:border-zinc-800"
-                role="tablist"
-                aria-label="본문 보기 모드"
-              >
-                {(["edit", "split", "preview"] as const).map((m) => {
-                  const label =
-                    m === "edit" ? "편집" : m === "split" ? "분할" : "미리보기";
-                  const active = bodyMode === m;
-                  return (
-                    <button
-                      key={m}
-                      type="button"
-                      role="tab"
-                      aria-selected={active}
-                      onClick={() => setBodyMode(m)}
-                      className={`px-3 py-1 transition ${
-                        active
-                          ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
-                          : "text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
-                      }`}
-                      style={{ minHeight: 28 }}
-                    >
-                      {label}
-                    </button>
-                  );
-                })}
-              </div>
             </div>
-            {bodyMode === "edit" ? (
-              <textarea
-                value={doc.content}
-                onChange={(e) => updateField("content", e.target.value)}
-                placeholder="회의 내용을 적어주세요. # 제목, **굵게**, - 목록, [ ] 체크박스 등 마크다운 사용 가능."
-                rows={12}
-                className="min-h-64 resize-y rounded-lg border border-zinc-200 bg-white px-3 py-3 font-mono text-sm leading-relaxed text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-zinc-400 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100 dark:placeholder:text-zinc-600 dark:focus:border-zinc-600"
-              />
-            ) : bodyMode === "preview" ? (
-              <div className="min-h-64 rounded-lg border border-zinc-200 bg-white p-3 dark:border-zinc-800 dark:bg-zinc-950">
-                <MarkdownView content={doc.content} />
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                <textarea
-                  value={doc.content}
-                  onChange={(e) => updateField("content", e.target.value)}
-                  placeholder="회의 내용을 적어주세요. 마크다운 사용 가능."
-                  rows={12}
-                  className="h-96 resize-y rounded-lg border border-zinc-200 bg-white px-3 py-3 font-mono text-sm leading-relaxed text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-zinc-400 md:h-[32rem] dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100 dark:placeholder:text-zinc-600 dark:focus:border-zinc-600"
-                  aria-label="본문 편집"
-                />
-                <div
-                  className="h-96 overflow-auto rounded-lg border border-zinc-200 bg-white p-3 md:h-[32rem] dark:border-zinc-800 dark:bg-zinc-950"
-                  aria-label="본문 미리보기"
-                >
-                  <MarkdownView content={doc.content} />
-                </div>
-              </div>
-            )}
           </div>
         </div>
 
-        <section className="mt-8 border-t border-zinc-200 pt-6 dark:border-zinc-800">
-          <div className="mb-4 flex items-center justify-between">
-            <h3 className="font-serif text-lg text-zinc-900 dark:text-zinc-100">
-              요약
-            </h3>
+        {/* Divider */}
+        <div className="my-6 border-t border-zinc-100 dark:border-zinc-800/50" />
+
+        {/* Body — full width textarea, no border */}
+        <textarea
+          value={doc.content}
+          onChange={(e) => updateField("content", e.target.value)}
+          placeholder="내용을 입력하세요..."
+          className="w-full resize-none bg-transparent text-base leading-relaxed text-zinc-800 outline-none placeholder:text-zinc-300 dark:text-zinc-200 dark:placeholder:text-zinc-600"
+          style={{ minHeight: "24rem" }}
+          onInput={(e) => {
+            const el = e.currentTarget;
+            el.style.height = "auto";
+            el.style.height = el.scrollHeight + "px";
+          }}
+        />
+
+        {/* AI Summary — collapsible, clean */}
+        <div className="mt-8 border-t border-zinc-100 pt-6 dark:border-zinc-800/50">
+          <div className="flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => setSummaryOpen((v) => !v)}
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-zinc-500 transition hover:text-zinc-900 dark:hover:text-zinc-100"
+              style={{ minHeight: 0 }}
+            >
+              <ChevronDown
+                className={`h-4 w-4 transition ${summaryOpen ? "" : "-rotate-90"}`}
+              />
+              <Sparkles className="h-3.5 w-3.5" />
+              AI 요약
+              {hasAnySummary ? (
+                <span className="ml-1 text-xs text-zinc-400">
+                  {doc.discussion_items.length + doc.decisions.length + doc.action_items.length}개
+                </span>
+              ) : null}
+            </button>
             <SummarizeButton
               meetingId={data.id}
               title={doc.title || null}
@@ -478,75 +413,72 @@ export function MeetingForm({ meetingId, onBack }: Props) {
                 });
                 history.flush();
                 setActionError(null);
+                setSummaryOpen(true);
               }}
               onError={setActionError}
             />
           </div>
 
-          {!hasAnySummary ? (
-            <p className="mb-4 text-sm text-zinc-400">
-              본문을 입력하고 AI 요약을 누르거나 직접 항목을 추가해주세요.
-            </p>
+          {summaryOpen ? (
+            <div className="mt-4 space-y-4">
+              {!hasAnySummary ? (
+                <p className="text-sm text-zinc-400">
+                  본문 입력 후 요약 버튼을 누르세요.
+                </p>
+              ) : null}
+              <EditableList
+                title="논의 사항"
+                items={doc.discussion_items}
+                onSave={(next) => updateField("discussion_items", next)}
+                bullet="dot"
+              />
+              <EditableList
+                title="결정 사항"
+                items={doc.decisions}
+                onSave={(next) => updateField("decisions", next)}
+                bullet="dot"
+              />
+              <EditableList
+                title="액션 아이템"
+                items={doc.action_items}
+                bullet="redCheckbox"
+                onSave={(next) => updateField("action_items", next)}
+                itemActions={(i, text) =>
+                  addedTodoIndices.has(i) ? (
+                    <span className="inline-flex items-center gap-1 text-xs text-zinc-400" style={{ minHeight: 0 }}>
+                      <Check className="h-3 w-3" /> 추가됨
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => addActionItemAsTodo(i, text)}
+                      disabled={createTodoMutation.isPending}
+                      className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-900 disabled:opacity-40 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+                      style={{ minHeight: 0 }}
+                    >
+                      <ListPlus className="h-3 w-3" /> 할 일로
+                    </button>
+                  )
+                }
+              />
+            </div>
           ) : null}
-          <div className="space-y-5">
-            <EditableList
-              title="논의 사항"
-              items={doc.discussion_items}
-              onSave={(next) => updateField("discussion_items", next)}
-              bullet="dot"
-            />
-            <EditableList
-              title="결정 사항"
-              items={doc.decisions}
-              onSave={(next) => updateField("decisions", next)}
-              bullet="dot"
-            />
-            <EditableList
-              title="액션 아이템"
-              items={doc.action_items}
-              bullet="redCheckbox"
-              onSave={(next) => updateField("action_items", next)}
-              itemActions={(i, text) =>
-                addedTodoIndices.has(i) ? (
-                  <span
-                    className="inline-flex items-center gap-1 text-xs text-zinc-400"
-                    aria-label="할 일로 추가됨"
-                    style={{ minHeight: 0 }}
-                  >
-                    <Check className="h-3 w-3" />
-                    추가됨
-                  </span>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => addActionItemAsTodo(i, text)}
-                    disabled={createTodoMutation.isPending}
-                    className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-900 disabled:opacity-40 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
-                    style={{ minHeight: 0 }}
-                  >
-                    <ListPlus className="h-3 w-3" />
-                    할 일로
-                  </button>
-                )
-              }
-            />
-          </div>
-        </section>
+        </div>
 
-        <div className="mt-8 flex flex-wrap items-center justify-between gap-3">
+        {/* Footer actions */}
+        <div className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-zinc-100 pt-4 dark:border-zinc-800/50">
           <CopyButton meeting={meetingForCopy} onError={setActionError} />
           <button
             type="button"
             onClick={handleDelete}
             disabled={deleteMutation.isPending}
-            className="inline-flex items-center gap-1.5 text-sm text-zinc-500 transition hover:text-red-600 disabled:opacity-50 dark:text-zinc-500 dark:hover:text-red-500"
+            className="inline-flex items-center gap-1.5 text-sm text-zinc-400 transition hover:text-red-600 disabled:opacity-50 dark:hover:text-red-500"
           >
-            <Trash2 className="h-4 w-4" />
-            삭제
+            <Trash2 className="h-4 w-4" /> 삭제
           </button>
         </div>
       </div>
-    </>
+    </div>
   );
 }
 
@@ -566,22 +498,18 @@ function SaveIndicator({
       <button
         type="button"
         onClick={onRetry}
-        className="text-sm text-red-600 underline underline-offset-2 dark:text-red-500"
-        style={{ minHeight: 28 }}
+        className="text-xs text-red-600 underline dark:text-red-500"
+        style={{ minHeight: 0 }}
       >
-        저장 실패 · 재시도
+        저장 실패
       </button>
     );
   }
   if (isPending) {
-    return (
-      <span className="text-sm text-zinc-500 dark:text-zinc-400">저장 중...</span>
-    );
+    return <span className="text-xs text-zinc-400">저장 중...</span>;
   }
   if (hasPendingEdit) {
-    return (
-      <span className="text-sm text-zinc-400 dark:text-zinc-500">대기 중</span>
-    );
+    return <span className="text-xs text-zinc-300 dark:text-zinc-600">...</span>;
   }
   return null;
 }

@@ -107,7 +107,7 @@ export default function App() {
                   onBack={closeMeeting}
                 />
               ) : (
-                <DesktopEmptyState message="왼쪽에서 회의록을 선택하세요" />
+                <DesktopEmptyState message="왼쪽에서 메모를 선택하세요" />
               )}
             </div>
           </>

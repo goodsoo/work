@@ -9,7 +9,7 @@ type Props = {
 };
 
 export const TABS: Array<{ id: Tab; label: string; icon: LucideIcon }> = [
-  { id: "meetings", label: "회의록", icon: ClipboardList },
+  { id: "meetings", label: "메모장", icon: ClipboardList },
   { id: "calendar", label: "캘린더", icon: CalendarDays },
   { id: "todos", label: "할 일", icon: ListChecks },
 ];

@@ -37,7 +37,7 @@ export function MeetingsList({ onSelect, onCreate, creating }: Props) {
       <PageHeader
         left={
           <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-            회의록
+            메모장
           </h2>
         }
         right={
@@ -48,7 +48,7 @@ export function MeetingsList({ onSelect, onCreate, creating }: Props) {
             className="inline-flex items-center gap-1.5 rounded-lg bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
           >
             <Plus className="h-4 w-4" />
-            새 회의록
+            새 메모장
           </button>
         }
       />
@@ -139,7 +139,7 @@ function EmptyState({ onCreate }: { onCreate: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center gap-4 px-4 py-16 text-center">
       <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-        아직 회의록이 없어요
+        아직 메모장이 없어요
       </h3>
       <p className="text-sm text-zinc-500 dark:text-zinc-400">
         첫 회의를 기록해볼까요?
@@ -149,7 +149,7 @@ function EmptyState({ onCreate }: { onCreate: () => void }) {
         onClick={onCreate}
         className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
       >
-        <Plus className="h-4 w-4" />새 회의록
+        <Plus className="h-4 w-4" />새 메모장
       </button>
     </div>
   );
