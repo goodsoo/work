@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Sun, Moon, Monitor } from "lucide-react";
+import { Sun, Moon } from "lucide-react";
 import { signOut } from "../../hooks/useAuth";
 import { useTheme } from "../../hooks/useTheme";
 import { BottomTabs, type Tab } from "./BottomTabs";
@@ -13,9 +13,9 @@ type Props = {
 };
 
 export function AppShell({ activeTab, onTabChange, sidePanel, children }: Props) {
-  const { theme, cycle } = useTheme();
+  const { theme, toggle } = useTheme();
   const hasSidePanel = sidePanel != null;
-  const ThemeIcon = theme === "light" ? Sun : theme === "dark" ? Moon : Monitor;
+  const ThemeIcon = theme === "light" ? Sun : Moon;
 
   return (
     <div
@@ -41,7 +41,7 @@ export function AppShell({ activeTab, onTabChange, sidePanel, children }: Props)
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={cycle}
+              onClick={toggle}
               className="flex h-8 w-8 items-center justify-center rounded-md text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
               style={{ minHeight: 0 }}
             >
