@@ -360,12 +360,12 @@ export function MeetingForm({ meetingId, onBack }: Props) {
           value={doc.content}
           onChange={(e) => updateField("content", e.target.value)}
           placeholder="내용을 입력하세요..."
-          className="mt-6 w-full resize-none bg-transparent text-base leading-relaxed text-zinc-800 outline-none placeholder:text-zinc-300 dark:text-zinc-200 dark:placeholder:text-zinc-600"
-          style={{ minHeight: "calc(100svh - 14rem)" }}
+          className="mt-6 w-full resize-none overflow-hidden bg-transparent text-base leading-relaxed text-zinc-800 outline-none placeholder:text-zinc-300 dark:text-zinc-200 dark:placeholder:text-zinc-600"
+          style={{ minHeight: "60svh" }}
           onInput={(e) => {
             const el = e.currentTarget;
             el.style.height = "auto";
-            el.style.height = Math.max(el.scrollHeight, window.innerHeight - 224) + "px";
+            el.style.height = el.scrollHeight + "px";
           }}
         />
 
