@@ -165,16 +165,26 @@ function MarkdownHelp() {
               <X className="h-4 w-4" />
             </button>
           </div>
-          <div className="space-y-3 px-4 py-4 text-sm" style={{ color: "var(--text-primary)" }}>
+          <div className="space-y-1.5 px-4 py-4 text-sm" style={{ color: "var(--text-primary)" }}>
             {MARKDOWN_HINTS.map((h) => (
               <div key={h.syntax}>
-                <code
-                  className="rounded px-1.5 py-0.5 font-mono text-xs"
-                  style={{ backgroundColor: "var(--bg-surface-active)", color: "var(--text-secondary)" }}
-                >
-                  {h.syntax}
-                </code>
-                <span className="ml-2 text-xs" style={{ color: "var(--text-secondary)" }}>{h.desc}</span>
+                {h.section ? (
+                  <div
+                    className="mb-1 mt-3 text-[10px] font-semibold uppercase tracking-wider first:mt-0"
+                    style={{ color: "var(--text-muted)" }}
+                  >
+                    {h.section}
+                  </div>
+                ) : null}
+                <div className="flex items-baseline gap-2">
+                  <code
+                    className="shrink-0 rounded px-1.5 py-0.5 font-mono text-[11px]"
+                    style={{ backgroundColor: "var(--bg-surface-active)", color: "var(--text-secondary)" }}
+                  >
+                    {h.syntax}
+                  </code>
+                  <span className="text-xs" style={{ color: "var(--text-muted)" }}>{h.desc}</span>
+                </div>
               </div>
             ))}
           </div>
@@ -184,19 +194,25 @@ function MarkdownHelp() {
   );
 }
 
-const MARKDOWN_HINTS = [
-  { syntax: "# 제목", desc: "큰 제목" },
-  { syntax: "## 소제목", desc: "중간 제목" },
-  { syntax: "**굵게**", desc: "굵은 글씨" },
+const MARKDOWN_HINTS: Array<{ syntax: string; desc: string; section?: string }> = [
+  { section: "제목", syntax: "# 제목", desc: "대제목" },
+  { syntax: "## 소제목", desc: "중제목" },
+  { syntax: "### 소소제목", desc: "소제목" },
+  { section: "서식", syntax: "**굵게**", desc: "굵은 글씨" },
   { syntax: "*기울임*", desc: "기울인 글씨" },
-  { syntax: "- 항목", desc: "목록" },
-  { syntax: "1. 항목", desc: "번호 목록" },
-  { syntax: "[ ] 할 일", desc: "체크박스" },
-  { syntax: "[x] 완료", desc: "완료된 체크박스" },
-  { syntax: "> 인용", desc: "인용문" },
+  { syntax: "~~취소선~~", desc: "취소선" },
   { syntax: "`코드`", desc: "인라인 코드" },
+  { section: "목록", syntax: "- 항목", desc: "글머리 목록" },
+  { syntax: "1. 항목", desc: "번호 목록" },
+  { syntax: "- [ ] 할 일", desc: "체크박스" },
+  { syntax: "- [x] 완료", desc: "완료 체크박스" },
+  { section: "블록", syntax: "> 인용문", desc: "인용 블록" },
+  { syntax: "```코드블록```", desc: "여러 줄 코드" },
   { syntax: "---", desc: "구분선" },
-  { syntax: "[텍스트](URL)", desc: "링크" },
+  { section: "링크/이미지", syntax: "[텍스트](URL)", desc: "링크" },
+  { syntax: "![설명](URL)", desc: "이미지" },
+  { section: "표", syntax: "| A | B |", desc: "표 (GFM)" },
+  { syntax: "|---|---|", desc: "표 구분선" },
 ];
 
 function MeetingItem({
