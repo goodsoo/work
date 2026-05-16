@@ -3,7 +3,10 @@ import {
   createMeeting,
   deleteMeeting,
   getMeeting,
+  listDeletedMeetings,
   listMeetings,
+  purgeMeeting,
+  restoreMeeting,
   updateMeeting,
   type Meeting,
   type MeetingInsert,
@@ -11,12 +14,20 @@ import {
 } from "../api/meetings";
 
 const meetingsKey = ["meetings"] as const;
+const deletedMeetingsKey = ["meetings", "deleted"] as const;
 const meetingKey = (id: string) => ["meetings", id] as const;
 
 export function useMeetings() {
   return useQuery({
     queryKey: meetingsKey,
     queryFn: listMeetings,
+  });
+}
+
+export function useDeletedMeetings() {
+  return useQuery({
+    queryKey: deletedMeetingsKey,
+    queryFn: listDeletedMeetings,
   });
 }
 
@@ -70,12 +81,44 @@ export function useUpdateMeeting(id: string) {
   });
 }
 
+// Soft delete: 활성 리스트에서 제거, 휴지통 invalidate (다음 조회 시 fetch).
 export function useDeleteMeeting() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => deleteMeeting(id),
     onSuccess: (_void, id) => {
       qc.setQueryData<Meeting[]>(meetingsKey, (prev) =>
+        prev?.filter((m) => m.id !== id)
+      );
+      qc.removeQueries({ queryKey: meetingKey(id) });
+      qc.invalidateQueries({ queryKey: deletedMeetingsKey });
+    },
+  });
+}
+
+export function useRestoreMeeting() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => restoreMeeting(id),
+    onSuccess: (restored) => {
+      qc.setQueryData<Meeting[]>(deletedMeetingsKey, (prev) =>
+        prev?.filter((m) => m.id !== restored.id)
+      );
+      qc.setQueryData<Meeting[]>(meetingsKey, (prev) =>
+        prev ? [restored, ...prev] : [restored]
+      );
+      qc.setQueryData(meetingKey(restored.id), restored);
+    },
+  });
+}
+
+// 영구 삭제 (휴지통에서만).
+export function usePurgeMeeting() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => purgeMeeting(id),
+    onSuccess: (_void, id) => {
+      qc.setQueryData<Meeting[]>(deletedMeetingsKey, (prev) =>
         prev?.filter((m) => m.id !== id)
       );
       qc.removeQueries({ queryKey: meetingKey(id) });

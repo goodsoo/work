@@ -40,8 +40,19 @@ export async function listMeetings(): Promise<Meeting[]> {
   const { data, error } = await supabase
     .from("meetings")
     .select("*")
+    .is("deleted_at", null)
     .order("date", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map(fromRow);
+}
+
+export async function listDeletedMeetings(): Promise<Meeting[]> {
+  const { data, error } = await supabase
+    .from("meetings")
+    .select("*")
+    .not("deleted_at", "is", null)
+    .order("deleted_at", { ascending: false });
   if (error) throw error;
   return (data ?? []).map(fromRow);
 }
@@ -86,7 +97,28 @@ export async function updateMeeting(
   return fromRow(data);
 }
 
+// Soft delete: deleted_at 셋팅. 휴지통에 표시됨.
 export async function deleteMeeting(id: string): Promise<void> {
+  const { error } = await supabase
+    .from("meetings")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) throw error;
+}
+
+export async function restoreMeeting(id: string): Promise<Meeting> {
+  const { data, error } = await supabase
+    .from("meetings")
+    .update({ deleted_at: null })
+    .eq("id", id)
+    .select("*")
+    .single();
+  if (error) throw error;
+  return fromRow(data);
+}
+
+// 영구 삭제. 휴지통에서만 호출.
+export async function purgeMeeting(id: string): Promise<void> {
   const { error } = await supabase.from("meetings").delete().eq("id", id);
   if (error) throw error;
 }
