@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ChevronLeft,
   Trash2,
@@ -7,6 +7,9 @@ import {
   Check,
   Undo2,
   Redo2,
+  Eye,
+  Pencil,
+  X,
 } from "lucide-react";
 import {
   useMeeting,
@@ -21,7 +24,12 @@ import { SummarizeButton } from "./SummarizeButton";
 import { CopyButton } from "./CopyButton";
 import { EditableList } from "./EditableList";
 import { AttendeeTagInput } from "./AttendeeTagInput";
+import { SourceBodyEditor } from "./SourceBodyEditor";
+import { MarkdownView } from "./MarkdownView";
 import { parseAttendees } from "../../lib/attendees";
+import { useViewMode } from "../../hooks/useViewMode";
+import { isTauri } from "../../lib/isTauri";
+import { formatError } from "../../lib/errors";
 
 type Props = {
   meetingId: string;
@@ -34,6 +42,7 @@ type MeetingDoc = {
   time: string;
   attendees: string;
   content: string;
+  transcript: string;
   discussion_items: string[];
   decisions: string[];
   action_items: string[];
@@ -45,6 +54,7 @@ const EMPTY_DOC: MeetingDoc = {
   time: "",
   attendees: "",
   content: "",
+  transcript: "",
   discussion_items: [],
   decisions: [],
   action_items: [],
@@ -58,6 +68,7 @@ function makeDocFromMeeting(m: Meeting | null | undefined): MeetingDoc {
     time: m.time ?? "",
     attendees: m.attendees ?? "",
     content: m.content ?? "",
+    transcript: m.transcript ?? "",
     discussion_items: m.discussion_items ?? [],
     decisions: m.decisions ?? [],
     action_items: m.action_items ?? [],
@@ -71,6 +82,7 @@ function docToPatch(doc: MeetingDoc): MeetingUpdate {
     time: doc.time.trim() || null,
     attendees: doc.attendees.trim() || null,
     content: doc.content,
+    transcript: doc.transcript || null,
     discussion_items: doc.discussion_items.length === 0 ? null : doc.discussion_items,
     decisions: doc.decisions.length === 0 ? null : doc.decisions,
     action_items: doc.action_items.length === 0 ? null : doc.action_items,
@@ -91,11 +103,13 @@ function docsEqual(a: MeetingDoc, b: MeetingDoc): boolean {
     a.time === b.time &&
     a.attendees === b.attendees &&
     a.content === b.content &&
+    a.transcript === b.transcript &&
     arraysEqual(a.discussion_items, b.discussion_items) &&
     arraysEqual(a.decisions, b.decisions) &&
     arraysEqual(a.action_items, b.action_items)
   );
 }
+
 
 export function MeetingForm({ meetingId, onBack }: Props) {
   const { data, isLoading, error, refetch } = useMeeting(meetingId);
@@ -103,6 +117,7 @@ export function MeetingForm({ meetingId, onBack }: Props) {
   const updateMutation = useUpdateMeeting(meetingId);
   const deleteMutation = useDeleteMeeting();
   const createTodoMutation = useCreateTodo();
+  const [viewMode, setViewMode] = useViewMode();
 
   const attendeeSuggestions = useMemo(() => {
     const set = new Set<string>();
@@ -128,6 +143,9 @@ export function MeetingForm({ meetingId, onBack }: Props) {
   const doc = history.value;
 
   const [actionError, setActionError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"body" | "transcript" | "summary">(
+    "body",
+  );
   const [addedTodoIndices, setAddedTodoIndices] = useState<Set<number>>(
     () => new Set(),
   );
@@ -149,26 +167,55 @@ export function MeetingForm({ meetingId, onBack }: Props) {
     };
   }, [history]);
 
+  // 메모 전환 시 본문 탭으로 reset
+  useEffect(() => {
+    setActiveTab("body");
+  }, [meetingId]);
+
   function updateField<K extends keyof MeetingDoc>(key: K, value: MeetingDoc[K]) {
     history.set({ ...doc, [key]: value });
   }
 
-  function onFormKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
-    const isUndo =
-      (e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === "z";
-    const isRedo =
-      ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "y") ||
-      ((e.metaKey || e.ctrlKey) &&
-        e.shiftKey &&
-        e.key.toLowerCase() === "z");
-    if (isUndo) {
-      e.preventDefault();
-      history.undo();
-    } else if (isRedo) {
-      e.preventDefault();
-      history.redo();
+  // 단축키: undo/redo (모든 환경) + Opt+1/2/3 sub-tab (Tauri only)
+  // window 에 직접 listener — 빈 곳에 focus 있어도 동작
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      const cmd = e.metaKey || e.ctrlKey;
+      const k = e.key.toLowerCase();
+      const isUndo = cmd && !e.shiftKey && !e.altKey && k === "z";
+      const isRedo =
+        (cmd && !e.altKey && k === "y") ||
+        (cmd && e.shiftKey && !e.altKey && k === "z");
+      if (isUndo) {
+        e.preventDefault();
+        history.undo();
+        return;
+      }
+      if (isRedo) {
+        e.preventDefault();
+        history.redo();
+        return;
+      }
+      // Opt+1/2/3 — Opt+숫자는 macOS 가 ¡™£ 로 바꾸므로 e.code 로 매칭
+      if (!isTauri || !e.altKey || e.metaKey || e.ctrlKey || e.shiftKey) return;
+      if (e.code === "Digit1") {
+        e.preventDefault();
+        if (activeTab === "body") {
+          setViewMode(viewMode === "edit" ? "view" : "edit");
+        } else {
+          setActiveTab("body");
+        }
+      } else if (e.code === "Digit2") {
+        e.preventDefault();
+        setActiveTab("transcript");
+      } else if (e.code === "Digit3") {
+        e.preventDefault();
+        setActiveTab("summary");
+      }
     }
-  }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [history, viewMode, setViewMode, activeTab]);
 
   async function handleDelete() {
     if (!data) return;
@@ -177,7 +224,7 @@ export function MeetingForm({ meetingId, onBack }: Props) {
       await deleteMutation.mutateAsync(data.id);
       onBack();
     } catch (e) {
-      setActionError(e instanceof Error ? e.message : String(e));
+      setActionError(formatError(e));
     }
   }
 
@@ -196,13 +243,13 @@ export function MeetingForm({ meetingId, onBack }: Props) {
         return next;
       });
     } catch (e) {
-      setActionError(e instanceof Error ? e.message : String(e));
+      setActionError(formatError(e));
     }
   }
 
   function retrySave() {
     history.flush();
-    if (history.canUndo === false && !updateMutation.isPending) {
+    if (!updateMutation.isPending) {
       updateMutation.mutate(docToPatch(doc));
     }
   }
@@ -258,7 +305,7 @@ export function MeetingForm({ meetingId, onBack }: Props) {
   };
 
   return (
-    <div onKeyDown={onFormKeyDown} className="min-h-svh">
+    <div className="min-h-svh">
       {/* Top bar — compact, floating feel */}
       <div
         className="sticky top-0 z-10 flex items-center justify-between px-5 py-2 backdrop-blur lg:top-0"
@@ -307,12 +354,18 @@ export function MeetingForm({ meetingId, onBack }: Props) {
         </div>
       </div>
 
-      {/* Error alerts */}
+      {/* Error toasts — fixed bottom-right, 본문 레이아웃에 영향 없음 */}
       {updateMutation.isError || actionError ? (
-        <div className="mx-auto max-w-3xl px-6 pt-2">
+        <div
+          className="fixed z-50 flex max-w-sm flex-col gap-2"
+          style={{
+            bottom: "calc(var(--safe-bottom) + 1rem)",
+            right: "1rem",
+          }}
+        >
           {updateMutation.isError ? (
             <div
-              className="flex items-start gap-2 rounded-lg p-3 text-sm"
+              className="animate-page-in flex items-start gap-2 rounded-lg p-3 text-sm shadow-lg"
               style={{
                 borderLeft: "4px solid var(--accent-red)",
                 backgroundColor: "var(--accent-red-bg)",
@@ -320,20 +373,55 @@ export function MeetingForm({ meetingId, onBack }: Props) {
               }}
             >
               <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-              <span className="flex-1">자동 저장 실패</span>
-              <button type="button" onClick={retrySave} className="text-xs underline">재시도</button>
+              <div className="flex-1">
+                <div className="font-medium">자동 저장 실패</div>
+                {updateMutation.error ? (
+                  <div className="mt-0.5 text-xs opacity-80">
+                    {formatError(updateMutation.error)}
+                  </div>
+                ) : null}
+              </div>
+              <button
+                type="button"
+                onClick={retrySave}
+                disabled={updateMutation.isPending}
+                className="text-xs underline disabled:opacity-40"
+                style={{ minHeight: 0 }}
+              >
+                {updateMutation.isPending ? "재시도 중..." : "재시도"}
+              </button>
+              <button
+                type="button"
+                onClick={() => updateMutation.reset()}
+                title="닫기"
+                aria-label="닫기"
+                className="rounded p-0.5 transition"
+                style={{ color: "var(--accent-red-text)", minHeight: 0 }}
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
             </div>
           ) : null}
           {actionError ? (
             <div
-              className="mt-2 rounded-lg p-3 text-sm"
+              className="animate-page-in flex items-start gap-2 rounded-lg p-3 text-sm shadow-lg"
               style={{
                 borderLeft: "4px solid var(--accent-red)",
                 backgroundColor: "var(--accent-red-bg)",
                 color: "var(--accent-red-text)",
               }}
             >
-              {actionError}
+              <span className="flex-1">{actionError}</span>
+              <button
+                type="button"
+                onClick={() => setActionError(null)}
+                title="닫기"
+                aria-label="닫기"
+                className="rounded p-0.5 transition"
+                style={{ color: "var(--accent-red-text)", minHeight: 0 }}
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
             </div>
           ) : null}
         </div>
@@ -389,119 +477,309 @@ export function MeetingForm({ meetingId, onBack }: Props) {
           </div>
         </div>
 
-        {/* Body — fills the viewport, no border, no chrome */}
-        <textarea
-          value={doc.content}
-          onChange={(e) => updateField("content", e.target.value)}
-          placeholder="내용을 입력하세요..."
-          className="mt-6 w-full resize-none overflow-hidden bg-transparent text-base leading-relaxed outline-none"
-          style={{ color: "var(--text-primary)", minHeight: "60svh" }}
-          onInput={(e) => {
-            const el = e.currentTarget;
-            el.style.height = "auto";
-            el.style.height = el.scrollHeight + "px";
+        {/* Tab nav + 액션 (sticky: 메타 아래에서 시작, 스크롤 시 상단 도달하면 고정) */}
+        <div
+          className="sticky z-10 mt-6 flex items-center justify-between"
+          style={{
+            top: "2.5rem",
+            borderBottom: "1px solid var(--border-subtle)",
+            backgroundColor: "var(--bg-base)",
           }}
-        />
+        >
+          <div className="flex gap-1">
+            <TabBtn
+              label="본문"
+              shortcut={isTauri ? "⌥1" : undefined}
+              active={activeTab === "body"}
+              onClick={() => setActiveTab("body")}
+            />
+            <TabBtn
+              label="회의 내용"
+              shortcut={isTauri ? "⌥2" : undefined}
+              active={activeTab === "transcript"}
+              onClick={() => setActiveTab("transcript")}
+            />
+            <TabBtn
+              label="요약"
+              shortcut={isTauri ? "⌥3" : undefined}
+              active={activeTab === "summary"}
+              onClick={() => setActiveTab("summary")}
+            />
+          </div>
+          <div className="flex items-center gap-1.5 pb-1">
+            {activeTab === "body" ? (
+              <button
+                type="button"
+                onClick={() =>
+                  setViewMode(viewMode === "edit" ? "view" : "edit")
+                }
+                title={
+                  isTauri
+                    ? `${viewMode === "edit" ? "보기 모드" : "편집 모드"}  ⌥1`
+                    : viewMode === "edit"
+                      ? "보기 모드"
+                      : "편집 모드"
+                }
+                className="rounded-md px-1.5 py-1 transition"
+                style={{
+                  border: "1px solid var(--border-subtle)",
+                  color: "var(--text-secondary)",
+                  minHeight: 0,
+                }}
+              >
+                {viewMode === "edit" ? (
+                  <Eye className="h-3.5 w-3.5" />
+                ) : (
+                  <Pencil className="h-3.5 w-3.5" />
+                )}
+              </button>
+            ) : null}
+            <CopyButton meeting={meetingForCopy} onError={setActionError} compact />
+            <button
+              type="button"
+              onClick={handleDelete}
+              disabled={deleteMutation.isPending}
+              title="메모 삭제"
+              aria-label="메모 삭제"
+              className="rounded-md px-1.5 py-1 transition disabled:opacity-40"
+              style={{
+                border: "1px solid var(--border-subtle)",
+                color: "var(--text-muted)",
+                minHeight: 0,
+              }}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
 
-        {/* AI Summary — inline callout blocks, part of the document flow */}
-        {hasAnySummary ? (
-          <div className="mt-6 space-y-3">
-            {doc.discussion_items.length > 0 ? (
-              <div
-                className="rounded-lg px-4 py-3"
-                style={{ backgroundColor: "var(--bg-surface)" }}
-              >
-                <EditableList
-                  title="논의 사항"
-                  items={doc.discussion_items}
-                  onSave={(next) => updateField("discussion_items", next)}
-                  bullet="dot"
-                />
-              </div>
-            ) : null}
-            {doc.decisions.length > 0 ? (
-              <div
-                className="rounded-lg px-4 py-3"
-                style={{ backgroundColor: "var(--bg-surface)" }}
-              >
-                <EditableList
-                  title="결정 사항"
-                  items={doc.decisions}
-                  onSave={(next) => updateField("decisions", next)}
-                  bullet="dot"
-                />
-              </div>
-            ) : null}
-            {doc.action_items.length > 0 ? (
-              <div
-                className="rounded-lg px-4 py-3"
-                style={{ backgroundColor: "var(--bg-surface)" }}
-              >
-                <EditableList
-                  title="액션 아이템"
-                  items={doc.action_items}
-                  bullet="redCheckbox"
-                  onSave={(next) => updateField("action_items", next)}
-                  itemActions={(i, text) =>
-                    addedTodoIndices.has(i) ? (
-                      <span
-                        className="inline-flex items-center gap-1 text-xs"
-                        style={{ color: "var(--text-muted)", minHeight: 0 }}
-                      >
-                        <Check className="h-3 w-3" /> 추가됨
-                      </span>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => addActionItemAsTodo(i, text)}
-                        disabled={createTodoMutation.isPending}
-                        className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs transition disabled:opacity-40"
-                        style={{ color: "var(--text-secondary)", minHeight: 0 }}
-                      >
-                        <ListPlus className="h-3 w-3" /> 할 일로
-                      </button>
-                    )
-                  }
-                />
-              </div>
-            ) : null}
+        {/* Tab content wrapper — 탭이 상단 도달할 때까지 페이지 스크롤 가능하도록 minHeight 보장 */}
+        <div className="mt-4" style={{ minHeight: "calc(100svh - 8rem)" }}>
+        {activeTab === "body" ? (
+          <div>
+            {viewMode === "edit" ? (
+              <SourceBodyEditor
+                key={`${meetingId}:body`}
+                content={doc.content}
+                onChange={(v) => updateField("content", v)}
+              />
+            ) : (
+              <MarkdownView content={doc.content} />
+            )}
           </div>
         ) : null}
 
-        {/* Inline actions — AI summarize + copy + delete */}
-        <div className="mt-6 flex flex-wrap items-center gap-3">
-          <SummarizeButton
-            meetingId={data.id}
-            title={doc.title || null}
-            date={doc.date || null}
-            time={doc.time || null}
-            attendees={doc.attendees || null}
-            content={doc.content}
-            hasResult={hasAnySummary}
-            onResult={(result) => {
-              history.set({
-                ...doc,
-                discussion_items: result.discussion_items,
-                decisions: result.decisions,
-                action_items: result.action_items,
-              });
-              history.flush();
-              setActionError(null);
-            }}
-            onError={setActionError}
-          />
-          <CopyButton meeting={meetingForCopy} onError={setActionError} />
-          <button
-            type="button"
-            onClick={handleDelete}
-            disabled={deleteMutation.isPending}
-            className="inline-flex items-center gap-1.5 text-sm transition disabled:opacity-50"
-            style={{ color: "var(--text-muted)" }}
-          >
-            <Trash2 className="h-4 w-4" /> 삭제
-          </button>
+        {/* Transcript tab */}
+        {activeTab === "transcript" ? (
+          <div>
+            <TranscriptArea
+              key={`${meetingId}:transcript`}
+              transcript={doc.transcript}
+              onChange={(v) => updateField("transcript", v)}
+              onError={setActionError}
+            />
+          </div>
+        ) : null}
+
+        {/* Summary tab */}
+        {activeTab === "summary" ? (
+          <div className="space-y-4">
+            <SummarizeButton
+              meetingId={data.id}
+              title={doc.title || null}
+              date={doc.date || null}
+              time={doc.time || null}
+              attendees={doc.attendees || null}
+              content={doc.content}
+              transcript={doc.transcript || null}
+              hasResult={hasAnySummary}
+              onResult={(result) => {
+                history.set({
+                  ...doc,
+                  discussion_items: result.discussion_items,
+                  decisions: result.decisions,
+                  action_items: result.action_items,
+                });
+                history.flush();
+                setActionError(null);
+              }}
+              onError={setActionError}
+            />
+            {hasAnySummary ? (
+              <div className="space-y-3">
+                {doc.discussion_items.length > 0 ? (
+                  <div
+                    className="rounded-lg px-4 py-3"
+                    style={{ backgroundColor: "var(--bg-surface)" }}
+                  >
+                    <EditableList
+                      title="논의 사항"
+                      items={doc.discussion_items}
+                      onSave={(next) => updateField("discussion_items", next)}
+                      bullet="dot"
+                    />
+                  </div>
+                ) : null}
+                {doc.decisions.length > 0 ? (
+                  <div
+                    className="rounded-lg px-4 py-3"
+                    style={{ backgroundColor: "var(--bg-surface)" }}
+                  >
+                    <EditableList
+                      title="결정 사항"
+                      items={doc.decisions}
+                      onSave={(next) => updateField("decisions", next)}
+                      bullet="dot"
+                    />
+                  </div>
+                ) : null}
+                {doc.action_items.length > 0 ? (
+                  <div
+                    className="rounded-lg px-4 py-3"
+                    style={{ backgroundColor: "var(--bg-surface)" }}
+                  >
+                    <EditableList
+                      title="액션 아이템"
+                      items={doc.action_items}
+                      bullet="redCheckbox"
+                      onSave={(next) => updateField("action_items", next)}
+                      itemActions={(i, text) =>
+                        addedTodoIndices.has(i) ? (
+                          <span
+                            className="inline-flex items-center gap-1 text-xs"
+                            style={{ color: "var(--text-muted)", minHeight: 0 }}
+                          >
+                            <Check className="h-3 w-3" /> 추가됨
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => addActionItemAsTodo(i, text)}
+                            disabled={createTodoMutation.isPending}
+                            className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs transition disabled:opacity-40"
+                            style={{ color: "var(--text-secondary)", minHeight: 0 }}
+                          >
+                            <ListPlus className="h-3 w-3" /> 할 일로
+                          </button>
+                        )
+                      }
+                    />
+                  </div>
+                ) : null}
+              </div>
+            ) : (
+              <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+                본문이나 회의 내용을 적은 뒤 위 버튼을 눌러 AI 요약을 만들어요.
+              </p>
+            )}
+          </div>
+        ) : null}
         </div>
+
       </div>
+    </div>
+  );
+}
+
+function TabBtn({
+  label,
+  shortcut,
+  active,
+  onClick,
+}: {
+  label: string;
+  shortcut?: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  const title = shortcut ? `${label}  ${shortcut}` : label;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      aria-current={active ? "page" : undefined}
+      className="px-3 py-2 text-sm transition"
+      style={{
+        color: active ? "var(--text-primary)" : "var(--text-secondary)",
+        borderBottom: active
+          ? "2px solid var(--text-primary)"
+          : "2px solid transparent",
+        marginBottom: "-1px",
+        minHeight: 0,
+        fontWeight: active ? 600 : 400,
+      }}
+    >
+      {label}
+    </button>
+  );
+}
+
+function TranscriptArea({
+  transcript,
+  onChange,
+  onError,
+}: {
+  transcript: string;
+  onChange: (v: string) => void;
+  onError: (msg: string) => void;
+}) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const text = reader.result;
+      if (typeof text !== "string") {
+        onError("파일을 텍스트로 읽지 못했어요");
+        return;
+      }
+      // 기존 내용 뒤에 이어붙이기 (덮어쓰기 방지). 비어있으면 그대로.
+      onChange(transcript ? `${transcript}\n\n${text}` : text);
+    };
+    reader.onerror = () => onError("파일 읽기 실패");
+    reader.readAsText(file);
+  }
+
+  return (
+    <div>
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+          녹음을 STT로 변환한 텍스트를 붙여넣거나 파일 업로드
+        </span>
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          className="rounded-md px-2 py-1 text-xs transition"
+          style={{
+            border: "1px solid var(--border-default)",
+            color: "var(--text-secondary)",
+            minHeight: 0,
+          }}
+        >
+          파일 업로드
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".txt,.md,.vtt,.srt,text/*"
+          onChange={handleFile}
+          className="hidden"
+        />
+      </div>
+      <textarea
+        value={transcript}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="회의 녹음의 텍스트 변환 결과를 여기에..."
+        className="w-full resize-none bg-transparent text-base leading-relaxed outline-none"
+        style={{
+          color: "var(--text-primary)",
+          height: "60svh",
+        }}
+      />
     </div>
   );
 }

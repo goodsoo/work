@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Sparkles, Loader2, RefreshCcw } from "lucide-react";
 import { supabase } from "../../lib/supabase";
+import { formatError } from "../../lib/errors";
 
 export type SummaryResult = {
   discussion_items: string[];
@@ -15,6 +16,7 @@ type Props = {
   time: string | null;
   attendees: string | null;
   content: string | null;
+  transcript: string | null;
   hasResult: boolean;
   onResult: (result: SummaryResult) => void;
   onError: (message: string) => void;
@@ -26,20 +28,32 @@ export function SummarizeButton({
   time,
   attendees,
   content,
+  transcript,
   hasResult,
   onResult,
   onError,
 }: Props) {
   const [pending, setPending] = useState(false);
-  const trimmed = (content ?? "").trim();
-  const disabled = pending || trimmed.length === 0;
+  const trimmedContent = (content ?? "").trim();
+  const trimmedTranscript = (transcript ?? "").trim();
+  const disabled =
+    pending || (trimmedContent.length === 0 && trimmedTranscript.length === 0);
 
   async function run() {
     setPending(true);
     try {
       const { data, error } = await supabase.functions.invoke<SummaryResult>(
         "summarize",
-        { body: { title, date, time, attendees, content: trimmed } }
+        {
+          body: {
+            title,
+            date,
+            time,
+            attendees,
+            content: trimmedContent,
+            transcript: trimmedTranscript || null,
+          },
+        }
       );
       if (error) throw error;
       if (
@@ -52,8 +66,7 @@ export function SummarizeButton({
       }
       onResult(data);
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      onError(msg || "요약에 실패했어요.");
+      onError(formatError(e) || "요약에 실패했어요.");
     } finally {
       setPending(false);
     }

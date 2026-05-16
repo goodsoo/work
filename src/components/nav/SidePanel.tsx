@@ -15,6 +15,7 @@ import type { Meeting } from "../../api/meetings";
 import type { Todo, TodoCategory } from "../../api/todos";
 import { TODO_CATEGORIES } from "../../api/todos";
 import { formatDateLong, isToday, todayIso } from "../../lib/dates";
+import { formatError } from "../../lib/errors";
 
 /* ── Meetings Side Panel ── */
 
@@ -60,7 +61,7 @@ export function MeetingsSidePanel({ selectedId, onSelect }: MeetingsPanelProps) 
       });
       onSelect(created.id);
     } catch (e) {
-      setCreateError(e instanceof Error ? e.message : String(e));
+      setCreateError(formatError(e));
     }
   }
 
@@ -166,8 +167,8 @@ function MarkdownHelp() {
             </button>
           </div>
           <div className="space-y-1.5 px-4 py-4 text-sm" style={{ color: "var(--text-primary)" }}>
-            {MARKDOWN_HINTS.map((h) => (
-              <div key={h.syntax}>
+            {MARKDOWN_HINTS.map((h, i) => (
+              <div key={i}>
                 {h.section ? (
                   <div
                     className="mb-1 mt-3 text-[10px] font-semibold uppercase tracking-wider first:mt-0"
@@ -195,24 +196,43 @@ function MarkdownHelp() {
 }
 
 const MARKDOWN_HINTS: Array<{ syntax: string; desc: string; section?: string }> = [
-  { section: "제목", syntax: "# 제목", desc: "대제목" },
-  { syntax: "## 소제목", desc: "중제목" },
-  { syntax: "### 소소제목", desc: "소제목" },
-  { section: "서식", syntax: "**굵게**", desc: "굵은 글씨" },
+  { section: "제목", syntax: "# 제목", desc: "H1 (대제목)" },
+  { syntax: "## 소제목", desc: "H2" },
+  { syntax: "### 소소제목", desc: "H3" },
+  { syntax: "#### 제목 4", desc: "H4" },
+  { syntax: "##### 제목 5", desc: "H5" },
+  { syntax: "###### 제목 6", desc: "H6" },
+  { syntax: "===", desc: "윗줄을 H1으로 (밑줄식)" },
+  { syntax: "---", desc: "윗줄을 H2로 (밑줄식, 윗줄에 텍스트 있을 때)" },
+
+  { section: "서식 (인라인)", syntax: "**굵게**", desc: "굵은 글씨" },
   { syntax: "*기울임*", desc: "기울인 글씨" },
   { syntax: "~~취소선~~", desc: "취소선" },
   { syntax: "`코드`", desc: "인라인 코드" },
+
   { section: "목록", syntax: "- 항목", desc: "글머리 목록" },
   { syntax: "1. 항목", desc: "번호 목록" },
   { syntax: "- [ ] 할 일", desc: "체크박스" },
   { syntax: "- [x] 완료", desc: "완료 체크박스" },
-  { section: "블록", syntax: "> 인용문", desc: "인용 블록" },
-  { syntax: "```코드블록```", desc: "여러 줄 코드" },
-  { syntax: "---", desc: "구분선" },
+  { syntax: "␣␣- 항목", desc: "중첩 목록 (2칸 들여쓰기 = 1단계)" },
+  { syntax: "␣␣␣␣- 항목", desc: "중첩 목록 (4칸 = 2단계)" },
+
+  { section: "블록", syntax: "> 인용문", desc: "인용 블록 (여러 줄은 줄마다 >)" },
+  { syntax: "```\n코드\n```", desc: "코드 블록 (펜스)" },
+  { syntax: "␣␣␣␣코드", desc: "코드 블록 (4칸 들여쓰기, list 밖에서)" },
+  { syntax: "---", desc: "구분선 (앞뒤로 빈 줄, 단독)" },
+
+  { section: "줄바꿈", syntax: "줄 끝␣␣", desc: "강제 줄바꿈 (줄 끝 공백 2개)" },
+
   { section: "링크/이미지", syntax: "[텍스트](URL)", desc: "링크" },
   { syntax: "![설명](URL)", desc: "이미지" },
+  { syntax: "<URL>", desc: "자동 링크" },
+  { syntax: "[label]: URL", desc: "참조 링크 정의 (별도 줄)" },
+  { syntax: "[텍스트][label]", desc: "참조 링크 사용" },
+
   { section: "표", syntax: "| A | B |", desc: "표 (GFM)" },
-  { syntax: "|---|---|", desc: "표 구분선" },
+  { syntax: "|---|---|", desc: "표 헤더 구분선" },
+  { syntax: "|:---|---:|", desc: "정렬 (왼쪽/오른쪽)" },
 ];
 
 function MeetingItem({

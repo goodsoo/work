@@ -11,6 +11,7 @@ type SummarizeInput = {
   time?: string | null;
   attendees?: string | null;
   content: string;
+  transcript?: string | null;
 };
 
 type SummarizeOutput = {
@@ -56,12 +57,22 @@ const tool = {
   },
 } as const;
 
-const SYSTEM_PROMPT = `당신은 회의록 어시스턴트입니다. 회의 본문을 받아 한국어로 논의 사항 / 결정 사항 / 액션 아이템을 분리 추출합니다.
+const SYSTEM_PROMPT = `당신은 회의록 어시스턴트입니다. 두 source를 받아 한국어로 논의 사항 / 결정 사항 / 액션 아이템을 분리 추출합니다.
+
+입력 source:
+- "본문 (회의록 초안)": 사용자가 회의 중 직접 적은 핵심 메모. 무엇이 중요한지의 가이드. 정확도 높음.
+- "회의 내용 (녹음 변환)": 녹음을 STT로 변환한 raw 텍스트. 빠진 디테일을 메우는 보조 source. 음성 인식 오류로 오타/잘못된 단어 가능.
+
+통합 원칙:
+- 본문을 우선 참고. 본문에서 강조된 게 회의의 중요한 부분.
+- 회의 내용은 본문에서 빠진 디테일을 보완.
+- 두 source가 충돌하면 본문 우선.
+- 둘 중 하나만 있어도 동작. 본문만 있으면 본문 기반, 회의 내용만 있으면 그것 기반.
 
 핵심 원칙 (반드시 지킴):
 - 각 항목은 한 줄~두 줄. 길어지면 압축한다. 회의록은 길수록 안 읽힙니다.
 - 산문 금지. 항상 압축된 불릿 한 줄.
-- 본문에 없는 내용은 절대 추측하지 않습니다.
+- source에 없는 내용은 절대 추측하지 않습니다.
 
 분리 규칙:
 - 논의 사항(discussion_items): 회의에서 다룬 주제. 결정 여부 무관. 형식 '[주제]: 설명'.
@@ -79,7 +90,17 @@ function buildUserPrompt(input: SummarizeInput): string {
   }
   if (input.attendees) meta.push(`참석: ${input.attendees}`);
   const header = meta.length > 0 ? meta.join("\n") + "\n\n" : "";
-  return `${header}본문:\n${input.content}`;
+
+  const sections: string[] = [];
+  const trimmedContent = (input.content ?? "").trim();
+  const trimmedTranscript = (input.transcript ?? "").trim();
+  if (trimmedContent) {
+    sections.push(`본문 (회의록 초안):\n${trimmedContent}`);
+  }
+  if (trimmedTranscript) {
+    sections.push(`회의 내용 (녹음 변환, 오인식 가능):\n${trimmedTranscript}`);
+  }
+  return header + sections.join("\n\n");
 }
 
 Deno.serve(async (req) => {
@@ -99,11 +120,11 @@ Deno.serve(async (req) => {
   } catch {
     return json({ error: "invalid_json" }, 400);
   }
-  if (
-    !body?.content ||
-    typeof body.content !== "string" ||
-    body.content.trim().length === 0
-  ) {
+  const hasContent =
+    typeof body?.content === "string" && body.content.trim().length > 0;
+  const hasTranscript =
+    typeof body?.transcript === "string" && body.transcript.trim().length > 0;
+  if (!hasContent && !hasTranscript) {
     return json({ error: "empty_content" }, 400);
   }
 

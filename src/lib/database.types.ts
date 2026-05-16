@@ -78,6 +78,7 @@ export type Database = {
           id: string
           time: string | null
           title: string | null
+          transcript: string | null
           updated_at: string
           user_id: string
         }
@@ -92,6 +93,7 @@ export type Database = {
           id?: string
           time?: string | null
           title?: string | null
+          transcript?: string | null
           updated_at?: string
           user_id: string
         }
@@ -106,6 +108,7 @@ export type Database = {
           id?: string
           time?: string | null
           title?: string | null
+          transcript?: string | null
           updated_at?: string
           user_id?: string
         }
