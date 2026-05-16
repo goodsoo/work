@@ -2,6 +2,7 @@ import { useCreateMeeting } from "../hooks/useMeetings";
 import { MeetingsList } from "../components/meetings/MeetingsList";
 import { MeetingForm } from "../components/meetings/MeetingForm";
 import { useState } from "react";
+import { formatError } from "../lib/errors";
 
 function todayIso(): string {
   const now = new Date();
@@ -36,7 +37,7 @@ export function MeetingsPage({ selectedId, onOpenMeeting, onCloseMeeting }: Prop
       });
       onOpenMeeting(created.id);
     } catch (e) {
-      setCreateError(e instanceof Error ? e.message : String(e));
+      setCreateError(formatError(e));
     }
   }
 

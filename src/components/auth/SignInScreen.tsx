@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { signInWithGoogle } from "../../hooks/useAuth";
+import { formatError } from "../../lib/errors";
 
 export function SignInScreen() {
   const [pending, setPending] = useState(false);
@@ -11,7 +12,7 @@ export function SignInScreen() {
     try {
       await signInWithGoogle();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "로그인에 실패했어요");
+      setError(formatError(e) || "로그인에 실패했어요");
       setPending(false);
     }
   }

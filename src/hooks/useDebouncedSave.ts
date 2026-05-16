@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { formatError } from "../lib/errors";
 
 export type SaveStatus = "idle" | "pending" | "saving" | "saved" | "error";
 
@@ -64,7 +65,7 @@ export function useDebouncedSave<T>(
         }
       } catch (e) {
         if (!mountedRef.current) return;
-        setError(e instanceof Error ? e : new Error(String(e)));
+        setError(e instanceof Error ? e : new Error(formatError(e)));
         setStatusSafe("error");
         return;
       } finally {
