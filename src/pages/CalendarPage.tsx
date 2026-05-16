@@ -10,7 +10,7 @@ import { useJournals } from "../hooks/useJournals";
 import { useTodos } from "../hooks/useTodos";
 import { useSchedules } from "../hooks/useSchedules";
 import { todayIso } from "../lib/dates";
-import { MonthGrid, type DayItems } from "../components/timeline/MonthGrid";
+import { MonthGrid, WEEKDAYS, type DayItems } from "../components/timeline/MonthGrid";
 
 type Props = {
   targetDate?: string | null;
@@ -41,6 +41,8 @@ export function CalendarPage({ targetDate, onSelectedDateChange }: Props) {
   const anchorMonth = useRef(new Date().getMonth() + 1);
 
   const [centerOffset, setCenterOffset] = useState(0);
+  // 현재 viewport 에 보이는 month offset (anchor 기준). 헤더 라벨 업데이트용.
+  const [visibleOffset, setVisibleOffset] = useState(0);
   const [selectedDate, setSelectedDate] = useState<string>(today);
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -145,22 +147,25 @@ export function CalendarPage({ targetDate, onSelectedDateChange }: Props) {
     return map;
   }, [meetingsQ.data, journalsQ.data, todosQ.data, schedulesQ.data]);
 
-  // Detect scroll-snap settle → rebalance if not center
+  // Detect scroll-snap settle → rebalance if not center.
+  // 매 스크롤마다 visibleOffset 도 업데이트 (헤더 라벨용).
   const scrollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handleScroll = useCallback(() => {
+    const el = containerRef.current;
+    if (!el || !el.clientHeight) return;
+    const idx = Math.round(el.scrollTop / el.clientHeight);
+    setVisibleOffset(centerOffset + (idx - CENTER));
+
     if (isRebalancing.current) return;
     if (scrollTimer.current) clearTimeout(scrollTimer.current);
     scrollTimer.current = setTimeout(() => {
-      const el = containerRef.current;
-      if (!el || !el.clientHeight) return;
-      const idx = Math.round(el.scrollTop / el.clientHeight);
       if (idx !== CENTER) {
         const delta = idx - CENTER;
         isRebalancing.current = true;
         setCenterOffset((prev) => prev + delta);
       }
     }, 150);
-  }, []);
+  }, [centerOffset]);
 
   function handleDayClick(date: string) {
     setSelectedDate(date);
@@ -174,11 +179,16 @@ export function CalendarPage({ targetDate, onSelectedDateChange }: Props) {
     setCenterOffset(0);
   }
 
-  // Is current center the "today" month?
-  const centerMonth = months[CENTER];
+  // 헤더에 표시할 "현재 보이는 달" — anchor + visibleOffset.
+  const currentMonthYM = useMemo(
+    () => addMonths(anchorYear.current, anchorMonth.current, visibleOffset),
+    [visibleOffset],
+  );
+
+  // Is current visible month the "today" month?
   const todayMonth =
-    new Date().getFullYear() === centerMonth?.year &&
-    new Date().getMonth() + 1 === centerMonth?.month;
+    new Date().getFullYear() === currentMonthYM.year &&
+    new Date().getMonth() + 1 === currentMonthYM.month;
 
   if (isLoading) {
     return (
@@ -195,11 +205,39 @@ export function CalendarPage({ targetDate, onSelectedDateChange }: Props) {
   }
 
   return (
-    <div className="relative h-[calc(100svh-var(--app-header-h)-72px)] lg:h-[calc(100svh-1.5rem)]">
+    <div className="relative flex h-[calc(100svh-var(--app-header-h)-72px)] flex-col lg:h-[calc(100svh-1.5rem)]">
+      {/* Sticky header: 월 라벨 + 요일 row */}
+      <div
+        className="shrink-0"
+        style={{ borderBottom: "1px solid var(--border-subtle)" }}
+      >
+        <div className="flex items-baseline gap-2 px-3 py-2 lg:px-5">
+          <h3
+            className="text-sm font-semibold"
+            style={{ color: "var(--text-primary)" }}
+          >
+            {currentMonthYM.year}년 {currentMonthYM.month}월
+          </h3>
+        </div>
+        <div className="grid grid-cols-7 px-3 lg:px-5">
+          {WEEKDAYS.map((w, i) => (
+            <div
+              key={w}
+              className={`py-1 text-center text-[11px] font-medium ${
+                i === 0 ? "text-red-500" : ""
+              }`}
+              style={i === 0 ? undefined : { color: "var(--text-secondary)" }}
+            >
+              {w}
+            </div>
+          ))}
+        </div>
+      </div>
+
       <div
         ref={containerRef}
         onScroll={handleScroll}
-        className="h-full overflow-y-auto"
+        className="min-h-0 flex-1 overflow-y-auto"
         style={{ scrollSnapType: "y mandatory" }}
       >
         {months.map((m) => (
