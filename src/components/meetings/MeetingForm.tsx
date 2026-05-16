@@ -18,8 +18,9 @@ import {
   useDeleteMeeting,
 } from "../../hooks/useMeetings";
 import { useStateHistory } from "../../hooks/useStateHistory";
+import type { UseStateHistoryResult } from "../../hooks/useStateHistory";
 import { useCreateTodo } from "../../hooks/useTodos";
-import type { Meeting, MeetingUpdate } from "../../api/meetings";
+import type { MeetingUpdate } from "../../api/meetings";
 import { SummarizeButton } from "./SummarizeButton";
 import { CopyButton } from "./CopyButton";
 import { EditableList } from "./EditableList";
@@ -36,58 +37,18 @@ type Props = {
   onBack: () => void;
 };
 
-type MeetingDoc = {
-  title: string;
-  date: string;
-  time: string;
-  attendees: string;
-  content: string;
-  transcript: string;
+type SummaryDoc = {
   discussion_items: string[];
   decisions: string[];
   action_items: string[];
 };
 
-const EMPTY_DOC: MeetingDoc = {
-  title: "",
-  date: "",
-  time: "",
-  attendees: "",
-  content: "",
-  transcript: "",
-  discussion_items: [],
-  decisions: [],
-  action_items: [],
+type MetaDoc = {
+  title: string;
+  date: string;
+  time: string;
+  attendees: string;
 };
-
-function makeDocFromMeeting(m: Meeting | null | undefined): MeetingDoc {
-  if (!m) return EMPTY_DOC;
-  return {
-    title: m.title ?? "",
-    date: m.date ?? "",
-    time: m.time ?? "",
-    attendees: m.attendees ?? "",
-    content: m.content ?? "",
-    transcript: m.transcript ?? "",
-    discussion_items: m.discussion_items ?? [],
-    decisions: m.decisions ?? [],
-    action_items: m.action_items ?? [],
-  };
-}
-
-function docToPatch(doc: MeetingDoc): MeetingUpdate {
-  return {
-    title: doc.title.trim() || null,
-    date: doc.date || null,
-    time: doc.time.trim() || null,
-    attendees: doc.attendees.trim() || null,
-    content: doc.content,
-    transcript: doc.transcript || null,
-    discussion_items: doc.discussion_items.length === 0 ? null : doc.discussion_items,
-    decisions: doc.decisions.length === 0 ? null : doc.decisions,
-    action_items: doc.action_items.length === 0 ? null : doc.action_items,
-  };
-}
 
 function arraysEqual(a: string[], b: string[]): boolean {
   if (a === b) return true;
@@ -96,20 +57,45 @@ function arraysEqual(a: string[], b: string[]): boolean {
   return true;
 }
 
-function docsEqual(a: MeetingDoc, b: MeetingDoc): boolean {
+function summariesEqual(a: SummaryDoc, b: SummaryDoc): boolean {
   return (
-    a.title === b.title &&
-    a.date === b.date &&
-    a.time === b.time &&
-    a.attendees === b.attendees &&
-    a.content === b.content &&
-    a.transcript === b.transcript &&
     arraysEqual(a.discussion_items, b.discussion_items) &&
     arraysEqual(a.decisions, b.decisions) &&
     arraysEqual(a.action_items, b.action_items)
   );
 }
 
+function metasEqual(a: MetaDoc, b: MetaDoc): boolean {
+  return (
+    a.title === b.title &&
+    a.date === b.date &&
+    a.time === b.time &&
+    a.attendees === b.attendees
+  );
+}
+
+function summaryToPatch(s: SummaryDoc): MeetingUpdate {
+  return {
+    discussion_items: s.discussion_items.length === 0 ? null : s.discussion_items,
+    decisions: s.decisions.length === 0 ? null : s.decisions,
+    action_items: s.action_items.length === 0 ? null : s.action_items,
+  };
+}
+
+function metaToPatch(m: MetaDoc): MeetingUpdate {
+  return {
+    title: m.title.trim() || null,
+    date: m.date || null,
+    time: m.time.trim() || null,
+    attendees: m.attendees.trim() || null,
+  };
+}
+
+type ActiveTab = "body" | "transcript" | "summary";
+
+// 메모별 마지막 활성 탭 기억. 페이지 전환으로 컴포넌트가 unmount/mount 되어도
+// 살아남도록 모듈 레벨에. 새로고침 시 초기화.
+const ACTIVE_TAB_CACHE = new Map<string, ActiveTab>();
 
 export function MeetingForm({ meetingId, onBack }: Props) {
   const { data, isLoading, error, refetch } = useMeeting(meetingId);
@@ -128,56 +114,111 @@ export function MeetingForm({ meetingId, onBack }: Props) {
     return Array.from(set).sort((a, b) => a.localeCompare(b, "ko"));
   }, [meetingsQ.data]);
 
-  const docInitial = useMemo(() => makeDocFromMeeting(data), [data]);
+  // 데이터 도착 전엔 cacheKey undefined → cache 참여 X. 데이터 도착 시
+  // undefined → defined transition 으로 initial 적용. 메모 전환 시
+  // cacheKey 가 바뀌면서 이전 메모의 stack state 가 모듈 캐시에 보존됨.
+  const id = data?.id;
+  const initialBody = data?.content ?? "";
+  const initialTranscript = data?.transcript ?? "";
+  const initialSummary = useMemo<SummaryDoc>(
+    () => ({
+      discussion_items: data?.discussion_items ?? [],
+      decisions: data?.decisions ?? [],
+      action_items: data?.action_items ?? [],
+    }),
+    [data?.discussion_items, data?.decisions, data?.action_items],
+  );
+  const initialMeta = useMemo<MetaDoc>(
+    () => ({
+      title: data?.title ?? "",
+      date: data?.date ?? "",
+      time: data?.time ?? "",
+      attendees: data?.attendees ?? "",
+    }),
+    [data?.title, data?.date, data?.time, data?.attendees],
+  );
 
-  const history = useStateHistory<MeetingDoc>({
-    initial: docInitial,
-    reKey: data?.id,
+  const bodyHistory = useStateHistory<string>({
+    initial: initialBody,
+    cacheKey: id ? `${id}:body` : undefined,
     commitMs: 1000,
-    isEqual: docsEqual,
-    onCommit: (doc) => {
-      updateMutation.mutate(docToPatch(doc));
-    },
+    onCommit: (v) => updateMutation.mutate({ content: v }),
   });
 
-  const doc = history.value;
+  const transcriptHistory = useStateHistory<string>({
+    initial: initialTranscript,
+    cacheKey: id ? `${id}:transcript` : undefined,
+    commitMs: 1000,
+    onCommit: (v) => updateMutation.mutate({ transcript: v || null }),
+  });
+
+  const summaryHistory = useStateHistory<SummaryDoc>({
+    initial: initialSummary,
+    cacheKey: id ? `${id}:summary` : undefined,
+    commitMs: 1000,
+    isEqual: summariesEqual,
+    onCommit: (s) => updateMutation.mutate(summaryToPatch(s)),
+  });
+
+  const metaHistory = useStateHistory<MetaDoc>({
+    initial: initialMeta,
+    cacheKey: id ? `${id}:meta` : undefined,
+    commitMs: 1000,
+    isEqual: metasEqual,
+    onCommit: (m) => updateMutation.mutate(metaToPatch(m)),
+  });
+
+  const body = bodyHistory.value;
+  const transcript = transcriptHistory.value;
+  const summary = summaryHistory.value;
+  const meta = metaHistory.value;
 
   const [actionError, setActionError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"body" | "transcript" | "summary">(
-    "body",
+  const [activeTab, setActiveTabState] = useState<ActiveTab>(
+    () => ACTIVE_TAB_CACHE.get(meetingId) ?? "body",
   );
+  function setActiveTab(t: ActiveTab) {
+    ACTIVE_TAB_CACHE.set(meetingId, t);
+    setActiveTabState(t);
+  }
   const [addedTodoIndices, setAddedTodoIndices] = useState<Set<number>>(
     () => new Set(),
   );
-  const addedKey = `${meetingId}|${doc.action_items.join("\n")}`;
+  const addedKey = `${meetingId}|${summary.action_items.join("\n")}`;
   const [trackedAddedKey, setTrackedAddedKey] = useState(addedKey);
   if (trackedAddedKey !== addedKey) {
     setTrackedAddedKey(addedKey);
     setAddedTodoIndices(new Set());
   }
 
+  // beforeunload — 페이지 닫기 직전 모든 pending 변경 flush.
+  // unmount 시 cleanup 은 useStateHistory 가 자체 처리하므로 여기선 listener 정리만.
   useEffect(() => {
     function onBeforeUnload() {
-      history.flush();
+      bodyHistory.flush();
+      transcriptHistory.flush();
+      summaryHistory.flush();
+      metaHistory.flush();
     }
     window.addEventListener("beforeunload", onBeforeUnload);
-    return () => {
-      window.removeEventListener("beforeunload", onBeforeUnload);
-      history.flush();
-    };
-  }, [history]);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [bodyHistory, transcriptHistory, summaryHistory, metaHistory]);
 
-  // 메모 전환 시 본문 탭으로 reset
+  // 메모 전환 시 그 메모의 마지막 탭으로 (cache miss 면 본문).
   useEffect(() => {
-    setActiveTab("body");
+    setActiveTabState(ACTIVE_TAB_CACHE.get(meetingId) ?? "body");
   }, [meetingId]);
 
-  function updateField<K extends keyof MeetingDoc>(key: K, value: MeetingDoc[K]) {
-    history.set({ ...doc, [key]: value });
-  }
+  // 활성 탭의 history (단축키 + 상단 undo/redo 버튼 대상).
+  // meta 는 단축키 안 받음 — 메타 input 안에서는 native input undo 사용.
+  const activeHistory: UseStateHistoryResult<unknown> =
+    activeTab === "body"
+      ? (bodyHistory as UseStateHistoryResult<unknown>)
+      : activeTab === "transcript"
+        ? (transcriptHistory as UseStateHistoryResult<unknown>)
+        : (summaryHistory as UseStateHistoryResult<unknown>);
 
-  // 단축키: undo/redo (모든 환경) + Opt+1/2/3 sub-tab (Tauri only)
-  // window 에 직접 listener — 빈 곳에 focus 있어도 동작
+  // 단축키: undo/redo (활성 탭의 stack) + Opt+1/2/3 sub-tab (Tauri only)
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       const cmd = e.metaKey || e.ctrlKey;
@@ -188,12 +229,12 @@ export function MeetingForm({ meetingId, onBack }: Props) {
         (cmd && e.shiftKey && !e.altKey && k === "z");
       if (isUndo) {
         e.preventDefault();
-        history.undo();
+        activeHistory.undo();
         return;
       }
       if (isRedo) {
         e.preventDefault();
-        history.redo();
+        activeHistory.redo();
         return;
       }
       // Opt+1/2/3 — Opt+숫자는 macOS 가 ¡™£ 로 바꾸므로 e.code 로 매칭
@@ -215,7 +256,7 @@ export function MeetingForm({ meetingId, onBack }: Props) {
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [history, viewMode, setViewMode, activeTab]);
+  }, [activeHistory, activeTab, viewMode, setViewMode]);
 
   async function handleDelete() {
     if (!data) return;
@@ -248,10 +289,13 @@ export function MeetingForm({ meetingId, onBack }: Props) {
   }
 
   function retrySave() {
-    history.flush();
-    if (!updateMutation.isPending) {
-      updateMutation.mutate(docToPatch(doc));
-    }
+    if (updateMutation.isPending) return;
+    updateMutation.mutate({
+      ...metaToPatch(meta),
+      content: body,
+      transcript: transcript || null,
+      ...summaryToPatch(summary),
+    });
   }
 
   if (error) {
@@ -292,17 +336,34 @@ export function MeetingForm({ meetingId, onBack }: Props) {
   }
 
   const hasAnySummary =
-    doc.discussion_items.length + doc.decisions.length + doc.action_items.length > 0;
+    summary.discussion_items.length + summary.decisions.length + summary.action_items.length > 0;
+
+  const anyPendingEdit =
+    bodyHistory.canUndo ||
+    transcriptHistory.canUndo ||
+    summaryHistory.canUndo ||
+    metaHistory.canUndo;
 
   const meetingForCopy = {
-    title: doc.title || null,
-    date: doc.date || null,
-    time: doc.time || null,
-    attendees: doc.attendees || null,
-    discussion_items: doc.discussion_items,
-    decisions: doc.decisions,
-    action_items: doc.action_items,
+    title: meta.title || null,
+    date: meta.date || null,
+    time: meta.time || null,
+    attendees: meta.attendees || null,
+    discussion_items: summary.discussion_items,
+    decisions: summary.decisions,
+    action_items: summary.action_items,
   };
+
+  function setMetaField<K extends keyof MetaDoc>(key: K, value: MetaDoc[K]) {
+    metaHistory.set({ ...meta, [key]: value });
+  }
+
+  function setSummaryField<K extends keyof SummaryDoc>(
+    key: K,
+    value: SummaryDoc[K],
+  ) {
+    summaryHistory.set({ ...summary, [key]: value });
+  }
 
   return (
     <div className="min-h-svh">
@@ -326,9 +387,9 @@ export function MeetingForm({ meetingId, onBack }: Props) {
           >
             <button
               type="button"
-              onClick={history.undo}
-              disabled={!history.canUndo}
-              title="실행 취소"
+              onClick={activeHistory.undo}
+              disabled={!activeHistory.canUndo}
+              title={`실행 취소 (${activeTab === "body" ? "본문" : activeTab === "transcript" ? "회의 내용" : "요약"})`}
               className="px-1.5 py-1 transition disabled:opacity-20"
               style={{ color: "var(--text-secondary)", minHeight: 0 }}
             >
@@ -336,9 +397,9 @@ export function MeetingForm({ meetingId, onBack }: Props) {
             </button>
             <button
               type="button"
-              onClick={history.redo}
-              disabled={!history.canRedo}
-              title="다시 실행"
+              onClick={activeHistory.redo}
+              disabled={!activeHistory.canRedo}
+              title={`다시 실행 (${activeTab === "body" ? "본문" : activeTab === "transcript" ? "회의 내용" : "요약"})`}
               className="px-1.5 py-1 transition disabled:opacity-20"
               style={{ color: "var(--text-secondary)", borderLeft: "1px solid var(--border-subtle)", minHeight: 0 }}
             >
@@ -348,7 +409,7 @@ export function MeetingForm({ meetingId, onBack }: Props) {
           <SaveIndicator
             isPending={updateMutation.isPending}
             isError={updateMutation.isError}
-            hasPendingEdit={history.canUndo && !updateMutation.isPending && !updateMutation.isError}
+            hasPendingEdit={anyPendingEdit && !updateMutation.isPending && !updateMutation.isError}
             onRetry={retrySave}
           />
         </div>
@@ -432,8 +493,8 @@ export function MeetingForm({ meetingId, onBack }: Props) {
         {/* Title — large, Notion-style */}
         <input
           type="text"
-          value={doc.title}
-          onChange={(e) => updateField("title", e.target.value)}
+          value={meta.title}
+          onChange={(e) => setMetaField("title", e.target.value)}
           placeholder="제목 없음"
           autoFocus={!data.title}
           className="w-full bg-transparent text-3xl font-bold outline-none"
@@ -449,16 +510,16 @@ export function MeetingForm({ meetingId, onBack }: Props) {
             <span className="text-xs" style={{ color: "var(--text-muted)" }}>날짜</span>
             <input
               type="date"
-              value={doc.date}
-              onChange={(e) => updateField("date", e.target.value)}
+              value={meta.date}
+              onChange={(e) => setMetaField("date", e.target.value)}
             />
           </label>
           <label className="inline-flex items-center gap-1.5">
             <span className="text-xs" style={{ color: "var(--text-muted)" }}>시간</span>
             <input
               type="text"
-              value={doc.time}
-              onChange={(e) => updateField("time", e.target.value)}
+              value={meta.time}
+              onChange={(e) => setMetaField("time", e.target.value)}
               placeholder="14:00"
               className="w-20 border-0 bg-transparent text-sm outline-none"
               style={{ color: "var(--text-secondary)" }}
@@ -468,8 +529,8 @@ export function MeetingForm({ meetingId, onBack }: Props) {
             <span className="text-xs" style={{ color: "var(--text-muted)" }}>참석</span>
             <div className="min-w-[12em]">
               <AttendeeTagInput
-                value={doc.attendees}
-                onChange={(next) => updateField("attendees", next)}
+                value={meta.attendees}
+                onChange={(next) => setMetaField("attendees", next)}
                 suggestions={attendeeSuggestions}
                 placeholder="이름"
               />
@@ -560,11 +621,11 @@ export function MeetingForm({ meetingId, onBack }: Props) {
             {viewMode === "edit" ? (
               <SourceBodyEditor
                 key={`${meetingId}:body`}
-                content={doc.content}
-                onChange={(v) => updateField("content", v)}
+                content={body}
+                onChange={(v) => bodyHistory.set(v)}
               />
             ) : (
-              <MarkdownView content={doc.content} />
+              <MarkdownView content={body} />
             )}
           </div>
         ) : null}
@@ -574,8 +635,8 @@ export function MeetingForm({ meetingId, onBack }: Props) {
           <div>
             <TranscriptArea
               key={`${meetingId}:transcript`}
-              transcript={doc.transcript}
-              onChange={(v) => updateField("transcript", v)}
+              transcript={transcript}
+              onChange={(v) => transcriptHistory.set(v)}
               onError={setActionError}
             />
           </div>
@@ -586,63 +647,62 @@ export function MeetingForm({ meetingId, onBack }: Props) {
           <div className="space-y-4">
             <SummarizeButton
               meetingId={data.id}
-              title={doc.title || null}
-              date={doc.date || null}
-              time={doc.time || null}
-              attendees={doc.attendees || null}
-              content={doc.content}
-              transcript={doc.transcript || null}
+              title={meta.title || null}
+              date={meta.date || null}
+              time={meta.time || null}
+              attendees={meta.attendees || null}
+              content={body}
+              transcript={transcript || null}
               hasResult={hasAnySummary}
               onResult={(result) => {
-                history.set({
-                  ...doc,
+                summaryHistory.set({
                   discussion_items: result.discussion_items,
                   decisions: result.decisions,
                   action_items: result.action_items,
                 });
-                history.flush();
+                summaryHistory.flush();
                 setActionError(null);
               }}
               onError={setActionError}
             />
             {hasAnySummary ? (
               <div className="space-y-3">
-                {doc.discussion_items.length > 0 ? (
+                {summary.discussion_items.length > 0 ? (
                   <div
                     className="rounded-lg px-4 py-3"
                     style={{ backgroundColor: "var(--bg-surface)" }}
                   >
                     <EditableList
                       title="논의 사항"
-                      items={doc.discussion_items}
-                      onSave={(next) => updateField("discussion_items", next)}
+                      items={summary.discussion_items}
+                      onSave={(next) => setSummaryField("discussion_items", next)}
                       bullet="dot"
                     />
                   </div>
                 ) : null}
-                {doc.decisions.length > 0 ? (
+                {summary.decisions.length > 0 ? (
                   <div
                     className="rounded-lg px-4 py-3"
                     style={{ backgroundColor: "var(--bg-surface)" }}
                   >
                     <EditableList
                       title="결정 사항"
-                      items={doc.decisions}
-                      onSave={(next) => updateField("decisions", next)}
+                      items={summary.decisions}
+                      onSave={(next) => setSummaryField("decisions", next)}
                       bullet="dot"
                     />
                   </div>
                 ) : null}
-                {doc.action_items.length > 0 ? (
+                {summary.action_items.length > 0 ? (
                   <div
                     className="rounded-lg px-4 py-3"
                     style={{ backgroundColor: "var(--bg-surface)" }}
                   >
                     <EditableList
                       title="액션 아이템"
-                      items={doc.action_items}
+                      items={summary.action_items}
                       bullet="redCheckbox"
-                      onSave={(next) => updateField("action_items", next)}
+                      onSave={(next) => setSummaryField("action_items", next)}
                       itemActions={(i, text) =>
                         addedTodoIndices.has(i) ? (
                           <span
