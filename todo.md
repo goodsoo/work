@@ -1,5 +1,19 @@
 # todo
 
+## 🟢 완료 — V0.5.4 (2026-05-16, 캘린더 연속 스크롤 세션)
+
+- [x] **캘린더 연속 스크롤 리라이트** — 월 단위 snap section 제거 → 주(週) 단위 연속 스크롤 (49주 버퍼, edge 근접 rebalance).
+- [x] **MonthGrid `weeks: Date[]` prop 으로 변경** — 1일 셀에 "N월" 라벨로 월 경계 시각화.
+- [x] **주 단위 snap** — 매 주 일요일 셀 `scroll-snap-align: start` + container `scroll-snap-type: y proximity`.
+- [x] **헤더 기준 = top row 토요일 month** — "1일 진입" semantic (새 달 1일이 행에 들어오면 즉시 전환). 4개 옵션(일요일/다수결/1일진입/iOS sticky) 중 선택.
+- [x] **현재 month 외 셀 회색톤** — `cell.month/year !== currentMonth/Year` 면 opacity 0.35.
+- [x] **2026 이전 차단** — `minCenterOffset` 클램프. 초기/rebalance/jump/target 4 경로 모두 보정.
+- [x] **day 클릭 시 스크롤 제거** — `setLastTarget(date)` 로 targetDate round-trip 의 rebalance 차단.
+- [x] **subpixel 정확도** — `getBoundingClientRect.height` + `Math.round` (snap 후 헤더 off-by-one 버그 fix).
+- [x] **사이드패널 헤더 연도 표시** — `formatDateLong` 이 다른 해면 `"2027년 5월 6일 화요일"`.
+
+---
+
 ## 🟢 완료 — V0.5.3 (2026-05-16)
 
 - [x] **캘린더 첫 진입 다른 월 표시 버그** — cold start 시 `useLayoutEffect` deps 에 `isLoading` 없어서 data 도착 후 effect 재실행 안 됨. deps 에 `isLoading` 추가.
