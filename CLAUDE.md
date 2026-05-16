@@ -14,28 +14,35 @@
 
 - ✅ V0.0~V0.5 — 기본 기능 완료 (메모 CRUD, AI 요약, 일기, Todo, 캘린더)
 - ✅ V0.5.1 — 데스크탑 3-pane 레이아웃 + 캘린더 리라이트 + 디자인 토큰 + 테마
-- 🟡 다음 — 메모장 뷰/편집 모드 전환 (MarkdownView ↔ textarea)
+- ✅ V0.5.2 — 메모장 본문/회의 내용/요약 3-탭 + transcript 필드 + 편집/보기 토글 + 글로벌 툴팁
 - 🟡 V0.6 후보 — Server-side 메모 history
 - 🟡 V0.7 후보 — UI/UX 포트폴리오 자동 기록
+- 🟡 후속 — 녹음 파일 직접 업로드 → 자동 STT (현재는 외부 AI로 변환한 결과 복붙/파일 업로드)
 
 ## 핵심 결정 (review 통과됨)
 
 - **Server state**: TanStack Query 일관 사용. 모든 fetch는 `useMeetings` 같은 훅 패턴. `src/api/{meetings,journals,todos,schedules}.ts` 가 supabase-js 캡슐화 + `src/hooks/use*.ts` 가 query/mutation 정의. `useUpdateMeeting` 은 optimistic update (인라인 편집 즉시 반영).
-- **회의록 폼 상태**: `useStateHistory<MeetingDoc>` 단일 hook 이 제목/날짜/시간/참석자/본문/요약 3리스트 모두 관리. 1초 debounce 후 onCommit → `updateMutation`. undo/redo + Cmd/Ctrl+Z 키보드 + 폼 전체 적용.
+- **회의록 폼 상태**: `useStateHistory<MeetingDoc>` 단일 hook 이 제목/날짜/시간/참석자/본문/회의내용(transcript)/요약 3리스트 모두 관리. 1초 debounce 후 onCommit → `updateMutation`. undo/redo + Cmd/Ctrl+Z 키보드 + 폼 전체 적용.
 - **일기/캘린더 자동 저장**: `useDebouncedSave` (queue coalescing) — 일기 본문 등 텍스트 단일 필드용. 회의록은 위 useStateHistory가 대체.
 - **Edge Function 에러**: try/catch + toast + retry button + Anthropic SDK `tool_use` 구조화 출력 강제. 모델은 `claude-haiku-4-5-20251001`.
 - **회의록 AI 출력 schema**: `{discussion_items, decisions, action_items}` 3분리 (V0.1.1). action_items 형식 `[담당자] 할 일 — 기한`. 결정 사항은 합의/확정된 것만.
+- **회의록 AI 입력 source** (V0.5.2): 본문(`content`, 회의 중 직접 적은 정리 노트) + 회의 내용(`transcript`, 녹음의 외부 STT 변환 결과). 본문 우선, transcript는 디테일 보조. 충돌 시 본문 우선. 한쪽만 있어도 동작. 둘 다 비면 SummarizeButton 비활성.
 - **테스트**: Vitest. `lib/markdown.test.ts` (5 unit) + `lib/dates.test.ts` (5 unit) + Edge Function smoke 1개. UI 회귀는 본인이 매일 사용으로 발견.
 - **디자인 토큰**: 시맨틱 CSS custom property 기반 (18개 토큰). `DESIGN.md` 참조. 컴포넌트에서 `style={{ color: "var(--text-primary)" }}` 패턴. Tailwind `dark:` 색상 접두사 사용 금지.
 - **테마**: `useTheme` hook. 라이트/다크 2단계 토글. 첫 방문 시 OS 설정 → localStorage 저장. `.dark` class 기반 (`@custom-variant dark`).
 - **레이아웃 (데스크탑)**: Obsidian 스타일 3-pane. `ActivityBar` (48px 아이콘) + `SidePanel` (288px, 탭별 내용) + Main. 모바일: 하단 탭 + 단일 컬럼.
 - **"회의록" → "메모장"**: UI 전체 리네이밍 완료. 내부 코드는 `meetings` 유지.
-- **메모장 에디터**: Notion 스타일 풀페이지. 제목(3xl) → 메타데이터(인라인) → 본문(textarea, 전체 스크롤) → AI 요약(인라인 블록).
+- **메모장 에디터** (V0.5.2): 제목(3xl) → 메타데이터(인라인) → 3-탭 [본문 / 회의 내용 / 요약]. 탭 row sticky(`top: 2.5rem`). 우측 액션(편집/보기 토글, 마크다운 복사, 삭제) compact 아이콘. 하단에 액션 X.
+  - **본문 탭**: `SourceBodyEditor` (편집, 마크다운 source) ↔ `MarkdownView` (보기). 토글은 `useViewMode` (localStorage persist). 편집 모드 textarea 왼쪽에 line gutter — `inferLineKind`가 줄별 마크다운 종류 표시 (제목/목록/인용/코드/Setext heading/들여쓰기 단계 등 + 이전 컨텍스트로 "이어짐" 추론). `wrap="off"` + 세로 페이지 스크롤.
+  - **회의 내용 탭** (`transcript`): raw textarea + 파일 업로드 (`.txt/.md/.vtt/.srt`). 업로드 시 기존 내용 뒤에 이어붙임.
+  - **요약 탭**: `SummarizeButton` + 기존 callout 3개 + 액션 아이템 → todo 변환.
+  - 단축키 (Tauri only): undo/redo `Cmd/Ctrl+Z`, Cmd+1/2/3 페이지 탭, Opt+1/2/3 메모 sub-tab (Opt+1은 본문 탭이면 편집/보기 토글). 브라우저는 시스템 단축키 충돌로 sub-tab 단축키 없음.
 - **캘린더**: 타임라인뷰 제거. 무한 스크롤 MonthGrid + snap. 셀 내 이벤트 타이틀 표시. 사이드 패널에 선택 날짜 상세.
 - **할 일 카테고리**: `todos.category` (work/meeting). 사이드바 필터 (전체/업무/미팅/미분류). 일정(schedules)과 통합 표시.
 - **라우팅**: URL hash 기반 (`#meetings` / `#calendar` / `#todos` / `#meeting-{id}`).
 - **마크다운 출력 포맷** (본인 회의록 spec, 외부 복사용): `## {title or "회의록"}` → `일시: YYYY.MM.DD (요일) [시간]` + `참석:` → `### 논의 사항` / `### 결정 사항` / `### 액션 아이템` 3섹션. 빈 섹션 omit. `lib/markdown.ts` `meetingToMarkdown()` 가 단일 source. ❌ "Notion 호환" 표현 쓰지 말 것.
-- **마크다운 렌더링**: `react-markdown` + `remark-gfm`. `MarkdownView.tsx` — 디자인 토큰 기반 스타일링.
+- **마크다운 렌더링**: `react-markdown` + `remark-gfm`. `MarkdownView.tsx` — 디자인 토큰 기반 스타일링. `ol` 컴포넌트에서 `start` prop 통과 (떨어진 ordered list 번호 이어짐).
+- **글로벌 툴팁** (V0.5.2): `<GlobalTooltip />` (`App.tsx`에 마운트). 모든 `title="..."` 속성을 hover 시 자동 커스텀 툴팁으로 변환. 250ms delay + 디자인 토큰 + 위치 자동 (top/bottom/left/right) + chain hover 즉시 표시. native title 비우고 `aria-label` 자동 보강.
 - **Tauri**: 데스크탑 앱 셋업 완료 (`src-tauri/`). `bun run tauri:dev` / `tauri:build`. Vite 포트 1420 고정.
 
 ## 빌더 모드 톤

@@ -1,20 +1,24 @@
 # todo
 
-## 🔴 다음 작업 — 메모장 뷰/편집 모드 전환
+## 🟢 완료 — V0.5.2 (2026-05-15~16)
 
-기본 뷰 모드 (마크다운 렌더링) ↔ 클릭 시 편집 모드 (textarea) 전환.
+- [x] **뷰/편집 모드 전환** — 처음 block 단위 편집기 시도 → 마크다운 spec 노출이 빌더 모드에 안 맞아 폐기. 단순 SourceBodyEditor(편집) ↔ MarkdownView(보기) 토글로 단순화. localStorage persist (`useViewMode`).
+- [x] **메모장 3-탭 구조** — 본문 / 회의 내용(transcript) / 요약. 탭 row sticky. 우측 액션 compact.
+- [x] **transcript 필드** — `meetings.transcript` text 컬럼. SourceBodyEditor + 파일 업로드 (.txt/.md/.vtt/.srt).
+- [x] **AI 요약 두 source 통합** — Edge Function이 본문(가이드) + transcript(보조, 오인식 가능) 통합. 충돌 시 본문 우선.
+- [x] **편집 모드 line gutter** — `inferLineKind` 줄별 마크다운 종류 표시 (제목/목록/인용/코드/들여쓰기 단계 + 이전 컨텍스트 "이어짐").
+- [x] **마크다운 도움말 확장** — Setext heading, 들여쓰기 코드, 중첩 목록, hard line break, 링크 정의/참조, 표 정렬.
+- [x] **글로벌 커스텀 툴팁** — `GlobalTooltip`이 모든 `title` 자동 가로채기.
+- [x] **단축키** (Tauri only): Cmd+1/2/3 페이지 탭, Opt+1/2/3 메모 sub-tab.
+- [x] **마크다운 ol start prop fix** — 떨어진 ordered list 번호 이어짐.
 
-### 동작
-- 메모 진입 시 **뷰 모드**: MarkdownView로 렌더링된 결과물 표시
-- 본문 영역 **클릭** → 편집 모드 (textarea) 전환
-- **ESC** 또는 본문 **바깥 클릭** → 뷰 모드로 복귀
-- 제목/메타데이터는 항상 편집 가능 (현재와 동일)
+---
 
-### 구현
-- 새 라이브러리 불필요. 기존 `MarkdownView` + textarea 조합.
-- `isEditing` state 하나로 전환
-- 뷰→편집 전환 시 클릭 위치에 커서 근사치 배치 (선택사항)
-- AI 요약 블록은 뷰/편집 모드 무관하게 항상 본문 아래에 표시
+## 🟡 V0.6 후보 — 녹음 파일 직접 업로드
+
+현재는 외부 AI로 STT 변환한 결과를 복붙/파일 업로드. 다음 단계:
+- 녹음 파일 (.m4a/.mp3/.wav) 업로드 → Edge Function이 Whisper API 호출 → transcript 자동 채움
+- 비용 발생 (Anthropic API와 별도). 사용 빈도 따라 결정.
 
 ---
 
