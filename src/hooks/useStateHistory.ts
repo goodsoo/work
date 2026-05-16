@@ -1,19 +1,28 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
+type CachedState<T> = { value: T; history: T[]; pointer: number };
+
+// Module-level cache shared across all useStateHistory instances.
+// Persists across component remounts so undo/redo survives navigation.
+const HISTORY_CACHE = new Map<string, CachedState<unknown>>();
+
 export type UseStateHistoryOptions<T> = {
-  /** Initial value. Reapplied when reKey changes. */
+  /** Initial value. Used on first mount and on cache miss. */
   initial: T;
-  /** Stable identity (e.g., document id). When this changes, history resets. */
-  reKey?: unknown;
-  /** Synchronously called on every set/undo/redo with the new value (visible update). */
+  /**
+   * Stable identity for this history stack. When it changes:
+   *  - The outgoing key's state is saved to a module-level cache.
+   *  - The incoming key's state is restored from cache (or `initial`).
+   *  - Any pending debounced commit is flushed via `onCommit` using the
+   *    callback that was active at transition time (so saves go to the
+   *    correct outgoing entity).
+   * Pass `undefined` to disable cache participation.
+   */
+  cacheKey?: string;
   onChange?: (next: T) => void;
-  /** Called after debounce on set, and immediately on undo/redo/flush (server save). */
   onCommit?: (next: T) => void;
-  /** Debounce window for committing a snapshot (ms). */
   commitMs?: number;
-  /** Max number of snapshots in history. */
   maxDepth?: number;
-  /** Custom equality (default: ===). */
   isEqual?: (a: T, b: T) => boolean;
 };
 
@@ -22,7 +31,7 @@ export type UseStateHistoryResult<T> = {
   set: (next: T) => void;
   undo: () => void;
   redo: () => void;
-  /** Force commit any pending edit immediately (e.g., before navigation away). */
+  /** Force commit any pending edit immediately. */
   flush: () => void;
   canUndo: boolean;
   canRedo: boolean;
@@ -32,19 +41,12 @@ function defaultEq<T>(a: T, b: T): boolean {
   return a === b;
 }
 
-/**
- * Generic undo/redo state container with debounced snapshotting.
- *
- * `set` updates the value visibly (via onChange) and schedules a snapshot
- * commit + save (via onCommit) after `commitMs`. `undo`/`redo` apply the
- * neighbor snapshot and trigger onCommit immediately.
- */
 export function useStateHistory<T>(
   opts: UseStateHistoryOptions<T>,
 ): UseStateHistoryResult<T> {
   const {
     initial,
-    reKey,
+    cacheKey,
     onChange,
     onCommit,
     commitMs = 800,
@@ -52,18 +54,19 @@ export function useStateHistory<T>(
     isEqual = defaultEq,
   } = opts;
 
-  const [value, setValue] = useState<T>(initial);
-  const [history, setHistory] = useState<T[]>([initial]);
-  const [pointer, setPointer] = useState(0);
-
-  // Reset on reKey change (state-based, no refs during render).
-  const [trackedReKey, setTrackedReKey] = useState<unknown>(reKey);
-  if (trackedReKey !== reKey) {
-    setTrackedReKey(reKey);
-    setValue(initial);
-    setHistory([initial]);
-    setPointer(0);
-  }
+  // Initial state — restore from cache if available, else use `initial`.
+  const initialState = (() => {
+    if (cacheKey !== undefined) {
+      const cached = HISTORY_CACHE.get(cacheKey) as
+        | CachedState<T>
+        | undefined;
+      if (cached) return cached;
+    }
+    return { value: initial, history: [initial], pointer: 0 };
+  });
+  const [value, setValue] = useState<T>(() => initialState().value);
+  const [history, setHistory] = useState<T[]>(() => initialState().history);
+  const [pointer, setPointer] = useState(() => initialState().pointer);
 
   const onChangeRef = useRef(onChange);
   const onCommitRef = useRef(onCommit);
@@ -78,7 +81,83 @@ export function useStateHistory<T>(
     isEqualRef.current = isEqual;
   }, [isEqual]);
 
+  // Latest snapshots for unmount cleanup (closure-safe).
+  const valueRef = useRef(value);
+  const historyRef = useRef(history);
+  const pointerRef = useRef(pointer);
+  const cacheKeyRef = useRef(cacheKey);
+  valueRef.current = value;
+  historyRef.current = history;
+  pointerRef.current = pointer;
+  cacheKeyRef.current = cacheKey;
+
   const commitTimerRef = useRef<number | null>(null);
+  const pendingTransitionFlushRef = useRef<
+    { value: T; onCommit: ((v: T) => void) | undefined } | null
+  >(null);
+
+  // cacheKey transition: save outgoing, restore incoming (state-based).
+  const [trackedKey, setTrackedKey] = useState(cacheKey);
+  if (trackedKey !== cacheKey) {
+    // 1) Save outgoing state.
+    if (trackedKey !== undefined) {
+      HISTORY_CACHE.set(trackedKey, { value, history, pointer });
+    }
+    // 2) Defer pending commit to effect (so outgoing onCommit fires).
+    if (commitTimerRef.current != null) {
+      window.clearTimeout(commitTimerRef.current);
+      commitTimerRef.current = null;
+      pendingTransitionFlushRef.current = {
+        value,
+        // onCommitRef still holds the previous render's callback —
+        // the ref-update effect has not fired yet for this render.
+        onCommit: onCommitRef.current,
+      };
+    }
+    // 3) Restore incoming state.
+    const cached =
+      cacheKey !== undefined
+        ? (HISTORY_CACHE.get(cacheKey) as CachedState<T> | undefined)
+        : undefined;
+    if (cached) {
+      setValue(cached.value);
+      setHistory(cached.history);
+      setPointer(cached.pointer);
+    } else {
+      setValue(initial);
+      setHistory([initial]);
+      setPointer(0);
+    }
+    setTrackedKey(cacheKey);
+  }
+
+  // Fire deferred transition flush.
+  useEffect(() => {
+    if (pendingTransitionFlushRef.current) {
+      const { value: v, onCommit: cb } = pendingTransitionFlushRef.current;
+      pendingTransitionFlushRef.current = null;
+      cb?.(v);
+    }
+  }, [trackedKey]);
+
+  // Unmount: persist final state + fire pending commit.
+  useEffect(() => {
+    return () => {
+      const ck = cacheKeyRef.current;
+      if (ck !== undefined) {
+        HISTORY_CACHE.set(ck, {
+          value: valueRef.current,
+          history: historyRef.current,
+          pointer: pointerRef.current,
+        });
+      }
+      if (commitTimerRef.current != null) {
+        window.clearTimeout(commitTimerRef.current);
+        commitTimerRef.current = null;
+        onCommitRef.current?.(valueRef.current);
+      }
+    };
+  }, []);
 
   const set = useCallback(
     (next: T) => {
