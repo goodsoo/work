@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { AuthGate } from "./components/auth/AuthGate";
 import { AppShell } from "./components/nav/AppShell";
+import { GlobalTooltip } from "./components/Tooltip";
 import type { Tab } from "./components/nav/BottomTabs";
 import { MeetingsPage } from "./pages/MeetingsPage";
 import { MeetingForm } from "./components/meetings/MeetingForm";
@@ -10,6 +11,7 @@ type TodosFilter = TodoCategory | "all" | "uncategorized";
 import { CalendarPage } from "./pages/CalendarPage";
 import { TodosPage } from "./pages/TodosPage";
 import { todayIso } from "./lib/dates";
+import { isTauri } from "./lib/isTauri";
 
 function readTabFromHash(): Tab {
   const h = window.location.hash;
@@ -44,6 +46,28 @@ export default function App() {
       window.removeEventListener("popstate", syncFromHash);
       window.removeEventListener("hashchange", syncFromHash);
     };
+  }, []);
+
+  // Desktop (Tauri) 전용 페이지 단축키: Cmd+1/2/3
+  useEffect(() => {
+    if (!isTauri) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (!(e.metaKey || e.ctrlKey) || e.shiftKey || e.altKey) return;
+      let next: Tab | null = null;
+      if (e.key === "1") next = "meetings";
+      else if (e.key === "2") next = "calendar";
+      else if (e.key === "3") next = "todos";
+      if (!next) return;
+      e.preventDefault();
+      setTab(next);
+      setSelectedMeetingId(null);
+      const target = next === "meetings" ? "" : `#${next}`;
+      if (window.location.hash !== target) {
+        window.history.pushState({ tab: next }, "", target || window.location.pathname);
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
   function changeTab(next: Tab) {
@@ -88,6 +112,7 @@ export default function App() {
 
   return (
     <AuthGate>
+      <GlobalTooltip />
       <AppShell activeTab={tab} onTabChange={changeTab} sidePanel={sidePanel}>
         {tab === "meetings" ? (
           <>
