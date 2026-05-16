@@ -1,11 +1,5 @@
 import { useMemo } from "react";
-import {
-  eachDayOfInterval,
-  endOfMonth,
-  endOfWeek,
-  startOfMonth,
-  startOfWeek,
-} from "date-fns";
+import { addDays } from "date-fns";
 import { todayIso, isToday } from "../../lib/dates";
 import type { Meeting } from "../../api/meetings";
 import type { Journal } from "../../api/journals";
@@ -32,137 +26,162 @@ type CellEvent = {
 const MAX_CELL_EVENTS = 3;
 
 type Props = {
-  year: number;
-  month: number;
+  weeks: Date[]; // 각 주의 일요일 (week start)
   byDate: Map<string, DayItems>;
   onDayClick: (date: string) => void;
   selectedDate?: string | null;
+  currentYear: number;
+  currentMonth: number;
 };
 
 export function MonthGrid({
-  year,
-  month,
+  weeks,
   byDate,
   onDayClick,
   selectedDate,
+  currentYear,
+  currentMonth,
 }: Props) {
-  const { days, weekCount } = useMemo(() => {
-    const monthStart = new Date(year, month - 1, 1);
-    const monthEnd = endOfMonth(monthStart);
-    const gridStart = startOfWeek(monthStart, { weekStartsOn: 0 });
-    const gridEnd = endOfWeek(monthEnd, { weekStartsOn: 0 });
-    const list = eachDayOfInterval({ start: gridStart, end: gridEnd });
-    const ms = startOfMonth(monthStart).getTime();
-    const me = endOfMonth(monthStart).getTime();
-    return {
-      days: list.map((d) => ({
-        date: todayIso(d),
-        dayNum: d.getDate(),
-        inMonth: d.getTime() >= ms && d.getTime() <= me,
-        weekday: d.getDay(),
-      })),
-      weekCount: Math.ceil(list.length / 7),
-    };
-  }, [year, month]);
+  const cells = useMemo(() => {
+    const list: Array<{
+      date: string;
+      dayNum: number;
+      year: number;
+      month: number;
+      weekday: number;
+      snapHere: boolean; // 매 주 일요일 셀 → scroll snap 대상
+    }> = [];
+    for (const ws of weeks) {
+      for (let i = 0; i < 7; i++) {
+        const d = addDays(ws, i);
+        list.push({
+          date: todayIso(d),
+          dayNum: d.getDate(),
+          year: d.getFullYear(),
+          month: d.getMonth() + 1,
+          weekday: d.getDay(),
+          snapHere: i === 0,
+        });
+      }
+    }
+    return list;
+  }, [weeks]);
 
   return (
     <div
-      className="grid h-full grid-cols-7 px-3 lg:px-5"
-      style={{ gridTemplateRows: `repeat(${weekCount}, minmax(0, 1fr))` }}
+      className="grid grid-cols-7 px-3 lg:px-5"
+      style={{ gridAutoRows: "clamp(100px, 18svh, 180px)" }}
     >
-      {days.map(({ date, dayNum, inMonth, weekday }) => {
-          const items = byDate.get(date);
-          const today = isToday(date);
-          const selected = date === selectedDate;
-          const events = buildCellEvents(items);
-          const overflow = Math.max(0, events.length - MAX_CELL_EVENTS);
-          const visible = events.slice(0, MAX_CELL_EVENTS);
+      {cells.map(({ date, dayNum, year, month, weekday, snapHere }) => {
+        const items = byDate.get(date);
+        const today = isToday(date);
+        const selected = date === selectedDate;
+        const events = buildCellEvents(items);
+        const overflow = Math.max(0, events.length - MAX_CELL_EVENTS);
+        const visible = events.slice(0, MAX_CELL_EVENTS);
+        const isFirstOfMonth = dayNum === 1;
+        const inCurrentMonth = year === currentYear && month === currentMonth;
 
-          return (
-            <button
-              key={date}
-              type="button"
-              onClick={() => onDayClick(date)}
-              className="flex flex-col overflow-hidden px-1 py-0.5 text-left transition"
-              style={{
-                borderBottom: "1px solid var(--border-subtle)",
-                borderRight: "1px solid var(--border-subtle)",
-                backgroundColor: selected ? "var(--bg-surface)" : undefined,
-                opacity: inMonth ? 1 : 0.3,
-                minHeight: 0,
-              }}
-            >
-              {/* Date number */}
-              <div className="flex shrink-0 items-center gap-1">
-                {today ? (
-                  <span
-                    className="flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-bold"
-                    style={{
-                      backgroundColor: "var(--accent-red)",
-                      color: "var(--text-inverse)",
-                    }}
-                  >
-                    {dayNum}
-                  </span>
-                ) : (
+        return (
+          <button
+            key={date}
+            type="button"
+            onClick={() => onDayClick(date)}
+            className="flex flex-col overflow-hidden px-1 py-0.5 text-left transition"
+            style={{
+              borderBottom: "1px solid var(--border-subtle)",
+              borderRight: "1px solid var(--border-subtle)",
+              backgroundColor: selected ? "var(--bg-surface)" : undefined,
+              opacity: inCurrentMonth ? 1 : 0.35,
+              minHeight: 0,
+              scrollSnapAlign: snapHere ? "start" : undefined,
+            }}
+          >
+            {/* Date number (with month label on day 1) */}
+            <div className="flex shrink-0 items-baseline gap-1">
+              {today ? (
+                <span
+                  className="flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-bold"
+                  style={{
+                    backgroundColor: "var(--accent-red)",
+                    color: "var(--text-inverse)",
+                  }}
+                >
+                  {dayNum}
+                </span>
+              ) : (
+                <>
+                  {isFirstOfMonth ? (
+                    <span
+                      className="text-[10px] font-semibold"
+                      style={{ color: "var(--text-secondary)" }}
+                    >
+                      {month}월
+                    </span>
+                  ) : null}
                   <span
                     className={`px-0.5 text-xs ${weekday === 0 ? "text-red-500" : ""}`}
-                    style={weekday === 0 ? undefined : { color: "var(--text-secondary)" }}
+                    style={
+                      weekday === 0
+                        ? undefined
+                        : { color: "var(--text-secondary)" }
+                    }
                   >
                     {dayNum}
                   </span>
-                )}
-                {items?.journal ? (
-                  <span
-                    className="text-[10px]"
-                    style={{ color: "var(--text-muted)" }}
-                    title="일기"
-                  >
-                    ✎
-                  </span>
-                ) : null}
-              </div>
+                </>
+              )}
+              {items?.journal ? (
+                <span
+                  className="text-[10px]"
+                  style={{ color: "var(--text-muted)" }}
+                  title="일기"
+                >
+                  ✎
+                </span>
+              ) : null}
+            </div>
 
-              {/* Event chips */}
-              <div className="mt-0.5 min-h-0 flex-1 space-y-px overflow-hidden">
-                {visible.map((ev) => (
-                  <div
-                    key={ev.key}
-                    className={`truncate rounded-sm px-1 py-px text-[11px] leading-tight ${
-                      ev.done ? "line-through" : ""
-                    }`}
-                    style={
-                      ev.type === "meeting"
-                        ? {
-                            backgroundColor: "var(--accent-blue-bg)",
-                            color: "var(--accent-blue-text)",
+            {/* Event chips */}
+            <div className="mt-0.5 min-h-0 flex-1 space-y-px overflow-hidden">
+              {visible.map((ev) => (
+                <div
+                  key={ev.key}
+                  className={`truncate rounded-sm px-1 py-px text-[11px] leading-tight ${
+                    ev.done ? "line-through" : ""
+                  }`}
+                  style={
+                    ev.type === "meeting"
+                      ? {
+                          backgroundColor: "var(--accent-blue-bg)",
+                          color: "var(--accent-blue-text)",
+                        }
+                      : ev.done
+                        ? { color: "var(--text-muted)" }
+                        : {
+                            backgroundColor: "var(--bg-surface)",
+                            color: "var(--text-secondary)",
                           }
-                        : ev.done
-                          ? { color: "var(--text-muted)" }
-                          : {
-                              backgroundColor: "var(--bg-surface)",
-                              color: "var(--text-secondary)",
-                            }
-                    }
-                  >
-                    {ev.time ? (
-                      <span className="opacity-60">{ev.time} </span>
-                    ) : null}
-                    {ev.label}
-                  </div>
-                ))}
-                {overflow > 0 ? (
-                  <div
-                    className="px-1 text-[10px]"
-                    style={{ color: "var(--text-muted)" }}
-                  >
-                    +{overflow}
-                  </div>
-                ) : null}
-              </div>
-            </button>
-          );
-        })}
+                  }
+                >
+                  {ev.time ? (
+                    <span className="opacity-60">{ev.time} </span>
+                  ) : null}
+                  {ev.label}
+                </div>
+              ))}
+              {overflow > 0 ? (
+                <div
+                  className="px-1 text-[10px]"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  +{overflow}
+                </div>
+              ) : null}
+            </div>
+          </button>
+        );
+      })}
     </div>
   );
 }

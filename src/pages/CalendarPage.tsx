@@ -1,29 +1,44 @@
 import {
   useCallback,
+  useEffect,
   useLayoutEffect,
   useMemo,
   useRef,
   useState,
 } from "react";
+import { addDays, startOfWeek } from "date-fns";
 import { useMeetings } from "../hooks/useMeetings";
 import { useJournals } from "../hooks/useJournals";
 import { useTodos } from "../hooks/useTodos";
 import { useSchedules } from "../hooks/useSchedules";
 import { todayIso } from "../lib/dates";
-import { MonthGrid, WEEKDAYS, type DayItems } from "../components/timeline/MonthGrid";
+import {
+  MonthGrid,
+  WEEKDAYS,
+  type DayItems,
+} from "../components/timeline/MonthGrid";
 
 type Props = {
   targetDate?: string | null;
   onSelectedDateChange?: (date: string) => void;
 };
 
-/** Number of months rendered. Must be odd so there's a center. */
-const BUFFER = 7;
-const CENTER = Math.floor(BUFFER / 2); // 3
+// 연속 스크롤 버퍼: 49주 (약 11개월). 가장자리 근접 시 rebalance.
+const WEEK_BUFFER = 49;
+const WEEK_CENTER = Math.floor(WEEK_BUFFER / 2); // 24
+const REBALANCE_EDGE = 8;
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
-function addMonths(year: number, month: number, offset: number) {
-  const d = new Date(year, month - 1 + offset, 1);
-  return { year: d.getFullYear(), month: d.getMonth() + 1 };
+// 2026년 이전은 표시하지 않음. 버퍼 first week가 startOfWeek(2026-01-01) 보다 앞으로
+// 못 나가도록 centerWeekOffset 의 하한 (minCenterOffset) 을 잡음.
+const MIN_DATE = new Date(2026, 0, 1);
+
+function computeMinCenterOffset(anchor: Date): number {
+  const minWS = startOfWeek(MIN_DATE, { weekStartsOn: 0 });
+  const minWeekOffset = Math.round(
+    (minWS.getTime() - anchor.getTime()) / WEEK_MS,
+  );
+  return minWeekOffset + WEEK_CENTER;
 }
 
 function timestampToLocalIsoDate(ts: string): string {
@@ -37,16 +52,29 @@ export function CalendarPage({ targetDate, onSelectedDateChange }: Props) {
   const schedulesQ = useSchedules();
 
   const today = todayIso();
-  const anchorYear = useRef(new Date().getFullYear());
-  const anchorMonth = useRef(new Date().getMonth() + 1);
-
-  const [centerOffset, setCenterOffset] = useState(0);
-  // 현재 viewport 에 보이는 month offset (anchor 기준). 헤더 라벨 업데이트용.
-  const [visibleOffset, setVisibleOffset] = useState(0);
+  // anchor: 오늘 주의 일요일. 마운트 이후 변경 X.
+  const [anchorWeekStart] = useState<Date>(() =>
+    startOfWeek(new Date(), { weekStartsOn: 0 }),
+  );
+  // minCenterOffset: centerWeekOffset 의 하한. 버퍼가 2026년 이전으로 안 빠지게.
+  const minCenterOffset = useMemo(
+    () => computeMinCenterOffset(anchorWeekStart),
+    [anchorWeekStart],
+  );
+  // centerWeekOffset: 버퍼 중심이 anchor 로부터 몇 주 떨어져 있는지. 초기 0 인데
+  // minCenter > 0 (= 아직 2026년 초반 사용 중) 이면 클램프됨 → 오늘은 idx=WEEK_CENTER 가 아닌
+  // (WEEK_CENTER - minCenter) 에 위치.
+  const [centerWeekOffset, setCenterWeekOffset] = useState(() =>
+    Math.max(0, computeMinCenterOffset(anchorWeekStart)),
+  );
+  // visibleWeekOffset: 현재 viewport 최상단의 주가 anchor 로부터 몇 주.
+  const [visibleWeekOffset, setVisibleWeekOffset] = useState(0);
   const [selectedDate, setSelectedDate] = useState<string>(today);
 
   const containerRef = useRef<HTMLDivElement>(null);
-  const isRebalancing = useRef(false);
+  const rowHeightRef = useRef<number>(140);
+  // rebalance 진행 중일 때 scroll을 복원할 target px. null 이면 idle.
+  const rebalanceTargetRef = useRef<number | null>(null);
   const initialScrollDone = useRef(false);
 
   const isLoading =
@@ -55,53 +83,16 @@ export function CalendarPage({ targetDate, onSelectedDateChange }: Props) {
     todosQ.isLoading ||
     schedulesQ.isLoading;
 
-  // Scroll to center section (initial + after rebalance)
-  useLayoutEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    if (!initialScrollDone.current || isRebalancing.current) {
-      // Use rAF to ensure layout is settled and clientHeight is non-zero
-      requestAnimationFrame(() => {
-        if (!el.clientHeight) return;
-        el.scrollTop = CENTER * el.clientHeight;
-        initialScrollDone.current = true;
-        isRebalancing.current = false;
-      });
-    }
-  }, [centerOffset, isLoading]);
-
-  // External target date (from side panel)
-  const [lastTarget, setLastTarget] = useState<string | null>(null);
-  if (targetDate && targetDate !== lastTarget) {
-    setLastTarget(targetDate);
-    setSelectedDate(targetDate);
-    // Jump to target month
-    const [y, m] = targetDate.split("-").map(Number);
-    if (y && m) {
-      const offset =
-        (y - anchorYear.current) * 12 + (m - anchorMonth.current);
-      if (offset !== centerOffset) {
-        isRebalancing.current = true;
-        setCenterOffset(offset);
-      }
-    }
-  }
-
-  // Generate month list
-  const months = useMemo(() => {
-    const result: Array<{ year: number; month: number; key: string }> = [];
-    for (let i = -CENTER; i <= CENTER; i++) {
-      const ym = addMonths(
-        anchorYear.current,
-        anchorMonth.current,
-        centerOffset + i,
-      );
-      result.push({ ...ym, key: `${ym.year}-${ym.month}` });
+  // 버퍼 주 목록 (각 주의 일요일)
+  const weeks = useMemo(() => {
+    const result: Date[] = [];
+    for (let i = -WEEK_CENTER; i <= WEEK_CENTER; i++) {
+      result.push(addDays(anchorWeekStart, (centerWeekOffset + i) * 7));
     }
     return result;
-  }, [centerOffset]);
+  }, [anchorWeekStart, centerWeekOffset]);
 
-  // Build byDate map
+  // byDate map
   const byDate = useMemo<Map<string, DayItems>>(() => {
     const map = new Map<string, DayItems>();
     function ensure(d: string): DayItems {
@@ -147,48 +138,120 @@ export function CalendarPage({ targetDate, onSelectedDateChange }: Props) {
     return map;
   }, [meetingsQ.data, journalsQ.data, todosQ.data, schedulesQ.data]);
 
-  // Detect scroll-snap settle → rebalance if not center.
-  // 매 스크롤마다 visibleOffset 도 업데이트 (헤더 라벨용).
-  const scrollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // External target date (from side panel)
+  const [lastTarget, setLastTarget] = useState<string | null>(null);
+  if (targetDate && targetDate !== lastTarget) {
+    setLastTarget(targetDate);
+    setSelectedDate(targetDate);
+    const target = new Date(targetDate + "T00:00:00");
+    const targetWeekStart = startOfWeek(target, { weekStartsOn: 0 });
+    const diffWeeks = Math.round(
+      (targetWeekStart.getTime() - anchorWeekStart.getTime()) / WEEK_MS,
+    );
+    const targetCenter = Math.max(minCenterOffset, diffWeeks);
+    if (targetCenter !== centerWeekOffset) {
+      // diffWeeks 가 minCenter 보다 작아 클램프되었으면 idx 도 조정 (그 주가 버퍼의 어느 인덱스에 있는지).
+      const idxTarget = diffWeeks - targetCenter + WEEK_CENTER;
+      rebalanceTargetRef.current = idxTarget * rowHeightRef.current;
+      setCenterWeekOffset(targetCenter);
+    }
+  }
+
+  // 행 높이 측정 (subpixel 정확도 위해 getBoundingClientRect 사용)
+  function measureRowHeight(): number {
+    const el = containerRef.current;
+    const grid = el?.firstElementChild as HTMLElement | null;
+    const firstCell = grid?.firstElementChild as HTMLElement | null;
+    if (!firstCell) return rowHeightRef.current;
+    const h = firstCell.getBoundingClientRect().height;
+    return h > 0 ? h : rowHeightRef.current;
+  }
+
+  // Initial 또는 rebalance 시 scroll 위치 복원.
+  // Initial: 오늘을 viewport top 으로. 오늘 offset=0, idx_today = WEEK_CENTER - centerOff.
+  useLayoutEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    if (!initialScrollDone.current || rebalanceTargetRef.current !== null) {
+      requestAnimationFrame(() => {
+        const e = containerRef.current;
+        if (!e || !e.clientHeight) return;
+        rowHeightRef.current = measureRowHeight();
+        const rh = rowHeightRef.current;
+        const initialTarget = (WEEK_CENTER - centerWeekOffset) * rh;
+        const target = rebalanceTargetRef.current ?? initialTarget;
+        e.scrollTop = target;
+        rebalanceTargetRef.current = null;
+        initialScrollDone.current = true;
+      });
+    }
+  }, [centerWeekOffset, isLoading]);
+
+  // 윈도우 리사이즈 시 행 높이 재측정
+  useEffect(() => {
+    function onResize() {
+      rowHeightRef.current = measureRowHeight();
+    }
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  // Scroll handler — visible week 갱신 + edge 근접 시 rebalance.
+  // round 사용해서 subpixel 으로 인한 off-by-one 방지 (snap 됐는데 헤더가 한 주 이전으로 잡히는 버그).
+  // 클램프: newCenter 가 minCenter 보다 작아질 수 없음 (2026 이전 차단).
   const handleScroll = useCallback(() => {
     const el = containerRef.current;
-    if (!el || !el.clientHeight) return;
-    const idx = Math.round(el.scrollTop / el.clientHeight);
-    setVisibleOffset(centerOffset + (idx - CENTER));
+    const rh = rowHeightRef.current;
+    if (!el || !rh) return;
+    const idx = Math.round(el.scrollTop / rh);
+    setVisibleWeekOffset(centerWeekOffset + (idx - WEEK_CENTER));
 
-    if (isRebalancing.current) return;
-    if (scrollTimer.current) clearTimeout(scrollTimer.current);
-    scrollTimer.current = setTimeout(() => {
-      if (idx !== CENTER) {
-        const delta = idx - CENTER;
-        isRebalancing.current = true;
-        setCenterOffset((prev) => prev + delta);
-      }
-    }, 150);
-  }, [centerOffset]);
+    if (rebalanceTargetRef.current !== null) return;
+    if (idx < REBALANCE_EDGE || idx > WEEK_BUFFER - 1 - REBALANCE_EDGE) {
+      const delta = idx - WEEK_CENTER;
+      const newCenter = Math.max(minCenterOffset, centerWeekOffset + delta);
+      if (newCenter === centerWeekOffset) return; // 더 이상 못 미는 경우 (이미 minCenter)
+      const appliedDelta = newCenter - centerWeekOffset;
+      const newIdx = idx - appliedDelta;
+      const remainder = el.scrollTop - idx * rh;
+      rebalanceTargetRef.current = newIdx * rh + remainder;
+      setCenterWeekOffset(newCenter);
+    }
+  }, [centerWeekOffset, minCenterOffset]);
+
+  // 헤더 라벨용 — 보이는 top row의 토요일(마지막 날) month 기준.
+  // "1일 진입" semantic: 새 달 1일이 행에 들어오면 토요일이 새 달이 되므로 헤더가 즉시 전환.
+  const currentMonthYM = useMemo(() => {
+    const w = addDays(anchorWeekStart, visibleWeekOffset * 7 + 6);
+    return { year: w.getFullYear(), month: w.getMonth() + 1 };
+  }, [anchorWeekStart, visibleWeekOffset]);
+
+  // "오늘" 버튼 가시성 — 오늘 주가 viewport 근처에 있는지
+  const todayWeekOffset = useMemo(() => {
+    const todayWS = startOfWeek(new Date(), { weekStartsOn: 0 });
+    return Math.round(
+      (todayWS.getTime() - anchorWeekStart.getTime()) / WEEK_MS,
+    );
+  }, [anchorWeekStart]);
+  const todayVisible = Math.abs(visibleWeekOffset - todayWeekOffset) <= 2;
 
   function handleDayClick(date: string) {
     setSelectedDate(date);
+    // lastTarget 도 같이 갱신 → targetDate prop round-trip (App.calendarDate → 다시 targetDate)
+    // 이 다음 render에서 rebalance/scroll 을 트리거 못 하게 pre-empt.
+    setLastTarget(date);
     onSelectedDateChange?.(date);
   }
 
   function jumpToToday() {
     setSelectedDate(today);
+    setLastTarget(today);
     onSelectedDateChange?.(today);
-    isRebalancing.current = true;
-    setCenterOffset(0);
+    const targetCenter = Math.max(minCenterOffset, todayWeekOffset);
+    const idxToday = todayWeekOffset - targetCenter + WEEK_CENTER;
+    rebalanceTargetRef.current = idxToday * rowHeightRef.current;
+    setCenterWeekOffset(targetCenter);
   }
-
-  // 헤더에 표시할 "현재 보이는 달" — anchor + visibleOffset.
-  const currentMonthYM = useMemo(
-    () => addMonths(anchorYear.current, anchorMonth.current, visibleOffset),
-    [visibleOffset],
-  );
-
-  // Is current visible month the "today" month?
-  const todayMonth =
-    new Date().getFullYear() === currentMonthYM.year &&
-    new Date().getMonth() + 1 === currentMonthYM.month;
 
   if (isLoading) {
     return (
@@ -206,7 +269,7 @@ export function CalendarPage({ targetDate, onSelectedDateChange }: Props) {
 
   return (
     <div className="relative flex h-[calc(100svh-var(--app-header-h)-72px)] flex-col lg:h-[calc(100svh-1.5rem)]">
-      {/* Sticky header: 월 라벨 + 요일 row */}
+      {/* Sticky 헤더: 월 라벨 + 요일 row */}
       <div
         className="shrink-0"
         style={{ borderBottom: "1px solid var(--border-subtle)" }}
@@ -238,27 +301,19 @@ export function CalendarPage({ targetDate, onSelectedDateChange }: Props) {
         ref={containerRef}
         onScroll={handleScroll}
         className="min-h-0 flex-1 overflow-y-auto"
-        style={{ scrollSnapType: "y mandatory" }}
+        style={{ scrollSnapType: "y proximity" }}
       >
-        {months.map((m) => (
-          <div
-            key={m.key}
-            className="h-full"
-            style={{ scrollSnapAlign: "start" }}
-          >
-            <MonthGrid
-              year={m.year}
-              month={m.month}
-              byDate={byDate}
-              onDayClick={handleDayClick}
-              selectedDate={selectedDate}
-            />
-          </div>
-        ))}
+        <MonthGrid
+          weeks={weeks}
+          byDate={byDate}
+          onDayClick={handleDayClick}
+          selectedDate={selectedDate}
+          currentYear={currentMonthYM.year}
+          currentMonth={currentMonthYM.month}
+        />
       </div>
 
-      {/* Floating "오늘" button — visible when not on today's month */}
-      {!todayMonth ? (
+      {!todayVisible ? (
         <button
           type="button"
           onClick={jumpToToday}
