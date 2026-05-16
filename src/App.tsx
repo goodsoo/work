@@ -38,7 +38,12 @@ export default function App() {
   useEffect(() => {
     function syncFromHash() {
       setTab(readTabFromHash());
-      setSelectedMeetingId(readMeetingFromHash());
+      // hash 에 meeting id 가 있을 때만 set. 다른 탭으로 갔을 땐 selectedMeetingId
+      // 를 보존 — 메모장 돌아오면 그 메모가 다시 열림.
+      const idFromHash = readMeetingFromHash();
+      if (idFromHash !== null) {
+        setSelectedMeetingId(idFromHash);
+      }
     }
     window.addEventListener("popstate", syncFromHash);
     window.addEventListener("hashchange", syncFromHash);
@@ -59,25 +64,33 @@ export default function App() {
       else if (e.key === "3") next = "todos";
       if (!next) return;
       e.preventDefault();
-      setTab(next);
-      setSelectedMeetingId(null);
-      const target = next === "meetings" ? "" : `#${next}`;
-      if (window.location.hash !== target) {
-        window.history.pushState({ tab: next }, "", target || window.location.pathname);
-      }
+      switchTab(next);
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
+  }, [selectedMeetingId]);
+
+  function switchTab(next: Tab) {
+    setTab(next);
+    // selectedMeetingId 는 보존. 메모장으로 돌아오면 그 메모가 다시 열림.
+    const target =
+      next === "meetings"
+        ? selectedMeetingId
+          ? `#meeting-${selectedMeetingId}`
+          : ""
+        : `#${next}`;
+    if (window.location.hash !== target) {
+      window.history.pushState(
+        { tab: next, meetingId: selectedMeetingId },
+        "",
+        target || window.location.pathname,
+      );
+    }
+  }
 
   function changeTab(next: Tab) {
-    if (next === tab && !selectedMeetingId) return;
-    setTab(next);
-    setSelectedMeetingId(null);
-    const target = next === "meetings" ? "" : `#${next}`;
-    if (window.location.hash !== target) {
-      window.history.pushState({ tab: next }, "", target || window.location.pathname);
-    }
+    if (next === tab) return;
+    switchTab(next);
   }
 
   function openMeeting(id: string) {
