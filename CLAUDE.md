@@ -39,7 +39,7 @@
   - **요약 탭**: `SummarizeButton` + 기존 callout 3개 + 액션 아이템 → todo 변환.
   - **메모/탭 전환 동작** (V0.5.3): 메모 전환 시 `ACTIVE_TAB_CACHE` 모듈 Map 에서 그 메모의 마지막 탭으로 (없으면 본문). 페이지 전환(메모장 ↔ 캘린더 등) 후 돌아와도 메모 + 마지막 탭 + 4-stack history 모두 유지. 새로고침 시 모듈 cache 비워짐.
   - 단축키 (Tauri only): Cmd/Ctrl+Z (활성 탭 stack 의 undo — meta 는 native input undo), Cmd+1/2/3 페이지 탭, Opt+1/2/3 메모 sub-tab (Opt+1은 본문 탭이면 편집/보기 토글). 브라우저는 시스템 단축키 충돌로 sub-tab 단축키 없음.
-- **캘린더**: 타임라인뷰 제거. 무한 스크롤 MonthGrid + snap. 셀 내 이벤트 타이틀 표시. 사이드 패널에 선택 날짜 상세.
+- **캘린더**: 주 단위 연속 스크롤 (49주 버퍼, edge 근접 rebalance). sticky 헤더 (월 라벨 + 요일 row) — 헤더 month 기준은 top row 의 토요일(=마지막 날) month, "1일 진입" semantic. 매 주 일요일 셀에 `scroll-snap-align: start` + container `scroll-snap-type: y proximity` → 자유 스크롤 + 주 단위 정렬. 1일 셀에 "N월" 라벨로 월 경계 표시. 현재 month 외 셀은 opacity 0.35 회색톤. 2026-01 이전 차단 (`minCenterOffset` 클램프). day 클릭은 selection/사이드패널만 갱신, 스크롤 X. 셀 내 이벤트 타이틀 표시, 사이드 패널에 선택 날짜 상세.
 - **할 일 카테고리**: `todos.category` (work/meeting). 사이드바 필터 (전체/업무/미팅/미분류). 일정(schedules)과 통합 표시.
 - **라우팅**: URL hash 기반 (`#meetings` / `#calendar` / `#todos` / `#meeting-{id}`). tab 전환 시 `selectedMeetingId` 보존 — 메모장 ↔ 다른 탭 왕복해도 보던 메모 그대로. `hashchange` listener 는 hash 에 meeting id 있을 때만 set, 다른 hash 일 땐 보존.
 - **메모장 자동 선택** (V0.5.3): 페이지 진입 시 메모 1개 이상이면 최상단(`date desc, created_at desc`) 자동 선택. 모듈 flag (`didAutoSelectThisSession`) 로 세션당 한 번만 — 사용자가 onBack 한 뒤 페이지 갔다 와도 다시 자동 선택 X. 새로고침 시 reset.
