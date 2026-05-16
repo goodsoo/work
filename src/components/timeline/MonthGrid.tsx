@@ -19,7 +19,7 @@ export type DayItems = {
   journal: Journal | null;
 };
 
-const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
+export const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
 
 type CellEvent = {
   key: string;
@@ -66,41 +66,11 @@ export function MonthGrid({
   }, [year, month]);
 
   return (
-    <div className="flex h-full flex-col px-3 lg:px-5">
-      {/* Month label */}
-      <div className="flex shrink-0 items-baseline gap-2 py-2">
-        <h3
-          className="text-sm font-semibold"
-          style={{ color: "var(--text-primary)" }}
-        >
-          {year}년 {month}월
-        </h3>
-      </div>
-
-      {/* Weekday headers */}
-      <div
-        className="grid shrink-0 grid-cols-7"
-        style={{ borderBottom: "1px solid var(--border-subtle)" }}
-      >
-        {WEEKDAYS.map((w, i) => (
-          <div
-            key={w}
-            className={`py-1 text-center text-[11px] font-medium ${
-              i === 0 ? "text-red-500" : ""
-            }`}
-            style={i === 0 ? undefined : { color: "var(--text-secondary)" }}
-          >
-            {w}
-          </div>
-        ))}
-      </div>
-
-      {/* Day cells — fill remaining height */}
-      <div
-        className="grid min-h-0 flex-1 grid-cols-7"
-        style={{ gridTemplateRows: `repeat(${weekCount}, minmax(0, 1fr))` }}
-      >
-        {days.map(({ date, dayNum, inMonth, weekday }) => {
+    <div
+      className="grid h-full grid-cols-7 px-3 lg:px-5"
+      style={{ gridTemplateRows: `repeat(${weekCount}, minmax(0, 1fr))` }}
+    >
+      {days.map(({ date, dayNum, inMonth, weekday }) => {
           const items = byDate.get(date);
           const today = isToday(date);
           const selected = date === selectedDate;
@@ -193,7 +163,6 @@ export function MonthGrid({
             </button>
           );
         })}
-      </div>
     </div>
   );
 }
