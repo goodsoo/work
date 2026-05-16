@@ -47,6 +47,12 @@ export function CalendarPage({ targetDate, onSelectedDateChange }: Props) {
   const isRebalancing = useRef(false);
   const initialScrollDone = useRef(false);
 
+  const isLoading =
+    meetingsQ.isLoading ||
+    journalsQ.isLoading ||
+    todosQ.isLoading ||
+    schedulesQ.isLoading;
+
   // Scroll to center section (initial + after rebalance)
   useLayoutEffect(() => {
     const el = containerRef.current;
@@ -60,7 +66,7 @@ export function CalendarPage({ targetDate, onSelectedDateChange }: Props) {
         isRebalancing.current = false;
       });
     }
-  }, [centerOffset]);
+  }, [centerOffset, isLoading]);
 
   // External target date (from side panel)
   const [lastTarget, setLastTarget] = useState<string | null>(null);
@@ -138,12 +144,6 @@ export function CalendarPage({ targetDate, onSelectedDateChange }: Props) {
     }
     return map;
   }, [meetingsQ.data, journalsQ.data, todosQ.data, schedulesQ.data]);
-
-  const isLoading =
-    meetingsQ.isLoading ||
-    journalsQ.isLoading ||
-    todosQ.isLoading ||
-    schedulesQ.isLoading;
 
   // Detect scroll-snap settle → rebalance if not center
   const scrollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
