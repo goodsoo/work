@@ -1,7 +1,7 @@
-import { useCreateMeeting } from "../hooks/useMeetings";
+import { useCreateMeeting, useMeetings } from "../hooks/useMeetings";
 import { MeetingsList } from "../components/meetings/MeetingsList";
 import { MeetingForm } from "../components/meetings/MeetingForm";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { formatError } from "../lib/errors";
 
 function todayIso(): string {
@@ -12,6 +12,11 @@ function todayIso(): string {
   return `${y}-${m}-${d}`;
 }
 
+// 세션 단위 한 번만 자동 선택. 사용자가 명시적으로 onBack/닫기 한 뒤 페이지
+// 전환했다가 돌아와도 다시 자동 선택되지 않도록 모듈 변수로 보관 (페이지
+// 컴포넌트 unmount/mount 무관). 새로고침하면 모듈이 다시 import 되며 false.
+let didAutoSelectThisSession = false;
+
 type Props = {
   selectedId: string | null;
   onOpenMeeting: (id: string) => void;
@@ -20,7 +25,25 @@ type Props = {
 
 export function MeetingsPage({ selectedId, onOpenMeeting, onCloseMeeting }: Props) {
   const createMutation = useCreateMeeting();
+  const meetingsQ = useMeetings();
   const [createError, setCreateError] = useState<string | null>(null);
+
+  // 세션당 한 번만 자동 선택. 사용자가 명시적으로 onBack/닫기 했으면
+  // 다른 페이지 갔다 와도 다시 자동 선택 안 함 (모듈 flag 유지).
+  const autoSelectedRef = useRef(didAutoSelectThisSession);
+  useEffect(() => {
+    if (autoSelectedRef.current) return;
+    if (selectedId) {
+      autoSelectedRef.current = true;
+      didAutoSelectThisSession = true;
+      return;
+    }
+    const list = meetingsQ.data;
+    if (!list || list.length === 0) return;
+    autoSelectedRef.current = true;
+    didAutoSelectThisSession = true;
+    onOpenMeeting(list[0].id);
+  }, [selectedId, meetingsQ.data, onOpenMeeting]);
 
   async function handleCreate() {
     setCreateError(null);
