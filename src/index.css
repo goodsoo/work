@@ -121,6 +121,12 @@
     min-height: 44px;
   }
 
+  /* 기본 hover — disabled / active nav / inline bg 가진 버튼은 자동 제외
+     (inline bg 있는 primary/accent 버튼은 specificity 로 인해 적용 안 됨) */
+  button:not(:disabled):not([aria-current="page"]):hover {
+    background-color: var(--bg-surface-hover);
+  }
+
   /* ── Form elements (token-based) ── */
 
   select {

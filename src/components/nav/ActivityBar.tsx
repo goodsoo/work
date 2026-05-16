@@ -1,6 +1,7 @@
 import { LogOut, Sun, Moon } from "lucide-react";
 import { useAuth, signOut } from "../../hooks/useAuth";
 import { useTheme } from "../../hooks/useTheme";
+import { isTauri } from "../../lib/isTauri";
 import { TABS, type Tab } from "./BottomTabs";
 
 type Props = {
@@ -19,18 +20,19 @@ export function ActivityBar({ activeTab, onTabChange }: Props) {
       style={{ backgroundColor: "var(--bg-surface)" }}
     >
       <nav className="flex flex-col gap-1.5" aria-label="primary">
-        {TABS.map(({ id, label, icon: Icon }) => {
+        {TABS.map(({ id, label, icon: Icon }, i) => {
           const active = id === activeTab;
+          const title = isTauri ? `${label}  ⌘${i + 1}` : label;
           return (
             <button
               key={id}
               type="button"
               onClick={() => onTabChange(id)}
               aria-current={active ? "page" : undefined}
-              title={label}
+              title={title}
               className="flex h-9 w-9 items-center justify-center rounded-lg transition"
               style={{
-                backgroundColor: active ? "var(--btn-primary)" : "transparent",
+                backgroundColor: active ? "var(--btn-primary)" : undefined,
                 color: active ? "var(--btn-primary-text)" : "var(--text-muted)",
               }}
             >
