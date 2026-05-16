@@ -29,9 +29,13 @@ export function isoDateRange(fromIso: string, toIso: string): string[] {
   return out;
 }
 
-/** "5월 6일 화요일" */
-export function formatDateLong(iso: string): string {
-  return format(parseIsoDate(iso), "M월 d일 EEEE", { locale: ko });
+/** "5월 6일 화요일" — 올해가 아니면 "2027년 5월 6일 화요일" */
+export function formatDateLong(iso: string, reference = new Date()): string {
+  const d = parseIsoDate(iso);
+  if (d.getFullYear() !== reference.getFullYear()) {
+    return format(d, "yyyy년 M월 d일 EEEE", { locale: ko });
+  }
+  return format(d, "M월 d일 EEEE", { locale: ko });
 }
 
 /** "5/6" */
