@@ -94,10 +94,18 @@ export default function App() {
     }
   }
 
+  function handleMeetingPurged(id: string) {
+    if (selectedMeetingId === id) closeMeeting();
+  }
+
   // Desktop side panel per tab
   const sidePanel =
     tab === "meetings" ? (
-      <MeetingsSidePanel selectedId={selectedMeetingId} onSelect={openMeeting} />
+      <MeetingsSidePanel
+        selectedId={selectedMeetingId}
+        onSelect={openMeeting}
+        onMeetingPurged={handleMeetingPurged}
+      />
     ) : tab === "calendar" ? (
       <CalendarDayPanel
         selectedDate={calendarDate}

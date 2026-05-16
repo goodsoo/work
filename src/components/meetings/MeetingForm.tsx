@@ -219,7 +219,7 @@ export function MeetingForm({ meetingId, onBack }: Props) {
 
   async function handleDelete() {
     if (!data) return;
-    if (!window.confirm("이 메모를 삭제할까요?")) return;
+    if (!window.confirm("이 메모를 휴지통으로 옮길까요?")) return;
     try {
       await deleteMutation.mutateAsync(data.id);
       onBack();
