@@ -15,14 +15,15 @@
 - ✅ V0.0~V0.5 — 기본 기능 완료 (메모 CRUD, AI 요약, 일기, Todo, 캘린더)
 - ✅ V0.5.1 — 데스크탑 3-pane 레이아웃 + 캘린더 리라이트 + 디자인 토큰 + 테마
 - ✅ V0.5.2 — 메모장 본문/회의 내용/요약 3-탭 + transcript 필드 + 편집/보기 토글 + 글로벌 툴팁
-- 🟡 V0.6 후보 — Server-side 메모 history
+- ✅ V0.5.3 — 캘린더 첫 진입 버그 fix + 메모 history 메모별·탭별 분리 + 진입 자동 선택 + 페이지 전환 시 보존
+- 🟡 V0.6 후보 — Server-side 메모 history (client-side 분리/보존으로 1차 해결, 새로고침 영속만 남음)
 - 🟡 V0.7 후보 — UI/UX 포트폴리오 자동 기록
 - 🟡 후속 — 녹음 파일 직접 업로드 → 자동 STT (현재는 외부 AI로 변환한 결과 복붙/파일 업로드)
 
 ## 핵심 결정 (review 통과됨)
 
 - **Server state**: TanStack Query 일관 사용. 모든 fetch는 `useMeetings` 같은 훅 패턴. `src/api/{meetings,journals,todos,schedules}.ts` 가 supabase-js 캡슐화 + `src/hooks/use*.ts` 가 query/mutation 정의. `useUpdateMeeting` 은 optimistic update (인라인 편집 즉시 반영).
-- **회의록 폼 상태**: `useStateHistory<MeetingDoc>` 단일 hook 이 제목/날짜/시간/참석자/본문/회의내용(transcript)/요약 3리스트 모두 관리. 1초 debounce 후 onCommit → `updateMutation`. undo/redo + Cmd/Ctrl+Z 키보드 + 폼 전체 적용.
+- **회의록 폼 상태** (V0.5.3): `useStateHistory` 를 4개 stack 으로 분리 — `body`(content) / `transcript` / `summary`(discussion_items + decisions + action_items) / `meta`(title + date + time + attendees). 각자 `cacheKey="${meetingId}:${stack}"` 로 module-level Map 에 보존. 메모 전환 또는 페이지 전환 후 같은 메모로 돌아오면 value + history + canUndo 가 그대로 복원됨. 각 stack 의 `onCommit` 은 자기 필드만 partial patch → `useUpdateMeeting` (optimistic). pending commit 은 cacheKey transition 시 outgoing onCommit (옛 메모의 mutation) 에 deferred flush.
 - **일기/캘린더 자동 저장**: `useDebouncedSave` (queue coalescing) — 일기 본문 등 텍스트 단일 필드용. 회의록은 위 useStateHistory가 대체.
 - **Edge Function 에러**: try/catch + toast + retry button + Anthropic SDK `tool_use` 구조화 출력 강제. 모델은 `claude-haiku-4-5-20251001`.
 - **회의록 AI 출력 schema**: `{discussion_items, decisions, action_items}` 3분리 (V0.1.1). action_items 형식 `[담당자] 할 일 — 기한`. 결정 사항은 합의/확정된 것만.
@@ -36,10 +37,12 @@
   - **본문 탭**: `SourceBodyEditor` (편집, 마크다운 source) ↔ `MarkdownView` (보기). 토글은 `useViewMode` (localStorage persist). 편집 모드 textarea 왼쪽에 line gutter — `inferLineKind`가 줄별 마크다운 종류 표시 (제목/목록/인용/코드/Setext heading/들여쓰기 단계 등 + 이전 컨텍스트로 "이어짐" 추론). `wrap="off"` + 세로 페이지 스크롤.
   - **회의 내용 탭** (`transcript`): raw textarea + 파일 업로드 (`.txt/.md/.vtt/.srt`). 업로드 시 기존 내용 뒤에 이어붙임.
   - **요약 탭**: `SummarizeButton` + 기존 callout 3개 + 액션 아이템 → todo 변환.
-  - 단축키 (Tauri only): undo/redo `Cmd/Ctrl+Z`, Cmd+1/2/3 페이지 탭, Opt+1/2/3 메모 sub-tab (Opt+1은 본문 탭이면 편집/보기 토글). 브라우저는 시스템 단축키 충돌로 sub-tab 단축키 없음.
+  - **메모/탭 전환 동작** (V0.5.3): 메모 전환 시 `ACTIVE_TAB_CACHE` 모듈 Map 에서 그 메모의 마지막 탭으로 (없으면 본문). 페이지 전환(메모장 ↔ 캘린더 등) 후 돌아와도 메모 + 마지막 탭 + 4-stack history 모두 유지. 새로고침 시 모듈 cache 비워짐.
+  - 단축키 (Tauri only): Cmd/Ctrl+Z (활성 탭 stack 의 undo — meta 는 native input undo), Cmd+1/2/3 페이지 탭, Opt+1/2/3 메모 sub-tab (Opt+1은 본문 탭이면 편집/보기 토글). 브라우저는 시스템 단축키 충돌로 sub-tab 단축키 없음.
 - **캘린더**: 타임라인뷰 제거. 무한 스크롤 MonthGrid + snap. 셀 내 이벤트 타이틀 표시. 사이드 패널에 선택 날짜 상세.
 - **할 일 카테고리**: `todos.category` (work/meeting). 사이드바 필터 (전체/업무/미팅/미분류). 일정(schedules)과 통합 표시.
-- **라우팅**: URL hash 기반 (`#meetings` / `#calendar` / `#todos` / `#meeting-{id}`).
+- **라우팅**: URL hash 기반 (`#meetings` / `#calendar` / `#todos` / `#meeting-{id}`). tab 전환 시 `selectedMeetingId` 보존 — 메모장 ↔ 다른 탭 왕복해도 보던 메모 그대로. `hashchange` listener 는 hash 에 meeting id 있을 때만 set, 다른 hash 일 땐 보존.
+- **메모장 자동 선택** (V0.5.3): 페이지 진입 시 메모 1개 이상이면 최상단(`date desc, created_at desc`) 자동 선택. 모듈 flag (`didAutoSelectThisSession`) 로 세션당 한 번만 — 사용자가 onBack 한 뒤 페이지 갔다 와도 다시 자동 선택 X. 새로고침 시 reset.
 - **마크다운 출력 포맷** (본인 회의록 spec, 외부 복사용): `## {title or "회의록"}` → `일시: YYYY.MM.DD (요일) [시간]` + `참석:` → `### 논의 사항` / `### 결정 사항` / `### 액션 아이템` 3섹션. 빈 섹션 omit. `lib/markdown.ts` `meetingToMarkdown()` 가 단일 source. ❌ "Notion 호환" 표현 쓰지 말 것.
 - **마크다운 렌더링**: `react-markdown` + `remark-gfm`. `MarkdownView.tsx` — 디자인 토큰 기반 스타일링. `ol` 컴포넌트에서 `start` prop 통과 (떨어진 ordered list 번호 이어짐).
 - **글로벌 툴팁** (V0.5.2): `<GlobalTooltip />` (`App.tsx`에 마운트). 모든 `title="..."` 속성을 hover 시 자동 커스텀 툴팁으로 변환. 250ms delay + 디자인 토큰 + 위치 자동 (top/bottom/left/right) + chain hover 즉시 표시. native title 비우고 `aria-label` 자동 보강.
