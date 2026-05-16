@@ -33,10 +33,25 @@ V0.5.2 세션 완료. 메모장 회의 흐름 구조화 + 글로벌 툴팁.
 
 - **Block-based editor (mdast top-level block 단위)**: 600줄+ 구현. paragraph/heading split, ghost block, append mode, IME guard, exit-to-ghost 등 매우 정교. 그러나 마크다운 spec(빈 줄로 분리, list lazy continuation 등)이 그대로 노출되어 빌더 모드 1인 사용자에게 over-engineering. 결국 source 편집 + 보기 토글로 단순화. `BlockEditableBody`, `markdownBlocks.ts`, `caret.ts` 삭제. `unified`/`remark-parse` 의존성도 제거.
 
-### 미확인 / 사용자 별도 작업
+### 같은 날 후속 (병렬 세션, 별도 커밋됨)
 
-- 사용자가 같은 세션 안에서 별도 작업: `src/lib/errors.ts`, `src/lib/isTauri.ts` 생성 + 일부 파일(MeetingForm, App, SummarizeButton, SidePanel 등)에 isTauri/formatError import 추가. 이는 우리 커밋에 같은 파일로 섞여 들어갔지만 두 신규 파일은 **untracked로 남음** — 사용자가 별도 커밋 필요. 안 하면 빌드 깨짐.
-- 사용자만 만진 파일: `SignInScreen.tsx`, `ActivityBar.tsx`, `index.css`, `useDebouncedSave.ts`, `MeetingsPage.tsx`. untouch.
+병렬 세션에서 단축키 + UX 폴리싱 추가:
+
+- **단축키 (Tauri only)**:
+  - 페이지: `Cmd+1` 메모장 / `Cmd+2` 캘린더 / `Cmd+3` 할 일 (App.tsx 의 window keydown).
+  - 메모 sub-tab: `Opt+1` 본문(편집/보기 토글) / `Opt+2` 회의 내용 / `Opt+3` AI 요약. `e.code === "Digit{N}"` 로 매칭 (Opt+숫자는 macOS 가 ¡™£ 로 바꿈).
+  - `Opt+1` 동작: 본문 탭에서 → 편집/보기 토글, 다른 탭에서 → 본문으로 이동만 (모드 변경 X).
+  - MeetingForm 의 keydown listener 는 div local `onKeyDown` 이 아니라 `window.addEventListener` 로 등록 — 빈 곳 focus 일 때도 동작.
+- **글로벌 hover 효과**: `button:not(:disabled):not([aria-current="page"]):hover { background-color: var(--bg-surface-hover); }` 한 줄. 버튼 50개 일일이 안 만져도 됨. inline `bg: transparent` 가진 곳은 specificity 로 안 먹어서 ActivityBar inactive 탭은 `undefined` 로 수정.
+- **글로벌 툴팁 개선**:
+  - 화면 좌측 가장자리 (rect.left < 60) 트리거는 → 오른쪽 placement. ActivityBar 아이콘이 창 밖으로 안 삐져나감.
+  - 4방향 placement 모두 화살표 삽입 (border-triangle).
+  - `useEffect` deps `[pos]` → `[]` + ref 패턴으로 변경. tooltip 떠/사라질 때마다 listener 재등록되던 race condition 제거.
+  - Chain hover (다른 `[data-tooltip]` 로 바로 이동) 시 SHOW_DELAY 무시하고 즉시 표시.
+- **자동저장 실패 토스트 우측 하단 fixed**: 페이지 inline 에서 떴다가 컴포넌트 밀어내던 문제 해결. 닫기(X) + 실제 에러 메시지 표시 + retry 동작 수정.
+- **`retrySave` 버그 수정**: `if (history.canUndo === false ...)` 조건이 거꾸로 박혀 있어서 보통 케이스에서 아무것도 안 했음. 단순 mutate 재호출로 변경.
+- **`formatError` 헬퍼**: Supabase PostgrestError 등 non-Error 객체에서 `.message` 추출. 기존 6곳 `e instanceof Error ? e.message : String(e)` → `formatError(e)`. "[object Object]" 메시지 사라짐.
+- **단축키 hint tooltip**: ActivityBar 탭 title 에 `⌘1/2/3` 표기, MeetingForm TabBtn 에 `⌥1/2/3` 표기 (Tauri 만).
 
 ## 다음 세션 작업
 
@@ -45,7 +60,6 @@ V0.5.2 세션 완료. 메모장 회의 흐름 구조화 + 글로벌 툴팁.
 1. **DB 마이그레이션 적용**: `supabase db push`
 2. **types 재생성** (선택, 수동 편집과 동일): `supabase gen types typescript --linked 2>/dev/null > src/lib/database.types.ts`
 3. **Edge Function 배포**: `supabase functions deploy summarize`
-4. **untracked 파일 커밋**: `src/lib/errors.ts`, `src/lib/isTauri.ts` 등 (그렇지 않으면 빌드 깨짐).
 
 ### V0.6 후보
 
@@ -59,7 +73,9 @@ V0.5.2 세션 완료. 메모장 회의 흐름 구조화 + 글로벌 툴팁.
 
 ## 알아야 할 컨텍스트
 
-- **단축키는 Tauri only**: 브라우저는 Cmd+1/2/3 같은 단축키가 시스템과 충돌. `isTauri` 분기.
+- **단축키는 Tauri only**: 브라우저는 Cmd+1/2/3 (탭 전환) / Cmd+E (find selection) / Cmd+R (reload) / Cmd+T (new tab) 등 시스템과 충돌. `isTauri` 분기로 Tauri 일 때만 동작.
+- **Tauri webview 가 일부 Cmd+키 가로챔**: 그래서 sub-tab 은 Cmd+ 가 아니라 Opt+ 로 매핑. Opt+숫자는 macOS 가 특수문자로 바꾸므로 `e.key` 대신 `e.code === "Digit{N}"` 매칭 필수.
+- **Tauri 에서 새로고침**: `Cmd+R` 안 먹음 (WKWebView 기본 동작 없음). 우클릭 → Inspect Element → DevTools 에서 Cmd+R, 또는 앱 종료 후 `bun run tauri:dev`.
 - **회의 흐름 (사용자 작업 패턴)**: 회의 중 본문에 핵심만 → 회의 후 녹음을 외부 STT → 회의 내용 탭에 붙여넣기 → AI 요약 탭에서 두 source 통합 요약 생성.
 - **transcript 컬럼은 nullable**: 기존 메모는 자동으로 `null`. 필요시 사용자가 회의 내용 탭에서 추가.
 - **AI 요약 prompt 우선순위**: 본문(직접 적은 메모) > transcript(STT, 오인식 가능). 충돌 시 본문.
