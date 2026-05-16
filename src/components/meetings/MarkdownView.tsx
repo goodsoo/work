@@ -42,8 +42,13 @@ export function MarkdownView({ content }: Props) {
           ul: ({ children }) => (
             <ul className="my-2 list-disc space-y-1 pl-6">{children}</ul>
           ),
-          ol: ({ children }) => (
-            <ol className="my-2 list-decimal space-y-1 pl-6">{children}</ol>
+          ol: ({ children, start }) => (
+            <ol
+              start={start}
+              className="my-2 list-decimal space-y-1 pl-6"
+            >
+              {children}
+            </ol>
           ),
           li: ({ children }) => <li>{children}</li>,
           input: (props) =>
