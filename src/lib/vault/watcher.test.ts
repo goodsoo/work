@@ -34,6 +34,29 @@ describe("VaultWatcher", () => {
     watcher.stop();
   });
 
+  it("portfolio/* 변경 → portfolio query key invalidate", async () => {
+    const adapter = createMemoryAdapter();
+    adapter.setRoot("/vault");
+    const qc = new QueryClient();
+    const invalidateSpy = vi.spyOn(qc, "invalidateQueries");
+
+    const watcher = createVaultWatcher(adapter, qc);
+    await watcher.start();
+
+    adapter.__trigger({
+      type: "modified",
+      path: "portfolio/owner-repo-1.md",
+    });
+    await new Promise((r) => setTimeout(r, 150));
+
+    const calls = invalidateSpy.mock.calls.map((c) =>
+      JSON.stringify((c[0] as { queryKey: unknown }).queryKey),
+    );
+    expect(calls.some((c) => c.includes("portfolio"))).toBe(true);
+
+    watcher.stop();
+  });
+
   it("우리가 직접 write 한 직후의 modified 이벤트는 무시 (selfWriteWindow)", async () => {
     const adapter = createMemoryAdapter();
     adapter.setRoot("/vault");

@@ -1,0 +1,156 @@
+import { useMemo, type ReactNode } from "react";
+import type {
+  PortfolioProject,
+  PortfolioWorkMeta,
+} from "../../api/portfolio";
+
+export type ProjectFilter =
+  | { kind: "all" }
+  | { kind: "uncategorized" }
+  | { kind: "project"; slug: string }
+  | { kind: "excluded" };
+
+type Props = {
+  projects: PortfolioProject[];
+  works: PortfolioWorkMeta[];
+  activeFilter: ProjectFilter;
+  onFilterChange: (next: ProjectFilter) => void;
+};
+
+const COLOR_DOT: Record<string, string> = {
+  blue: "var(--accent-blue)",
+  red: "var(--accent-red)",
+};
+
+// name 에 "/" 있으면 owner/repo 분리. 본인이 한국어로 rename 한 경우는 그대로.
+function renderProjectName(name: string): ReactNode {
+  const slashIdx = name.indexOf("/");
+  if (slashIdx < 0) return name;
+  const owner = name.slice(0, slashIdx);
+  const repo = name.slice(slashIdx + 1);
+  return (
+    <span className="flex flex-col leading-tight">
+      <span
+        className="text-[10px]"
+        style={{ color: "var(--text-muted)" }}
+      >
+        {owner}
+      </span>
+      <span className="truncate">{repo}</span>
+    </span>
+  );
+}
+
+export function PortfolioProjectList({
+  projects,
+  works,
+  activeFilter,
+  onFilterChange,
+}: Props) {
+  const counts = useMemo(() => {
+    const total = works.filter((w) => w.frontmatter.included).length;
+    const uncategorized = works.filter(
+      (w) => w.frontmatter.included && !w.frontmatter.project,
+    ).length;
+    const excluded = works.filter((w) => !w.frontmatter.included).length;
+    const byProject = new Map<string, number>();
+    for (const w of works) {
+      if (!w.frontmatter.included) continue;
+      const p = w.frontmatter.project;
+      if (!p) continue;
+      byProject.set(p, (byProject.get(p) ?? 0) + 1);
+    }
+    return { total, uncategorized, excluded, byProject };
+  }, [works]);
+
+  return (
+    <nav className="flex flex-col gap-1 p-3 text-sm">
+      <FilterItem
+        label="전체"
+        count={counts.total}
+        active={activeFilter.kind === "all"}
+        onClick={() => onFilterChange({ kind: "all" })}
+      />
+      <FilterItem
+        label="분류안됨"
+        count={counts.uncategorized}
+        active={activeFilter.kind === "uncategorized"}
+        onClick={() => onFilterChange({ kind: "uncategorized" })}
+      />
+
+      {projects.length > 0 ? (
+        <div
+          className="my-2 h-px"
+          style={{ backgroundColor: "var(--border-default)" }}
+        />
+      ) : null}
+
+      {projects.map((p) => (
+        <FilterItem
+          key={p.slug}
+          label={renderProjectName(p.name)}
+          count={counts.byProject.get(p.slug) ?? 0}
+          active={
+            activeFilter.kind === "project" && activeFilter.slug === p.slug
+          }
+          colorDot={p.color ? COLOR_DOT[p.color] ?? p.color : undefined}
+          onClick={() => onFilterChange({ kind: "project", slug: p.slug })}
+        />
+      ))}
+
+      <div
+        className="my-2 h-px"
+        style={{ backgroundColor: "var(--border-default)" }}
+      />
+
+      <FilterItem
+        label="미사용"
+        count={counts.excluded}
+        muted
+        active={activeFilter.kind === "excluded"}
+        onClick={() => onFilterChange({ kind: "excluded" })}
+      />
+    </nav>
+  );
+}
+
+function FilterItem({
+  label,
+  count,
+  active,
+  muted,
+  colorDot,
+  onClick,
+}: {
+  label: ReactNode;
+  count: number;
+  active: boolean;
+  muted?: boolean;
+  colorDot?: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex items-center justify-between rounded-md px-3 py-2 text-left transition"
+      style={{
+        backgroundColor: active ? "var(--bg-surface-active)" : undefined,
+        color: muted ? "var(--text-secondary)" : "var(--text-primary)",
+      }}
+    >
+      <span className="flex items-center gap-2 truncate">
+        {colorDot ? (
+          <span
+            className="h-2 w-2 shrink-0 rounded-full"
+            style={{ backgroundColor: colorDot }}
+          />
+        ) : null}
+        <span className="truncate">{label}</span>
+      </span>
+      <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+        {count}
+      </span>
+    </button>
+  );
+}

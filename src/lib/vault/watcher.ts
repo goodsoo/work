@@ -13,6 +13,13 @@ function affectedQueryKeys(path: string): unknown[][] {
     keys.push(["journals"]);
     keys.push(["journals", path]);
     keys.push(["todos"]);
+  } else if (path.startsWith("portfolio/")) {
+    keys.push(["portfolio"]);
+    keys.push(["portfolio", path]);
+    if (path === "portfolio/projects.md") {
+      keys.push(["portfolio-projects"]);
+    }
+    // _attachments/* 변경도 카드 새로고침 필요 (썸네일 캐시)
   } else if (path === "inbox.md" || !path.includes("/")) {
     // root level *.md (inbox 등)
     keys.push(["todos"]);

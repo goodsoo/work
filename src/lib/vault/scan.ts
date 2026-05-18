@@ -442,6 +442,7 @@ export async function ensureVaultStructure(
 ): Promise<void> {
   await adapter.mkdir("meetings");
   await adapter.mkdir("journals");
+  await adapter.mkdir("portfolio"); // V0.7
   if (!(await adapter.exists("inbox.md"))) {
     await adapter.write(
       "inbox.md",
