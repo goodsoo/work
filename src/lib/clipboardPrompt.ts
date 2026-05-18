@@ -168,14 +168,20 @@ synced_at: ''
 
 ## Description (from GitHub)
 
-## Summary
-- {PR description 처럼 3-6 bullet, 무엇을/왜 했는지}
+## 한 줄 임팩트
+{유저가 얻는 가치, 30자 이내 한 문장. frontmatter impact_summary 와 동일 내용}
 
-## What changed
-- {주요 변경 area 별로 1-2 줄씩}
+## 문제 (Why)
+{이 작업이 풀려고 했던 불편/관찰 — 2-3줄}
 
-## Notes
-{선택 — 의도적 미터치, 알려진 후속작업, 회고 등}
+## 변경 요약
+- {주요 변경 area 별로 1-2 줄씩, 무엇을/왜 했는지}
+
+## 디자인 결정
+- {왜 이 방향으로 했나, 고려한 대안과 trade-off}
+
+## 유저가 얻는 것
+- {사용자 입장에서 무엇이 좋아졌나, 1-2 bullet}
 
 
 ## Notes
@@ -183,10 +189,11 @@ synced_at: ''
 \`\`\`
 
 주의:
-- 파일 마지막에 빈 \`## Notes\` 섹션을 한 번 더 둬 (본인이 외부 에디터로 메모 추가하는 영역, 위 Description 안의 ## Notes 와 별개).
+- 파일 마지막에 빈 \`## Notes\` 섹션을 한 번 더 둬 (본인이 외부 에디터로 메모 추가하는 영역, 위 Description 안의 섹션과 별개).
 - \`github_pr_number: 0\` 이 legacy 카드 표식. 절대 0 이 아닌 값 쓰지 마.
 - \`github_pr_url: ''\` 빈 문자열.
-- \`category\` 는 enum 5개 중 하나만, 정확한 spelling (\`ui_ux\` 언더바).
+- \`category\` 는 enum 5개 중 하나만, 정확한 spelling (\`ui_ux\` 언더바). 매핑: \`ui_ux\` (시각/인터랙션/레이아웃), \`backend\` (API/데이터/로직), \`infra\` (빌드/CI/패키지), \`fix\` (버그 수정), \`other\` (문서/리팩토링/환경).
+- UI/UX 작업이면 Before/After 스크린샷 섹션을 추가해도 됨 — 단 legacy 는 GitHub 호스팅 이미지 URL 이 없으니 본인이 나중에 vault 카드 사이드바 dropzone 으로 _attachments/ 에 추가. 본문엔 \`## Before\` / \`## After\` 헤더만 빈 채로 두거나 생략.
 - diff stat 은 \`git diff --shortstat <first-commit>~..<last-commit>\` 한 번에 뽑아서 정확히 옮겨. merge commit 끼면 \`--no-merges\` 추가.
 
 ## 4. project 분류
@@ -221,6 +228,91 @@ export function buildLegacyCardPrompt(vaultRoot: string | null): string {
 `;
   }
   return legacyCardPromptHeader(vaultRoot) + LEGACY_CARD_PROMPT_BODY;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PR 가이드 프롬프트 — 다른 프로젝트의 Claude Code 에게 "앞으로 이 repo 에서
+// PR 만들 땐 이 양식 따라라" 라고 지시. 그 repo 의 CLAUDE.md 에 PR 규칙
+// 섹션을 박는 작업까지 시킴 → 다음 세션에도 자동 적용.
+//
+// 사용자의 goodsoob-work 데스크탑 앱이 본인 PR 들을 자동 수집해서 카드로
+// 만드니까, PR body 가 곧 포트폴리오 본문이 됨. UI/UX 가 본인 주력이라
+// before/after 스크린샷이 핵심 → 템플릿이 7섹션 강제.
+
+const PR_GUIDE_PROMPT = `# Goodsoob 포트폴리오 호환: PR 작성 가이드
+
+본인이 운영하는 "goodsoob-work" 데스크탑 앱이 이 repo 의 merged PR 들을 자동 수집해서 포트폴리오 카드로 만들어 (\`gh search prs --author @me is:merged\` 위임). **PR body 가 곧 포트폴리오 카드의 본문**이 되니까, 앞으로 이 repo 에서 PR 만들 땐 아래 양식을 따라야 해.
+
+## 1. 이 repo 의 CLAUDE.md 에 규칙 추가
+
+\`CLAUDE.md\` 가 있으면 그 파일에 아래 \`## PR 작성 규칙 (포트폴리오 호환)\` 섹션을 추가해 (기존 다른 섹션 다음). 없으면 새로 만들고 그 안에 넣어. 이미 같은 제목 섹션이 있으면 덮어쓰지 말고 차이만 본인에게 알려.
+
+## 2. 규칙 본문 (CLAUDE.md 에 그대로 복사)
+
+\`\`\`\`markdown
+## PR 작성 규칙 (포트폴리오 호환)
+
+이 repo 의 모든 PR 은 본인의 goodsoob-work vault \`portfolio/\` 카드의 본문이 됨. PR body 가 곧 포트폴리오 글감이라 다음 7섹션 템플릿대로 작성. UI/UX 작업이 주력이라 before/after 스크린샷이 핵심.
+
+### PR body 템플릿
+
+\`\`\`
+## 한 줄 임팩트
+{유저가 얻는 가치, 30자 이내 한 문장 — 카드 frontmatter impact_summary 로 옮길 줄}
+
+## 문제 (Why)
+{어떤 불편함/관찰을 풀었나 — 2-3줄}
+
+## Before
+![before](GitHub-image-url)
+{캡션: 어떤 점이 안 좋았나}
+
+## After
+![after](GitHub-image-url)
+{캡션: 무엇이 어떻게 달라졌나}
+
+## 디자인 결정
+- {왜 이 방향}
+- {고려한 대안과 trade-off}
+
+## 유저가 얻는 것
+- {bullet 1-2개, 사용자 입장 서술}
+
+## 카테고리
+ui_ux
+\`\`\`
+
+### Claude 동작 규칙
+
+사용자가 "PR 만들어줘" 라고 하면 다음 5가지를 먼저 물어볼 것 (이미 대화에서 확보된 정보면 재질문 X):
+
+1. **의도** — 왜 했는지, 어떤 불편 해결
+2. **유저 가치** — 한 줄 임팩트로 옮길 한 문장
+3. **before/after 스크린샷** — 경로(local) 또는 URL. UI/UX 변경이면 필수. backend/infra/fix 면 생략 OK
+4. **디자인 결정 근거** — 왜 이 방향, 고려한 대안
+5. **카테고리** — \`ui_ux\` | \`backend\` | \`infra\` | \`fix\` | \`other\`
+
+확보 후 위 템플릿대로 PR body 작성 → \`gh pr create\` (또는 사용 중인 ship 워크플로) 로 PR 생성.
+
+**스크린샷 처리**: 로컬 파일 경로면 사용자에게 "GitHub PR 작성창에 drag&drop 후 생성된 user-images.githubusercontent.com URL 알려달라" 안내. URL 이면 markdown \`![before](url)\` 그대로 박음.
+
+**카테고리 매핑** (goodsoob vault 카드 frontmatter \`category\` 와 정확히 일치):
+- \`ui_ux\` — 시각/인터랙션/레이아웃/디자인
+- \`backend\` — API, 데이터 모델, 비즈니스 로직
+- \`infra\` — 빌드, 배포, CI, 패키지 의존성
+- \`fix\` — 버그 수정 (UX 영향 작은 것)
+- \`other\` — 문서, 리팩토링, 환경
+
+**작은 변경은 main 직커밋 허용** — 오타/문서 한 줄/dep bump 처럼 포트폴리오 가치 없는 것은 PR 안 만들고 그냥 main 직커밋. PR 은 포트폴리오로 보여줄 만한 변경 단위.
+\`\`\`\`
+
+## 3. 완료 보고
+
+CLAUDE.md 업데이트 했으면 "PR 규칙 추가했습니다" 라고 보고해줘. 이미 동일 섹션이 있어서 skip 했으면 그것도 알려줘. 추가 위치는 본인에게 따로 안 물어봐도 됨 — 자연스러운 곳 (다른 ## 섹션들 사이) 알아서 골라.
+`;
+
+export function buildPRGuidePrompt(): string {
+  return PR_GUIDE_PROMPT;
 }
 
 // H3 split: "한 줄 임팩트" 와 "카테고리" 섹션 추출.

@@ -4,7 +4,10 @@ import {
   usePortfolioWorks,
   type GhSyncProgress,
 } from "../../hooks/usePortfolio";
-import { buildLegacyCardPrompt } from "../../lib/clipboardPrompt";
+import {
+  buildLegacyCardPrompt,
+  buildPRGuidePrompt,
+} from "../../lib/clipboardPrompt";
 import { useVault } from "../../lib/vault/useVault";
 import { ClipPromptButton } from "../common/ClipPromptButton";
 import { PortfolioProjectList, type ProjectFilter } from "./PortfolioProjectList";
@@ -40,6 +43,12 @@ export function PortfolioSidePanel({
           내 작업
         </h2>
         <SyncButton state={syncState} onRun={onSyncRun} />
+        <ClipPromptButton
+          buildPrompt={() => buildPRGuidePrompt()}
+          label="PR 가이드 프롬프트"
+          title="다른 repo 의 Claude Code 에게 '앞으로 PR 만들 땐 포트폴리오 호환 양식 따라라' 라고 시킬 프롬프트 복사"
+          variant="compact"
+        />
         <ClipPromptButton
           buildPrompt={() => buildLegacyCardPrompt(vaultRoot)}
           label="Legacy 카드 프롬프트"
