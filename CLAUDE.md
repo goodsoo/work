@@ -1,11 +1,12 @@
 # goodsoob-work — Claude Code 컨텍스트
 
-본인 전용 시간축 통합 업무관리 PWA. 1인 본인 사용 사이드 프로젝트 (빌더 모드).
+본인 전용 시간축 통합 업무관리 데스크탑 앱 (Tauri). 1인 본인 사용 사이드 프로젝트 (빌더 모드). **V0.6 부터 로컬 md 파일 vault 백엔드** — 옵시디안 스타일.
 
 ## 프로젝트 진실 source
 
 - **기획안**: `goodsoob-work-plan.md`
-- **Design doc** (eng/design review 결정 다 반영): `~/.gstack/projects/goodsoob-work/ham-no-git-design-20260506-161246.md`
+- **V0.6 Vault 마이그레이션 design doc**: `V0.6-vault-design.md` (프로젝트 루트). eng-review 통과.
+- **V0.5 Design doc** (이전): `~/.gstack/projects/goodsoob-work/ham-no-git-design-20260506-161246.md`
 - **Test plan**: `~/.gstack/projects/goodsoob-work/ham-no-git-eng-review-test-plan-20260506-170527.md`
 
 해당 파일을 읽고 일하는 게 source of truth. 이 파일은 빠른 컨텍스트만.
@@ -16,9 +17,9 @@
 - ✅ V0.5.1 — 데스크탑 3-pane 레이아웃 + 캘린더 리라이트 + 디자인 토큰 + 테마
 - ✅ V0.5.2 — 메모장 본문/회의 내용/요약 3-탭 + transcript 필드 + 편집/보기 토글 + 글로벌 툴팁
 - ✅ V0.5.3 — 캘린더 첫 진입 버그 fix + 메모 history 메모별·탭별 분리 + 진입 자동 선택 + 페이지 전환 시 보존
-- 🟡 V0.6 후보 — Server-side 메모 history (client-side 분리/보존으로 1차 해결, 새로고침 영속만 남음)
-- 🟡 V0.7 후보 — UI/UX 포트폴리오 자동 기록
-- 🟡 후속 — 녹음 파일 직접 업로드 → 자동 STT (현재는 외부 AI로 변환한 결과 복붙/파일 업로드)
+- ✅ V0.6 — **Vault 마이그레이션**. Supabase + Auth 완전 제거, 로컬 md 파일 vault 백엔드, Tauri 데스크탑 전용 (PWA 빌드 폐기), AI 자동 요약 제거하고 "Claude 프롬프트 복사" 헬퍼 추가. design doc: `V0.6-vault-design.md`
+- 🟡 V0.7 후보 — Tauri 2 Mobile (모바일 본인 앱), UI/UX 포트폴리오 자동 기록, "Claude 응답 paste → 자동 callout" 헬퍼
+- 🟡 후속 — 녹음 파일 직접 업로드 → 자동 STT
 
 ## 핵심 결정 (review 통과됨)
 
@@ -78,11 +79,11 @@ results than an ad-hoc answer.
 - Tests: `bun run test:run` (one-off), `bun run test` (watch)
 - Build: `bun run build`
 - Typecheck: `bun run typecheck`
-- 마이그레이션: `supabase db push` (linked project로 적용) → `supabase gen types typescript --linked 2>/dev/null > src/lib/database.types.ts`. **stderr 분리 필수** — 안 그러면 CLI 업데이트 알림 줄이 types 파일에 섞여 들어가 typecheck 깨짐.
+- 마이그레이션 (DB): V0.6 부터 없음. vault = 로컬 md 파일. 스키마 변경 = md 파일 형식 변경 (frontmatter 필드 추가/이름 변경 등).
 
 ## 주의사항 / 알려진 footgun
 
-- **iOS PWA + Google OAuth**: redirect URL 정확히 등록 필수 (Supabase URL Configuration + Google Cloud Console). PWA 스탠드얼론 모드 세션은 Safari와 분리됨 — PWA 안에서만 로그인 유지됨.
-- **Anthropic API key**: 절대 클라이언트에 안 노출. `supabase secrets set ANTHROPIC_API_KEY=...` 로 Edge Functions 환경변수에만. SDK도 클라이언트 import 금지. claude.ai 구독과 별개 결제 (console.anthropic.com).
-- **RLS**: 1인 사용자라도 RLS 켜기 (`auth.uid() = user_id`). anon key 노출 시 데이터 보호. Supabase 셋업: `Auto-expose new tables` **OFF** + `Auto RLS` **ON** — 마이그레이션마다 `grant select, insert, update, delete on <table> to authenticated;` 명시 필요.
+- **Vault 폴더 위치**: iCloud Drive 안에 두면 자동 동기화. 같은 vault 를 옵시디안 모바일로 열어 모바일에서도 같은 데이터. 단, sync 도구가 만드는 `(conflicted copy)` 파일은 vault 스캔에서 무시 (`.` 시작 또는 별도 처리 필요).
+- **동시 편집 충돌**: 옵시디안 모바일이 같은 파일 수정 + 데스크탑도 수정 = mtime mismatch → `ConflictError`. UI 가 보존/덮어쓰기 선택 모달 띄움 (Phase 6 polish).
+- **Tauri 데스크탑 전용**: V0.6 부터 PWA 빌드 폐기. `bun run tauri:dev` / `tauri:build` 만 사용.
 - **Pretendard CDN**: `index.html`에서 로드. 본인 도메인에서 첫 로딩 ~50ms 추가. 빠른 로컬 fallback (`-apple-system`)이 base case.
