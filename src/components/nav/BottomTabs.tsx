@@ -1,7 +1,7 @@
-import { ClipboardList, CalendarDays, ListChecks } from "lucide-react";
+import { ClipboardList, CalendarDays, ListChecks, Briefcase } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
-export type Tab = "meetings" | "calendar" | "todos";
+export type Tab = "meetings" | "calendar" | "todos" | "portfolio";
 
 type Props = {
   activeTab: Tab;
@@ -12,6 +12,7 @@ export const TABS: Array<{ id: Tab; label: string; icon: LucideIcon }> = [
   { id: "meetings", label: "메모장", icon: ClipboardList },
   { id: "calendar", label: "캘린더", icon: CalendarDays },
   { id: "todos", label: "할 일", icon: ListChecks },
+  { id: "portfolio", label: "내 작업", icon: Briefcase },
 ];
 
 export function BottomTabs({ activeTab, onTabChange }: Props) {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { VaultGate } from "./components/vault/VaultGate";
 import { AppShell } from "./components/nav/AppShell";
 import { GlobalTooltip } from "./components/Tooltip";
@@ -10,6 +10,12 @@ import type { TodoCategory } from "./api/todos";
 type TodosFilter = TodoCategory | "all" | "uncategorized";
 import { CalendarPage } from "./pages/CalendarPage";
 import { TodosPage } from "./pages/TodosPage";
+import { PortfolioPage } from "./pages/PortfolioPage";
+import { PortfolioSidePanel } from "./components/portfolio/PortfolioSidePanel";
+import type { ProjectFilter } from "./components/portfolio/PortfolioProjectList";
+import { useGhSync } from "./hooks/usePortfolio";
+import { readSyncState } from "./api/portfolio";
+import { useVault } from "./lib/vault/useVault";
 import { todayIso } from "./lib/dates";
 import { isTauri } from "./lib/isTauri";
 
@@ -18,6 +24,7 @@ function readTabFromHash(): Tab {
   if (h.startsWith("#meeting-")) return "meetings";
   if (h === "#calendar") return "calendar";
   if (h === "#todos") return "todos";
+  if (h === "#portfolio") return "portfolio";
   return "meetings";
 }
 
@@ -34,6 +41,31 @@ export default function App() {
   );
   const [calendarDate, setCalendarDate] = useState<string>(todayIso());
   const [todoCategory, setTodoCategory] = useState<TodosFilter>("all");
+  const [portfolioFilter, setPortfolioFilter] = useState<ProjectFilter>({
+    kind: "all",
+  });
+  const portfolioSync = useGhSync();
+  const { adapter, isReady } = useVault();
+  const autoSyncDone = useRef(false);
+
+  // V0.7 design step 3 (1B): vault ready 후 5초 background sync 1회 (since=last_sync).
+  // 본인 매일 앱 켜면 silent fetch — 의식 0 으로 카드 누적. Tauri 만 (gh 호출 필요).
+  useEffect(() => {
+    if (!isTauri || !isReady || autoSyncDone.current) return;
+    autoSyncDone.current = true;
+    const t = setTimeout(async () => {
+      try {
+        const state = await readSyncState(adapter);
+        await portfolioSync.run(
+          state.last_sync ? { since: state.last_sync.slice(0, 10) } : {},
+        );
+      } catch {
+        // useGhSync state.error 에 반영 — sidebar 가 표시
+      }
+    }, 5000);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isReady]);
 
   useEffect(() => {
     function syncFromHash() {
@@ -53,6 +85,23 @@ export default function App() {
     };
   }, []);
 
+  // macOS WKWebView 가 Backspace/Delete 를 history.back() 으로 처리 — SPA state 망가짐.
+  // 텍스트 입력 컨텍스트가 아니면 막음.
+  useEffect(() => {
+    function blockNavKeys(e: KeyboardEvent) {
+      if (e.key !== "Backspace" && e.key !== "Delete") return;
+      const t = e.target as HTMLElement | null;
+      if (t) {
+        const tag = t.tagName;
+        if (tag === "INPUT" || tag === "TEXTAREA") return;
+        if (t.isContentEditable) return;
+      }
+      e.preventDefault();
+    }
+    window.addEventListener("keydown", blockNavKeys);
+    return () => window.removeEventListener("keydown", blockNavKeys);
+  }, []);
+
   // Desktop (Tauri) 전용 페이지 단축키: Cmd+1/2/3
   useEffect(() => {
     if (!isTauri) return;
@@ -62,6 +111,7 @@ export default function App() {
       if (e.key === "1") next = "meetings";
       else if (e.key === "2") next = "calendar";
       else if (e.key === "3") next = "todos";
+      else if (e.key === "4") next = "portfolio";
       if (!next) return;
       e.preventDefault();
       switchTab(next);
@@ -129,6 +179,17 @@ export default function App() {
         activeCategory={todoCategory}
         onCategoryChange={setTodoCategory}
       />
+    ) : tab === "portfolio" ? (
+      <PortfolioSidePanel
+        activeFilter={portfolioFilter}
+        onFilterChange={setPortfolioFilter}
+        syncState={portfolioSync.state}
+        onSyncRun={() => {
+          portfolioSync.run({}).catch(() => {
+            // error 는 portfolioSync.state.error 에 반영, sidebar 가 표시
+          });
+        }}
+      />
     ) : undefined;
 
   return (
@@ -161,6 +222,14 @@ export default function App() {
           <CalendarPage
             targetDate={calendarDate}
             onSelectedDateChange={setCalendarDate}
+          />
+        ) : tab === "portfolio" ? (
+          <PortfolioPage
+            activeFilter={portfolioFilter}
+            onSync={() => {
+              portfolioSync.run({}).catch(() => {});
+            }}
+            syncRunning={portfolioSync.state.running}
           />
         ) : (
           <TodosPage categoryFilter={todoCategory} />
