@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { buildClaudePrompt, buildPRPrompt, parsePRResponse } from "./clipboardPrompt";
+import {
+  buildClaudePrompt,
+  buildLegacyCardPrompt,
+  buildPRPrompt,
+  parsePRResponse,
+} from "./clipboardPrompt";
 
 describe("buildClaudePrompt", () => {
   it("본문 + transcript + meta 가 모두 포함된 프롬프트", () => {
@@ -65,6 +70,22 @@ describe("buildPRPrompt (V0.7 step 8)", () => {
       deletions: 1,
     });
     expect(out).toContain("...(truncated)");
+  });
+});
+
+describe("buildLegacyCardPrompt", () => {
+  it("주입된 vaultRoot 경로 + pr_number 0 + category enum 명시 포함", () => {
+    const out = buildLegacyCardPrompt("/Users/x/MyVault");
+    expect(out).toContain("/Users/x/MyVault/portfolio/");
+    expect(out).toContain("github_pr_number: 0");
+    expect(out).toContain("ui_ux | backend | infra | fix | other");
+    expect(out).toContain("projects.md");
+  });
+
+  it("vaultRoot null → vault 설정 안내 메시지", () => {
+    const out = buildLegacyCardPrompt(null);
+    expect(out).toContain("vault 폴더를 먼저 선택");
+    expect(out).not.toContain("github_pr_number: 0"); // 본문 안 들어감
   });
 });
 
