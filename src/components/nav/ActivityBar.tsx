@@ -1,5 +1,4 @@
-import { LogOut, Sun, Moon } from "lucide-react";
-import { useAuth, signOut } from "../../hooks/useAuth";
+import { Sun, Moon } from "lucide-react";
 import { useTheme } from "../../hooks/useTheme";
 import { isTauri } from "../../lib/isTauri";
 import { TABS, type Tab } from "./BottomTabs";
@@ -10,7 +9,6 @@ type Props = {
 };
 
 export function ActivityBar({ activeTab, onTabChange }: Props) {
-  const { user } = useAuth();
   const { theme, toggle } = useTheme();
   const ThemeIcon = theme === "light" ? Sun : Moon;
 
@@ -50,22 +48,6 @@ export function ActivityBar({ activeTab, onTabChange }: Props) {
           style={{ color: "var(--text-muted)", minHeight: 0 }}
         >
           <ThemeIcon className="h-3.5 w-3.5" />
-        </button>
-        <div
-          className="flex h-7 w-7 items-center justify-center rounded-full text-[10px] font-semibold"
-          title={user?.email ?? user?.id ?? ""}
-          style={{ backgroundColor: "var(--bg-surface-active)", color: "var(--text-secondary)" }}
-        >
-          {(user?.email ?? "U")[0].toUpperCase()}
-        </div>
-        <button
-          type="button"
-          onClick={() => void signOut()}
-          title="로그아웃"
-          className="flex h-7 w-7 items-center justify-center rounded-lg transition"
-          style={{ color: "var(--text-muted)", minHeight: 0 }}
-        >
-          <LogOut className="h-3.5 w-3.5" />
         </button>
       </div>
     </div>

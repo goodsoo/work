@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { AuthGate } from "./components/auth/AuthGate";
+import { VaultGate } from "./components/vault/VaultGate";
 import { AppShell } from "./components/nav/AppShell";
 import { GlobalTooltip } from "./components/Tooltip";
 import type { Tab } from "./components/nav/BottomTabs";
@@ -132,7 +132,7 @@ export default function App() {
     ) : undefined;
 
   return (
-    <AuthGate>
+    <VaultGate>
       <GlobalTooltip />
       <AppShell activeTab={tab} onTabChange={changeTab} sidePanel={sidePanel}>
         {tab === "meetings" ? (
@@ -166,7 +166,7 @@ export default function App() {
           <TodosPage categoryFilter={todoCategory} />
         )}
       </AppShell>
-    </AuthGate>
+    </VaultGate>
   );
 }
 
