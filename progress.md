@@ -2,49 +2,71 @@
 
 다음 세션이 빠르게 파악할 수 있도록 짧게 유지.
 
-## 현재 상태 (2026-05-16)
+## 현재 상태 (2026-05-18)
 
-V0.5.4 세션 완료. 캘린더 연속 스크롤 리라이트.
+**V0.6 Vault 마이그레이션 코드 완료.** Supabase → 로컬 md 파일 vault 백엔드. 4개 commit. typecheck/test 통과, `bun run build` 성공. Tauri dev 도 정상 동작.
 
 ### 이번 세션에서 완료
 
-**캘린더 연속 스크롤 리라이트 (`745624c`)**
-- 기존: 월 단위 snap-mandatory section. 각 월이 viewport-height. 인접 월의 leading/trailing partial week 가 중복 표시되는 문제.
-- 새 구조: 주(週) 단위 연속 스크롤. 49주 버퍼 (`WEEK_BUFFER=49`, `WEEK_CENTER=24`). 가장자리 근접(`REBALANCE_EDGE=8`) 시 rebalance로 버퍼 shift + scrollTop 보정.
-- `MonthGrid` 시그니처: `year/month` → `weeks: Date[]` (각 주의 일요일). 평탄 7-col grid (`gridAutoRows: clamp(100px, 18svh, 180px)`).
-- 1일 셀에 "N월" 텍스트 inline 라벨 — 월 경계 시각 cue.
-- 매 주 일요일 셀에 `scroll-snap-align: start` + container `scroll-snap-type: y proximity`. 자유 스크롤 + 주 단위 정렬.
-- 헤더 month 기준: top row 토요일 month ("1일 진입" semantic — 새 달 1일이 행에 들어오면 토요일이 새 달이라 즉시 전환).
-- 현재 month 외 셀 `opacity: 0.35` 회색톤 (`cell.year/month vs currentYear/Month`).
-- 2026 이전 차단: `MIN_DATE = 2026-01-01`. `minCenterOffset = round((startOfWeek(MIN_DATE) - anchor) / WEEK_MS) + WEEK_CENTER`. 4 경로 모두 클램프 — 초기 centerOffset, handleScroll rebalance, jumpToToday, targetDate effect. 클램프 시 user 시각 위치 보존 위해 `newIdx = idx - appliedDelta` 로 scroll target 재계산.
-- day 클릭 시 스크롤 제거: `setLastTarget(date)` 로 round-trip `App.calendarDate → targetDate prop` 의 rebalance effect 차단. selection / 사이드패널만 갱신.
-- subpixel 정확도: `getBoundingClientRect().height` 측정 + `Math.round(scrollTop / rh)`. 이전 `offsetHeight` + `floor` 가 snap 후 off-by-one 발생.
+**Phase 1 — Vault foundation** (`e853007`)
+- `src/lib/vault/` 6 모듈: adapter (Tauri fs + in-memory + atomic write + ConflictError), parser (gray-matter 대신 js-yaml JSON_SCHEMA + H1 split), tasks (inline syntax + toggleTodo), scan (디렉토리 list + trashFile + ensureVaultStructure), watcher (TanStack Query invalidate + selfWriteWindow), VaultProvider/useVault (React context).
+- Tauri 2 plugin: `tauri-plugin-fs` (`features = ["watch"]` 필수 — 빼면 "Command watch not found" 런타임 에러), `tauri-plugin-dialog`. permissions `fs:scope-home-recursive` + 개별 권한.
+- 28 unit test (parser 12 + tasks 8 + tasks-toggle 3 + watcher 2 + conflict 2).
+- design doc `V0.6-vault-design.md` + `mock-vault/` 샘플 (회의록 2 + 일기 2 + inbox).
 
-**`formatDateLong` 연도 표시 (`c8e42fd`)**
-- 다른 해 날짜면 `"2027년 5월 6일 화요일"`, 올해면 기존 `"5월 6일 화요일"`. 사이드패널 헤더 한 곳 호출.
+**Phase 2 — API/hooks swap** (`ce3955c`)
+- hook 시그니처 100% 유지. 내부만 vault adapter 호출.
+- id 체계 변경: UUID → file path. Todo.id = `file#L{line}`.
+- attendees: string CSV → string[]. UI 호환은 join/array 변환.
+- soft delete: `deleted_at` → `.trash/{stamp}-{base}.md`.
+- created_at/updated_at: file mtime 기반 ISO 노출 (UI 호환).
+- Schedule = isEvent todo subset.
 
-### 폐기 / 동작 변경
+**Phase 3+4 — UI** (`4dee4ff`)
+- VaultPicker / VaultGate. 첫 실행 시 폴더 선택 모달.
+- AuthGate / 로그인 화면 / 로그아웃 버튼 / 유저 아바타 제거.
+- ClaudePromptButton (SummarizeButton 대체) + `lib/clipboardPrompt.ts`.
 
-- **월 snap-by-month** → 주 단위 연속 스크롤. snap 단위가 1개월 → 1주.
-- **MonthGrid 의 inMonth 그레이아웃 (인접 월 셀 0.3)** → currentMonth 외 셀 (헤더 기준) 0.35. 의미가 달라짐: 이전엔 "이 grid 가 표시하는 월", 이제는 "헤더가 가리키는 월".
+**Phase 5 — cleanup + docs** (`06e0fe4`)
+- 삭제: `src/lib/supabase.ts`, `database.types.ts`, `src/hooks/useAuth.ts`, `src/components/auth/*`, `SummarizeButton.tsx`, `supabase/` 폴더 전체, `.env.example`.
+- CLAUDE.md V0.6 갱신 (로드맵 + vault footgun + Tauri 전용).
+- PWA 제거 (vite-plugin-pwa, vite.config 의 VitePWA) — commit 1 에 통합됨.
+
+### review 결과
+
+`/plan-eng-review` 통과 — VaultIndexer 별도 모듈 제거 (TanStack Query 가 캐시 레이어), PWA 빌드 폐기, 모바일 V0.7+ candidate, 자체 todo syntax (옵시디안 Tasks plugin emoji 호환 X), 3 critical test 추가 (watcher/conflict/toggle). gstack review log 기록됨.
 
 ## 다음 세션 작업
 
-### V0.6 후보
+### V0.6.1 dogfood / polish
 
-- **Server-side 메모 history**: V0.5.3 의 client-side 분리/보존으로 1차 해결됨. 우선순위 낮음.
-- **녹음 파일 직접 업로드 → 자동 STT**: 유료 외부 API 추가 회피 정책으로 보류. 로컬 whisper.cpp (Tauri sidecar) 만 비용 0 옵션.
+1주일 본인 매일 사용. 발견 버그 fix. todo.md 의 "V0.6.1 후속" 항목들 우선:
+- Conflict resolution 모달 (현재는 throw 만)
+- Vault 변경 UI (설정 페이지)
+- iCloud sync `(conflicted copy)` 파일 무시
+- vault 스캔 실측 (수백 파일 < 50ms 가설)
+- vault 폴더 사라짐 graceful
+
+### V0.7 후보
+
+- Tauri 2 Mobile (모바일 본인 앱)
+- Claude 응답 paste → 자동 callout
+- 녹음 → STT
+- 메모 history (서버 또는 git 기반)
 
 ### 미해결
 
-- **캘린더 스크롤 상태 페이지 전환 시 보존 안 됨**: `visibleWeekOffset` / `centerWeekOffset` 이 component state. 캘린더 탭 떠나면 unmount → 상태 reset. 명시적 날짜 클릭(`calendarDate`)은 App 에 보존돼서 복원 OK. 스크롤만 한 케이스는 페이지 전환 시 초기 위치(today)로 돌아감. 빌더 모드 ROI 따져 일단 패스.
-- 모바일 실기기 PWA 테스트 (V0.5.2 부터 미확인).
+- mock-vault/.obsidian/ untracked — `.gitignore` 에 추가 필요 (옵시디안이 mock-vault 열면 자동 생성).
+- 캘린더 스크롤 상태 페이지 전환 시 보존 (V0.5.4 부터 carry-over).
+- 에러 상태 패딩 통일 (p-3/p-4 혼재).
+- V0.5.3~V0.5.4 lint 11 errors (기존 코드 react-hooks/refs 등) — V0.6 영역 외, dogfood 단계에서 정리.
 
 ## 알아야 할 컨텍스트
 
-- **캘린더 anchor 고정**: `anchorWeekStart = startOfWeek(today, sun)` 가 useState 로 마운트 시 한 번. 이후 절대 변경 X. 모든 offset 계산 (centerOffset, visibleOffset, todayWeekOffset, minCenterOffset) 이 anchor 기준.
-- **rebalance 클램프 패턴**: `newCenter = max(minCenterOffset, centerOffset + delta)`. `newCenter === centerOffset` 이면 early return (더 못 미는 케이스 = 이미 minCenter). `appliedDelta = newCenter - centerOffset`, `newIdx = idx - appliedDelta`. 스크롤 target = `newIdx * rh + remainder`.
-- **헤더 month 계산**: `addDays(anchor, visibleWeekOffset * 7 + 6).getMonth()`. `+6` 으로 토요일을 가리킴 → "1일 진입" semantic.
-- **scroll-snap 과 React state**: snap 후 `scrollTop` 이 정확히 row 경계여도 subpixel 오차 가능. `getBoundingClientRect.height` (float) + `Math.round` 필수. `offsetHeight` (integer) + `floor` 는 boundary 에서 off-by-one.
-- **유료 외부 API 추가 회피**: 사용자 명시. 이미 Claude Code 구독 + Anthropic API (Edge Function) 결제 중. STT/이미지생성 등 새 결제 옵션은 기본 거름.
-- **CLAUDE.md 의 캘린더 라인**: 이번 세션에서 갱신 (월 단위 무한 스크롤 → 주 단위 연속 스크롤 + 1일 진입 기준 + 회색톤 + 2026 차단 등).
+- **Tauri fs watch 활성화**: `Cargo.toml` 의 `tauri-plugin-fs` 에 `features = ["watch"]` 명시. 안 하면 JS 측 watch 호출이 "Command watch not found" 런타임 에러로 vault init 실패 → localStorage 비워지고 picker 다시 표시.
+- **id = file path 의 영향**: 메모 파일명을 옵시디안에서 rename 하면 우리 앱 입장에선 "삭제 + 신규". TanStack Query cache 무효화 + UI 가 새 id 로 다시 fetch. content 유지는 됨 (파일 내용 동일).
+- **attendees 마이그레이션**: 새 vault 라 기존 데이터 없음. UI 가 string 받던 곳은 `array.join(", ")` 으로 변환. AttendeeTagInput 같은 컴포넌트가 array 다루는지 확인 필요할 수 있음 (dogfood 시).
+- **소량 lint 에러**: VaultProvider 의 `setIsReady(false)` in effect 는 의도된 패턴 (vault root null 이면 즉시 reset). 한 줄 eslint-disable. 다른 V0.5.3 lint 는 기존 코드.
+- **conflict 충돌 처리 흐름**: VaultAdapter.write 호출 시 expectedMtime 누락하면 검사 안 함 (`undefined`). hooks 가 mutation 시 readMeta → expectedMtime 전달하는 패턴은 V0.6 에서 부분만 적용. 정밀하게 하려면 모든 mutation 에 적용 + UI 모달.
+- **gstack review log** 표준 위치: `~/.gstack/projects/goodsoob-work/`. 이번 V0.6 design doc 도 거기 sync 됨 (`ham-main-design-20260517-140918.md`).
+- **mock-vault/**: 디자인 시 샘플로 작성. 실제 vault 폴더로 사용 가능 (개발 중 dogfood 용으로 적합).

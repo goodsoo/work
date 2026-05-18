@@ -34,13 +34,8 @@ dist-ssr
 # Vercel
 .vercel
 
-# Supabase local
-.supabase
-
-# PWA generated
-public/sw.js
-public/workbox-*.js
-public/registerSW.js
+# Obsidian (옵시디안이 vault 폴더 열면 자동 생성하는 메타)
+.obsidian/
 
 # Claude Code (project shared config OK, local user config gitignored)
 .claude/settings.local.json
