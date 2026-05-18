@@ -62,16 +62,20 @@ describe("parseVaultFile", () => {
     expect(file.sections.get("요약")).toBe("요약 내용");
   });
 
-  it("알려지지 않은 H1 은 unmapped 에 보존", () => {
+  it("본문 안의 사용자 H1 은 그 섹션의 텍스트로 유지 (별도 섹션 아님)", () => {
+    // 사용자가 본문에 `# 회의 제목` 같은 H1 을 적어도 본문 안에 그대로.
+    // 이전 동작 (unmapped 로 분리) 은 데이터 손실 + 중복 누적 버그 원인이었음.
     const raw = `# 본문
 A
-# 메모
+# 회의 제목
 B
+# 회의 내용
+T
 `;
     const file = parseVaultFile(raw);
-    expect(file.sections.get("본문")).toBe("A");
-    expect(file.unmapped).toContain("# 메모");
-    expect(file.unmapped).toContain("B");
+    expect(file.sections.get("본문")).toBe("A\n# 회의 제목\nB");
+    expect(file.sections.get("회의 내용")).toBe("T");
+    expect(file.unmapped).toBe("");
   });
 
   it("손상된 frontmatter 는 빈 객체로 fallback (raw 보존)", () => {
@@ -141,6 +145,31 @@ describe("patchSection", () => {
     expect(file.sections.get("요약")).toContain("## 액션 아이템");
     // frontmatter 유지
     expect(file.frontmatter.title).toBe("팀 주간 회의");
+  });
+
+  it("본문 안에 사용자 H1 있어도 다음 KNOWN 섹션까지 통째로 교체 (중복 누적 방지)", () => {
+    // 회귀: 사용자 본문이 `# 회의 제목` 같은 H1 으로 시작하면, 이전엔 patchSection 이
+    // `# 본문` 과 그 H1 사이만 교체해서 매 저장마다 새 블록이 누적됨.
+    const raw = `---
+title: T
+---
+
+# 본문
+# 회의 제목
+old body
+## sub
+- old item
+
+# 회의 내용
+T
+# 요약
+`;
+    const patched = patchSection(raw, "본문", "# 회의 제목\nnew body");
+    const file = parseVaultFile(patched);
+    expect(file.sections.get("본문")).toBe("# 회의 제목\nnew body");
+    expect(file.sections.get("회의 내용")).toBe("T");
+    expect(patched).not.toContain("old body");
+    expect(patched).not.toContain("old item");
   });
 
   it("존재하지 않는 H1 추가 — body 끝에", () => {
