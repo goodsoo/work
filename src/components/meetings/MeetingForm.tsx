@@ -21,7 +21,8 @@ import { useStateHistory } from "../../hooks/useStateHistory";
 import type { UseStateHistoryResult } from "../../hooks/useStateHistory";
 import { useCreateTodo } from "../../hooks/useTodos";
 import type { MeetingUpdate } from "../../api/meetings";
-import { ClaudePromptButton } from "./ClaudePromptButton";
+import { ClipPromptButton } from "../common/ClipPromptButton";
+import { buildClaudePrompt } from "../../lib/clipboardPrompt";
 import { CopyButton } from "./CopyButton";
 import { EditableList } from "./EditableList";
 import { AttendeeTagInput } from "./AttendeeTagInput";
@@ -644,13 +645,22 @@ export function MeetingForm({ meetingId, onBack }: Props) {
         {/* Summary tab */}
         {activeTab === "summary" ? (
           <div className="space-y-4">
-            <ClaudePromptButton
-              title={meta.title || null}
-              date={meta.date || null}
-              time={meta.time || null}
-              attendees={meta.attendees || null}
-              content={body}
-              transcript={transcript || null}
+            <ClipPromptButton
+              buildPrompt={() =>
+                buildClaudePrompt({
+                  title: meta.title || null,
+                  date: meta.date || null,
+                  time: meta.time || null,
+                  attendees: meta.attendees || null,
+                  content: body,
+                  transcript: transcript || null,
+                })
+              }
+              disabled={
+                (body ?? "").trim().length === 0 &&
+                (transcript ?? "").trim().length === 0
+              }
+              title="본문과 회의 내용을 묶어 Claude 프롬프트로 복사"
               onError={setActionError}
             />
             {hasAnySummary ? (

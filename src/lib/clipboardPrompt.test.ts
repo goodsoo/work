@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildClaudePrompt } from "./clipboardPrompt";
+import { buildClaudePrompt, buildPRPrompt, parsePRResponse } from "./clipboardPrompt";
 
 describe("buildClaudePrompt", () => {
   it("본문 + transcript + meta 가 모두 포함된 프롬프트", () => {
@@ -35,5 +35,69 @@ describe("buildClaudePrompt", () => {
     const out = buildClaudePrompt({ title: "빈 메모" });
     expect(out).toContain("다음 회의록을 정리해주세요");
     expect(out).toContain("제목: 빈 메모");
+  });
+});
+
+describe("buildPRPrompt (V0.7 step 8)", () => {
+  it("title + url + 변경 통계 + body 포함", () => {
+    const out = buildPRPrompt({
+      title: "feat: redesign dashboard",
+      body: "기존 차트 가독성 낮음, 토큰 적용",
+      url: "https://github.com/owner/repo/pull/42",
+      changedFiles: 12,
+      additions: 340,
+      deletions: 87,
+    });
+    expect(out).toContain("제목: feat: redesign dashboard");
+    expect(out).toContain("12 files, +340 -87");
+    expect(out).toContain("기존 차트 가독성");
+    expect(out).toContain("### 한 줄 임팩트");
+    expect(out).toContain("### 카테고리");
+  });
+
+  it("긴 body 는 5000자에서 truncate marker 추가", () => {
+    const out = buildPRPrompt({
+      title: "x",
+      body: "a".repeat(6000),
+      url: "u",
+      changedFiles: 1,
+      additions: 1,
+      deletions: 1,
+    });
+    expect(out).toContain("...(truncated)");
+  });
+});
+
+describe("parsePRResponse (V0.7 step 8)", () => {
+  it("정상 H3 응답 → impact + category", () => {
+    const r = parsePRResponse(
+      `### 한 줄 임팩트\n차트 가독성 개선\n\n### 카테고리\nui_ux\n`,
+    );
+    expect(r).toEqual({ impact: "차트 가독성 개선", category: "ui_ux" });
+  });
+
+  it("bullet prefix 와 공백 정리", () => {
+    const r = parsePRResponse(
+      `### 한 줄 임팩트\n- 로그인 속도 2배\n\n### 카테고리\n- backend\n`,
+    );
+    expect(r?.impact).toBe("로그인 속도 2배");
+    expect(r?.category).toBe("backend");
+  });
+
+  it("카테고리 이상하면 other fallback", () => {
+    const r = parsePRResponse(
+      `### 한 줄 임팩트\nx\n\n### 카테고리\n뭐 모름\n`,
+    );
+    expect(r?.category).toBe("other");
+  });
+
+  it("impact 헤더 없음 → null", () => {
+    expect(parsePRResponse(`### 카테고리\nui_ux\n`)).toBeNull();
+  });
+
+  it("60자 cap", () => {
+    const long = "x".repeat(100);
+    const r = parsePRResponse(`### 한 줄 임팩트\n${long}\n\n### 카테고리\nui_ux\n`);
+    expect(r?.impact.length).toBe(60);
   });
 });
