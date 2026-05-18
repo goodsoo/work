@@ -85,6 +85,8 @@ results than an ad-hoc answer.
 - Tests: `bun run test:run` (one-off), `bun run test` (watch)
 - Build: `bun run build`
 - Typecheck: `bun run typecheck`
+- CI: `.github/workflows/ci.yml` — push(main) + PR 마다 `bun install --frozen-lockfile` → typecheck → test:run 자동 실행 (ubuntu, oven-sh/setup-bun@v2). Tauri build 는 OS 종속이라 CI 에서 skip.
+- 배포: 없음 (Tauri 데스크탑 전용). `vercel.json` 으로 main deploy 비활성화. Vercel 대시보드 연동은 남아있지만 deploy 자체는 막혀있음.
 - 마이그레이션 (DB): V0.6 부터 없음. vault = 로컬 md 파일. 스키마 변경 = md 파일 형식 변경 (frontmatter 필드 추가/이름 변경 등).
 
 ## 주의사항 / 알려진 footgun

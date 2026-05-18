@@ -53,7 +53,9 @@
 - [ ] **첫 평가 자료 누적 시즌까지 매일 사용** — 다음 분기 평가 시 portfolio 탭만 띄워서 5분 내 펼쳐보일 수 있는지 검증.
 - [x] **legacy 카드 작성 프롬프트 + 복사 버튼** (2026-05-18). `buildLegacyCardPrompt(vaultRoot)` + PortfolioSidePanel 의 `ClipPromptButton`. vaultRoot 는 `useVault()` 에서 주입 (picker 바뀌어도 자동 반영, 미설정 시 vault 선택 안내). owner repo `goodsoo/work` 자체에도 적용 → V0.0~V0.7 마일스톤 5장 카드 + `projects.md` 에 `goodsoo-work` slug 추가.
 - [ ] **다른 owner repo legacy 카드 backfill** — "내 작업" 탭의 "Legacy 카드 프롬프트" 버튼 복사 → 각 repo Claude Code 에 붙여넣어 카드 생성.
-- [ ] **회사 owner repo 도 PR 워크플로 전환 시도** — branch + 셀프 PR + auto-merge (셸 alias 로 5초). 매 commit 마다 PR description 작성이 평가 자료 품질 ↑.
+- [x] **goodsoo/work PR 워크플로 셋업** (2026-05-18 밤). 23 commit 을 5 PR 로 retroactive 분할 — V0.5.x polish (#1) / V0.6 vault (#2) / V0.7 portfolio (#3) / ops CI+Vercel (#4) / PR body 7섹션 양식 (#5). `.github/workflows/ci.yml` 도입 (push/PR 마다 typecheck + test:run). `vercel.json` 으로 main deploy 비활성화.
+- [ ] **회사 owner repo 도 PR 워크플로 전환 시도** — branch + 셀프 PR + auto-merge (셸 alias 로 5초). 매 commit 마다 PR description 작성이 평가 자료 품질 ↑. goodsoo/work 양식 (`buildPRGuidePrompt()`) paste 로 적용.
+- [ ] **backup-pre-pr-split branch 삭제 결정** — PR 분할 안전망. dogfood 며칠 후 안전 확인되면 `git branch -D`.
 
 ## 🟡 V0.7.x 후속 (dogfood 결과로 결정)
 

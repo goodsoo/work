@@ -2,9 +2,9 @@
 
 다음 세션이 빠르게 파악할 수 있도록 짧게 유지.
 
-## 현재 상태 (2026-05-18 저녁, legacy 카드 프롬프트 + goodsoo/work 자체 카드 5장 완료 후)
+## 현재 상태 (2026-05-18 밤, 5 PR 분할 ship + CI + Vercel 비활성화 + PR template 완료 후)
 
-**V0.7 "내 작업" 탭 ship + dogfood fix + legacy 카드 도구 완료**. owner repo `goodsoo/work` 자체에 대한 평가 자료 (V0.0~V0.7 마일스톤 5장) 도 vault 에 누적. **다음 세션 = 모바일 layout 통일 (drawer)** — 기획 완료, 구현 대기.
+**goodsoo/work PR 워크플로 + CI 셋업 완료**. 23 commit 을 5 PR 로 분할 머지, GitHub Actions CI 작동 확인, V0.7 portfolio 자동 수집 대상 PR 5장 누적. **다음 세션 = 모바일 layout 통일 (drawer)** — 기획 완료, 구현 대기.
 
 ## 다음 세션 진입점 — 모바일 drawer 구현
 
@@ -28,14 +28,19 @@
   - `MeetingsPage.tsx`: **파일 자체 삭제** (역할 사라짐)
 - **invariant 부가 효과**: 이번 변경으로 모바일도 항상 form 표시 → "선택 0 개 안 됨" invariant 자연스럽게 만족.
 
-## 이번 세션에 한 일 (2026-05-18 저녁)
+## 이번 세션에 한 일 (2026-05-18 밤)
 
-- **legacy 카드 작성 프롬프트 + 복사 버튼** (commit `9f7ffed`): `src/lib/clipboardPrompt.ts` 에 `buildLegacyCardPrompt(vaultRoot)` 추가. PR 없이 직접 push 한 owner repo 에서 git log 기반으로 일관된 schema 의 portfolio 카드를 생성하라는 self-contained 지시 프롬프트. `PortfolioSidePanel` 의 `ClipPromptButton` (compact) 으로 한 번에 클립보드 복사. vaultRoot 는 `useVault()` 에서 주입 — picker 가 바뀌어도 자동 반영, 미설정 시 vault 선택 안내 메시지로 대체. 테스트 2 케이스 추가 (12개 pass).
-- **goodsoo/work 자체 legacy 카드 5장 생성**: 위 프롬프트 schema 그대로 적용. 본인 71 커밋을 V0.0~V0.7 마일스톤 5개로 그룹핑 + 각 그룹 첫커밋~끝커밋 `git diff --shortstat` 정확 산출. vault `portfolio/goodsoo-work-{v0-0-to-0-5-web-mvp,v0-5-1-desktop-layout,v0-5-2-to-0-5-4-memo-polish,v0-6-vault-migration,v0-7-portfolio}.md` + `projects.md` 에 `goodsoo-work` slug (sort=5, repos=[goodsoo/work]) 추가. 모두 vault 안 직접 작성이라 git diff 에 없음.
+- **23 commit 5 PR 분할 ship** — 그동안 main 에 직커밋 누적되어 있던 V0.5.3~V0.7 + legacy 카드 작업 23 commit 을 retroactive 하게 5 PR 로 분할:
+  - **PR #1** V0.5.x polish (12) — 캘린더 연속 스크롤 + 메모 history 분리 + soft delete 등
+  - **PR #2** V0.6 vault 마이그레이션 (6) — Supabase 제거 + 로컬 md vault, Phase 1~5
+  - **PR #3** V0.7 portfolio (7) — "내 작업" 탭 + parser fix + legacy 카드 프롬프트
+  - **PR #4** ops (1) — `.github/workflows/ci.yml` + `vercel.json` (main deploy 비활성화)
+  - **PR #5** PR body 7섹션 양식 (1) — `buildPRGuidePrompt()` + 사이드바 가이드 프롬프트 복사 버튼
+  - 분할 방법: 분기점 commit 에 branch 만들기 → 차례로 push + PR + rebase merge. CI + Vercel 모두 pass.
+- **CI 작동 확인** — `.github/workflows/ci.yml` 첫 작동 (PR #4 에서 19초, PR #5 에서 22초). `bun install --frozen-lockfile` → typecheck → test:run, 90/90 pass.
+- **V0.7 portfolio 자동 수집 대상 = 머지된 PR 5장** — dogfood: "내 작업" 사이드바 sync 누르면 5장 카드 자동 누적되는지 사용자가 직접 검증 예정.
 
-**직전 세션 (2026-05-18 낮) 작업** (이미 ship): parser KNOWN_H1 fix (`c8d5d17`) / Backspace history.back 차단 + Tauri dev Cmd+R reload (`1a025ee` 에 묶임) / 모바일 drawer 기획.
-
-- **2026-05-18-회의록.md** 파일 = 본인 데이터 (parser 버그로 중복 누적된 회의록). 여전히 프로젝트 루트 untracked. 사용자가 수동 정리 예정. **git 에 넣으면 안 됨**.
+**직전 세션 (2026-05-18 저녁) 작업** (이미 ship): legacy 카드 작성 프롬프트 + 복사 버튼 (`9f7ffed`) / goodsoo/work 자체 legacy 카드 5장 생성 (vault `portfolio/goodsoo-work-*.md`).
 
 ## V0.7 핵심 결정 요약
 
@@ -66,5 +71,6 @@
 - 캘린더 스크롤 상태 페이지 전환 시 보존 (V0.5.4 부터 carry-over).
 - 에러 상태 패딩 통일 (p-3/p-4 혼재).
 - V0.5.3~V0.5.4 lint 11 errors (기존 코드 react-hooks/refs 등) — dogfood 단계에서 정리.
-- `2026-05-18-회의록.md` 프로젝트 루트 untracked. 본인 정리 대기.
 - `syncPortfolio` 안 `[syncPortfolio]` 진단 console.log — dogfood 안정화 후 제거.
+- `backup-pre-pr-split` branch 안전망 — PR 분할 작업의 백업. dogfood 며칠 후 안전 확인되면 삭제.
+- **Vercel 대시보드 disconnect** (선택) — `vercel.json` 으로 deploy 는 막혔지만 GitHub 연동은 남아있음. PR 마다 Vercel preview check 가 도는 중. 진짜 정리하려면 대시보드에서 disconnect.
