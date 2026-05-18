@@ -2,97 +2,72 @@
 
 다음 세션이 빠르게 파악할 수 있도록 짧게 유지.
 
-## 현재 상태 (2026-05-18, 늦은 저녁 — V0.7 ship 완료, dogfood 진행 중)
+## 현재 상태 (2026-05-18, V0.7 ship + V0.6 dogfood fix 후)
 
-**V0.7 "내 작업" 탭 ship.** 코드 + 첫 sync + rename 자동 감지 + 자동 분류 + dogfood fix 모두 통과. 88 tests pass. **다음 세션 = 매일 사용하면서 발견하는 거 즉시 fix + owner repo legacy 카드 작성**.
+**V0.7 "내 작업" 탭 ship 완료**. dogfood 중 V0.6 vault 파서 버그 발견 → fix 완료. **다음 세션 = 모바일 layout 통일 (drawer)** — 기획 완료, 구현 대기.
 
-## 다음 세션 진입점
+## 다음 세션 진입점 — 모바일 drawer 구현
 
-### 1. owner repo legacy 카드 작성 (우선순위)
+기획은 끝났고 구현만 남음. 결정사항/변경 파일 todo.md 의 "다음 세션 진입" 섹션 참조. 핵심 요약:
 
-본인이 PR 없이 직접 commit + push 한 owner repo 의 작업들. claude code 로 한 번에 카드 생성.
+- **목표**: 모바일도 데스크탑과 같은 3-pane 구조. SidePanel 을 overlay drawer 로. BottomTabs 유지.
+- **트리거**: 모바일 헤더 좌측 햄버거. drawer 폭 288 (데스크탑 기본 동일). dim 탭 + 좌 swipe 닫기.
+- **drawer 내용**: SidePanel 만 (ActivityBar 제외 — 모바일에선 BottomTabs 가 그 역할).
+- **결정사항**:
+  - 메모 선택 시 drawer 자동 닫기
+  - BottomTab 변경 시 drawer 자동 닫기
+  - 햄버거 = 토글 (✕ 로 안 바꿈)
+  - 모바일 초기 drawer 닫힘 상태. 메모장 진입 시 desktop 과 같은 auto-select.
+  - swipe-from-edge 으로 열기는 v1 미구현
+  - dim 이 헤더/BottomTabs 까지 덮는지는 구현 직전 결정
+- **변경 파일**:
+  - `AppShell.tsx`: drawer state + 햄버거 + overlay + body scroll lock + swipe + `DrawerContext` provider
+  - `App.tsx`: 메모장 탭의 `lg:hidden` / `hidden lg:block` 분기 제거 → 단일 렌더, `MeetingsPage` 의 자동 선택 로직 흡수
+  - `MeetingForm.tsx`: `lg:hidden` 뒤로가기 버튼 2개 (line 306, 377) 제거
+  - 각 SidePanel: item onClick 안에서 `useDrawer().close()` 호출
+  - `MeetingsPage.tsx`: **파일 자체 삭제** (역할 사라짐)
+- **invariant 부가 효과**: 이번 변경으로 모바일도 항상 form 표시 → "선택 0 개 안 됨" invariant 자연스럽게 만족.
 
-각 owner repo 마다:
-```bash
-cd ~/Projects/<repo>
-claude
-```
+## 이번 세션에 한 일 (2026-05-18)
 
-claude 에게 줄 프롬프트:
-```
-이 repo 의 git log 을 author=<your-email> 으로 필터해서 의미 있는 feature 단위로
-묶고, 각 묶음마다 /Users/ham/Goodsoob/portfolio/<owner>-<repo>-legacy-<n>.md 파일을 만들어줘.
+- **parser fix** (commit `c8d5d17`): KNOWN_H1 (`본문`/`회의 내용`/`요약`) 만 섹션 경계로 인식. 사용자가 본문에 `# 회의 제목` 같은 H1 쓰면 매 저장마다 블록이 누적되는 데이터 손상 버그 fix. 회귀 테스트 포함.
+- **Backspace/Delete history.back() 차단** (commit `1a025ee` 에 묶여 들어감): macOS WKWebView 가 두 키를 브라우저 뒤로가기로 처리 → SPA selection state 망가짐. 입력 컨텍스트 (`INPUT`/`TEXTAREA`/`contenteditable`) 밖에서만 `preventDefault`.
+- **Tauri dev Cmd+R reload menu** (commit `1a025ee` 에 묶여 들어감): JS 가 죽어 흰 화면 됐을 때 native menu 가 받아서 reload. `cfg!(debug_assertions)` 한정.
+- **모바일 drawer 기획** — 위 "다음 세션 진입점" 참조.
+- **2026-05-18-회의록.md** 파일 = 본인 데이터 (parser 버그로 11번 중복 누적된 회의록). 사용자가 수동으로 정리 예정. **git 에 넣으면 안 됨** (.gitignore 에 추가하든 수동 정리 후 vault 로 이동하든).
 
-frontmatter:
-  type: portfolio-work
-  github_owner: <owner>
-  github_repo: <repo>
-  github_pr_number: 0
-  github_pr_url: ""
-  github_state: merged
-  github_merged_at: <묶음 첫 commit 날짜 ISO>
-  github_title: <한 줄 작업 요약>
-  github_changed_files: <합산>
-  github_additions: <합산>
-  github_deletions: <합산>
-  project: ""              # projects.md 에 그 repo 매칭되면 자동 분류, 아니면 본인이 옵시디안에서
-  included: true
-  category: ui_ux | backend | infra | fix | other 중 추정
-  impact_summary: "한 줄, 30자 이내, '그래서 뭐가 좋아졌는지' 중심"
-  screenshots: []
-  synced_at: ""
+## owner repo legacy 카드 (V0.7 dogfood 진행 중)
 
-body:
-## Description (from GitHub)
-- <sha-short> <commit message>
-- ...
-
-## Notes
-(빈)
-
-규칙:
-- 의미적으로 연결된 commit 들 묶기. "fix typo", "rename" 같은 사소한 commit 은 큰 묶음에 흡수.
-- 평가 자료용이라 가치 약한 묶음은 skip.
-- 묶음 5-15개 정도 적절.
-```
-
-### 2. 매일 사용하면서 발견하는 UX 갈리는 곳 fix
-
-V0.7 ship 후 1주일 매일 사용 (design step 13). 본인이 발견 시 즉시 commit.
-
-### 3. progress.md 의 console.log 제거 (안정화 후)
-
-`syncPortfolio` 안 `[syncPortfolio]` 진단 로그. dogfood 안정화 후 제거.
+본인이 PR 없이 직접 commit + push 한 owner repo 의 작업들. claude code 로 한 번에 카드 생성. 자세한 프롬프트 템플릿은 이전 progress 에 있었지만, 매일 사용 중 발견되는 즉시-fix 가 우선순위 더 높음.
 
 ## V0.7 핵심 결정 요약
 
-- **자동 분류**: `projects.md` 의 `projects[].repos: ["owner/repo"]` 매핑으로 신규 카드 자동 부여. 본인 명시 분류 (`project: <slug>`) 는 sync 가 보존. 빈 값 → 다음 sync 가 매핑으로 채움.
-- **부트스트랩**: 첫 sync 시 projects.md 자동 생성 (1 repo = 1 project). 본인이 옵시디안에서 한국어 rename + 여러 repo 묶기.
-- **rename 자동 감지**: `github_pr_id` (GitHub 내부 영구 PR ID) frontmatter 매칭. owner/repo rename 시 파일 + `_attachments/{slug}/` + `projects.md repos` 자동 갱신. 본인 수정 필드 보존.
-- **legacy 카드**: `pr_number=0` 허용 (negative 만 reject). PR 안 만든 commit 도 schema 통과. UI 에선 외부 링크 비활성 (`github_pr_url=""` → `<span>` fallback).
-- **카드 자동 삭제 0**: repo 삭제되어도 vault 카드 보존. 본인 평가 자료 안전.
-- **gh CLI 위임**: 우리 앱은 GitHub 계정 정보 0 보관. `gh auth login` 키체인 토큰을 `sh -lc` 로 통해 사용.
+- **자동 분류**: `projects.md` 의 `projects[].repos: ["owner/repo"]` 매핑으로 신규 카드 자동 부여. 본인 명시 분류 (`project: <slug>`) 는 sync 가 보존.
+- **rename 자동 감지**: `github_pr_id` (GitHub 내부 영구 PR ID) frontmatter 매칭. owner/repo rename 시 파일 + `_attachments/{slug}/` + `projects.md repos` 자동 갱신.
+- **legacy 카드**: `pr_number=0` 허용. PR 안 만든 commit 도 schema 통과.
+- **카드 자동 삭제 0**: repo 삭제되어도 vault 카드 보존.
+- **gh CLI 위임**: 우리 앱은 GitHub 계정 정보 0 보관.
 
 ## 알아야 할 컨텍스트
 
-- **design doc v2.3 가 source of truth**. `~/.gstack/projects/goodsoob-work/ham-main-design-20260518-105501.md`. 본 progress 는 high-level only.
-- **dogfood 결정**: owner repo 도 PR 워크플로 (Approach A) 시도하는 게 추천. 셀프 PR 5초/번 + PR description 강제 → 평가 자료 품질 ↑. 부담 크면 commit cluster (Plan B) 는 V0.8 후보.
-- **vault 위치**: 본인 `/Users/ham/Goodsoob` (iCloud 동기화).
+- **design doc v2.3** = V0.7 source of truth. `~/.gstack/projects/goodsoob-work/ham-main-design-20260518-105501.md`.
+- **vault 위치**: `/Users/ham/Goodsoob` (iCloud 동기화).
 - **portfolio capability**: `fs:scope` 에 dotfile path 명시. 새 capability 변경 시 `tauri:dev` 재시작 필요. Rust 변경 없으면 HMR 만으로 충분.
-- **gh CLI 첫 셋업**: 본인은 이미 `gh auth login` 통과 (github.com, repo scope). Enterprise 아님.
+- **selection invariant**: "노트 0개 경우 제외하고 항상 최소 1개 선택" — 사용자 명시 요구. 현재 desktop 은 만족, 모바일은 drawer 구현 후 자연스럽게 만족.
 
-## V0.6.1 후속 (V0.7 와 병행)
+## V0.6.1 후속 (V0.7 dogfood 와 병행)
 
-- [ ] Conflict resolution 모달 (현재는 throw 만)
+- [x] parser KNOWN_H1 만 섹션 경계 (이번 세션 완료)
+- [ ] Conflict resolution 모달 (현재 throw 만)
 - [ ] Vault 변경 UI (설정 페이지)
-- [ ] iCloud `(conflicted copy)` 파일 무시 룰 (portfolio 도 cover)
+- [ ] iCloud `(conflicted copy)` 파일 무시 룰
 - [ ] vault 스캔 성능 실측 + frontmatter-only fast path
 - [ ] vault 폴더 사라짐 graceful
 
 ## 미해결
 
-- mock-vault/.obsidian/ untracked (옵시디안 자동 생성). .gitignore 에 이미 .obsidian/ 있음 — mock-vault 안쪽 cover 되는지 확인.
 - 캘린더 스크롤 상태 페이지 전환 시 보존 (V0.5.4 부터 carry-over).
 - 에러 상태 패딩 통일 (p-3/p-4 혼재).
 - V0.5.3~V0.5.4 lint 11 errors (기존 코드 react-hooks/refs 등) — dogfood 단계에서 정리.
-- 다른 세션이 `src/lib/vault/parser.ts` 와 `parser.test.ts` 수정 중. 이번 wrap 에서 건드리지 않음.
+- `2026-05-18-회의록.md` 프로젝트 루트 untracked. 본인 정리 대기.
+- `syncPortfolio` 안 `[syncPortfolio]` 진단 console.log — dogfood 안정화 후 제거.
