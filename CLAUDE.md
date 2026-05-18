@@ -58,6 +58,10 @@
 - 매일 사용 시 신뢰 깨지는 곳 (data loss, 한 번도 발생 안 한 에러 silent fail)은 단단히.
 - 그 외 generic SaaS pattern (multi-user, sharing, analytics, complex permissions) 절대 안 만듦.
 
+## PR 작성 (포트폴리오 호환)
+
+PR body 가 곧 vault `portfolio/` 카드의 본문이 됨. 양식 (한 줄 임팩트 / 문제 / Before / After / 디자인 결정 / 유저가 얻는 것 / 카테고리 7섹션) 은 `src/lib/clipboardPrompt.ts` 의 `buildPRGuidePrompt()` 가 single source. 카테고리 enum: `ui_ux | backend | infra | fix | other`. "PR 만들어줘" 요청 받으면 의도 / 유저 가치 / before-after 스크린샷 / 디자인 결정 / 카테고리 5가지 먼저 확보. 작은 변경(오타·dep bump 등 포트폴리오 가치 없는 것)은 PR 안 만들고 main 직커밋 허용.
+
 ## Skill routing
 
 When the user's request matches an available skill, invoke it via the Skill tool. The
