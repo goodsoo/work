@@ -2,71 +2,62 @@
 
 다음 세션이 빠르게 파악할 수 있도록 짧게 유지.
 
-## 현재 상태 (2026-05-18)
+## 현재 상태 (2026-05-18, 오후)
 
-**V0.6 Vault 마이그레이션 코드 완료.** Supabase → 로컬 md 파일 vault 백엔드. 4개 commit. typecheck/test 통과, `bun run build` 성공. Tauri dev 도 정상 동작.
+**V0.7 "내 작업" 탭 plan-eng-review CLEAR.** design doc v2.2 ship-ready. 구현 코드는 아직 0줄. 다음 세션에서 step 1 진입.
 
-### 이번 세션에서 완료
+### 이번 세션에서 한 일 (코드 변경 0)
 
-**Phase 1 — Vault foundation** (`e853007`)
-- `src/lib/vault/` 6 모듈: adapter (Tauri fs + in-memory + atomic write + ConflictError), parser (gray-matter 대신 js-yaml JSON_SCHEMA + H1 split), tasks (inline syntax + toggleTodo), scan (디렉토리 list + trashFile + ensureVaultStructure), watcher (TanStack Query invalidate + selfWriteWindow), VaultProvider/useVault (React context).
-- Tauri 2 plugin: `tauri-plugin-fs` (`features = ["watch"]` 필수 — 빼면 "Command watch not found" 런타임 에러), `tauri-plugin-dialog`. permissions `fs:scope-home-recursive` + 개별 권한.
-- 28 unit test (parser 12 + tasks 8 + tasks-toggle 3 + watcher 2 + conflict 2).
-- design doc `V0.6-vault-design.md` + `mock-vault/` 샘플 (회의록 2 + 일기 2 + inbox).
+전부 design / 메모리 / log 작업. 프로젝트 git working tree 변경 없음 (todo.md / progress.md 만 이 wrap 단계에서 갱신).
 
-**Phase 2 — API/hooks swap** (`ce3955c`)
-- hook 시그니처 100% 유지. 내부만 vault adapter 호출.
-- id 체계 변경: UUID → file path. Todo.id = `file#L{line}`.
-- attendees: string CSV → string[]. UI 호환은 join/array 변환.
-- soft delete: `deleted_at` → `.trash/{stamp}-{base}.md`.
-- created_at/updated_at: file mtime 기반 ISO 노출 (UI 호환).
-- Schedule = isEvent todo subset.
-
-**Phase 3+4 — UI** (`4dee4ff`)
-- VaultPicker / VaultGate. 첫 실행 시 폴더 선택 모달.
-- AuthGate / 로그인 화면 / 로그아웃 버튼 / 유저 아바타 제거.
-- ClaudePromptButton (SummarizeButton 대체) + `lib/clipboardPrompt.ts`.
-
-**Phase 5 — cleanup + docs** (`06e0fe4`)
-- 삭제: `src/lib/supabase.ts`, `database.types.ts`, `src/hooks/useAuth.ts`, `src/components/auth/*`, `SummarizeButton.tsx`, `supabase/` 폴더 전체, `.env.example`.
-- CLAUDE.md V0.6 갱신 (로드맵 + vault footgun + Tauri 전용).
-- PWA 제거 (vite-plugin-pwa, vite.config 의 VitePWA) — commit 1 에 통합됨.
-
-### review 결과
-
-`/plan-eng-review` 통과 — VaultIndexer 별도 모듈 제거 (TanStack Query 가 캐시 레이어), PWA 빌드 폐기, 모바일 V0.7+ candidate, 자체 todo syntax (옵시디안 Tasks plugin emoji 호환 X), 3 critical test 추가 (watcher/conflict/toggle). gstack review log 기록됨.
+- **V0.7 plan-eng-review resume + 마무리** — 이전 세션 API surrogate 에러로 Section 3 중간에 죽었던 거 이어 받음. Section 3 (Tests) / Section 4 (Performance) / Outputs / Outside voice 까지 완주.
+- **5개 본인 결정 받음**:
+  - 1A — Vault 구조 flat (`portfolio/{pr-slug}.md` 단일 폴더, project = frontmatter)
+  - 1B — atomic per-PR write + 시작/완료/중단 toast
+  - 2A — `ClipPromptButton` 일반화 (meeting/PR/journal 공유, `ClaudePromptButton` 흡수)
+  - 3A → T4-NEW — tombstone 폐기, `included: true/false` frontmatter (옵시디안 모바일 race 자연 해결, 본인 제안)
+  - 4A — sync 직렬 호출 유지 (첫 sync 3분, toast expectation set)
+- **outside voice (Claude subagent, Codex 미설치)** — 7 issues. 4개 본문 반영 (T2 scan 단축, T3 attachments cleanup, T5 `--limit 1000`, T7 이름 정리). T6 (ROI 재고) 본인이 명시적 "지금 구현 진입" 선택.
+- **design doc v2.2 patch** — `~/.gstack/projects/goodsoob-work/ham-main-design-20260518-105501.md`. 9 섹션 갱신 (헤더, 데이터 모델, sync 흐름, syncPortfolio, Tauri 셋업, 컴포넌트, 카드 메뉴, Reviewer Concerns, Next Steps, Spec Review History, GSTACK REVIEW REPORT).
+- **test plan artifact** — `~/.gstack/projects/goodsoob-work/ham-main-eng-review-test-plan-20260518-125206.md`. 8 unit + 1 manual smoke.
+- **TODO-1 신규** — Tauri macOS PATH 대응. 모든 gh 호출을 `Command.create("sh", ["-lc", ...])` 로 감쌈. design 본문 코드 예시에 적용됨.
 
 ## 다음 세션 작업
 
-### V0.6.1 dogfood / polish
+### V0.7 step 1 부터 진입
 
-1주일 본인 매일 사용. 발견 버그 fix. todo.md 의 "V0.6.1 후속" 항목들 우선:
-- Conflict resolution 모달 (현재는 throw 만)
-- Vault 변경 UI (설정 페이지)
-- iCloud sync `(conflicted copy)` 파일 무시
-- vault 스캔 실측 (수백 파일 < 50ms 가설)
-- vault 폴더 사라짐 graceful
+design doc 의 Next Steps 13 step 순서대로:
 
-### V0.7 후보
+1. **frontmatter schema + TypeScript interface lock-in** — `src/api/portfolio.ts` 빈 스켈레톤. `PortfolioWorkFrontmatter` (project + included 포함), `PortfolioWork`, `PortfolioProject`. CC 30분.
+2. **scanPortfolio + watcher 확장** — `adapter.list("portfolio")` flat, `scanMeetings` 패턴 복붙. watcher `portfolio/` 케이스 추가. CC 15분.
+3. **Tauri shell + 5초 hook + TODO-1 sh -lc 래핑** — Cargo.toml + capability + AppShell. CC 2-3시간. **여기서 Tauri dev 재시작 1번 필요.**
+4. **2-step sync + frontmatter 보존 + tombstone 폐기 + injection** — CC 2-3시간.
+5. 이후 step 5-13.
 
-- Tauri 2 Mobile (모바일 본인 앱)
-- Claude 응답 paste → 자동 callout
-- 녹음 → STT
-- 메모 history (서버 또는 git 기반)
+### 병행 검토 후보
 
-### 미해결
-
-- mock-vault/.obsidian/ untracked — `.gitignore` 에 추가 필요 (옵시디안이 mock-vault 열면 자동 생성).
-- 캘린더 스크롤 상태 페이지 전환 시 보존 (V0.5.4 부터 carry-over).
-- 에러 상태 패딩 통일 (p-3/p-4 혼재).
-- V0.5.3~V0.5.4 lint 11 errors (기존 코드 react-hooks/refs 등) — V0.6 영역 외, dogfood 단계에서 정리.
+- **Design Review** — V0.7 가 UI 컴포넌트 6개 신규 (카드, 그리드, 사이드바, 드롭존, lightbox, ResponsePasteArea). `/plan-design-review` 돌리면 디자인 토큰 / 시각 위계 / 인터랙션 점검. 선택.
 
 ## 알아야 할 컨텍스트
 
-- **Tauri fs watch 활성화**: `Cargo.toml` 의 `tauri-plugin-fs` 에 `features = ["watch"]` 명시. 안 하면 JS 측 watch 호출이 "Command watch not found" 런타임 에러로 vault init 실패 → localStorage 비워지고 picker 다시 표시.
-- **id = file path 의 영향**: 메모 파일명을 옵시디안에서 rename 하면 우리 앱 입장에선 "삭제 + 신규". TanStack Query cache 무효화 + UI 가 새 id 로 다시 fetch. content 유지는 됨 (파일 내용 동일).
-- **attendees 마이그레이션**: 새 vault 라 기존 데이터 없음. UI 가 string 받던 곳은 `array.join(", ")` 으로 변환. AttendeeTagInput 같은 컴포넌트가 array 다루는지 확인 필요할 수 있음 (dogfood 시).
-- **소량 lint 에러**: VaultProvider 의 `setIsReady(false)` in effect 는 의도된 패턴 (vault root null 이면 즉시 reset). 한 줄 eslint-disable. 다른 V0.5.3 lint 는 기존 코드.
-- **conflict 충돌 처리 흐름**: VaultAdapter.write 호출 시 expectedMtime 누락하면 검사 안 함 (`undefined`). hooks 가 mutation 시 readMeta → expectedMtime 전달하는 패턴은 V0.6 에서 부분만 적용. 정밀하게 하려면 모든 mutation 에 적용 + UI 모달.
-- **gstack review log** 표준 위치: `~/.gstack/projects/goodsoob-work/`. 이번 V0.6 design doc 도 거기 sync 됨 (`ham-main-design-20260517-140918.md`).
-- **mock-vault/**: 디자인 시 샘플로 작성. 실제 vault 폴더로 사용 가능 (개발 중 dogfood 용으로 적합).
+- **design doc v2.2 가 source of truth**. todo.md / progress.md 는 high-level 트래커. 구현 디테일 (frontmatter 스키마, sync 로직, 컴포넌트 이름 등) 은 design doc 한 파일만 보면 됨.
+- **dev 서버 재시작 시점**: src/**.tsx 만 변경하면 HMR 자동. `src-tauri/` Cargo.toml / capability / lib.rs / `vite.config.ts` 변경하면 재시작 필요. V0.7 step 3 이 첫 재시작 지점.
+- **이번 세션 API surrogate 에러**: 한국어 + emoji + 긴 컨텍스트 조합에서 UTF-16 surrogate pair 가 깨지면서 750KB 직렬화 fail. 메모리에 저장 (`feedback_korean_output_quality.md`). 다음 세션부터 짧은 평범한 단어 / 한자 약자 회피 / emoji + 한글 혼용 절제 적용.
+- **review log**: `~/.gstack/projects/goodsoob-work/main-reviews.jsonl` 에 2건 (`plan-eng-review` CLEAR + `codex-plan-review` issues_found). `/ship` 시 readiness dashboard 가 이걸 봄.
+- **본인 워크플로 confirm**: `gh` 설치 + login + `repo` scope OK. github.com (Enterprise 아님). 회사 + 개인 repo 모두 personal 계정으로 접근. The Assignment #1 종료.
+- **V0.7 ROI risk (outside voice T6)**: 분기 1회 평가 자료 작성 × 연 4시간 수동 vs CC 2일 + Human 1-2주 + 매년 유지보수. 본인이 ROI 재고 후 "지금 구현 진입" 선택. 첫 dogfood 시즌 (다음 분기 평가) 에서 실제 가치 검증 시점 도래.
+
+## V0.6.1 후속 (dogfood 진행 중, V0.7 와 병행)
+
+- [ ] Conflict resolution 모달 (현재는 throw 만)
+- [ ] Vault 변경 UI (설정 페이지)
+- [ ] iCloud `(conflicted copy)` 파일 무시 룰 (portfolio 도 같이 cover)
+- [ ] vault 스캔 성능 실측 + frontmatter-only fast path
+- [ ] vault 폴더 사라짐 graceful
+
+## 미해결
+
+- mock-vault/.obsidian/ untracked (옵시디안이 자동 생성). .gitignore 에 이미 .obsidian/ 있음 — mock-vault 안쪽도 cover 되는지 확인.
+- 캘린더 스크롤 상태 페이지 전환 시 보존 (V0.5.4 부터 carry-over).
+- 에러 상태 패딩 통일 (p-3/p-4 혼재).
+- V0.5.3~V0.5.4 lint 11 errors (기존 코드 react-hooks/refs 등) — V0.6 영역 외, dogfood 단계에서 정리.
