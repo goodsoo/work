@@ -12,59 +12,81 @@ import {
   type MeetingInsert,
   type MeetingUpdate,
 } from "../api/meetings";
+import { useVault } from "../lib/vault/useVault";
 
 const meetingsKey = ["meetings"] as const;
 const deletedMeetingsKey = ["meetings", "deleted"] as const;
 const meetingKey = (id: string) => ["meetings", id] as const;
 
 export function useMeetings() {
+  const { adapter, isReady } = useVault();
   return useQuery({
     queryKey: meetingsKey,
-    queryFn: listMeetings,
+    queryFn: () => listMeetings(adapter),
+    enabled: isReady,
   });
 }
 
 export function useDeletedMeetings() {
+  const { adapter, isReady } = useVault();
   return useQuery({
     queryKey: deletedMeetingsKey,
-    queryFn: listDeletedMeetings,
+    queryFn: () => listDeletedMeetings(adapter),
+    enabled: isReady,
   });
 }
 
 export function useMeeting(id: string | undefined) {
+  const { adapter, isReady } = useVault();
   return useQuery({
     queryKey: id ? meetingKey(id) : ["meetings", "none"],
-    queryFn: () => getMeeting(id!),
-    enabled: !!id,
+    queryFn: () => getMeeting(adapter, id!),
+    enabled: !!id && isReady,
   });
 }
 
 export function useCreateMeeting() {
+  const { adapter, watcher } = useVault();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: Omit<MeetingInsert, "user_id">) => createMeeting(input),
+    mutationFn: async (input: MeetingInsert) => {
+      const created = await createMeeting(adapter, input);
+      watcher.markSelfWrite(created.id);
+      return created;
+    },
     onSuccess: (created) => {
       qc.setQueryData<Meeting[]>(meetingsKey, (prev) =>
-        prev ? [created, ...prev] : [created]
+        prev ? [created, ...prev] : [created],
       );
       qc.setQueryData(meetingKey(created.id), created);
+      qc.invalidateQueries({ queryKey: ["todos"] });
     },
   });
 }
 
 export function useUpdateMeeting(id: string) {
+  const { adapter, watcher } = useVault();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (patch: MeetingUpdate) => updateMeeting(id, patch),
+    mutationFn: async (patch: MeetingUpdate) => {
+      const updated = await updateMeeting(adapter, id, patch);
+      watcher.markSelfWrite(id);
+      return updated;
+    },
     onMutate: async (patch) => {
       await qc.cancelQueries({ queryKey: meetingKey(id) });
       const prevDetail = qc.getQueryData<Meeting>(meetingKey(id));
       const prevList = qc.getQueryData<Meeting[]>(meetingsKey);
       if (prevDetail) {
-        qc.setQueryData(meetingKey(id), { ...prevDetail, ...patch } as Meeting);
+        qc.setQueryData(meetingKey(id), {
+          ...prevDetail,
+          ...patch,
+        } as Meeting);
       }
       qc.setQueryData<Meeting[]>(meetingsKey, (curr) =>
-        curr?.map((m) => (m.id === id ? ({ ...m, ...patch } as Meeting) : m)),
+        curr?.map((m) =>
+          m.id === id ? ({ ...m, ...patch } as Meeting) : m,
+        ),
       );
       return { prevDetail, prevList };
     },
@@ -75,53 +97,59 @@ export function useUpdateMeeting(id: string) {
     onSuccess: (updated) => {
       qc.setQueryData(meetingKey(id), updated);
       qc.setQueryData<Meeting[]>(meetingsKey, (prev) =>
-        prev?.map((m) => (m.id === id ? updated : m))
+        prev?.map((m) => (m.id === id ? updated : m)),
       );
+      qc.invalidateQueries({ queryKey: ["todos"] });
     },
   });
 }
 
-// Soft delete: 활성 리스트에서 제거, 휴지통 invalidate (다음 조회 시 fetch).
 export function useDeleteMeeting() {
+  const { adapter, watcher } = useVault();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => deleteMeeting(id),
+    mutationFn: async (id: string) => {
+      await deleteMeeting(adapter, id);
+      watcher.markSelfWrite(id);
+    },
     onSuccess: (_void, id) => {
       qc.setQueryData<Meeting[]>(meetingsKey, (prev) =>
-        prev?.filter((m) => m.id !== id)
+        prev?.filter((m) => m.id !== id),
       );
       qc.removeQueries({ queryKey: meetingKey(id) });
       qc.invalidateQueries({ queryKey: deletedMeetingsKey });
+      qc.invalidateQueries({ queryKey: ["todos"] });
     },
   });
 }
 
 export function useRestoreMeeting() {
+  const { adapter } = useVault();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => restoreMeeting(id),
-    onSuccess: (restored) => {
+    mutationFn: (trashId: string) => restoreMeeting(adapter, trashId),
+    onSuccess: (restored, trashId) => {
       qc.setQueryData<Meeting[]>(deletedMeetingsKey, (prev) =>
-        prev?.filter((m) => m.id !== restored.id)
+        prev?.filter((m) => m.id !== trashId),
       );
       qc.setQueryData<Meeting[]>(meetingsKey, (prev) =>
-        prev ? [restored, ...prev] : [restored]
+        prev ? [restored, ...prev] : [restored],
       );
       qc.setQueryData(meetingKey(restored.id), restored);
+      qc.invalidateQueries({ queryKey: ["todos"] });
     },
   });
 }
 
-// 영구 삭제 (휴지통에서만).
 export function usePurgeMeeting() {
+  const { adapter } = useVault();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => purgeMeeting(id),
-    onSuccess: (_void, id) => {
+    mutationFn: (trashId: string) => purgeMeeting(adapter, trashId),
+    onSuccess: (_void, trashId) => {
       qc.setQueryData<Meeting[]>(deletedMeetingsKey, (prev) =>
-        prev?.filter((m) => m.id !== id)
+        prev?.filter((m) => m.id !== trashId),
       );
-      qc.removeQueries({ queryKey: meetingKey(id) });
     },
   });
 }

@@ -1,48 +1,98 @@
-import { supabase } from "../lib/supabase";
-import type { Tables, TablesInsert, TablesUpdate } from "../lib/database.types";
+import type { VaultAdapter } from "../lib/vault/adapter";
+import {
+  createTodo,
+  deleteTodo,
+  listTodos,
+  parseTodoId,
+  updateTodo,
+  type Todo,
+} from "./todos";
 
-export type Schedule = Tables<"schedules">;
-export type ScheduleInsert = Omit<TablesInsert<"schedules">, "user_id">;
-export type ScheduleUpdate = TablesUpdate<"schedules">;
+// V0.6: schedule = event (time 있거나 #event 태그 있는 inline todo).
+// 별도 entity 없음 — vault 의 todo 중 isEvent=true 만 schedule 로 표현.
 
-export async function listSchedules(): Promise<Schedule[]> {
-  const { data, error } = await supabase
-    .from("schedules")
-    .select("*")
-    .order("start_time", { ascending: true });
-  if (error) throw error;
-  return data ?? [];
+export interface Schedule {
+  id: string;
+  title: string;
+  start_time: string; // ISO datetime (YYYY-MM-DDTHH:MM:SS)
+  end_time: string | null;
+  linked_todo_id: string | null;
 }
 
-export async function createSchedule(input: ScheduleInsert): Promise<Schedule> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("로그인이 필요해요");
-  const { data, error } = await supabase
-    .from("schedules")
-    .insert({ ...input, user_id: user.id })
-    .select("*")
-    .single();
-  if (error) throw error;
-  return data;
+export interface ScheduleInsert {
+  title: string;
+  start_time: string; // ISO datetime
+  end_time?: string | null;
+}
+
+export interface ScheduleUpdate {
+  title?: string;
+  start_time?: string;
+  end_time?: string | null;
+}
+
+function isoToParts(iso: string): { date: string; time: string } {
+  const m = iso.match(/^(\d{4}-\d{2}-\d{2})(?:T(\d{2}:\d{2}))?/);
+  if (!m) return { date: iso, time: "" };
+  return { date: m[1], time: m[2] ?? "" };
+}
+
+function todoToSchedule(t: Todo): Schedule {
+  const time = t.due_time ?? "00:00";
+  const date = t.due_date ?? "";
+  const startIso = date ? `${date}T${time}:00` : "";
+  return {
+    id: t.id,
+    title: t.title,
+    start_time: startIso,
+    end_time: null,
+    linked_todo_id: t.id,
+  };
+}
+
+export async function listSchedules(
+  adapter: VaultAdapter,
+): Promise<Schedule[]> {
+  const todos = await listTodos(adapter);
+  return todos
+    .filter((t) => t._is_event && t.due_date)
+    .map(todoToSchedule)
+    .sort((a, b) => a.start_time.localeCompare(b.start_time));
+}
+
+export async function createSchedule(
+  adapter: VaultAdapter,
+  input: ScheduleInsert,
+): Promise<Schedule> {
+  const { date, time } = isoToParts(input.start_time);
+  const todo = await createTodo(adapter, {
+    title: input.title,
+    due_date: date,
+    due_time: time || null,
+  });
+  return todoToSchedule(todo);
 }
 
 export async function updateSchedule(
+  adapter: VaultAdapter,
   id: string,
   patch: ScheduleUpdate,
 ): Promise<Schedule> {
-  const { data, error } = await supabase
-    .from("schedules")
-    .update(patch)
-    .eq("id", id)
-    .select("*")
-    .single();
-  if (error) throw error;
-  return data;
+  const updates: Parameters<typeof updateTodo>[2] = {};
+  if (patch.title !== undefined) updates.title = patch.title;
+  if (patch.start_time !== undefined) {
+    const { date, time } = isoToParts(patch.start_time);
+    updates.due_date = date;
+    updates.due_time = time || null;
+  }
+  const todo = await updateTodo(adapter, id, updates);
+  return todoToSchedule(todo);
 }
 
-export async function deleteSchedule(id: string): Promise<void> {
-  const { error } = await supabase.from("schedules").delete().eq("id", id);
-  if (error) throw error;
+export async function deleteSchedule(
+  adapter: VaultAdapter,
+  id: string,
+): Promise<void> {
+  void parseTodoId(id); // validate
+  await deleteTodo(adapter, id);
 }

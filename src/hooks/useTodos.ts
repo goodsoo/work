@@ -8,39 +8,52 @@ import {
   type TodoInsert,
   type TodoUpdate,
 } from "../api/todos";
+import { useVault } from "../lib/vault/useVault";
 
 const todosKey = ["todos"] as const;
 
 export function useTodos() {
+  const { adapter, isReady } = useVault();
   return useQuery({
     queryKey: todosKey,
-    queryFn: listTodos,
+    queryFn: () => listTodos(adapter),
+    enabled: isReady,
   });
 }
 
 export function useCreateTodo() {
+  const { adapter, watcher } = useVault();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: TodoInsert) => createTodo(input),
+    mutationFn: async (input: TodoInsert) => {
+      const created = await createTodo(adapter, input);
+      watcher.markSelfWrite(created._source.file);
+      return created;
+    },
     onSuccess: (created) => {
       qc.setQueryData<Todo[]>(todosKey, (prev) =>
         prev ? [created, ...prev] : [created],
       );
+      qc.invalidateQueries({ queryKey: ["meetings"] });
+      qc.invalidateQueries({ queryKey: ["journals"] });
     },
   });
 }
 
 export function useUpdateTodo() {
+  const { adapter, watcher } = useVault();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, patch }: { id: string; patch: TodoUpdate }) =>
-      updateTodo(id, patch),
-    // optimistic update — done toggle 즉각 반응
+    mutationFn: async ({ id, patch }: { id: string; patch: TodoUpdate }) => {
+      const updated = await updateTodo(adapter, id, patch);
+      watcher.markSelfWrite(updated._source.file);
+      return updated;
+    },
     onMutate: async ({ id, patch }) => {
       await qc.cancelQueries({ queryKey: todosKey });
       const prev = qc.getQueryData<Todo[]>(todosKey);
       qc.setQueryData<Todo[]>(todosKey, (curr) =>
-        curr?.map((t) => (t.id === id ? { ...t, ...patch } as Todo : t)),
+        curr?.map((t) => (t.id === id ? ({ ...t, ...patch } as Todo) : t)),
       );
       return { prev };
     },
@@ -54,13 +67,20 @@ export function useUpdateTodo() {
 }
 
 export function useDeleteTodo() {
+  const { adapter, watcher } = useVault();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => deleteTodo(id),
+    mutationFn: async (id: string) => {
+      const file = id.replace(/#L\d+$/, "");
+      await deleteTodo(adapter, id);
+      watcher.markSelfWrite(file);
+    },
     onSuccess: (_void, id) => {
       qc.setQueryData<Todo[]>(todosKey, (prev) =>
         prev?.filter((t) => t.id !== id),
       );
+      qc.invalidateQueries({ queryKey: ["meetings"] });
+      qc.invalidateQueries({ queryKey: ["journals"] });
     },
   });
 }
