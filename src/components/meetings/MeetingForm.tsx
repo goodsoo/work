@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  ChevronLeft,
   Trash2,
   AlertCircle,
   ListPlus,
@@ -301,14 +300,6 @@ export function MeetingForm({ meetingId, onBack }: Props) {
   if (error) {
     return (
       <div className="mx-auto w-full max-w-3xl px-6 py-16">
-        <button
-          type="button"
-          onClick={onBack}
-          className="mb-6 inline-flex items-center gap-1 text-sm lg:hidden"
-          style={{ color: "var(--text-secondary)" }}
-        >
-          <ChevronLeft className="h-4 w-4" /> 목록
-        </button>
         <div
           className="rounded-lg p-4 text-sm"
           style={{
@@ -372,15 +363,7 @@ export function MeetingForm({ meetingId, onBack }: Props) {
         className="sticky top-0 z-10 flex items-center justify-between px-5 py-2 backdrop-blur lg:top-0"
         style={{ backgroundColor: "var(--bg-overlay)" }}
       >
-        <button
-          type="button"
-          onClick={onBack}
-          className="inline-flex items-center gap-1 text-sm transition lg:hidden"
-          style={{ color: "var(--text-muted)" }}
-        >
-          <ChevronLeft className="h-4 w-4" /> 목록
-        </button>
-        <div className="flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-2">
           <div
             className="inline-flex overflow-hidden rounded-md"
             style={{ border: "1px solid var(--border-subtle)" }}
