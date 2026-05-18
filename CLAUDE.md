@@ -18,7 +18,8 @@
 - ✅ V0.5.2 — 메모장 본문/회의 내용/요약 3-탭 + transcript 필드 + 편집/보기 토글 + 글로벌 툴팁
 - ✅ V0.5.3 — 캘린더 첫 진입 버그 fix + 메모 history 메모별·탭별 분리 + 진입 자동 선택 + 페이지 전환 시 보존
 - ✅ V0.6 — **Vault 마이그레이션**. Supabase + Auth 완전 제거, 로컬 md 파일 vault 백엔드, Tauri 데스크탑 전용 (PWA 빌드 폐기), AI 자동 요약 제거하고 "Claude 프롬프트 복사" 헬퍼 추가. design doc: `V0.6-vault-design.md`
-- 🟡 V0.7 후보 — Tauri 2 Mobile (모바일 본인 앱), UI/UX 포트폴리오 자동 기록, "Claude 응답 paste → 자동 callout" 헬퍼
+- ✅ V0.7 — **"내 작업" 탭**. gh CLI 위임으로 본인 GitHub PR 자동 수집 → vault `portfolio/` 폴더에 카드 누적. design doc: `~/.gstack/projects/goodsoob-work/ham-main-design-20260518-105501.md` (v2.3, eng + design review CLEAR). repo → project 자동 분류 + github_pr_id 기반 rename 자동 감지 + legacy 카드 (PR 안 만든 commit) 도 schema 지원.
+- 🟡 V0.7.x 후보 — Tauri 2 Mobile, 전체 재동기화 (since 무시), 회사 outbound 차단 시 auto-sync off 옵션, "Claude 응답 paste → 자동 callout" 헬퍼
 - 🟡 후속 — 녹음 파일 직접 업로드 → 자동 STT
 
 ## 핵심 결정 (review 통과됨)
@@ -42,7 +43,8 @@
   - 단축키 (Tauri only): Cmd/Ctrl+Z (활성 탭 stack 의 undo — meta 는 native input undo), Cmd+1/2/3 페이지 탭, Opt+1/2/3 메모 sub-tab (Opt+1은 본문 탭이면 편집/보기 토글). 브라우저는 시스템 단축키 충돌로 sub-tab 단축키 없음.
 - **캘린더**: 주 단위 연속 스크롤 (49주 버퍼, edge 근접 rebalance). sticky 헤더 (월 라벨 + 요일 row) — 헤더 month 기준은 top row 의 토요일(=마지막 날) month, "1일 진입" semantic. 매 주 일요일 셀에 `scroll-snap-align: start` + container `scroll-snap-type: y proximity` → 자유 스크롤 + 주 단위 정렬. 1일 셀에 "N월" 라벨로 월 경계 표시. 현재 month 외 셀은 opacity 0.35 회색톤. 2026-01 이전 차단 (`minCenterOffset` 클램프). day 클릭은 selection/사이드패널만 갱신, 스크롤 X. 셀 내 이벤트 타이틀 표시, 사이드 패널에 선택 날짜 상세.
 - **할 일 카테고리**: `todos.category` (work/meeting). 사이드바 필터 (전체/업무/미팅/미분류). 일정(schedules)과 통합 표시.
-- **라우팅**: URL hash 기반 (`#meetings` / `#calendar` / `#todos` / `#meeting-{id}`). tab 전환 시 `selectedMeetingId` 보존 — 메모장 ↔ 다른 탭 왕복해도 보던 메모 그대로. `hashchange` listener 는 hash 에 meeting id 있을 때만 set, 다른 hash 일 땐 보존.
+- **라우팅**: URL hash 기반 (`#meetings` / `#calendar` / `#todos` / `#portfolio` / `#meeting-{id}`). tab 전환 시 `selectedMeetingId` 보존 — 메모장 ↔ 다른 탭 왕복해도 보던 메모 그대로. `hashchange` listener 는 hash 에 meeting id 있을 때만 set, 다른 hash 일 땐 보존.
+- **"내 작업" 탭** (V0.7, `#portfolio`, Cmd+4): `src/api/portfolio.ts` (vault 캡슐화) + `src/hooks/usePortfolio.ts` (TanStack Query + useGhSync) + `src/components/portfolio/*` (카드 그리드 + 사이드바 + dropzone + lightbox) + `src/pages/PortfolioPage.tsx`. **데이터 모델**: vault 안 `portfolio/{owner-repo-{number}}.md` flat 폴더 + `portfolio/projects.md` (프로젝트 그룹 + repos 매핑) + `portfolio/.synced.md` (마지막 sync 시각) + `portfolio/_attachments/{slug}/{before|after}-{n}.jpg` (스크린샷). **frontmatter**: `type: portfolio-work` + `github_pr_id` (영구 식별자) + github_* (read-only, sync 갱신) + project/included/category/impact_summary/screenshots/synced_at (본인 수정 + sync 보존). **sync**: `gh search prs --author @me is:merged --json id,...` 으로 본인 PR 전체 fetch → `gh pr view <url> --json mergedAt,changedFiles,...` enrich → upsert (id 매칭 rename 감지 + repo→project 자동 분류 + 본인 수정 보존). gh 호출은 모두 `Command.create("sh", ["-lc", "gh ..."])` (Tauri macOS PATH). 첫 sync 시 projects.md 자동 부트스트랩 (1 repo = 1 project, 옵시디안에서 rename/merge 가능). 5초 background auto-sync + 사이드바 수동 트리거. 카드 자동 삭제 0 (repo 삭제되어도 평가 자료 보존). legacy 카드 (pr_number=0) 허용 = claude code 가 owner repo git log 으로 직접 카드 생성. design doc v2.3.
 - **메모장 자동 선택** (V0.5.3): 페이지 진입 시 메모 1개 이상이면 최상단(`date desc, created_at desc`) 자동 선택. 모듈 flag (`didAutoSelectThisSession`) 로 세션당 한 번만 — 사용자가 onBack 한 뒤 페이지 갔다 와도 다시 자동 선택 X. 새로고침 시 reset.
 - **마크다운 출력 포맷** (본인 회의록 spec, 외부 복사용): `## {title or "회의록"}` → `일시: YYYY.MM.DD (요일) [시간]` + `참석:` → `### 논의 사항` / `### 결정 사항` / `### 액션 아이템` 3섹션. 빈 섹션 omit. `lib/markdown.ts` `meetingToMarkdown()` 가 단일 source. ❌ "Notion 호환" 표현 쓰지 말 것.
 - **마크다운 렌더링**: `react-markdown` + `remark-gfm`. `MarkdownView.tsx` — 디자인 토큰 기반 스타일링. `ol` 컴포넌트에서 `start` prop 통과 (떨어진 ordered list 번호 이어짐).
@@ -87,3 +89,4 @@ results than an ad-hoc answer.
 - **동시 편집 충돌**: 옵시디안 모바일이 같은 파일 수정 + 데스크탑도 수정 = mtime mismatch → `ConflictError`. UI 가 보존/덮어쓰기 선택 모달 띄움 (Phase 6 polish).
 - **Tauri 데스크탑 전용**: V0.6 부터 PWA 빌드 폐기. `bun run tauri:dev` / `tauri:build` 만 사용.
 - **Pretendard CDN**: `index.html`에서 로드. 본인 도메인에서 첫 로딩 ~50ms 추가. 빠른 로컬 fallback (`-apple-system`)이 base case.
+- **gh CLI 의존** (V0.7): portfolio sync 는 `gh` 가 macOS keychain 에 토큰 저장해둔 것에 위임. 첫 셋업 1회 `gh auth login` 필요. 회사 GitHub Enterprise 면 `--hostname` 추가. 호출은 모두 `sh -lc` 래핑 (Tauri PATH 상속 X). `tauri-plugin-shell` + `portfolio` capability 가 `sh` 실행 허용 + `fs:scope` 에 dotfile path 추가 (`.synced.md` 같은 케이스).

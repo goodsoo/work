@@ -30,25 +30,47 @@
 
 ---
 
-## 🟡 V0.7 — "내 작업" 탭 (다음 진입 트랙, design v2.2 CLEAR)
+## 🟢 완료 — V0.7 (2026-05-18, "내 작업" 탭)
 
-- [ ] **V0.7 "내 작업" 탭** — gh CLI 위임 + vault 기반 PR 카드 누적. design doc: `~/.gstack/projects/goodsoob-work/ham-main-design-20260518-105501.md` (v2.2, plan-eng-review CLEAR). 본인 결정: 1A flat / 1B atomic+toast / 2A ClipPromptButton 일반화 / T4-NEW `included` 필드 (tombstone 폐기) / 4A 직렬 enrich. Next Steps 13 step. 다음 세션은 step 1 (frontmatter schema + interface lock-in) 부터.
-  - 동반 TODO: 모든 gh 호출은 `Command.create("sh", ["-lc", ...])` 패턴 (Tauri macOS PATH). design 본문 코드 예시에 반영됨.
-  - test plan artifact: `~/.gstack/projects/goodsoob-work/ham-main-eng-review-test-plan-20260518-125206.md`
+- [x] **V0.7 step 1~10 핵심 구현** (단일 세션). design doc: `~/.gstack/projects/goodsoob-work/ham-main-design-20260518-105501.md` (v2.3, plan-eng-review + plan-design-review CLEAR).
+- [x] **dogfood fix** (실사용 중 발견):
+  - capability `fs:scope` 에 dotfile path 추가 (`.synced.md` 등)
+  - `ensureVaultStructure` + `syncPortfolio` + `writeSyncState` 에 portfolio mkdir
+  - gh state 필터 case-insensitive + "MERGED" (GraphQL enum)
+  - 사이드바 마지막 sync 결과 표시 (신규/갱신/전체)
+- [x] **자동 분류 + rename 감지** (dogfood 중 결정):
+  - **repo → project 자동 매핑** — `projects.md` 의 `repos: [...]` 배열로 신규 카드 자동 분류. 첫 sync 시 unique repo 마다 1 project 부트스트랩 (옵시디안에서 한국어 rename / merge 가능).
+  - **github_pr_id 영구 식별자** — owner/repo rename 시 vault 카드 + `_attachments` + `projects.md repos` 자동 갱신. 본인 수정 필드 (impact_summary/project/category/screenshots/notes) 보존.
+  - **legacy 카드** — `pr_number=0` 허용. owner repo 에서 PR 안 만들고 직접 commit 하는 워크플로 cover (claude code 가 git log 보고 vault 에 카드 생성).
+  - **카드 자동 삭제 0** — GitHub repo 삭제되어도 vault 카드 보존 (본인 평가 자료 안전).
+- [x] **테스트** — 11 test files, **88 tests**. typecheck + cargo check 통과.
 
-## 🟡 V0.7 다른 후보 (병행 검토)
+---
 
-- [ ] **Tauri 2 Mobile**. 모바일에서 본인 디자인 UI 사용. iOS sandbox/document picker + security-scoped bookmark 패턴. 일단 옵시디안 모바일로 dogfood 후 진짜 필요한지 평가.
-- [ ] **"Claude 응답 paste → 자동 callout"**. Claude 응답 paste 시 H2 split → 요약 탭 callout 자동 채움.
-- [ ] **녹음 파일 직접 업로드 → 자동 STT**. 현재는 외부 AI로 변환한 결과 복붙. 비용/사용 빈도 따져 결정.
-- [ ] **Server-side 메모 history**. 새로고침/디바이스 변경 후에도 복원. vault 방식이면 git commit 으로도 가능.
-- [ ] **Tauri 데스크탑 앱 빌드 마무리**. `bun run tauri:build` 로 .dmg 생성 + 코드 사인 (선택).
+## 🟡 V0.7 dogfood 진행 중 (1주일 매일 사용)
 
-## 🟡 V0.7.x 후속 (V0.7 ship 후 dogfood 결과로 결정)
+- [ ] **첫 평가 자료 누적 시즌까지 매일 사용** — 다음 분기 평가 시 portfolio 탭만 띄워서 5분 내 펼쳐보일 수 있는지 검증.
+- [ ] **owner repo legacy 카드 생성** — 본인 personal repo 들에서 claude code 돌려 git log 으로 legacy 카드 (`pr_number=0`) 작성. 프롬프트 템플릿은 progress.md 참조.
+- [ ] **회사 owner repo 도 PR 워크플로 전환 시도** — branch + 셀프 PR + auto-merge (셸 alias 로 5초). 매 commit 마다 PR description 작성이 평가 자료 품질 ↑.
 
-- [ ] **gh search concurrency 5 병렬 enrich**. 4A 직렬 결정. 매일 사용에서 첫 sync 3분 통증 크면 도입 (Promise.allSettled, +30분 CC).
+## 🟡 V0.7.x 후속 (dogfood 결과로 결정)
+
+- [ ] **전체 재동기화 버튼** — since 무시하고 full fetch. rename 발생 시 옛 PR 도 매칭 가능. 사이드바 SyncButton 옆 별도 트리거.
+- [ ] **gh search concurrency 5 병렬 enrich**. 4A 직렬. 매일 사용에서 첫 sync 3분 통증 크면 도입.
 - [ ] **`gh search prs` 페이지네이션**. 1000 개 넘는 케이스. 본인 1-2년치 cover 검증 후 결정.
 - [ ] **회사 HTTPS outbound 차단 시 자동 sync 끄기 설정**. dogfood 시 매일 토스트 떠야 발견.
+- [ ] **gh 미설치 / 미로그인 별도 모달** — 현재는 sync error 가 sidebar inline 메시지. 첫 dogfood 시 본인 경험 안 좋으면 추가.
+- [ ] **"GitHub 에서 사라진 카드 식별" 도구** — 본인 클릭 시 "이 카드 PR 이 GitHub 에 없습니다. 보관/휴지통/무시?" 선택. 자동 삭제 절대 X.
+- [ ] **portfolio 진단 console.log 제거** — `syncPortfolio` 안 `[syncPortfolio]` log. dogfood 안정화 후.
+- [ ] **commit cluster 카드 모델** (Plan B) — owner repo PR 워크플로 전환 부담 크면 → branch 단위 cluster + AI 입력 commit messages.
+
+## 🟡 V0.7 다른 후보 (V0.7 dogfood 후 진입)
+
+- [ ] **Tauri 2 Mobile**. 모바일에서 본인 디자인 UI 사용.
+- [ ] **"Claude 응답 paste → 자동 callout"** (회의록 영역).
+- [ ] **녹음 파일 직접 업로드 → 자동 STT**.
+- [ ] **Server-side 메모 history**. vault 방식이면 git commit 으로도 가능.
+- [ ] **Tauri 데스크탑 앱 빌드 마무리**. `bun run tauri:build` 로 .dmg 생성 + 코드 사인.
 
 ---
 
@@ -62,6 +84,7 @@
 
 ## 🟢 완료 이전 버전 (참고용)
 
+V0.6 (Vault 마이그레이션): Supabase 제거 + 로컬 md vault + Tauri 전용 + Claude 프롬프트 복사.
 V0.5.4 (캘린더 연속 스크롤): 주 단위 연속 스크롤 + 1일 진입 기준 헤더 + 2026 이전 차단 + 다른 해 연도 표시.
 V0.5.3 (메모 history 분리): cacheKey 4-stack + 페이지 전환 시 보존 + 진입 자동 선택.
 V0.5.2 (3-탭 + transcript): 본문/회의 내용/요약 탭 + line gutter + 글로벌 툴팁.
