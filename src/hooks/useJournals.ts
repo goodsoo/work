@@ -5,21 +5,28 @@ import {
   upsertJournal,
   type Journal,
 } from "../api/journals";
+import { useVault } from "../lib/vault/useVault";
 
 const journalsKey = ["journals"] as const;
 
 export function useJournals() {
+  const { adapter, isReady } = useVault();
   return useQuery({
     queryKey: journalsKey,
-    queryFn: listJournals,
+    queryFn: () => listJournals(adapter),
+    enabled: isReady,
   });
 }
 
 export function useUpsertJournal() {
+  const { adapter, watcher } = useVault();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ date, content }: { date: string; content: string }) =>
-      upsertJournal(date, content),
+    mutationFn: async ({ date, content }: { date: string; content: string }) => {
+      const saved = await upsertJournal(adapter, date, content);
+      watcher.markSelfWrite(saved.id);
+      return saved;
+    },
     onSuccess: (saved) => {
       qc.setQueryData<Journal[]>(journalsKey, (prev) => {
         const next = (prev ?? []).filter((j) => j.id !== saved.id);
@@ -27,18 +34,24 @@ export function useUpsertJournal() {
         next.sort((a, b) => (a.date < b.date ? 1 : -1));
         return next;
       });
+      qc.invalidateQueries({ queryKey: ["todos"] });
     },
   });
 }
 
 export function useDeleteJournal() {
+  const { adapter, watcher } = useVault();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => deleteJournal(id),
+    mutationFn: async (id: string) => {
+      await deleteJournal(adapter, id);
+      watcher.markSelfWrite(id);
+    },
     onSuccess: (_void, id) => {
       qc.setQueryData<Journal[]>(journalsKey, (prev) =>
         prev?.filter((j) => j.id !== id),
       );
+      qc.invalidateQueries({ queryKey: ["todos"] });
     },
   });
 }

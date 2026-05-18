@@ -1,15 +1,14 @@
 import type { Meeting } from "../api/meetings";
 
-export type MeetingMarkdownInput = Pick<
-  Meeting,
-  | "title"
-  | "date"
-  | "time"
-  | "attendees"
-  | "discussion_items"
-  | "decisions"
-  | "action_items"
->;
+export interface MeetingMarkdownInput {
+  title: Meeting["title"] | null;
+  date: Meeting["date"];
+  time: Meeting["time"];
+  attendees: Meeting["attendees"] | string | null;
+  discussion_items: Meeting["discussion_items"] | null;
+  decisions: Meeting["decisions"] | null;
+  action_items: Meeting["action_items"] | null;
+}
 
 const isNonEmpty = (s: string | null | undefined): s is string =>
   typeof s === "string" && s.trim().length > 0;
@@ -44,7 +43,10 @@ export function meetingToMarkdown(meeting: MeetingMarkdownInput): string {
   } else if (isNonEmpty(meeting.time)) {
     meta.push(`일시: ${meeting.time.trim()}`);
   }
-  if (isNonEmpty(meeting.attendees)) meta.push(`참석: ${meeting.attendees.trim()}`);
+  const attendeesStr = Array.isArray(meeting.attendees)
+    ? meeting.attendees.join(", ")
+    : meeting.attendees ?? "";
+  if (isNonEmpty(attendeesStr)) meta.push(`참석: ${attendeesStr.trim()}`);
   if (meta.length > 0) parts.push(meta.join("\n"));
 
   const discussion = nonEmptyList(meeting.discussion_items);

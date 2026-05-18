@@ -9,7 +9,8 @@ type Props = {
 export function MeetingBlock({ meeting, onOpen }: Props) {
   const title = meeting.title?.trim() || "(제목 없음)";
   const meta: string[] = [];
-  if (meeting.attendees?.trim()) meta.push(meeting.attendees.trim());
+  if (meeting.attendees && meeting.attendees.length > 0)
+    meta.push(meeting.attendees.join(", "));
   if (meeting.time?.trim()) meta.push(meeting.time.trim());
 
   return (
