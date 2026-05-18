@@ -4,6 +4,9 @@ import {
   usePortfolioWorks,
   type GhSyncProgress,
 } from "../../hooks/usePortfolio";
+import { buildLegacyCardPrompt } from "../../lib/clipboardPrompt";
+import { useVault } from "../../lib/vault/useVault";
+import { ClipPromptButton } from "../common/ClipPromptButton";
 import { PortfolioProjectList, type ProjectFilter } from "./PortfolioProjectList";
 import { SyncButton } from "./SyncButton";
 
@@ -22,6 +25,7 @@ export function PortfolioSidePanel({
 }: Props) {
   const works = usePortfolioWorks();
   const projects = usePortfolioProjects();
+  const { vaultRoot } = useVault();
 
   return (
     <div className="flex h-full flex-col">
@@ -36,6 +40,12 @@ export function PortfolioSidePanel({
           내 작업
         </h2>
         <SyncButton state={syncState} onRun={onSyncRun} />
+        <ClipPromptButton
+          buildPrompt={() => buildLegacyCardPrompt(vaultRoot)}
+          label="Legacy 카드 프롬프트"
+          title="PR 없이 직접 push 한 repo 에서 카드 만들도록 Claude 에게 시킬 프롬프트 복사"
+          variant="compact"
+        />
         {syncState.error ? (
           <SyncError message={syncState.error.message} />
         ) : null}
