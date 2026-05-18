@@ -1,0 +1,110 @@
+import { useState } from "react";
+import { open } from "@tauri-apps/plugin-dialog";
+import { useVault } from "../../lib/vault/useVault";
+
+interface Props {
+  initialPath?: string | null;
+  onCancel?: () => void;
+}
+
+export function VaultPicker({ initialPath = null, onCancel }: Props) {
+  const { setVaultRoot } = useVault();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function pick() {
+    setError(null);
+    try {
+      const result = await open({
+        directory: true,
+        multiple: false,
+        title: "Vault 폴더 선택",
+        defaultPath: initialPath ?? undefined,
+      });
+      if (typeof result !== "string") return; // 취소
+      setBusy(true);
+      await setVaultRoot(result);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <main
+      className="flex min-h-svh items-center justify-center px-6"
+      style={{ background: "var(--bg-base)" }}
+    >
+      <div
+        className="w-full max-w-md rounded-xl p-6"
+        style={{
+          background: "var(--bg-surface)",
+          border: "1px solid var(--border-default)",
+        }}
+      >
+        <h1
+          className="text-xl font-bold mb-2"
+          style={{ color: "var(--text-primary)" }}
+        >
+          Vault 폴더 선택
+        </h1>
+        <p className="text-sm mb-6" style={{ color: "var(--text-secondary)" }}>
+          모든 메모/일기/할 일이 이 폴더 안의 md 파일로 저장됩니다. iCloud Drive 같은
+          동기화 폴더 안에 두면 다른 기기에서도 같은 vault를 공유할 수 있어요.
+        </p>
+
+        {initialPath && (
+          <div
+            className="text-xs mb-4 px-3 py-2 rounded"
+            style={{
+              background: "var(--bg-base)",
+              color: "var(--text-secondary)",
+              border: "1px solid var(--border-default)",
+            }}
+          >
+            현재: <span className="font-mono">{initialPath}</span>
+          </div>
+        )}
+
+        <button
+          type="button"
+          disabled={busy}
+          onClick={pick}
+          className="w-full px-4 py-2.5 rounded-lg text-sm font-medium transition-opacity"
+          style={{
+            background: "var(--accent-red)",
+            color: "white",
+            opacity: busy ? 0.5 : 1,
+          }}
+        >
+          {busy ? "준비 중…" : initialPath ? "다른 폴더로 변경" : "폴더 선택하기"}
+        </button>
+
+        {onCancel && initialPath && (
+          <button
+            type="button"
+            onClick={onCancel}
+            className="w-full mt-2 px-4 py-2 text-sm"
+            style={{ color: "var(--text-secondary)" }}
+          >
+            취소
+          </button>
+        )}
+
+        {error && (
+          <div
+            className="mt-3 text-sm px-3 py-2 rounded"
+            style={{
+              color: "var(--accent-red)",
+              background: "var(--bg-base)",
+              border: "1px solid var(--accent-red)",
+            }}
+          >
+            {error}
+          </div>
+        )}
+      </div>
+    </main>
+  );
+}

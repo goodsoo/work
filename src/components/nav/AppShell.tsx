@@ -1,6 +1,5 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { Sun, Moon } from "lucide-react";
-import { signOut } from "../../hooks/useAuth";
 import { useTheme } from "../../hooks/useTheme";
 import {
   useSidePanelWidth,
@@ -69,14 +68,6 @@ export function AppShell({ activeTab, onTabChange, sidePanel, children }: Props)
               style={{ color: "var(--text-muted)", minHeight: 0 }}
             >
               <ThemeIcon className="h-4 w-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => void signOut()}
-              className="text-xs transition"
-              style={{ color: "var(--text-muted)" }}
-            >
-              로그아웃
             </button>
           </div>
         </div>

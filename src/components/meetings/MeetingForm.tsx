@@ -21,13 +21,12 @@ import { useStateHistory } from "../../hooks/useStateHistory";
 import type { UseStateHistoryResult } from "../../hooks/useStateHistory";
 import { useCreateTodo } from "../../hooks/useTodos";
 import type { MeetingUpdate } from "../../api/meetings";
-import { SummarizeButton } from "./SummarizeButton";
+import { ClaudePromptButton } from "./ClaudePromptButton";
 import { CopyButton } from "./CopyButton";
 import { EditableList } from "./EditableList";
 import { AttendeeTagInput } from "./AttendeeTagInput";
 import { SourceBodyEditor } from "./SourceBodyEditor";
 import { MarkdownView } from "./MarkdownView";
-import { parseAttendees } from "../../lib/attendees";
 import { useViewMode } from "../../hooks/useViewMode";
 import { isTauri } from "../../lib/isTauri";
 import { formatError } from "../../lib/errors";
@@ -108,8 +107,8 @@ export function MeetingForm({ meetingId, onBack }: Props) {
   const attendeeSuggestions = useMemo(() => {
     const set = new Set<string>();
     for (const m of meetingsQ.data ?? []) {
-      if (!m.attendees) continue;
-      for (const tag of parseAttendees(m.attendees)) set.add(tag);
+      if (!m.attendees || m.attendees.length === 0) continue;
+      for (const tag of m.attendees) set.add(tag);
     }
     return Array.from(set).sort((a, b) => a.localeCompare(b, "ko"));
   }, [meetingsQ.data]);
@@ -133,7 +132,7 @@ export function MeetingForm({ meetingId, onBack }: Props) {
       title: data?.title ?? "",
       date: data?.date ?? "",
       time: data?.time ?? "",
-      attendees: data?.attendees ?? "",
+      attendees: data?.attendees ? data.attendees.join(", ") : "",
     }),
     [data?.title, data?.date, data?.time, data?.attendees],
   );
@@ -645,24 +644,13 @@ export function MeetingForm({ meetingId, onBack }: Props) {
         {/* Summary tab */}
         {activeTab === "summary" ? (
           <div className="space-y-4">
-            <SummarizeButton
-              meetingId={data.id}
+            <ClaudePromptButton
               title={meta.title || null}
               date={meta.date || null}
               time={meta.time || null}
               attendees={meta.attendees || null}
               content={body}
               transcript={transcript || null}
-              hasResult={hasAnySummary}
-              onResult={(result) => {
-                summaryHistory.set({
-                  discussion_items: result.discussion_items,
-                  decisions: result.decisions,
-                  action_items: result.action_items,
-                });
-                summaryHistory.flush();
-                setActionError(null);
-              }}
               onError={setActionError}
             />
             {hasAnySummary ? (
