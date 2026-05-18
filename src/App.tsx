@@ -3,7 +3,6 @@ import { VaultGate } from "./components/vault/VaultGate";
 import { AppShell } from "./components/nav/AppShell";
 import { GlobalTooltip } from "./components/Tooltip";
 import type { Tab } from "./components/nav/BottomTabs";
-import { MeetingsPage } from "./pages/MeetingsPage";
 import { MeetingForm } from "./components/meetings/MeetingForm";
 import { MeetingsSidePanel, CalendarDayPanel, TodosSidePanel } from "./components/nav/SidePanel";
 import type { TodoCategory } from "./api/todos";
@@ -15,7 +14,9 @@ import { PortfolioSidePanel } from "./components/portfolio/PortfolioSidePanel";
 import type { ProjectFilter } from "./components/portfolio/PortfolioProjectList";
 import { useGhSync } from "./hooks/usePortfolio";
 import { readSyncState } from "./api/portfolio";
+import { useMeetings } from "./hooks/useMeetings";
 import { useVault } from "./lib/vault/useVault";
+import { DrawerProvider, useDrawer } from "./hooks/useDrawer";
 import { todayIso } from "./lib/dates";
 import { isTauri } from "./lib/isTauri";
 
@@ -34,7 +35,24 @@ function readMeetingFromHash(): string | null {
   return null;
 }
 
+// 세션 단위 한 번만 자동 선택. 사용자가 명시적으로 onBack/닫기 한 뒤 페이지
+// 전환했다가 돌아와도 다시 자동 선택되지 않도록 모듈 변수로 보관. 새로고침하면
+// 모듈이 다시 import 되며 false.
+let didAutoSelectThisSession = false;
+
 export default function App() {
+  return (
+    <VaultGate>
+      <GlobalTooltip />
+      <DrawerProvider>
+        <AppContent />
+      </DrawerProvider>
+    </VaultGate>
+  );
+}
+
+function AppContent() {
+  const drawer = useDrawer();
   const [tab, setTab] = useState<Tab>(() => readTabFromHash());
   const [selectedMeetingId, setSelectedMeetingId] = useState<string | null>(() =>
     readMeetingFromHash(),
@@ -46,7 +64,9 @@ export default function App() {
   });
   const portfolioSync = useGhSync();
   const { adapter, isReady } = useVault();
+  const meetings = useMeetings();
   const autoSyncDone = useRef(false);
+  const autoSelectedRef = useRef(didAutoSelectThisSession);
 
   // V0.7 design step 3 (1B): vault ready 후 5초 background sync 1회 (since=last_sync).
   // 본인 매일 앱 켜면 silent fetch — 의식 0 으로 카드 누적. Tauri 만 (gh 호출 필요).
@@ -66,6 +86,24 @@ export default function App() {
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isReady]);
+
+  // 메모장 진입 시 세션당 한 번 자동 선택 (V0.5.3). 모듈 flag 로 페이지 갔다와도
+  // 다시 발동 안 함. 메모 0개면 skip.
+  useEffect(() => {
+    if (tab !== "meetings") return;
+    if (autoSelectedRef.current) return;
+    if (selectedMeetingId) {
+      autoSelectedRef.current = true;
+      didAutoSelectThisSession = true;
+      return;
+    }
+    const list = meetings.data;
+    if (!list || list.length === 0) return;
+    autoSelectedRef.current = true;
+    didAutoSelectThisSession = true;
+    openMeeting(list[0].id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, selectedMeetingId, meetings.data]);
 
   useEffect(() => {
     function syncFromHash() {
@@ -144,6 +182,7 @@ export default function App() {
   }
 
   function openMeeting(id: string) {
+    drawer.close();
     setTab("meetings");
     setSelectedMeetingId(id);
     window.history.pushState({ meetingId: id }, "", `#meeting-${id}`);
@@ -161,7 +200,7 @@ export default function App() {
     if (selectedMeetingId === id) closeMeeting();
   }
 
-  // Desktop side panel per tab
+  // Side panel per tab (모바일에선 drawer, 데스크탑에선 3-pane 왼쪽 컬럼).
   const sidePanel =
     tab === "meetings" ? (
       <MeetingsSidePanel
@@ -193,56 +232,44 @@ export default function App() {
     ) : undefined;
 
   return (
-    <VaultGate>
-      <GlobalTooltip />
-      <AppShell activeTab={tab} onTabChange={changeTab} sidePanel={sidePanel}>
-        {tab === "meetings" ? (
-          <>
-            {/* Mobile: full MeetingsPage (list or form) */}
-            <div className="lg:hidden">
-              <MeetingsPage
-                selectedId={selectedMeetingId}
-                onOpenMeeting={openMeeting}
-                onCloseMeeting={closeMeeting}
-              />
-            </div>
-            {/* Desktop: only the form (list is in side panel) */}
-            <div className="hidden lg:block">
-              {selectedMeetingId ? (
-                <MeetingForm
-                  meetingId={selectedMeetingId}
-                  onBack={closeMeeting}
-                />
-              ) : (
-                <DesktopEmptyState message="왼쪽에서 메모를 선택하세요" />
-              )}
-            </div>
-          </>
-        ) : tab === "calendar" ? (
-          <CalendarPage
-            targetDate={calendarDate}
-            onSelectedDateChange={setCalendarDate}
-          />
-        ) : tab === "portfolio" ? (
-          <PortfolioPage
-            activeFilter={portfolioFilter}
-            onSync={() => {
-              portfolioSync.run({}).catch(() => {});
-            }}
-            syncRunning={portfolioSync.state.running}
-          />
+    <AppShell activeTab={tab} onTabChange={changeTab} sidePanel={sidePanel}>
+      {tab === "meetings" ? (
+        selectedMeetingId ? (
+          <MeetingForm meetingId={selectedMeetingId} onBack={closeMeeting} />
         ) : (
-          <TodosPage categoryFilter={todoCategory} />
-        )}
-      </AppShell>
-    </VaultGate>
+          <MeetingsEmpty count={meetings.data?.length ?? 0} loading={meetings.isLoading} />
+        )
+      ) : tab === "calendar" ? (
+        <CalendarPage
+          targetDate={calendarDate}
+          onSelectedDateChange={setCalendarDate}
+        />
+      ) : tab === "portfolio" ? (
+        <PortfolioPage
+          activeFilter={portfolioFilter}
+          onSync={() => {
+            portfolioSync.run({}).catch(() => {});
+          }}
+          syncRunning={portfolioSync.state.running}
+        />
+      ) : (
+        <TodosPage categoryFilter={todoCategory} />
+      )}
+    </AppShell>
   );
 }
 
-function DesktopEmptyState({ message }: { message: string }) {
+function MeetingsEmpty({ count, loading }: { count: number; loading: boolean }) {
+  const message = loading
+    ? ""
+    : count === 0
+      ? "아직 메모가 없어요. 메뉴에서 + 를 눌러 새 메모를 만드세요."
+      : "메뉴에서 메모를 선택하세요.";
   return (
-    <div className="flex h-[calc(100svh-3rem)] items-center justify-center">
-      <p className="text-sm text-zinc-400 dark:text-zinc-500">{message}</p>
+    <div className="flex h-[calc(100svh-3rem)] items-center justify-center px-6 text-center">
+      <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+        {message}
+      </p>
     </div>
   );
 }
