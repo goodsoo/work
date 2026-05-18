@@ -110,18 +110,19 @@ export function useUpdateMeeting(id: string) {
     onSuccess: (updated) => {
       const newId = updated.id;
       if (newId !== id) {
-        // 파일 rename — 옛 detail query 제거, 새 id 로 detail 셋. list 도 옛 id 항목을
-        // 새 id 로 교체. URL hash 가 옛 id 였으면 새 id 로 갱신.
-        qc.removeQueries({ queryKey: meetingKey(id) });
+        // 파일 rename — 옛 id + 새 id 둘 다 detail 셋 (UI 가 새 id 로 전환할 때까지
+        // 옛 id 도 valid 한 상태 유지 → 노트 선택 끊김 방지). list 도 옛 id 를 새 id 로 교체.
+        // URL hash 갱신 → hashchange listener 가 selectedMeetingId 를 새 id 로 set.
+        // 옛 detail query 는 다음 list refresh 때 GC 자연 처리.
+        qc.setQueryData(meetingKey(id), updated);
         qc.setQueryData(meetingKey(newId), updated);
         qc.setQueryData<Meeting[]>(meetingsKey, (prev) =>
           prev?.map((m) => (m.id === id ? updated : m)),
         );
-        if (typeof window !== "undefined") {
-          const currentHash = window.location.hash;
-          if (currentHash.includes(encodeURIComponent(id)) || currentHash.includes(id)) {
-            window.location.hash = `#meeting-${encodeURIComponent(newId)}`;
-          }
+        if (typeof window !== "undefined" && window.location.hash === `#meeting-${id}`) {
+          // raw path 그대로 — encodeURIComponent 가 `/` 도 escape 해서 listener 가
+          // slice 한 결과가 망가짐. App.tsx 의 readMeetingFromHash 는 raw path 받음.
+          window.location.hash = `#meeting-${newId}`;
         }
       } else {
         qc.setQueryData(meetingKey(id), updated);
