@@ -1,5 +1,6 @@
 import type { QueryClient } from "@tanstack/react-query";
 import type { VaultAdapter, VaultWatchEvent } from "./adapter";
+import { isMeetingSidecar, meetingMainPath } from "./scan";
 
 // vault 변경 시 어떤 query key 를 invalidate 할지 매핑.
 // hooks 의 query key 와 일치해야 함.
@@ -7,7 +8,9 @@ function affectedQueryKeys(path: string): unknown[][] {
   const keys: unknown[][] = [];
   if (path.startsWith("meetings/")) {
     keys.push(["meetings"]);
-    keys.push(["meetings", path]);
+    // sidecar (.transcript.md / .summary.md) 변경 시 메인 path key 로 invalidate.
+    const mainPath = isMeetingSidecar(path) ? meetingMainPath(path) : path;
+    keys.push(["meetings", mainPath]);
     keys.push(["todos"]); // 회의록 안 todo 가 통합 뷰에 영향
   } else if (path.startsWith("journals/")) {
     keys.push(["journals"]);

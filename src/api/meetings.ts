@@ -1,19 +1,25 @@
 import type { VaultAdapter } from "../lib/vault/adapter";
 import {
+  buildSummaryBody,
   fileToMeeting,
+  freshStamp,
   generateMeetingPath,
-  meetingToRaw,
-  patchMeetingContent,
-  patchMeetingSummary,
-  patchMeetingTranscript,
+  isMeetingSidecar,
+  meetingMainPath,
+  meetingToMainRaw,
+  meetingToSummaryRaw,
+  meetingToTranscriptRaw,
+  patchMeetingFrontmatter,
+  patchMeetingMainBody,
   restoreFromTrash,
   scanMeetings,
   scanTrash,
-  trashFile,
+  summaryPath,
+  transcriptPath,
+  trashFileWithStamp,
   type Meeting,
   type MeetingMeta,
 } from "../lib/vault/scan";
-import { patchFrontmatter } from "../lib/vault/parser";
 
 export type { Meeting, MeetingMeta };
 
@@ -59,8 +65,26 @@ function buildMeeting(input: MeetingInsert, id: string): Meeting {
     discussion_items: input.discussion_items ?? [],
     decisions: input.decisions ?? [],
     action_items: input.action_items ?? [],
-    unmapped: "",
   };
+}
+
+// 한 회의 sidecar 까지 read 해서 합쳐 반환. sidecar 없으면 그 필드는 빈 값.
+async function readFullMeeting(
+  adapter: VaultAdapter,
+  id: string,
+): Promise<Meeting | null> {
+  if (!(await adapter.exists(id))) return null;
+  const mainRaw = await adapter.read(id);
+  const meta = await adapter.readMeta(id);
+  const tPath = transcriptPath(id);
+  const sPath = summaryPath(id);
+  const transcriptRaw = (await adapter.exists(tPath))
+    ? await adapter.read(tPath)
+    : "";
+  const summaryRaw = (await adapter.exists(sPath))
+    ? await adapter.read(sPath)
+    : "";
+  return fileToMeeting(id, mainRaw, transcriptRaw, summaryRaw, meta.mtime);
 }
 
 export async function listMeetings(adapter: VaultAdapter): Promise<Meeting[]> {
@@ -74,7 +98,6 @@ export async function listMeetings(adapter: VaultAdapter): Promise<Meeting[]> {
     discussion_items: [],
     decisions: [],
     action_items: [],
-    unmapped: "",
   }));
 }
 
@@ -82,21 +105,30 @@ export async function listDeletedMeetings(
   adapter: VaultAdapter,
 ): Promise<Meeting[]> {
   const trashed = await scanTrash(adapter);
-  // 회의록만 (날짜 prefix 있는 파일)
+  // 회의록 메인 파일만 (sidecar 는 메인과 같은 stamp 로 함께 trash 되어 있지만 보여줄 필요 X)
   const meetings: Meeting[] = [];
   for (const { id, deletedAt } of trashed) {
-    // .trash/{stamp}-{원본base}.md → 원본 base 가 meetings/* 형식인지 추정
+    if (isMeetingSidecar(id)) continue; // sidecar 는 별도로 보여주지 않음
     const base = id.replace(/^\.trash\//, "").replace(
       /^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-/,
       "",
     );
     if (!base.match(/^\d{4}-\d{2}-\d{2}-/) || base.match(/^\d{4}-\d{2}-\d{2}\.md$/)) {
-      continue; // 일기는 별도
+      continue; // 일기 등 다른 종류 skip
     }
     try {
       const raw = await adapter.read(id);
       const meta = await adapter.readMeta(id);
-      const m = fileToMeeting(id, raw, meta.mtime);
+      // trash 안 sidecar 도 같은 stamp 로 같이 들어있을 거라 함께 read 시도
+      const tInTrash = id.replace(/\.md$/, ".transcript.md");
+      const sInTrash = id.replace(/\.md$/, ".summary.md");
+      const transcriptRaw = (await adapter.exists(tInTrash))
+        ? await adapter.read(tInTrash)
+        : "";
+      const summaryRaw = (await adapter.exists(sInTrash))
+        ? await adapter.read(sInTrash)
+        : "";
+      const m = fileToMeeting(id, raw, transcriptRaw, summaryRaw, meta.mtime);
       meetings.push({ ...m, mtime: deletedAt || meta.mtime });
     } catch {
       // skip
@@ -110,10 +142,7 @@ export async function getMeeting(
   adapter: VaultAdapter,
   id: string,
 ): Promise<Meeting | null> {
-  if (!(await adapter.exists(id))) return null;
-  const raw = await adapter.read(id);
-  const meta = await adapter.readMeta(id);
-  return fileToMeeting(id, raw, meta.mtime);
+  return readFullMeeting(adapter, id);
 }
 
 export async function createMeeting(
@@ -124,9 +153,21 @@ export async function createMeeting(
   const title = input.title ?? "회의록";
   const path = await generateMeetingPath(adapter, date, title);
   const meeting = buildMeeting({ ...input, date, title }, path);
-  const raw = meetingToRaw(meeting);
-  const meta = await adapter.write(path, raw);
-  return { ...meeting, mtime: meta.mtime };
+
+  const mainRaw = meetingToMainRaw(meeting);
+  const mainMeta = await adapter.write(path, mainRaw);
+
+  // sidecar 는 내용 있을 때만 생성 (빈 파일 회피)
+  const tRaw = meetingToTranscriptRaw(meeting);
+  if (tRaw.length > 0) {
+    await adapter.write(transcriptPath(path), tRaw);
+  }
+  const sRaw = meetingToSummaryRaw(meeting);
+  if (sRaw.length > 0) {
+    await adapter.write(summaryPath(path), sRaw);
+  }
+
+  return { ...meeting, mtime: mainMeta.mtime };
 }
 
 export async function updateMeeting(
@@ -137,10 +178,8 @@ export async function updateMeeting(
   if (!(await adapter.exists(id))) {
     throw new Error(`meeting not found: ${id}`);
   }
-  let raw = await adapter.read(id);
-  const meta = await adapter.readMeta(id);
 
-  // Frontmatter patches (title/date/time/attendees/tags)
+  // 메인 파일 — frontmatter / content
   const fmPatch: Record<string, unknown> = {};
   if (patch.title !== undefined) fmPatch.title = patch.title ?? "";
   if (patch.date !== undefined) fmPatch.date = patch.date;
@@ -149,57 +188,132 @@ export async function updateMeeting(
     fmPatch.attendees = normalizeAttendees(patch.attendees);
   }
   if (patch.tags !== undefined) fmPatch.tags = patch.tags;
-  if (Object.keys(fmPatch).length > 0) {
-    raw = patchFrontmatter(raw, fmPatch);
+
+  const touchesMain =
+    Object.keys(fmPatch).length > 0 || patch.content !== undefined;
+
+  if (touchesMain) {
+    let raw = await adapter.read(id);
+    const mainMeta = await adapter.readMeta(id);
+    if (Object.keys(fmPatch).length > 0) {
+      raw = patchMeetingFrontmatter(raw, fmPatch);
+    }
+    if (patch.content !== undefined) {
+      raw = patchMeetingMainBody(raw, patch.content ?? "");
+    }
+    await adapter.write(id, raw, mainMeta.mtime);
   }
 
-  // Body section patches
-  if (patch.content !== undefined) {
-    raw = patchMeetingContent(raw, patch.content ?? "");
-  }
+  // Transcript sidecar
   if (patch.transcript !== undefined) {
-    raw = patchMeetingTranscript(raw, patch.transcript ?? "");
+    const tPath = transcriptPath(id);
+    const next = patch.transcript ?? "";
+    if (next.length === 0) {
+      if (await adapter.exists(tPath)) {
+        await adapter.delete(tPath);
+      }
+    } else {
+      const exists = await adapter.exists(tPath);
+      const prevMtime = exists ? (await adapter.readMeta(tPath)).mtime : undefined;
+      await adapter.write(tPath, `${next}\n`, prevMtime);
+    }
   }
+
+  // Summary sidecar
   if (
     patch.discussion_items !== undefined ||
     patch.decisions !== undefined ||
     patch.action_items !== undefined
   ) {
-    // 현재 상태 읽어서 부분 update
-    const current = fileToMeeting(id, raw, meta.mtime);
-    raw = patchMeetingSummary(raw, {
+    const sPath = summaryPath(id);
+    // 현재 상태 read (sidecar 가 있으면 그 H2 list 보존)
+    const current = (await readFullMeeting(adapter, id)) ?? buildMeeting({}, id);
+    const merged = {
       discussion_items: patch.discussion_items ?? current.discussion_items,
       decisions: patch.decisions ?? current.decisions,
       action_items: patch.action_items ?? current.action_items,
-    });
+    };
+    const isEmpty =
+      merged.discussion_items.length === 0 &&
+      merged.decisions.length === 0 &&
+      merged.action_items.length === 0;
+
+    if (isEmpty) {
+      if (await adapter.exists(sPath)) {
+        await adapter.delete(sPath);
+      }
+    } else {
+      const exists = await adapter.exists(sPath);
+      const prevMtime = exists ? (await adapter.readMeta(sPath)).mtime : undefined;
+      await adapter.write(sPath, `${buildSummaryBody(merged)}\n`, prevMtime);
+    }
   }
 
-  const newMeta = await adapter.write(id, raw, meta.mtime);
-  return fileToMeeting(id, raw, newMeta.mtime);
+  const updated = await readFullMeeting(adapter, id);
+  if (!updated) throw new Error(`meeting disappeared after update: ${id}`);
+  return updated;
 }
 
-// Soft delete: .trash/ 로 이동
+// Soft delete: 메인 + sidecar 다 같은 stamp 로 .trash/ 이동
 export async function deleteMeeting(
   adapter: VaultAdapter,
   id: string,
 ): Promise<void> {
-  await trashFile(adapter, id);
+  const stamp = freshStamp();
+  await trashFileWithStamp(adapter, id, stamp);
+  const tPath = transcriptPath(id);
+  if (await adapter.exists(tPath)) {
+    await trashFileWithStamp(adapter, tPath, stamp);
+  }
+  const sPath = summaryPath(id);
+  if (await adapter.exists(sPath)) {
+    await trashFileWithStamp(adapter, sPath, stamp);
+  }
 }
 
 export async function restoreMeeting(
   adapter: VaultAdapter,
   trashId: string,
 ): Promise<Meeting> {
+  // 메인 파일 복원
   const restoredPath = await restoreFromTrash(adapter, trashId);
-  const m = await getMeeting(adapter, restoredPath);
+  // 같은 stamp 의 sidecar 도 복원 시도
+  const stampMatch = trashId.match(
+    /^\.trash\/(\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2})-(.+)\.md$/,
+  );
+  if (stampMatch) {
+    const [, stamp, base] = stampMatch;
+    for (const suffix of ["transcript", "summary"]) {
+      const sidecarTrash = `.trash/${stamp}-${base}.${suffix}.md`;
+      if (await adapter.exists(sidecarTrash)) {
+        await restoreFromTrash(adapter, sidecarTrash);
+      }
+    }
+  }
+  const m = await readFullMeeting(adapter, restoredPath);
   if (!m) throw new Error(`restore failed: ${trashId}`);
   return m;
 }
 
-// 영구 삭제 (휴지통에서만)
+// 영구 삭제 (휴지통에서만) — 메인 + 같은 stamp sidecar 도 함께 삭제
 export async function purgeMeeting(
   adapter: VaultAdapter,
   trashId: string,
 ): Promise<void> {
   await adapter.delete(trashId);
+  const stampMatch = trashId.match(
+    /^\.trash\/(\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2})-(.+)\.md$/,
+  );
+  if (stampMatch) {
+    const [, stamp, base] = stampMatch;
+    for (const suffix of ["transcript", "summary"]) {
+      const sidecarTrash = `.trash/${stamp}-${base}.${suffix}.md`;
+      if (await adapter.exists(sidecarTrash)) {
+        await adapter.delete(sidecarTrash);
+      }
+    }
+  }
 }
+
+// re-export — watcher / 외부 호환
+export { meetingMainPath, isMeetingSidecar };
