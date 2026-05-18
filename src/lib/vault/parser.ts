@@ -42,7 +42,9 @@ interface SplitResult {
   unmapped: string;
 }
 
-// H1 단위로 split. 코드블록 (``` 또는 ~~~) 안의 H1 은 무시.
+// KNOWN H1 (`# 본문` / `# 회의 내용` / `# 요약`) 만 섹션 경계로 인식.
+// 본문 안에 사용자가 적은 임의 H1 (예: `# 회의 제목`) 은 그냥 텍스트로 유지.
+// 코드블록 (``` 또는 ~~~) 안의 H1 은 무시.
 function splitH1Sections(body: string): SplitResult {
   const lines = body.split("\n");
   const sections = new Map<string, string>();
@@ -55,19 +57,15 @@ function splitH1Sections(body: string): SplitResult {
 
   const flush = () => {
     if (currentH1 === null) {
-      // 첫 H1 이전 텍스트는 버림 (대개 빈 줄). frontmatter 다음 텍스트.
-      // 단, 비어있지 않으면 unmapped 로.
+      // 첫 KNOWN H1 이전 텍스트. frontmatter 다음 텍스트. 비어있지 않으면 unmapped 로.
       const pre = currentBuf.join("\n").trim();
       if (pre.length > 0) unmappedChunks.push(pre);
     } else {
-      const content = currentBuf.join("\n").replace(/^\n+/, "").replace(/\n+$/, "");
-      if (KNOWN_H1_SECTIONS.includes(currentH1 as KnownSection)) {
-        sections.set(currentH1, content);
-      } else {
-        // 알려진 라벨이 아님 → unmapped 에 H1 포함해서 보존
-        const raw = `# ${currentH1}\n${content}`.trim();
-        unmappedChunks.push(raw);
-      }
+      const content = currentBuf
+        .join("\n")
+        .replace(/^\n+/, "")
+        .replace(/\n+$/, "");
+      sections.set(currentH1, content);
     }
   };
 
@@ -88,7 +86,8 @@ function splitH1Sections(body: string): SplitResult {
 
     if (!inCodeFence) {
       const h1 = line.match(/^# (.+?)\s*$/);
-      if (h1) {
+      // KNOWN H1 만 섹션 경계. 다른 H1 은 본문 텍스트로 취급.
+      if (h1 && KNOWN_H1_SECTIONS.includes(h1[1] as KnownSection)) {
         flush();
         currentH1 = h1[1];
         currentBuf = [];
@@ -205,6 +204,8 @@ export function patchSection(
 
     const h1 = line.match(/^# (.+?)\s*$/);
     if (!h1) continue;
+    // KNOWN H1 만 섹션 경계. 본문 안 사용자 H1 은 건너뜀.
+    if (!KNOWN_H1_SECTIONS.includes(h1[1] as KnownSection)) continue;
 
     if (startLine === -1 && h1[1] === h1Title) {
       startLine = i;
