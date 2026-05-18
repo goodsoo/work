@@ -21,6 +21,7 @@
 
 ## 🟡 V0.6.1 후속 (dogfood 단계)
 
+- [x] **parser KNOWN_H1 만 섹션 경계** (2026-05-18). 사용자가 본문에 `# 회의 제목` 같은 H1 적으면 파서가 새 섹션 시작으로 오해 → UI 본문 빈 화면 + 매 저장마다 블록 누적 (한 파일에 11번 중복). `splitH1Sections` / `patchSection` 모두 `본문`/`회의 내용`/`요약` 만 경계로 인식하도록 수정. 회귀 테스트 추가.
 - [ ] **Conflict resolution 모달**. 현재는 ConflictError throw 만. UI 에서 "내 변경 보존 / 외부 변경 가져오기" 선택지 + `.conflict-*.md` 파일 생성.
 - [ ] **Vault 변경 UI**. 설정 페이지에 "다른 vault 폴더로 변경" 버튼. 현재는 localStorage 수동 비워야 picker 다시 뜸.
 - [ ] **Vault 폴더 picker 후 첫 인덱싱 진행률**. 큰 vault 인 경우 spinner.
@@ -73,6 +74,17 @@
 - [ ] **Tauri 데스크탑 앱 빌드 마무리**. `bun run tauri:build` 로 .dmg 생성 + 코드 사인.
 
 ---
+
+## 🟠 다음 세션 진입 — 모바일 layout 통일 (drawer)
+
+- [ ] **모바일 = 데스크탑 3-pane 구조 + SidePanel 만 overlay drawer 화**. BottomTabs 유지, 햄버거는 모바일 헤더 좌측, 드로어 폭 288 (데스크탑 기본), dim 탭/스와이프 좌로 닫기, drawer 내용 = SidePanel 만 (ActivityBar 제외). 기획 완료, 구현 대기.
+  - 변경: `AppShell.tsx` (drawer state + 햄버거 + overlay + body scroll lock + swipe + DrawerContext)
+  - 변경: `App.tsx` (모바일/데스크탑 메모장 분기 제거 → 단일 렌더, 자동 선택 로직 흡수)
+  - 제거: `MeetingsPage.tsx` 파일 자체 deprecate (역할 없어짐)
+  - 변경: `MeetingForm.tsx` `lg:hidden` 뒤로가기 버튼 2개 제거
+  - 변경: 각 SidePanel 의 item onClick 안에서 `closeDrawer()` 호출 (context)
+  - 결정사항: 메모 선택 시 자동 drawer 닫기, BottomTab 변경 시 자동 닫기, 햄버거 = 토글 (✕ 로 변경 X), drawer 가 헤더 + BottomTabs 까지 dim 으로 덮을지는 구현 직전 결정. v1 에서 swipe-from-edge 열기 미구현.
+  - 자세한 기획: `progress.md` 참조.
 
 ## 🟡 디자인 / UI 폴리싱 (남은 작업)
 
