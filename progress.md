@@ -2,9 +2,9 @@
 
 다음 세션이 빠르게 파악할 수 있도록 짧게 유지.
 
-## 현재 상태 (2026-05-18, V0.7 ship + V0.6 dogfood fix 후)
+## 현재 상태 (2026-05-18 저녁, legacy 카드 프롬프트 + goodsoo/work 자체 카드 5장 완료 후)
 
-**V0.7 "내 작업" 탭 ship 완료**. dogfood 중 V0.6 vault 파서 버그 발견 → fix 완료. **다음 세션 = 모바일 layout 통일 (drawer)** — 기획 완료, 구현 대기.
+**V0.7 "내 작업" 탭 ship + dogfood fix + legacy 카드 도구 완료**. owner repo `goodsoo/work` 자체에 대한 평가 자료 (V0.0~V0.7 마일스톤 5장) 도 vault 에 누적. **다음 세션 = 모바일 layout 통일 (drawer)** — 기획 완료, 구현 대기.
 
 ## 다음 세션 진입점 — 모바일 drawer 구현
 
@@ -28,17 +28,14 @@
   - `MeetingsPage.tsx`: **파일 자체 삭제** (역할 사라짐)
 - **invariant 부가 효과**: 이번 변경으로 모바일도 항상 form 표시 → "선택 0 개 안 됨" invariant 자연스럽게 만족.
 
-## 이번 세션에 한 일 (2026-05-18)
+## 이번 세션에 한 일 (2026-05-18 저녁)
 
-- **parser fix** (commit `c8d5d17`): KNOWN_H1 (`본문`/`회의 내용`/`요약`) 만 섹션 경계로 인식. 사용자가 본문에 `# 회의 제목` 같은 H1 쓰면 매 저장마다 블록이 누적되는 데이터 손상 버그 fix. 회귀 테스트 포함.
-- **Backspace/Delete history.back() 차단** (commit `1a025ee` 에 묶여 들어감): macOS WKWebView 가 두 키를 브라우저 뒤로가기로 처리 → SPA selection state 망가짐. 입력 컨텍스트 (`INPUT`/`TEXTAREA`/`contenteditable`) 밖에서만 `preventDefault`.
-- **Tauri dev Cmd+R reload menu** (commit `1a025ee` 에 묶여 들어감): JS 가 죽어 흰 화면 됐을 때 native menu 가 받아서 reload. `cfg!(debug_assertions)` 한정.
-- **모바일 drawer 기획** — 위 "다음 세션 진입점" 참조.
-- **2026-05-18-회의록.md** 파일 = 본인 데이터 (parser 버그로 11번 중복 누적된 회의록). 사용자가 수동으로 정리 예정. **git 에 넣으면 안 됨** (.gitignore 에 추가하든 수동 정리 후 vault 로 이동하든).
+- **legacy 카드 작성 프롬프트 + 복사 버튼** (commit `9f7ffed`): `src/lib/clipboardPrompt.ts` 에 `buildLegacyCardPrompt(vaultRoot)` 추가. PR 없이 직접 push 한 owner repo 에서 git log 기반으로 일관된 schema 의 portfolio 카드를 생성하라는 self-contained 지시 프롬프트. `PortfolioSidePanel` 의 `ClipPromptButton` (compact) 으로 한 번에 클립보드 복사. vaultRoot 는 `useVault()` 에서 주입 — picker 가 바뀌어도 자동 반영, 미설정 시 vault 선택 안내 메시지로 대체. 테스트 2 케이스 추가 (12개 pass).
+- **goodsoo/work 자체 legacy 카드 5장 생성**: 위 프롬프트 schema 그대로 적용. 본인 71 커밋을 V0.0~V0.7 마일스톤 5개로 그룹핑 + 각 그룹 첫커밋~끝커밋 `git diff --shortstat` 정확 산출. vault `portfolio/goodsoo-work-{v0-0-to-0-5-web-mvp,v0-5-1-desktop-layout,v0-5-2-to-0-5-4-memo-polish,v0-6-vault-migration,v0-7-portfolio}.md` + `projects.md` 에 `goodsoo-work` slug (sort=5, repos=[goodsoo/work]) 추가. 모두 vault 안 직접 작성이라 git diff 에 없음.
 
-## owner repo legacy 카드 (V0.7 dogfood 진행 중)
+**직전 세션 (2026-05-18 낮) 작업** (이미 ship): parser KNOWN_H1 fix (`c8d5d17`) / Backspace history.back 차단 + Tauri dev Cmd+R reload (`1a025ee` 에 묶임) / 모바일 drawer 기획.
 
-본인이 PR 없이 직접 commit + push 한 owner repo 의 작업들. claude code 로 한 번에 카드 생성. 자세한 프롬프트 템플릿은 이전 progress 에 있었지만, 매일 사용 중 발견되는 즉시-fix 가 우선순위 더 높음.
+- **2026-05-18-회의록.md** 파일 = 본인 데이터 (parser 버그로 중복 누적된 회의록). 여전히 프로젝트 루트 untracked. 사용자가 수동 정리 예정. **git 에 넣으면 안 됨**.
 
 ## V0.7 핵심 결정 요약
 
@@ -51,7 +48,7 @@
 ## 알아야 할 컨텍스트
 
 - **design doc v2.3** = V0.7 source of truth. `~/.gstack/projects/goodsoob-work/ham-main-design-20260518-105501.md`.
-- **vault 위치**: `/Users/ham/Goodsoob` (iCloud 동기화).
+- **vault 위치**: `/Users/ham/Library/Mobile Documents/com~apple~CloudDocs/Goodsoob/` (iCloud Drive, 옵시디안 호환).
 - **portfolio capability**: `fs:scope` 에 dotfile path 명시. 새 capability 변경 시 `tauri:dev` 재시작 필요. Rust 변경 없으면 HMR 만으로 충분.
 - **selection invariant**: "노트 0개 경우 제외하고 항상 최소 1개 선택" — 사용자 명시 요구. 현재 desktop 은 만족, 모바일은 drawer 구현 후 자연스럽게 만족.
 

@@ -51,7 +51,8 @@
 ## 🟡 V0.7 dogfood 진행 중 (1주일 매일 사용)
 
 - [ ] **첫 평가 자료 누적 시즌까지 매일 사용** — 다음 분기 평가 시 portfolio 탭만 띄워서 5분 내 펼쳐보일 수 있는지 검증.
-- [ ] **owner repo legacy 카드 생성** — 본인 personal repo 들에서 claude code 돌려 git log 으로 legacy 카드 (`pr_number=0`) 작성. 프롬프트 템플릿은 progress.md 참조.
+- [x] **legacy 카드 작성 프롬프트 + 복사 버튼** (2026-05-18). `buildLegacyCardPrompt(vaultRoot)` + PortfolioSidePanel 의 `ClipPromptButton`. vaultRoot 는 `useVault()` 에서 주입 (picker 바뀌어도 자동 반영, 미설정 시 vault 선택 안내). owner repo `goodsoo/work` 자체에도 적용 → V0.0~V0.7 마일스톤 5장 카드 + `projects.md` 에 `goodsoo-work` slug 추가.
+- [ ] **다른 owner repo legacy 카드 backfill** — "내 작업" 탭의 "Legacy 카드 프롬프트" 버튼 복사 → 각 repo Claude Code 에 붙여넣어 카드 생성.
 - [ ] **회사 owner repo 도 PR 워크플로 전환 시도** — branch + 셀프 PR + auto-merge (셸 alias 로 5초). 매 commit 마다 PR description 작성이 평가 자료 품질 ↑.
 
 ## 🟡 V0.7.x 후속 (dogfood 결과로 결정)
