@@ -253,13 +253,18 @@ export function patchMeetingFrontmatter(
 // ─────────────────────────────────────────────────────────────────────────────
 // Filename helpers
 
+// 파일시스템 금지 문자 (`/ \ : * ? " < > |`) + 옵시디안 link syntax 와 충돌하는
+// 문자 (`# ^ [ ] |`) 는 `-` 로 치환. NUL/제어문자도 제거.
+// 빈 결과 → "untitled" fallback. 100자 cap.
+const UNSAFE_FILENAME_RE = /[ -/\\:*?"<>|#\^\[\]]/g;
+
 export function slugify(title: string): string {
-  return title
-    .trim()
-    .replace(/[/:\\]/g, "-")
-    .replace(/\s+/g, "-")
-    .replace(/-{2,}/g, "-")
-    .replace(/^-+|-+$/g, "");
+  let s = title.replace(UNSAFE_FILENAME_RE, "-");
+  // 앞뒤 dot/공백 제거 — Windows trim + macOS dotfile 회피
+  s = s.replace(/^[.\s]+|[.\s]+$/g, "");
+  s = s.replace(/\s+/g, "-").replace(/-{2,}/g, "-").replace(/^-+|-+$/g, "");
+  if (s.length > 100) s = s.slice(0, 100).replace(/-+$/, "");
+  return s || "untitled";
 }
 
 function filePathToTitle(filePath: string): string {
@@ -280,7 +285,7 @@ export async function generateMeetingPath(
   date: string,
   title: string,
 ): Promise<string> {
-  const slug = slugify(title) || "untitled";
+  const slug = slugify(title);
   const base = `meetings/${date}-${slug}`;
   let candidate = `${base}.md`;
   let n = 2;
@@ -289,6 +294,47 @@ export async function generateMeetingPath(
     n++;
   }
   return candidate;
+}
+
+// title/date 변경 시 새 path 계산. 자기 자신과 같으면 그대로 (no-op).
+// 다른 메모와 충돌 시 -2, -3 suffix.
+export async function computeRenamedMeetingPath(
+  adapter: VaultAdapter,
+  currentId: string,
+  newDate: string,
+  newTitle: string,
+): Promise<string> {
+  const slug = slugify(newTitle);
+  const base = `meetings/${newDate}-${slug}`;
+  const target = `${base}.md`;
+  if (target === currentId) return currentId; // 변경 없음
+  let candidate = target;
+  let n = 2;
+  while (candidate !== currentId && (await adapter.exists(candidate))) {
+    candidate = `${base}-${n}.md`;
+    n++;
+  }
+  return candidate;
+}
+
+// 메인 + 두 sidecar 한 묶음 rename. sidecar 가 없으면 skip.
+export async function renameMeetingFiles(
+  adapter: VaultAdapter,
+  oldPath: string,
+  newPath: string,
+): Promise<void> {
+  if (oldPath === newPath) return;
+  await adapter.rename(oldPath, newPath);
+  const oldT = transcriptPath(oldPath);
+  const newT = transcriptPath(newPath);
+  if (await adapter.exists(oldT)) {
+    await adapter.rename(oldT, newT);
+  }
+  const oldS = summaryPath(oldPath);
+  const newS = summaryPath(newPath);
+  if (await adapter.exists(oldS)) {
+    await adapter.rename(oldS, newS);
+  }
 }
 
 export function journalPath(date: string): string {

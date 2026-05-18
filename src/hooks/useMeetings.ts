@@ -78,8 +78,12 @@ export function useUpdateMeeting(id: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (patch: MeetingUpdate) => {
-      const updated = await updateMeeting(adapter, id, patch);
+      // rename 가능성 — 양쪽 path 다 markSelfWrite 해서 watcher 가 자기 변경 무시.
       markMeetingSelfWrite(watcher, id);
+      const updated = await updateMeeting(adapter, id, patch);
+      if (updated.id !== id) {
+        markMeetingSelfWrite(watcher, updated.id);
+      }
       return updated;
     },
     onMutate: async (patch) => {
@@ -104,10 +108,27 @@ export function useUpdateMeeting(id: string) {
       if (ctx?.prevList) qc.setQueryData(meetingsKey, ctx.prevList);
     },
     onSuccess: (updated) => {
-      qc.setQueryData(meetingKey(id), updated);
-      qc.setQueryData<Meeting[]>(meetingsKey, (prev) =>
-        prev?.map((m) => (m.id === id ? updated : m)),
-      );
+      const newId = updated.id;
+      if (newId !== id) {
+        // 파일 rename — 옛 detail query 제거, 새 id 로 detail 셋. list 도 옛 id 항목을
+        // 새 id 로 교체. URL hash 가 옛 id 였으면 새 id 로 갱신.
+        qc.removeQueries({ queryKey: meetingKey(id) });
+        qc.setQueryData(meetingKey(newId), updated);
+        qc.setQueryData<Meeting[]>(meetingsKey, (prev) =>
+          prev?.map((m) => (m.id === id ? updated : m)),
+        );
+        if (typeof window !== "undefined") {
+          const currentHash = window.location.hash;
+          if (currentHash.includes(encodeURIComponent(id)) || currentHash.includes(id)) {
+            window.location.hash = `#meeting-${encodeURIComponent(newId)}`;
+          }
+        }
+      } else {
+        qc.setQueryData(meetingKey(id), updated);
+        qc.setQueryData<Meeting[]>(meetingsKey, (prev) =>
+          prev?.map((m) => (m.id === id ? updated : m)),
+        );
+      }
       qc.invalidateQueries({ queryKey: ["todos"] });
     },
   });

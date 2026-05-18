@@ -1,6 +1,7 @@
 import type { VaultAdapter } from "../lib/vault/adapter";
 import {
   buildSummaryBody,
+  computeRenamedMeetingPath,
   fileToMeeting,
   freshStamp,
   generateMeetingPath,
@@ -11,6 +12,7 @@ import {
   meetingToTranscriptRaw,
   patchMeetingFrontmatter,
   patchMeetingMainBody,
+  renameMeetingFiles,
   restoreFromTrash,
   scanMeetings,
   scanTrash,
@@ -150,7 +152,7 @@ export async function createMeeting(
   input: MeetingInsert,
 ): Promise<Meeting> {
   const date = input.date ?? new Date().toISOString().slice(0, 10);
-  const title = input.title ?? "회의록";
+  const title = input.title ?? "메모";
   const path = await generateMeetingPath(adapter, date, title);
   const meeting = buildMeeting({ ...input, date, title }, path);
 
@@ -179,6 +181,33 @@ export async function updateMeeting(
     throw new Error(`meeting not found: ${id}`);
   }
 
+  // Title/date 변경 시 파일명 rename (메인 + sidecar 묶음).
+  // rename 후 currentId 가 새 path — 이후 모든 patch 는 currentId 기준.
+  let currentId = id;
+  if (patch.title !== undefined || patch.date !== undefined) {
+    const current = await readFullMeeting(adapter, id);
+    if (current) {
+      const nextTitle = patch.title !== undefined
+        ? (patch.title ?? "")
+        : current.title;
+      const nextDate = patch.date !== undefined
+        ? (patch.date ?? "")
+        : (current.date ?? "");
+      if (nextDate) {
+        const newPath = await computeRenamedMeetingPath(
+          adapter,
+          id,
+          nextDate,
+          nextTitle,
+        );
+        if (newPath !== id) {
+          await renameMeetingFiles(adapter, id, newPath);
+          currentId = newPath;
+        }
+      }
+    }
+  }
+
   // 메인 파일 — frontmatter / content
   const fmPatch: Record<string, unknown> = {};
   if (patch.title !== undefined) fmPatch.title = patch.title ?? "";
@@ -193,20 +222,20 @@ export async function updateMeeting(
     Object.keys(fmPatch).length > 0 || patch.content !== undefined;
 
   if (touchesMain) {
-    let raw = await adapter.read(id);
-    const mainMeta = await adapter.readMeta(id);
+    let raw = await adapter.read(currentId);
+    const mainMeta = await adapter.readMeta(currentId);
     if (Object.keys(fmPatch).length > 0) {
       raw = patchMeetingFrontmatter(raw, fmPatch);
     }
     if (patch.content !== undefined) {
       raw = patchMeetingMainBody(raw, patch.content ?? "");
     }
-    await adapter.write(id, raw, mainMeta.mtime);
+    await adapter.write(currentId, raw, mainMeta.mtime);
   }
 
   // Transcript sidecar
   if (patch.transcript !== undefined) {
-    const tPath = transcriptPath(id);
+    const tPath = transcriptPath(currentId);
     const next = patch.transcript ?? "";
     if (next.length === 0) {
       if (await adapter.exists(tPath)) {
@@ -225,9 +254,9 @@ export async function updateMeeting(
     patch.decisions !== undefined ||
     patch.action_items !== undefined
   ) {
-    const sPath = summaryPath(id);
+    const sPath = summaryPath(currentId);
     // 현재 상태 read (sidecar 가 있으면 그 H2 list 보존)
-    const current = (await readFullMeeting(adapter, id)) ?? buildMeeting({}, id);
+    const current = (await readFullMeeting(adapter, currentId)) ?? buildMeeting({}, currentId);
     const merged = {
       discussion_items: patch.discussion_items ?? current.discussion_items,
       decisions: patch.decisions ?? current.decisions,
@@ -249,8 +278,8 @@ export async function updateMeeting(
     }
   }
 
-  const updated = await readFullMeeting(adapter, id);
-  if (!updated) throw new Error(`meeting disappeared after update: ${id}`);
+  const updated = await readFullMeeting(adapter, currentId);
+  if (!updated) throw new Error(`meeting disappeared after update: ${currentId}`);
   return updated;
 }
 
