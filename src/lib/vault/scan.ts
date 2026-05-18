@@ -2,9 +2,8 @@ import type { VaultAdapter } from "./adapter";
 import {
   parseVaultFile,
   serializeVaultFile,
-  patchSection,
   patchFrontmatter,
-  type VaultFile,
+  patchBody,
 } from "./parser";
 import { extractTodos, type TodoItem } from "./tasks";
 
@@ -12,7 +11,7 @@ import { extractTodos, type TodoItem } from "./tasks";
 // Types — UI/hooks 가 다루는 형태
 
 export interface MeetingMeta {
-  id: string; // file path (e.g. "meetings/2026-05-16-팀-주간회의.md")
+  id: string; // 메인 파일 path (e.g. "meetings/2026-05-16-팀-주간회의.md")
   title: string;
   date: string | null;
   time: string | null;
@@ -31,7 +30,6 @@ export interface Meeting extends MeetingMeta {
   discussion_items: string[];
   decisions: string[];
   action_items: string[];
-  unmapped: string;
 }
 
 export interface JournalMeta {
@@ -42,6 +40,29 @@ export interface JournalMeta {
 
 export interface Journal extends JournalMeta {
   content: string;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Sidecar path helpers — 메인 파일과 같은 폴더에 `.transcript.md` / `.summary.md`.
+// 한 회의 = 3 파일. sidecar 는 frontmatter 없는 raw markdown.
+// 본문 안에 사용자가 `# 본문` 같은 H1 적어도 충돌 0 (in-band sentinel X).
+
+export function transcriptPath(mainPath: string): string {
+  return mainPath.replace(/\.md$/, ".transcript.md");
+}
+
+export function summaryPath(mainPath: string): string {
+  return mainPath.replace(/\.md$/, ".summary.md");
+}
+
+const SIDECAR_RE = /\.(transcript|summary)\.md$/;
+
+export function isMeetingSidecar(path: string): boolean {
+  return SIDECAR_RE.test(path);
+}
+
+export function meetingMainPath(path: string): string {
+  return path.replace(SIDECAR_RE, ".md");
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -58,16 +79,15 @@ function fmStringArray(value: unknown): string[] {
     return value.filter((v): v is string => typeof v === "string");
   }
   if (typeof value === "string" && value.trim() !== "") {
-    // CSV fallback (V0.5.3 호환)
     return value.split(",").map((s) => s.trim()).filter(Boolean);
   }
   return [];
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// H2 list 변환 (요약 H1 안의 H2 section 들)
+// Summary body — `## 논의 사항` / `## 결정 사항` / `## 액션 아이템` H2 list 형식.
+// summary sidecar 파일 안 markdown.
 
-// `## 논의 사항\n- foo\n- bar` → ['foo', 'bar']
 export function extractH2List(summaryBody: string, h2Label: string): string[] {
   const lines = summaryBody.split("\n");
   let inSection = false;
@@ -79,14 +99,12 @@ export function extractH2List(summaryBody: string, h2Label: string): string[] {
       continue;
     }
     if (!inSection) continue;
-    // bullet line: `- text` or `- [x] text` or `- [ ] text`
     const bullet = line.match(/^\s*- (?:\[[ x]\]\s+)?(.+?)\s*$/);
     if (bullet) items.push(bullet[1]);
   }
   return items;
 }
 
-// items → `## label\n- item1\n- item2\n` (checkbox 옵션: action_items 용)
 export function buildH2List(
   h2Label: string,
   items: string[],
@@ -99,7 +117,6 @@ export function buildH2List(
   return `## ${h2Label}\n${lines}\n`;
 }
 
-// 요약 body 재구성: 기존의 다른 H2 (없을 알려진 라벨) 는 보존
 export function buildSummaryBody(parts: {
   discussion_items: string[];
   decisions: string[];
@@ -109,24 +126,26 @@ export function buildSummaryBody(parts: {
     buildH2List("논의 사항", parts.discussion_items),
     buildH2List("결정 사항", parts.decisions),
     buildH2List("액션 아이템", parts.action_items, true),
-  ]
-    .filter((s) => s.trim() !== `## ${s.match(/^## (.+?)\n/)?.[1] ?? ""}`)
-    .join("\n");
+  ].join("\n");
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // File → Meeting/Journal
 
+// 메인 파일 + 두 sidecar raw 받아서 합쳐서 Meeting 객체. sidecar 가 없으면 빈 string.
 export function fileToMeeting(
   filePath: string,
-  raw: string,
+  mainRaw: string,
+  transcriptRaw: string,
+  summaryRaw: string,
   mtime: number,
 ): Meeting {
-  const file = parseVaultFile(raw);
-  const fm = file.frontmatter;
-  const summary = file.sections.get("요약") ?? "";
+  const main = parseVaultFile(mainRaw);
+  const fm = main.frontmatter;
   const isoMtime = new Date(mtime || Date.now()).toISOString();
   const isInTrash = filePath.startsWith(".trash/");
+
+  const summary = transcriptOrSummaryBody(summaryRaw);
 
   return {
     id: filePath,
@@ -139,13 +158,19 @@ export function fileToMeeting(
     created_at: isoMtime,
     updated_at: isoMtime,
     deleted_at: isInTrash ? isoMtime : null,
-    content: file.sections.get("본문") ?? "",
-    transcript: file.sections.get("회의 내용") ?? "",
+    content: main.body,
+    transcript: transcriptOrSummaryBody(transcriptRaw),
     discussion_items: extractH2List(summary, "논의 사항"),
     decisions: extractH2List(summary, "결정 사항"),
     action_items: extractH2List(summary, "액션 아이템"),
-    unmapped: file.unmapped,
   };
+}
+
+// sidecar 파일은 일반적으로 frontmatter 없는 raw markdown. 다만 외부 에디터가 frontmatter 끼워넣어도
+// 본문만 회수.
+function transcriptOrSummaryBody(raw: string): string {
+  if (!raw) return "";
+  return parseVaultFile(raw).body;
 }
 
 export function fileToJournal(
@@ -155,39 +180,18 @@ export function fileToJournal(
 ): Journal {
   const file = parseVaultFile(raw);
   const fm = file.frontmatter;
-  // 일기는 H1 split 없이 전체 본문이 content
-  const allBody = [
-    file.sections.get("본문") ?? "",
-    file.sections.get("회의 내용") ?? "",
-    file.sections.get("요약") ?? "",
-    file.unmapped,
-  ]
-    .filter((s) => s.trim())
-    .join("\n\n");
-
-  // 일기는 H1 없는 자유 형식이 일반적 — H1 split 안 된 raw 사용이 더 안전.
-  // 기준: 알려진 H1 이 하나도 없으면 unmapped 가 전체 본문.
-  const hasKnownH1 = ["본문", "회의 내용", "요약"].some(
-    (h) => (file.sections.get(h) ?? "") !== "",
-  );
-
   return {
     id: filePath,
     date: fmString(fm.date) ?? filePathToDate(filePath),
     mtime,
-    content: hasKnownH1 ? allBody : file.unmapped || rawBodyAfterFrontmatter(raw),
+    content: file.body,
   };
 }
 
-function rawBodyAfterFrontmatter(raw: string): string {
-  const m = raw.match(/^---\s*\n[\s\S]*?\n---\s*(\n|$)/);
-  return m ? raw.slice(m[0].length) : raw;
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
-// Build Meeting → raw
+// Build Meeting → 3 raw files
 
-export function meetingToRaw(meeting: Meeting): string {
+export function meetingToMainRaw(meeting: Meeting): string {
   const frontmatter: Record<string, unknown> = {
     title: meeting.title,
   };
@@ -196,56 +200,54 @@ export function meetingToRaw(meeting: Meeting): string {
   if (meeting.attendees.length > 0) frontmatter.attendees = meeting.attendees;
   if (meeting.tags.length > 0) frontmatter.tags = meeting.tags;
 
-  const sections = new Map<string, string>();
-  sections.set("본문", meeting.content);
-  sections.set("회의 내용", meeting.transcript);
-  sections.set("요약", buildSummaryBody({
+  return serializeVaultFile({
+    raw: "",
+    frontmatter,
+    body: meeting.content,
+  });
+}
+
+export function meetingToTranscriptRaw(meeting: Meeting): string {
+  return meeting.transcript.length > 0 ? `${meeting.transcript}\n` : "";
+}
+
+export function meetingToSummaryRaw(meeting: Meeting): string {
+  const body = buildSummaryBody({
     discussion_items: meeting.discussion_items,
     decisions: meeting.decisions,
     action_items: meeting.action_items,
-  }));
-
-  const file: VaultFile = {
-    raw: "",
-    frontmatter,
-    sections,
-    unmapped: meeting.unmapped,
-  };
-  return serializeVaultFile(file);
+  });
+  // 모두 비어있으면 빈 string — sidecar 파일 자체를 안 만듦.
+  if (
+    meeting.discussion_items.length === 0 &&
+    meeting.decisions.length === 0 &&
+    meeting.action_items.length === 0
+  ) {
+    return "";
+  }
+  return body;
 }
 
 export function journalToRaw(journal: Journal): string {
-  const frontmatter: Record<string, unknown> = { date: journal.date };
-  // 일기는 H1 split 없이 본문 그대로. patchSection 동작과 일관성 위해 본문 H1 사용 안 함.
-  let raw = `---\ndate: ${journal.date}\n---\n\n${journal.content}\n`;
-  if (Object.keys(frontmatter).length > 1) {
-    // 추가 frontmatter 가 있으면 dump
-    raw = patchFrontmatter("\n" + journal.content + "\n", frontmatter);
-  }
-  return raw;
+  return serializeVaultFile({
+    raw: "",
+    frontmatter: { date: journal.date },
+    body: journal.content,
+  });
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Patch helpers — 부분 patch (전체 직렬화 안 함)
+// Patch helpers — 부분 patch. meetings.ts api 가 사용.
 
-export function patchMeetingContent(raw: string, newContent: string): string {
-  return patchSection(raw, "본문", newContent);
+export function patchMeetingMainBody(raw: string, newContent: string): string {
+  return patchBody(raw, newContent);
 }
-export function patchMeetingTranscript(
+
+export function patchMeetingFrontmatter(
   raw: string,
-  newTranscript: string,
+  updates: Record<string, unknown>,
 ): string {
-  return patchSection(raw, "회의 내용", newTranscript);
-}
-export function patchMeetingSummary(
-  raw: string,
-  parts: {
-    discussion_items: string[];
-    decisions: string[];
-    action_items: string[];
-  },
-): string {
-  return patchSection(raw, "요약", buildSummaryBody(parts));
+  return patchFrontmatter(raw, updates);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -301,10 +303,12 @@ export async function scanMeetings(adapter: VaultAdapter): Promise<MeetingMeta[]
   const results: MeetingMeta[] = [];
   for (const path of files) {
     if (!path.endsWith(".md")) continue;
+    if (isMeetingSidecar(path)) continue; // sidecar 는 scan 대상 X
     try {
       const raw = await adapter.read(path);
       const meta = await adapter.readMeta(path);
-      const m = fileToMeeting(path, raw, meta.mtime);
+      // meta-only — sidecar 안 읽어도 OK. fileToMeeting 으로 frontmatter 만 회수.
+      const m = fileToMeeting(path, raw, "", "", meta.mtime);
       results.push({
         id: m.id,
         title: m.title,
@@ -321,7 +325,6 @@ export async function scanMeetings(adapter: VaultAdapter): Promise<MeetingMeta[]
       // 손상된 파일 skip
     }
   }
-  // date desc, mtime desc 정렬
   results.sort((a, b) => {
     const da = a.date ?? "";
     const db = b.date ?? "";
@@ -348,7 +351,7 @@ export async function scanJournals(adapter: VaultAdapter): Promise<JournalMeta[]
   return results;
 }
 
-// vault 전체 *.md 스캔 → 모든 todo 추출 (휴지통 제외)
+// vault 전체 *.md 스캔 → 모든 todo 추출 (휴지통 제외). sidecar 도 source 가 됨 (summary 의 action_items).
 export async function scanAllTodos(adapter: VaultAdapter): Promise<TodoItem[]> {
   const todoFiles: string[] = [];
   todoFiles.push(...(await adapter.list("")));
@@ -361,7 +364,9 @@ export async function scanAllTodos(adapter: VaultAdapter): Promise<TodoItem[]> {
     if (path.startsWith(".") || path.startsWith(".trash/")) continue;
     try {
       const raw = await adapter.read(path);
-      items.push(...extractTodos(path, raw));
+      // sidecar 면 메인 path 로 source 보고 → todo extractor 가 같은 meeting 의 항목으로 group.
+      const sourcePath = isMeetingSidecar(path) ? meetingMainPath(path) : path;
+      items.push(...extractTodos(sourcePath, raw));
     } catch {
       // skip
     }
@@ -376,19 +381,31 @@ export async function trashFile(
   adapter: VaultAdapter,
   filePath: string,
 ): Promise<string> {
+  return trashFileWithStamp(adapter, filePath, freshStamp());
+}
+
+// stamp 를 외부에서 주입 가능 — 메인 + sidecar 를 같은 stamp 로 묶기 위해 사용.
+export async function trashFileWithStamp(
+  adapter: VaultAdapter,
+  filePath: string,
+  stamp: string,
+): Promise<string> {
   await adapter.mkdir(".trash");
   const base = filePath.replace(/^.*\//, "");
-  const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
   const trashPath = `.trash/${stamp}-${base}`;
   await adapter.rename(filePath, trashPath);
   return trashPath;
+}
+
+export function freshStamp(): string {
+  return new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
 }
 
 export async function restoreFromTrash(
   adapter: VaultAdapter,
   trashPath: string,
 ): Promise<string> {
-  // ".trash/2026-05-17T14-09-18-{원본경로}" → 원본경로 복원
+  // ".trash/2026-05-17T14-09-18-{원본base}" → 원본 base 추출
   const base = trashPath.replace(/^\.trash\//, "").replace(
     /^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-/,
     "",

@@ -12,7 +12,16 @@ import {
   type MeetingInsert,
   type MeetingUpdate,
 } from "../api/meetings";
+import { summaryPath, transcriptPath } from "../lib/vault/scan";
 import { useVault } from "../lib/vault/useVault";
+import type { VaultWatcher } from "../lib/vault/watcher";
+
+// 한 회의는 메인 + 2 sidecar 파일이라 자기 write 마크도 셋 다.
+function markMeetingSelfWrite(watcher: VaultWatcher, id: string): void {
+  watcher.markSelfWrite(id);
+  watcher.markSelfWrite(transcriptPath(id));
+  watcher.markSelfWrite(summaryPath(id));
+}
 
 const meetingsKey = ["meetings"] as const;
 const deletedMeetingsKey = ["meetings", "deleted"] as const;
@@ -51,7 +60,7 @@ export function useCreateMeeting() {
   return useMutation({
     mutationFn: async (input: MeetingInsert) => {
       const created = await createMeeting(adapter, input);
-      watcher.markSelfWrite(created.id);
+      markMeetingSelfWrite(watcher, created.id);
       return created;
     },
     onSuccess: (created) => {
@@ -70,7 +79,7 @@ export function useUpdateMeeting(id: string) {
   return useMutation({
     mutationFn: async (patch: MeetingUpdate) => {
       const updated = await updateMeeting(adapter, id, patch);
-      watcher.markSelfWrite(id);
+      markMeetingSelfWrite(watcher, id);
       return updated;
     },
     onMutate: async (patch) => {
@@ -110,7 +119,7 @@ export function useDeleteMeeting() {
   return useMutation({
     mutationFn: async (id: string) => {
       await deleteMeeting(adapter, id);
-      watcher.markSelfWrite(id);
+      markMeetingSelfWrite(watcher, id);
     },
     onSuccess: (_void, id) => {
       qc.setQueryData<Meeting[]>(meetingsKey, (prev) =>
