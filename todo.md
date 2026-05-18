@@ -30,14 +30,25 @@
 
 ---
 
-## 🟡 V0.7 후보
+## 🟡 V0.7 — "내 작업" 탭 (다음 진입 트랙, design v2.2 CLEAR)
+
+- [ ] **V0.7 "내 작업" 탭** — gh CLI 위임 + vault 기반 PR 카드 누적. design doc: `~/.gstack/projects/goodsoob-work/ham-main-design-20260518-105501.md` (v2.2, plan-eng-review CLEAR). 본인 결정: 1A flat / 1B atomic+toast / 2A ClipPromptButton 일반화 / T4-NEW `included` 필드 (tombstone 폐기) / 4A 직렬 enrich. Next Steps 13 step. 다음 세션은 step 1 (frontmatter schema + interface lock-in) 부터.
+  - 동반 TODO: 모든 gh 호출은 `Command.create("sh", ["-lc", ...])` 패턴 (Tauri macOS PATH). design 본문 코드 예시에 반영됨.
+  - test plan artifact: `~/.gstack/projects/goodsoob-work/ham-main-eng-review-test-plan-20260518-125206.md`
+
+## 🟡 V0.7 다른 후보 (병행 검토)
 
 - [ ] **Tauri 2 Mobile**. 모바일에서 본인 디자인 UI 사용. iOS sandbox/document picker + security-scoped bookmark 패턴. 일단 옵시디안 모바일로 dogfood 후 진짜 필요한지 평가.
 - [ ] **"Claude 응답 paste → 자동 callout"**. Claude 응답 paste 시 H2 split → 요약 탭 callout 자동 채움.
 - [ ] **녹음 파일 직접 업로드 → 자동 STT**. 현재는 외부 AI로 변환한 결과 복붙. 비용/사용 빈도 따져 결정.
 - [ ] **Server-side 메모 history**. 새로고침/디바이스 변경 후에도 복원. vault 방식이면 git commit 으로도 가능.
-- [ ] **UI/UX 작업 포트폴리오 자동 기록**. GitHub API + Claude Code 세션 내 분석.
 - [ ] **Tauri 데스크탑 앱 빌드 마무리**. `bun run tauri:build` 로 .dmg 생성 + 코드 사인 (선택).
+
+## 🟡 V0.7.x 후속 (V0.7 ship 후 dogfood 결과로 결정)
+
+- [ ] **gh search concurrency 5 병렬 enrich**. 4A 직렬 결정. 매일 사용에서 첫 sync 3분 통증 크면 도입 (Promise.allSettled, +30분 CC).
+- [ ] **`gh search prs` 페이지네이션**. 1000 개 넘는 케이스. 본인 1-2년치 cover 검증 후 결정.
+- [ ] **회사 HTTPS outbound 차단 시 자동 sync 끄기 설정**. dogfood 시 매일 토스트 떠야 발견.
 
 ---
 
