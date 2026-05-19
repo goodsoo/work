@@ -12,6 +12,7 @@ import {
   Calendar as CalendarIcon,
   Clock,
   Users,
+  Loader2,
 } from "lucide-react";
 
 // 숫자 + 지정 separator 만 허용 (cmd/ctrl 단축키 + 화살표/backspace/delete/Enter 통과).
@@ -984,6 +985,20 @@ function TranscriptArea({
   );
 }
 
+// pending 이 200ms 이상 지속될 때만 visible — 빠른 mutation 의 깜빡임 회피.
+function useDebouncedPending(isPending: boolean, delayMs = 200): boolean {
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    if (!isPending) {
+      setVisible(false);
+      return;
+    }
+    const t = setTimeout(() => setVisible(true), delayMs);
+    return () => clearTimeout(t);
+  }, [isPending, delayMs]);
+  return visible;
+}
+
 function SaveIndicator({
   isPending,
   isError,
@@ -995,23 +1010,52 @@ function SaveIndicator({
   hasPendingEdit: boolean;
   onRetry: () => void;
 }) {
+  const showPending = useDebouncedPending(isPending);
+
   if (isError) {
     return (
       <button
         type="button"
         onClick={onRetry}
-        className="text-xs underline"
+        title="저장 실패 — 재시도"
+        aria-label="저장 실패 — 재시도"
+        className="rounded p-1 transition"
         style={{ color: "var(--accent-red)", minHeight: 0 }}
       >
-        저장 실패
+        <AlertCircle className="h-3.5 w-3.5" />
       </button>
     );
   }
-  if (isPending) {
-    return <span className="text-xs" style={{ color: "var(--text-muted)" }}>저장 중...</span>;
+  if (showPending) {
+    return (
+      <span
+        title="저장 중"
+        aria-label="저장 중"
+        className="inline-flex items-center p-1"
+        style={{ color: "var(--text-muted)" }}
+      >
+        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+      </span>
+    );
   }
   if (hasPendingEdit) {
-    return <span className="text-xs" style={{ color: "var(--text-muted)" }}>...</span>;
+    // 저장 대기 (debounce 안) — 작은 dot 만으로 미세 신호
+    return (
+      <span
+        title="저장 대기 중"
+        aria-label="저장 대기 중"
+        className="inline-flex items-center justify-center p-1"
+      >
+        <span
+          className="block rounded-full"
+          style={{
+            width: "0.375rem",
+            height: "0.375rem",
+            backgroundColor: "var(--text-muted)",
+          }}
+        />
+      </span>
+    );
   }
   return null;
 }
