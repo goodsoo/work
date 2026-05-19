@@ -119,21 +119,13 @@ export function SourceBodyEditor({ content, onChange }: Props) {
   }, [draft]);
 
   return (
-    <div
-      className="flex"
-      style={{
-        minHeight: "60svh",
-        // 옵션 2: 좌측 외부 bar 2px accent — "편집 중" 인디케이터
-        borderLeft: "2px solid var(--accent-blue)",
-      }}
-    >
+    <div className="flex" style={{ minHeight: "60svh" }}>
       <div
         className="select-none"
         style={{
           width: GUTTER_WIDTH,
           color: "var(--text-muted)",
-          // 옵션 1: gutter divider 색 강조 (옛 --border-subtle → --accent-blue)
-          borderRight: "1px solid var(--accent-blue)",
+          borderRight: "1px solid var(--border-subtle)",
         }}
         aria-hidden
       >
