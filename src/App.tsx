@@ -20,7 +20,7 @@ import { PortfolioSidePanel } from "./components/portfolio/PortfolioSidePanel";
 import type { ProjectFilter } from "./components/portfolio/PortfolioProjectList";
 import { useGhSync } from "./hooks/usePortfolio";
 import { readSyncState } from "./api/portfolio";
-import { useMeetings } from "./hooks/useMeetings";
+import { useMeetings, useCreateMeeting, useDeleteMeeting } from "./hooks/useMeetings";
 import { useVault } from "./lib/vault/useVault";
 import { DrawerProvider, useDrawer } from "./hooks/useDrawer";
 import { todayIso } from "./lib/dates";
@@ -72,6 +72,8 @@ function AppContent() {
   const portfolioSync = useGhSync();
   const { adapter, isReady } = useVault();
   const meetings = useMeetings();
+  const createMeetingMutation = useCreateMeeting();
+  const deleteMeetingMutation = useDeleteMeeting();
   const autoSyncDone = useRef(false);
   const autoSelectedRef = useRef(didAutoSelectThisSession);
 
@@ -147,7 +149,7 @@ function AppContent() {
     return () => window.removeEventListener("keydown", blockNavKeys);
   }, []);
 
-  // Desktop (Tauri) 전용 페이지 단축키: Cmd+1/2/3
+  // Desktop (Tauri) 전용 페이지 단축키: Cmd+1/2/3/4
   useEffect(() => {
     if (!isTauri) return;
     function onKeyDown(e: KeyboardEvent) {
@@ -164,6 +166,112 @@ function AppContent() {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [selectedMeetingId]);
+
+  // 메모장 단축키 (Tauri only):
+  // - Cmd+N: 새 메모 생성 + 자동 선택 (textarea 안에서도 동작)
+  // - Cmd+Backspace/Delete: 현재 메모 삭제 (input/textarea 밖에서만)
+  // - Cmd+↑/↓: 이전/다음 메모 (input/textarea 밖에서만)
+  useEffect(() => {
+    if (!isTauri) return;
+    if (tab !== "meetings") return;
+
+    function isInTextInput(t: EventTarget | null): boolean {
+      if (!(t instanceof HTMLElement)) return false;
+      const tag = t.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true;
+      return t.isContentEditable;
+    }
+
+    async function handleCreate() {
+      if (createMeetingMutation.isPending) return;
+      try {
+        const created = await createMeetingMutation.mutateAsync({
+          title: null,
+          date: todayIso(),
+          time: null,
+          attendees: null,
+          content: "",
+          discussion_items: null,
+          decisions: null,
+          action_items: null,
+        });
+        openMeeting(created.id);
+      } catch {
+        // 사이드 패널의 createError 와 별도 — 단축키 실패는 silent (drawer 안에서도 동작)
+      }
+    }
+
+    async function handleDelete() {
+      if (!selectedMeetingId) return;
+      if (deleteMeetingMutation.isPending) return;
+      if (!window.confirm("이 메모를 휴지통으로 옮길까요?")) return;
+      try {
+        await deleteMeetingMutation.mutateAsync(selectedMeetingId);
+        closeMeeting();
+      } catch {
+        // ignore — TanStack Query mutation state 에 반영됨
+      }
+    }
+
+    function moveSelection(dir: 1 | -1) {
+      const list = meetings.data;
+      if (!list || list.length === 0) return;
+      const currIdx = selectedMeetingId
+        ? list.findIndex((m) => m.id === selectedMeetingId)
+        : -1;
+      let nextIdx: number;
+      if (currIdx === -1) {
+        nextIdx = dir === 1 ? 0 : list.length - 1;
+      } else {
+        nextIdx =
+          dir === 1
+            ? Math.min(currIdx + 1, list.length - 1)
+            : Math.max(currIdx - 1, 0);
+      }
+      if (nextIdx === currIdx) return;
+      openMeeting(list[nextIdx].id);
+    }
+
+    function onKeyDown(e: KeyboardEvent) {
+      const cmd = e.metaKey || e.ctrlKey;
+      if (!cmd) return;
+      if (e.altKey) return;
+
+      // Cmd+N: 새 메모 (textarea/input 안에서도 동작)
+      if ((e.key === "n" || e.key === "N") && !e.shiftKey) {
+        e.preventDefault();
+        void handleCreate();
+        return;
+      }
+
+      // 아래 단축키는 input/textarea 밖에서만
+      if (isInTextInput(e.target)) return;
+
+      // Cmd+Backspace/Delete: 메모 삭제
+      if ((e.key === "Backspace" || e.key === "Delete") && !e.shiftKey) {
+        if (!selectedMeetingId) return;
+        e.preventDefault();
+        void handleDelete();
+        return;
+      }
+
+      // Cmd+↑/↓: 메모 이동
+      if (e.key === "ArrowUp" && !e.shiftKey) {
+        e.preventDefault();
+        moveSelection(-1);
+        return;
+      }
+      if (e.key === "ArrowDown" && !e.shiftKey) {
+        e.preventDefault();
+        moveSelection(1);
+        return;
+      }
+    }
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, selectedMeetingId, meetings.data]);
 
   function switchTab(next: Tab) {
     setTab(next);

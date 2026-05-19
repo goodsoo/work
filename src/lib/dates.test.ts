@@ -4,6 +4,8 @@ import {
   isPast,
   isToday,
   isoDateRange,
+  parseLooseDate,
+  parseLooseTime,
   relativeDateLabel,
   todayIso,
 } from "./dates";
@@ -45,5 +47,74 @@ describe("dates", () => {
     expect(isPast("2026-05-05", ref)).toBe(true);
     expect(isPast("2026-05-06", ref)).toBe(false);
     expect(isPast("2026-05-07", ref)).toBe(false);
+  });
+
+  it("parseLooseDate accepts natural-language Korean", () => {
+    expect(parseLooseDate("오늘", ref)).toBe("2026-05-06");
+    expect(parseLooseDate("내일", ref)).toBe("2026-05-07");
+    expect(parseLooseDate("어제", ref)).toBe("2026-05-05");
+    expect(parseLooseDate("모레", ref)).toBe("2026-05-08");
+    expect(parseLooseDate("그제", ref)).toBe("2026-05-04");
+  });
+
+  it("parseLooseDate accepts weekday shortcut → 최근 과거 방향", () => {
+    // 2026-05-06 = 수요일 (Wed)
+    expect(parseLooseDate("수", ref)).toBe("2026-05-06"); // 오늘
+    expect(parseLooseDate("화", ref)).toBe("2026-05-05"); // 어제
+    expect(parseLooseDate("월", ref)).toBe("2026-05-04");
+    expect(parseLooseDate("일", ref)).toBe("2026-05-03");
+    expect(parseLooseDate("토", ref)).toBe("2026-05-02");
+    expect(parseLooseDate("금", ref)).toBe("2026-05-01");
+    expect(parseLooseDate("목", ref)).toBe("2026-04-30"); // 저번주 목
+    // 풀 한글
+    expect(parseLooseDate("수요일", ref)).toBe("2026-05-06");
+    expect(parseLooseDate("목요일", ref)).toBe("2026-04-30");
+  });
+
+  it("parseLooseDate accepts varied separators with year omitted", () => {
+    expect(parseLooseDate("5/19", ref)).toBe("2026-05-19");
+    expect(parseLooseDate("5.19", ref)).toBe("2026-05-19");
+    expect(parseLooseDate("5-19", ref)).toBe("2026-05-19");
+    expect(parseLooseDate("5 19", ref)).toBe("2026-05-19");
+    expect(parseLooseDate("5월 19일", ref)).toBe("2026-05-19");
+  });
+
+  it("parseLooseDate accepts full year forms and compact digits", () => {
+    expect(parseLooseDate("2027/3/4", ref)).toBe("2027-03-04");
+    expect(parseLooseDate("2026.05.19", ref)).toBe("2026-05-19");
+    expect(parseLooseDate("2026년 5월 19일", ref)).toBe("2026-05-19");
+    expect(parseLooseDate("20260519", ref)).toBe("2026-05-19");
+    expect(parseLooseDate("260519", ref)).toBe("2026-05-19");
+  });
+
+  it("parseLooseDate returns null for out-of-range or unparseable", () => {
+    expect(parseLooseDate("13/40", ref)).toBe(null);
+    expect(parseLooseDate("2/30", ref)).toBe(null);
+    expect(parseLooseDate("", ref)).toBe(null);
+    expect(parseLooseDate("아무말", ref)).toBe(null);
+  });
+
+  it("parseLooseTime accepts canonical and natural forms", () => {
+    expect(parseLooseTime("14:30")).toBe("14:30");
+    expect(parseLooseTime("2:30")).toBe("02:30");
+    expect(parseLooseTime("14시 30분")).toBe("14:30");
+    expect(parseLooseTime("14시")).toBe("14:00");
+    expect(parseLooseTime("오후 2시")).toBe("14:00");
+    expect(parseLooseTime("오후 2시 30분")).toBe("14:30");
+    expect(parseLooseTime("오전 9시")).toBe("09:00");
+    expect(parseLooseTime("오전 12시")).toBe("00:00");
+    expect(parseLooseTime("오후 12시")).toBe("12:00");
+    expect(parseLooseTime("2pm")).toBe("14:00");
+    expect(parseLooseTime("2:30 PM")).toBe("14:30");
+    expect(parseLooseTime("11am")).toBe("11:00");
+    expect(parseLooseTime("1430")).toBe("14:30");
+    expect(parseLooseTime("930")).toBe("09:30");
+  });
+
+  it("parseLooseTime returns null for invalid", () => {
+    expect(parseLooseTime("25:00")).toBe(null);
+    expect(parseLooseTime("14:99")).toBe(null);
+    expect(parseLooseTime("")).toBe(null);
+    expect(parseLooseTime("아침")).toBe(null);
   });
 });

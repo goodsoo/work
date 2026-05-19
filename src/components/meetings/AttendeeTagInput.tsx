@@ -20,6 +20,10 @@ export function AttendeeTagInput({
   const [open, setOpen] = useState(false);
   const [highlight, setHighlight] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  // ESC → blur 시 onBlur 의 addTag 를 한 번 skip. setDraft("") 가 async 라
+  // onBlur 클로저가 stale draft 보고 typing 중이던 텍스트를 태그로 commit
+  // 하는 버그 방지.
+  const skipBlurAddRef = useRef(false);
 
   const tagsLower = useMemo(() => tags.map((t) => t.toLowerCase()), [tags]);
 
@@ -79,7 +83,12 @@ export function AttendeeTagInput({
       setOpen(true);
       setHighlight((h) => (h - 1 + filtered.length) % filtered.length);
     } else if (e.key === "Escape") {
+      e.preventDefault();
       setOpen(false);
+      // typing 중인 새 tag draft 폐기 + blur. 이미 commit 된 tags 는 유지.
+      skipBlurAddRef.current = true;
+      setDraft("");
+      inputRef.current?.blur();
     }
   }
 
@@ -122,12 +131,16 @@ export function AttendeeTagInput({
           onFocus={() => setOpen(true)}
           onBlur={() => {
             setTimeout(() => setOpen(false), 100);
+            if (skipBlurAddRef.current) {
+              skipBlurAddRef.current = false;
+              return;
+            }
             if (draft.trim()) addTag(draft);
           }}
           onKeyDown={onKeyDown}
           placeholder={tags.length === 0 ? placeholder ?? "이름 입력 후 Enter" : ""}
-          className="min-w-[6em] flex-1 bg-transparent px-1 py-0.5 text-sm outline-none"
-          style={{ color: "var(--text-primary)", minHeight: 0 }}
+          className="min-w-[6em] flex-1 bg-transparent text-sm outline-none"
+          style={{ color: "var(--text-primary)", minHeight: 0, padding: 0 }}
         />
       </div>
       {open && filtered.length > 0 ? (

@@ -16,18 +16,6 @@ import {
   Circle,
 } from "lucide-react";
 
-// 숫자 + 지정 separator 만 허용 (cmd/ctrl 단축키 + 화살표/backspace/delete/Enter 통과).
-function makeNumericOnly(separators: string) {
-  return (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.metaKey || e.ctrlKey || e.altKey) return;
-    if (e.key.length > 1) return;
-    if (/[0-9]/.test(e.key)) return;
-    if (separators.includes(e.key)) return;
-    e.preventDefault();
-  };
-}
-const dateKeyFilter = makeNumericOnly("-");
-const timeKeyFilter = makeNumericOnly(":");
 import {
   consumeJustCreatedMeetingUid,
   useMeeting,
@@ -36,7 +24,6 @@ import {
   useDeleteMeeting,
 } from "../../hooks/useMeetings";
 import { useStateHistory } from "../../hooks/useStateHistory";
-import type { UseStateHistoryResult } from "../../hooks/useStateHistory";
 import { useCreateTodo } from "../../hooks/useTodos";
 import type { MeetingUpdate } from "../../api/meetings";
 import { ClipPromptButton } from "../common/ClipPromptButton";
@@ -50,6 +37,7 @@ import { useViewMode } from "../../hooks/useViewMode";
 import { isTauri } from "../../lib/isTauri";
 import { formatError } from "../../lib/errors";
 import { TitleConflictError } from "../../lib/vault/scan";
+import { parseLooseDate, parseLooseTime, weekdayShort } from "../../lib/dates";
 
 // 파일시스템 + 옵시디안 link syntax 금지 문자. title input commit 시 검사.
 const TITLE_UNSAFE_RE = /[/\\:*?"<>|#\^\[\]]/;
@@ -65,11 +53,19 @@ type SummaryDoc = {
   action_items: string[];
 };
 
+// title 은 history 미참여 (별도 commitTitle 가 직접 mutation).
 type MetaDoc = {
-  title: string;
   date: string;
   time: string;
   attendees: string;
+};
+
+// 전체 메모 도큐먼트 = 1 history stack (옵시디안/notion 패턴).
+type DocSnapshot = {
+  body: string;
+  transcript: string;
+  summary: SummaryDoc;
+  meta: MetaDoc;
 };
 
 function arraysEqual(a: string[], b: string[]): boolean {
@@ -96,6 +92,36 @@ function summaryToPatch(s: SummaryDoc): MeetingUpdate {
     discussion_items: s.discussion_items.length === 0 ? null : s.discussion_items,
     decisions: s.decisions.length === 0 ? null : s.decisions,
     action_items: s.action_items.length === 0 ? null : s.action_items,
+  };
+}
+
+function metasEqual(a: MetaDoc, b: MetaDoc): boolean {
+  return a.date === b.date && a.time === b.time && a.attendees === b.attendees;
+}
+
+function metaToPatch(m: MetaDoc): MeetingUpdate {
+  return {
+    date: m.date || null,
+    time: m.time.trim() || null,
+    attendees: m.attendees.trim() || null,
+  };
+}
+
+function docsEqual(a: DocSnapshot, b: DocSnapshot): boolean {
+  return (
+    a.body === b.body &&
+    a.transcript === b.transcript &&
+    summariesEqual(a.summary, b.summary) &&
+    metasEqual(a.meta, b.meta)
+  );
+}
+
+function docToPatch(d: DocSnapshot): MeetingUpdate {
+  return {
+    content: d.body,
+    transcript: d.transcript || null,
+    ...summaryToPatch(d.summary),
+    ...metaToPatch(d.meta),
   };
 }
 
@@ -139,68 +165,71 @@ export function MeetingForm({ meetingId, onBack }: Props) {
   );
   const initialMeta = useMemo<MetaDoc>(
     () => ({
-      title: data?.title ?? "",
       date: data?.date ?? "",
       time: data?.time ?? "",
       attendees: data?.attendees ? data.attendees.join(", ") : "",
     }),
-    [data?.title, data?.date, data?.time, data?.attendees],
+    [data?.date, data?.time, data?.attendees],
   );
 
-  const bodyHistory = useStateHistory<string>({
-    initial: initialBody,
-    cacheKey: id ? `${id}:body` : undefined,
+  const initialDoc = useMemo<DocSnapshot>(
+    () => ({
+      body: initialBody,
+      transcript: initialTranscript,
+      summary: initialSummary,
+      meta: initialMeta,
+    }),
+    [initialBody, initialTranscript, initialSummary, initialMeta],
+  );
+
+  // 메모 전체 = 1 history stack. body 키타이프 / transcript / summary edit /
+  // date·time·attendees commit 모두 하나의 timeline. Cmd+Z 는 focus 무관 마지막
+  // 변경 undo (옵시디안/notion 패턴). 제목은 history 미참여 — commitTitle 직접 mutation.
+  const docHistory = useStateHistory<DocSnapshot>({
+    initial: initialDoc,
+    cacheKey: id ? `${id}:doc` : undefined,
     commitMs: 1000,
-    onCommit: (v) => updateMutation.mutate({ content: v }),
+    isEqual: docsEqual,
+    onCommit: (d) => updateMutation.mutate(docToPatch(d)),
   });
 
-  const transcriptHistory = useStateHistory<string>({
-    initial: initialTranscript,
-    cacheKey: id ? `${id}:transcript` : undefined,
-    commitMs: 1000,
-    onCommit: (v) => updateMutation.mutate({ transcript: v || null }),
-  });
+  const doc = docHistory.value;
+  const body = doc.body;
+  const transcript = doc.transcript;
+  const summary = doc.summary;
+  const meta = doc.meta;
 
-  const summaryHistory = useStateHistory<SummaryDoc>({
-    initial: initialSummary,
-    cacheKey: id ? `${id}:summary` : undefined,
-    commitMs: 1000,
-    isEqual: summariesEqual,
-    onCommit: (s) => updateMutation.mutate(summaryToPatch(s)),
-  });
-
-  const body = bodyHistory.value;
-  const transcript = transcriptHistory.value;
-  const summary = summaryHistory.value;
+  // history entry boundary 추적 — 직전 set 의 source 와 다르면 flush 먼저
+  // (= 직전 source 의 pending 을 별도 entry 로 마감, 새 entry 시작).
+  const lastSourceRef = useRef<string | null>(null);
+  function setDoc(source: string, next: DocSnapshot, immediate = false) {
+    if (lastSourceRef.current !== null && lastSourceRef.current !== source) {
+      docHistory.flush();
+    }
+    lastSourceRef.current = source;
+    docHistory.set(next);
+    if (immediate) docHistory.flush();
+  }
 
   const [actionError, setActionError] = useState<string | null>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
   // ESC revert 직후 onBlur 가 commitTitle 다시 발사하는 것 차단용.
   const skipNextTitleCommit = useRef(false);
 
-  // meta 4 field 는 typing 중 mutation X (매번 rename / spinner 깜빡임 회피).
-  // onBlur / Enter / tag 추가 같은 명시 시점에만 commit. 메모 전환 시 initialMeta 와 sync.
-  const [titleDraft, setTitleDraft] = useState<string>(() => initialMeta.title);
-  const [dateDraft, setDateDraft] = useState<string>(() => initialMeta.date);
-  const [timeDraft, setTimeDraft] = useState<string>(() => initialMeta.time);
+  // title 은 history 미참여 — draft + blur/Enter 시 직접 mutation.
+  const initialTitle = data?.title ?? "";
+  const [titleDraft, setTitleDraft] = useState<string>(initialTitle);
   const [attendeesDraft, setAttendeesDraft] = useState<string>(
-    () => initialMeta.attendees,
+    () => meta.attendees,
   );
   useEffect(() => {
     // 사용자가 typing 중 (input focus) 이면 server value 로 덮어쓰기 회피.
-    // mutation 인플라이트 중 cache 갱신으로 인한 draft reset 차단.
     if (document.activeElement === titleInputRef.current) return;
-    setTitleDraft(initialMeta.title);
-  }, [initialMeta.title]);
+    setTitleDraft(initialTitle);
+  }, [initialTitle]);
   useEffect(() => {
-    setDateDraft(initialMeta.date);
-  }, [initialMeta.date]);
-  useEffect(() => {
-    setTimeDraft(initialMeta.time);
-  }, [initialMeta.time]);
-  useEffect(() => {
-    setAttendeesDraft(initialMeta.attendees);
-  }, [initialMeta.attendees]);
+    setAttendeesDraft(meta.attendees);
+  }, [meta.attendees]);
 
   async function commitTitle() {
     if (skipNextTitleCommit.current) {
@@ -208,11 +237,9 @@ export function MeetingForm({ meetingId, onBack }: Props) {
       return;
     }
     const trimmed = titleDraft.trim();
-    // 빈 → 기존 제목으로 revert. 기존도 빈이면 'untitled'.
-    const next = trimmed === "" ? (initialMeta.title || "untitled") : trimmed;
+    const next = trimmed === "" ? (initialTitle || "untitled") : trimmed;
     if (next !== titleDraft) setTitleDraft(next);
-    if (next === initialMeta.title) return;
-    // sync 검사 — 금지문자 발견 시 focus 유지 + toast. 사용자가 수정 또는 ESC.
+    if (next === initialTitle) return;
     if (TITLE_UNSAFE_RE.test(next)) {
       setActionError(
         `제목에 다음 문자 사용 불가: / \\ : * ? " < > | # ^ [ ]\n계속 수정하거나 ESC 로 원래 제목 유지하세요.`,
@@ -220,7 +247,6 @@ export function MeetingForm({ meetingId, onBack }: Props) {
       requestAnimationFrame(() => titleInputRef.current?.focus());
       return;
     }
-    // async — 디스크 충돌 검사는 updateMeeting 안에서 throw. focus 복귀 후 사용자가 다른 title 시도.
     try {
       await updateMutation.mutateAsync({ title: next });
     } catch (err) {
@@ -230,50 +256,25 @@ export function MeetingForm({ meetingId, onBack }: Props) {
         );
         requestAnimationFrame(() => titleInputRef.current?.focus());
       }
-      // 다른 에러 (저장 실패 등) 는 useUpdateMeeting 의 일반 onError 가 일반 토스트로 처리.
     }
   }
 
-  function commitDate() {
-    const v = dateDraft.trim();
-    // 빈 OK (날짜 제거). 그 외엔 YYYY-MM-DD + Date 유효.
-    const valid =
-      v === "" ||
-      (/^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(v + "T00:00:00")));
-    if (!valid) {
-      setDateDraft(initialMeta.date); // 형식 안 맞으면 기존으로 revert
-      return;
-    }
-    if (v === initialMeta.date) return;
-    updateMutation.mutate({ date: v || null });
+  // meta 변경은 명시 commit (blur/Enter/tag 추가) — source 별로 분리 entry,
+  // immediate=true 로 즉시 history append.
+  function commitDate(next: string) {
+    if (next === meta.date) return;
+    setDoc("meta:date", { ...doc, meta: { ...meta, date: next } }, true);
   }
 
-  function commitTime() {
-    const v = timeDraft.trim();
-    // 빈 OK. 그 외엔 HH:MM + 0-23 / 0-59.
-    let valid = v === "";
-    if (!valid) {
-      const m = v.match(/^(\d{2}):(\d{2})$/);
-      if (m) {
-        const h = parseInt(m[1], 10);
-        const mm = parseInt(m[2], 10);
-        valid = h >= 0 && h <= 23 && mm >= 0 && mm <= 59;
-      }
-    }
-    if (!valid) {
-      setTimeDraft(initialMeta.time);
-      return;
-    }
-    if (v === initialMeta.time) return;
-    updateMutation.mutate({ time: v || null });
+  function commitTime(next: string) {
+    if (next === meta.time) return;
+    setDoc("meta:time", { ...doc, meta: { ...meta, time: next } }, true);
   }
 
   function commitAttendees(next: string) {
-    // AttendeeTagInput onChange 는 tag 추가/제거 시점 — 이미 명시 intent. 즉시 commit.
     setAttendeesDraft(next);
-    const trimmed = next.trim();
-    if (trimmed === initialMeta.attendees.trim()) return;
-    updateMutation.mutate({ attendees: trimmed || null });
+    if (next.trim() === meta.attendees.trim()) return;
+    setDoc("meta:attendees", { ...doc, meta: { ...meta, attendees: next } }, true);
   }
   const [activeTab, setActiveTabState] = useState<ActiveTab>(
     () => ACTIVE_TAB_CACHE.get(meetingId) ?? "body",
@@ -296,13 +297,11 @@ export function MeetingForm({ meetingId, onBack }: Props) {
   // unmount 시 cleanup 은 useStateHistory 가 자체 처리하므로 여기선 listener 정리만.
   useEffect(() => {
     function onBeforeUnload() {
-      bodyHistory.flush();
-      transcriptHistory.flush();
-      summaryHistory.flush();
+      docHistory.flush();
     }
     window.addEventListener("beforeunload", onBeforeUnload);
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
-  }, [bodyHistory, transcriptHistory, summaryHistory]);
+  }, [docHistory]);
 
   // 메모 전환 시 그 메모의 마지막 탭으로 (cache miss 면 본문).
   useEffect(() => {
@@ -321,20 +320,40 @@ export function MeetingForm({ meetingId, onBack }: Props) {
     }
   }, [meetingId]);
 
-  // 활성 탭의 history (단축키 + 상단 undo/redo 버튼 대상).
-  // meta 는 단축키 안 받음 — 메타 input 안에서는 native input undo 사용.
-  const activeHistory: UseStateHistoryResult<unknown> =
-    activeTab === "body"
-      ? (bodyHistory as UseStateHistoryResult<unknown>)
-      : activeTab === "transcript"
-        ? (transcriptHistory as UseStateHistoryResult<unknown>)
-        : (summaryHistory as UseStateHistoryResult<unknown>);
+  // ESC: 활성 input/textarea/contenteditable 의 focus 제거. 제목/날짜/시간/참석자는
+  // 각자 onKeyDown 의 Esc 핸들러가 먼저 발동해 draft → 이전값 revert + 자체 blur.
+  // 본문/음성 기록 textarea 는 값 유지 + 여기서 blur 만.
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key !== "Escape") return;
+      const a = document.activeElement as HTMLElement | null;
+      if (!a) return;
+      const tag = a.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || a.isContentEditable) {
+        a.blur();
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   // 단축키 (Tauri only):
-  //   Cmd/Ctrl+Z/Y/Shift+Z = 활성 탭 stack 의 undo/redo
-  //   Cmd+[ / Cmd+] = sub-tab 좌/우 cycling (메모 ↔ 음성 기록 ↔ 요약)
-  //   Cmd+E = 본문 탭일 때 편집/보기 토글 (옵시디안 패턴)
+  //   Cmd/Ctrl+Z/Y/Shift+Z = docHistory undo/redo (전체 도큐먼트 timeline. 제목 제외).
+  //     focus 가 제목 input 이면 native input undo 사용 (preventDefault X).
+  //   Q / W / E = sub-tab 메모 / 음성 기록 / 요약 (input/textarea 밖에서만). Q 두 번째 =
+  //     본문 탭일 때 편집/보기 토글. e.code 매칭으로 한글 IME 켜져 있어도 동작.
   useEffect(() => {
+    function isInTextInput(t: EventTarget | null): boolean {
+      if (!(t instanceof HTMLElement)) return false;
+      const tag = t.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true;
+      return t.isContentEditable;
+    }
+
+    function isInTitleInput(): boolean {
+      return document.activeElement === titleInputRef.current;
+    }
+
     function onKeyDown(e: KeyboardEvent) {
       const cmd = e.metaKey || e.ctrlKey;
       const k = e.key.toLowerCase();
@@ -342,36 +361,40 @@ export function MeetingForm({ meetingId, onBack }: Props) {
       const isRedo =
         (cmd && !e.altKey && k === "y") ||
         (cmd && e.shiftKey && !e.altKey && k === "z");
+      // 제목 input focus 면 native input undo 통과 (title 은 history 미참여).
+      if ((isUndo || isRedo) && isInTitleInput()) return;
       if (isUndo) {
         e.preventDefault();
-        activeHistory.undo();
+        docHistory.undo();
         return;
       }
       if (isRedo) {
         e.preventDefault();
-        activeHistory.redo();
+        docHistory.redo();
         return;
       }
       if (!isTauri) return;
-      // Cmd+E — 메모 탭일 때만 편집/보기 토글. 다른 탭이면 무시 (textarea 통과).
-      if (cmd && !e.shiftKey && !e.altKey && k === "e") {
-        if (activeTab !== "body") return;
+      // single-key sub-tab — modifier 있으면 무시.
+      if (cmd || e.shiftKey || e.altKey) return;
+      if (isInTextInput(e.target)) return;
+      if (e.code === "KeyQ") {
         e.preventDefault();
-        setViewMode(viewMode === "edit" ? "view" : "edit");
-        return;
-      }
-      // Cmd+] = 다음 sub-tab, Cmd+[ = 이전 sub-tab. cycling.
-      if (cmd && !e.shiftKey && !e.altKey && (k === "]" || k === "[")) {
+        if (activeTab === "body") {
+          setViewMode(viewMode === "edit" ? "view" : "edit");
+        } else {
+          setActiveTab("body");
+        }
+      } else if (e.code === "KeyW") {
         e.preventDefault();
-        const order: typeof activeTab[] = ["body", "transcript", "summary"];
-        const idx = order.indexOf(activeTab);
-        const next = k === "]" ? (idx + 1) % order.length : (idx - 1 + order.length) % order.length;
-        setActiveTab(order[next]);
+        setActiveTab("transcript");
+      } else if (e.code === "KeyE") {
+        e.preventDefault();
+        setActiveTab("summary");
       }
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [activeHistory, activeTab, viewMode, setViewMode]);
+  }, [docHistory, activeTab, viewMode, setViewMode]);
 
   async function handleDelete() {
     if (!data) return;
@@ -406,13 +429,8 @@ export function MeetingForm({ meetingId, onBack }: Props) {
   function retrySave() {
     if (updateMutation.isPending) return;
     updateMutation.mutate({
-      title: titleDraft.trim() || initialMeta.title || "untitled",
-      date: dateDraft.trim() || null,
-      time: timeDraft.trim() || null,
-      attendees: attendeesDraft.trim() || null,
-      content: body,
-      transcript: transcript || null,
-      ...summaryToPatch(summary),
+      title: titleDraft.trim() || initialTitle || "untitled",
+      ...docToPatch(doc),
     });
   }
 
@@ -460,10 +478,10 @@ export function MeetingForm({ meetingId, onBack }: Props) {
     !summariesEqual(summary, initialSummary);
 
   const meetingForCopy = {
-    title: initialMeta.title || null,
-    date: initialMeta.date || null,
-    time: initialMeta.time || null,
-    attendees: initialMeta.attendees || null,
+    title: titleDraft.trim() || initialTitle || null,
+    date: meta.date || null,
+    time: meta.time || null,
+    attendees: meta.attendees || null,
     discussion_items: summary.discussion_items,
     decisions: summary.decisions,
     action_items: summary.action_items,
@@ -473,7 +491,8 @@ export function MeetingForm({ meetingId, onBack }: Props) {
     key: K,
     value: SummaryDoc[K],
   ) {
-    summaryHistory.set({ ...summary, [key]: value });
+    // summary list 변경은 명시 intent (Enter, 삭제 등) — 즉시 entry.
+    setDoc(`summary:${key}`, { ...doc, summary: { ...summary, [key]: value } }, true);
   }
 
   return (
@@ -484,7 +503,7 @@ export function MeetingForm({ meetingId, onBack }: Props) {
         className="sticky top-0 z-20 grid items-center gap-2 overflow-hidden px-3 backdrop-blur lg:shrink-0 lg:relative lg:top-auto"
         style={{
           height: "3.5rem",
-          gridTemplateColumns: "1fr auto 1fr",
+          gridTemplateColumns: "minmax(0, 1fr) minmax(0, auto) minmax(0, 1fr)",
           backgroundColor: "var(--bg-overlay)",
           borderBottom: "1px solid var(--border-subtle)",
         }}
@@ -497,8 +516,8 @@ export function MeetingForm({ meetingId, onBack }: Props) {
           >
             <button
               type="button"
-              onClick={activeHistory.undo}
-              disabled={!activeHistory.canUndo}
+              onClick={docHistory.undo}
+              disabled={!docHistory.canUndo}
               title={`실행 취소 (${activeTab === "body" ? "메모" : activeTab === "transcript" ? "음성 기록" : "요약"})`}
               className="px-1.5 py-1 transition disabled:opacity-20"
               style={{ color: "var(--text-secondary)", minHeight: 0 }}
@@ -507,8 +526,8 @@ export function MeetingForm({ meetingId, onBack }: Props) {
             </button>
             <button
               type="button"
-              onClick={activeHistory.redo}
-              disabled={!activeHistory.canRedo}
+              onClick={docHistory.redo}
+              disabled={!docHistory.canRedo}
               title={`다시 실행 (${activeTab === "body" ? "메모" : activeTab === "transcript" ? "음성 기록" : "요약"})`}
               className="px-1.5 py-1 transition disabled:opacity-20"
               style={{ color: "var(--text-secondary)", borderLeft: "1px solid var(--border-subtle)", minHeight: 0 }}
@@ -539,7 +558,7 @@ export function MeetingForm({ meetingId, onBack }: Props) {
             } else if (e.key === "Escape") {
               e.preventDefault();
               // 원래 제목으로 revert + blur. 다음 onBlur 의 commitTitle 는 skip.
-              setTitleDraft(initialMeta.title);
+              setTitleDraft(initialTitle);
               skipNextTitleCommit.current = true;
               setActionError(null);
               (e.target as HTMLInputElement).blur();
@@ -550,9 +569,13 @@ export function MeetingForm({ meetingId, onBack }: Props) {
           className="min-w-0 justify-self-center bg-transparent text-center text-base font-semibold outline-none"
           style={{
             color: "var(--text-primary)",
-            maxWidth: "min(28rem, 100%)",
-            width: `${Math.max((titleDraft || "untitled").length, 6) + 2}ch`,
-          }}
+            // field-sizing: input width 가 자동으로 content 길이 따라감 (한글/영문 정확).
+            // max-width 28rem 또는 grid track 안 100% 로 cap, 초과 시 native ellipsis.
+            fieldSizing: "content",
+            maxWidth: "min(100%, 28rem)",
+            textOverflow: "ellipsis",
+            overflow: "hidden",
+          } as React.CSSProperties}
         />
 
         {/* Right: edit toggle / copy / delete */}
@@ -567,7 +590,7 @@ export function MeetingForm({ meetingId, onBack }: Props) {
             title={
               activeTab === "body"
                 ? isTauri
-                  ? `${viewMode === "edit" ? "보기 모드" : "편집 모드"}  ⌘ + E`
+                  ? `${viewMode === "edit" ? "보기 모드" : "편집 모드"}  Q`
                   : viewMode === "edit"
                     ? "보기 모드"
                     : "편집 모드"
@@ -693,30 +716,19 @@ export function MeetingForm({ meetingId, onBack }: Props) {
           <div className="flex gap-1">
             <TabBtn
               label="메모"
-              badge={viewMode === "edit" ? "편집" : "보기"}
-              badgeAccent={viewMode === "edit"}
-              badgeTitle={
-                isTauri
-                  ? `${viewMode === "edit" ? "보기 모드" : "편집 모드"}  ⌘ + E`
-                  : viewMode === "edit"
-                    ? "보기 모드"
-                    : "편집 모드"
-              }
-              onBadgeClick={
-                activeTab === "body"
-                  ? () => setViewMode(viewMode === "edit" ? "view" : "edit")
-                  : undefined
-              }
+              shortcut={isTauri ? "Q" : undefined}
               active={activeTab === "body"}
               onClick={() => setActiveTab("body")}
             />
             <TabBtn
               label="음성 기록"
+              shortcut={isTauri ? "W" : undefined}
               active={activeTab === "transcript"}
               onClick={() => setActiveTab("transcript")}
             />
             <TabBtn
               label="요약"
+              shortcut={isTauri ? "E" : undefined}
               active={activeTab === "summary"}
               onClick={() => setActiveTab("summary")}
             />
@@ -747,44 +759,24 @@ export function MeetingForm({ meetingId, onBack }: Props) {
                 보기 모드 = plain text (icon/divider 없음, 빈 field 안 보임). */}
             {viewMode === "edit" ? (
               <div className="mb-4">
-                <MetaRow icon={<CalendarIcon className="h-3.5 w-3.5" />} label="날짜">
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    value={dateDraft}
-                    onChange={(e) => setDateDraft(e.target.value)}
-                    onBlur={commitDate}
-                    onKeyDown={(e) => {
-                      dateKeyFilter(e);
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        // blur 만 — onBlur 가 commitDate. commit 중복 발사 회피.
-                        (e.target as HTMLInputElement).blur();
-                      }
-                    }}
-                    placeholder="YYYY-MM-DD"
-                    className="meta-input flex-1"
-                    maxLength={10}
+                <MetaRow
+                  icon={<CalendarIcon className="h-3.5 w-3.5" />}
+                  iconTitle="허용 형식: YYYY-MM-DD · 5/19 · 5.19 · 5월 19일 · 2026/5/19 · 오늘 · 내일 · 어제 · 모레 · 그제 · 월/화/수… (가장 최근 그 요일)"
+                  label="날짜"
+                >
+                  <LooseDateInput
+                    value={meta.date}
+                    onCommit={commitDate}
                   />
                 </MetaRow>
-                <MetaRow icon={<Clock className="h-3.5 w-3.5" />} label="시간">
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    value={timeDraft}
-                    onChange={(e) => setTimeDraft(e.target.value)}
-                    onBlur={commitTime}
-                    onKeyDown={(e) => {
-                      timeKeyFilter(e);
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        // blur 만 — onBlur 가 commitTime. commit 중복 발사 회피.
-                        (e.target as HTMLInputElement).blur();
-                      }
-                    }}
-                    placeholder="HH:MM"
-                    className="meta-input flex-1"
-                    maxLength={5}
+                <MetaRow
+                  icon={<Clock className="h-3.5 w-3.5" />}
+                  iconTitle="허용 형식: HH:MM · 14:30 · 14시 30분 · 오후 2시 · 오전 9:30 · 2pm · 2:30 PM · 1430"
+                  label="시간"
+                >
+                  <LooseTimeInput
+                    value={meta.time}
+                    onCommit={commitTime}
                   />
                 </MetaRow>
                 <MetaRow icon={<Users className="h-3.5 w-3.5" />} label="참석자">
@@ -799,13 +791,19 @@ export function MeetingForm({ meetingId, onBack }: Props) {
                 </MetaRow>
               </div>
             ) : (
-              <MetaReadOnly meta={initialMeta} />
+              <MetaReadOnly meta={meta} />
             )}
             {viewMode === "edit" ? (
               <SourceBodyEditor
                 key={`${meetingId}:body`}
                 content={body}
-                onChange={(v) => bodyHistory.set(v)}
+                onChange={(v) => {
+                  // 줄이 늘었으면 직전 줄까지 별도 entry.
+                  const prevLines = (doc.body.match(/\n/g)?.length ?? 0);
+                  const newLines = (v.match(/\n/g)?.length ?? 0);
+                  if (newLines > prevLines) docHistory.flush();
+                  setDoc("body", { ...doc, body: v });
+                }}
               />
             ) : (
               <MarkdownView content={body} />
@@ -819,7 +817,12 @@ export function MeetingForm({ meetingId, onBack }: Props) {
             <TranscriptArea
               key={`${meetingId}:transcript`}
               transcript={transcript}
-              onChange={(v) => transcriptHistory.set(v)}
+              onChange={(v) => {
+                const prevLines = (doc.transcript.match(/\n/g)?.length ?? 0);
+                const newLines = (v.match(/\n/g)?.length ?? 0);
+                if (newLines > prevLines) docHistory.flush();
+                setDoc("transcript", { ...doc, transcript: v });
+              }}
               onError={setActionError}
             />
           </div>
@@ -831,10 +834,10 @@ export function MeetingForm({ meetingId, onBack }: Props) {
             <ClipPromptButton
               buildPrompt={() =>
                 buildClaudePrompt({
-                  title: initialMeta.title || null,
-                  date: initialMeta.date || null,
-                  time: initialMeta.time || null,
-                  attendees: initialMeta.attendees || null,
+                  title: titleDraft.trim() || initialTitle || null,
+                  date: meta.date || null,
+                  time: meta.time || null,
+                  attendees: meta.attendees || null,
                   content: body,
                   transcript: transcript || null,
                 })
@@ -935,10 +938,12 @@ function CharCountBadge({ count }: { count: number }) {
 // 본문 textarea 의 line gutter 패턴과 동일: icon col (1.75rem) + 우측 divider + 라벨 + 값.
 function MetaRow({
   icon,
+  iconTitle,
   label,
   children,
 }: {
   icon: React.ReactNode;
+  iconTitle?: string;
   label: string;
   children: React.ReactNode;
 }) {
@@ -951,7 +956,8 @@ function MetaRow({
           color: "var(--text-muted)",
           borderRight: "1px solid var(--border-subtle)",
         }}
-        aria-hidden
+        title={iconTitle}
+        aria-label={iconTitle}
       >
         {icon}
       </div>
@@ -974,8 +980,9 @@ function MetaRow({
 // 보기 모드용 meta — icon/divider 없는 plain text. 빈 field 안 보임.
 // 편집 모드 MetaRow 와 같은 line height (1.625rem) + 라벨 위치 (gutter 1.75rem + paddingLeft 0.5rem).
 function MetaReadOnly({ meta }: { meta: MetaDoc }) {
+  const wd = weekdayShort(meta.date);
   const rows: { label: string; value: string }[] = [];
-  if (meta.date) rows.push({ label: "날짜", value: meta.date });
+  if (meta.date) rows.push({ label: "날짜", value: wd ? `${meta.date} (${wd})` : meta.date });
   if (meta.time) rows.push({ label: "시간", value: meta.time });
   if (meta.attendees) rows.push({ label: "참석자", value: meta.attendees });
   if (rows.length === 0) return null;
@@ -1038,6 +1045,20 @@ function TabBtn({
       }}
     >
       <span>{label}</span>
+      {shortcut ? (
+        <kbd
+          aria-hidden
+          className="rounded font-mono text-[10px] leading-none"
+          style={{
+            padding: "2px 5px",
+            border: "1px solid var(--border-subtle)",
+            color: "var(--text-muted)",
+            backgroundColor: "var(--bg-surface)",
+          }}
+        >
+          {shortcut}
+        </kbd>
+      ) : null}
       {badge ? (
         <span
           role={onBadgeClick ? "button" : undefined}
@@ -1156,6 +1177,146 @@ function TranscriptArea({
         }}
       />
     </div>
+  );
+}
+
+/**
+ * 너그러운 날짜 input. blur/Enter 시 parseLooseDate → ISO 정규화. 파싱 실패 시
+ * 이전 값으로 revert. blur 상태 + 유효 ISO + 요일 있으면 input value 자체에
+ * " (요일)" 합쳐 표시. focus 가면 ISO 만 (편집 가능).
+ */
+function LooseDateInput({
+  value,
+  onCommit,
+}: {
+  value: string;
+  onCommit: (next: string) => void;
+}) {
+  const [draft, setDraft] = useState(value);
+  const [focused, setFocused] = useState(false);
+  // ESC → blur 시 commit skip flag. setDraft 가 async 라 commit 클로저가
+  // stale draft 읽고 수정값을 저장하는 버그 방지.
+  const skipCommitRef = useRef(false);
+  useEffect(() => {
+    setDraft(value);
+  }, [value]);
+
+  function commit() {
+    if (skipCommitRef.current) {
+      skipCommitRef.current = false;
+      return;
+    }
+    const trimmed = draft.trim();
+    if (trimmed === "") {
+      if (value !== "") onCommit("");
+      return;
+    }
+    if (trimmed === value) return;
+    const iso = parseLooseDate(trimmed);
+    if (iso) {
+      setDraft(iso);
+      if (iso !== value) onCommit(iso);
+    } else {
+      setDraft(value);
+    }
+  }
+
+  const wd = weekdayShort(value);
+  const display = !focused && draft && wd ? `${draft} (${wd})` : draft;
+  const widthCh = Math.max(display.length, 10);
+
+  return (
+    <input
+      type="text"
+      value={display}
+      onChange={(e) => setDraft(e.target.value)}
+      onFocus={() => setFocused(true)}
+      onBlur={() => {
+        setFocused(false);
+        commit();
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          e.currentTarget.blur();
+        } else if (e.key === "Escape") {
+          skipCommitRef.current = true;
+          setDraft(value);
+          e.currentTarget.blur();
+        }
+      }}
+      placeholder="yyyy-mm-dd"
+      maxLength={10}
+      className="border-0 bg-transparent text-sm leading-none outline-none"
+      style={{
+        color: "var(--text-secondary)",
+        width: `${widthCh}ch`,
+      }}
+    />
+  );
+}
+
+/**
+ * 너그러운 시간 input. blur/Enter 시 parseLooseTime → HH:mm 정규화.
+ * 파싱 실패 시 이전 값으로 revert.
+ */
+function LooseTimeInput({
+  value,
+  onCommit,
+}: {
+  value: string;
+  onCommit: (next: string) => void;
+}) {
+  const [draft, setDraft] = useState(value);
+  const skipCommitRef = useRef(false);
+  useEffect(() => {
+    setDraft(value);
+  }, [value]);
+
+  function commit() {
+    if (skipCommitRef.current) {
+      skipCommitRef.current = false;
+      return;
+    }
+    const trimmed = draft.trim();
+    if (trimmed === "") {
+      if (value !== "") onCommit("");
+      return;
+    }
+    if (trimmed === value) return;
+    const hhmm = parseLooseTime(trimmed);
+    if (hhmm) {
+      setDraft(hhmm);
+      if (hhmm !== value) onCommit(hhmm);
+    } else {
+      setDraft(value);
+    }
+  }
+
+  return (
+    <input
+      type="text"
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          e.currentTarget.blur();
+        } else if (e.key === "Escape") {
+          skipCommitRef.current = true;
+          setDraft(value);
+          e.currentTarget.blur();
+        }
+      }}
+      placeholder="hh:mm"
+      maxLength={11}
+      className="border-0 bg-transparent text-sm leading-none outline-none"
+      style={{
+        color: "var(--text-secondary)",
+        width: `${Math.max(draft.length, 5)}ch`,
+      }}
+    />
   );
 }
 

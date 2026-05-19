@@ -483,14 +483,14 @@ export async function restoreFromTrash(
     /^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-/,
     "",
   );
-  // 원본 폴더 구조 추정: meetings/* 또는 journals/* 또는 root
+  // 원본 폴더 구조 추정. V0.7.1: 메모는 meetings/{title}.md (date prefix 없음).
+  // 순수 YYYY-MM-DD.md 만 일기, 그 외 (legacy date-prefix + V0.7.1 title-only)
+  // 는 모두 메모로 복원.
   let target: string;
-  if (base.match(/^\d{4}-\d{2}-\d{2}-/) && !base.startsWith("journals/")) {
-    target = `meetings/${base}`;
-  } else if (base.match(/^\d{4}-\d{2}-\d{2}\.md$/)) {
+  if (base.match(/^\d{4}-\d{2}-\d{2}\.md$/)) {
     target = `journals/${base}`;
   } else {
-    target = base;
+    target = `meetings/${base}`;
   }
   // 충돌 회피
   let n = 2;

@@ -37,6 +37,21 @@ export function SourceBodyEditor({ content, onChange }: Props) {
     setCaretLine(el.value.slice(0, pos).split("\n").length - 1);
   }
 
+  // gutter 클릭 → 해당 줄 전체 선택 (줄 시작 ~ 끝, 개행 제외) + focus
+  function focusLine(lineIndex: number) {
+    const el = textareaRef.current;
+    if (!el) return;
+    const lines = el.value.split("\n");
+    let start = 0;
+    for (let i = 0; i < lineIndex && i < lines.length; i++) {
+      start += lines[i].length + 1; // +1 = "\n"
+    }
+    const end = start + (lines[lineIndex]?.length ?? 0);
+    el.focus();
+    el.setSelectionRange(start, end);
+    setCaretLine(lineIndex);
+  }
+
   useEffect(() => {
     if (skipNextValueSyncRef.current) {
       skipNextValueSyncRef.current = false;
@@ -127,10 +142,14 @@ export function SourceBodyEditor({ content, onChange }: Props) {
           color: "var(--text-muted)",
           borderRight: "1px solid var(--border-subtle)",
         }}
-        aria-hidden
       >
         {lineKinds.map((kind, i) => (
-          <GutterMarker key={i} kind={kind} active={i === caretLine} />
+          <GutterMarker
+            key={i}
+            kind={kind}
+            active={i === caretLine}
+            onClick={() => focusLine(i)}
+          />
         ))}
       </div>
       <textarea
@@ -167,9 +186,11 @@ export function SourceBodyEditor({ content, onChange }: Props) {
 function GutterMarker({
   kind,
   active,
+  onClick,
 }: {
   kind: LineKind;
   active: boolean;
+  onClick: () => void;
 }) {
   const label = labelForKind(kind);
   const depth =
@@ -179,8 +200,9 @@ function GutterMarker({
 
   return (
     <div
-      title={label || undefined}
-      className="flex items-center justify-center"
+      title={label || "이 줄로 이동"}
+      onClick={onClick}
+      className="flex cursor-pointer items-center justify-center hover:bg-[var(--bg-surface-hover)]"
       style={{
         height: LINE_HEIGHT,
         lineHeight: LINE_HEIGHT,

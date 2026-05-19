@@ -131,8 +131,11 @@ export async function listDeletedMeetings(
       /^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-/,
       "",
     );
-    if (!base.match(/^\d{4}-\d{2}-\d{2}-/) || base.match(/^\d{4}-\d{2}-\d{2}\.md$/)) {
-      continue; // 일기 등 다른 종류 skip
+    // V0.7.1: 메모 파일명은 임의 title (date prefix 없음). 순수 YYYY-MM-DD.md
+    // 만 일기로 보고 skip. 그 외 (legacy YYYY-MM-DD-{title}.md + V0.7.1
+    // {title}.md) 는 모두 메모.
+    if (base.match(/^\d{4}-\d{2}-\d{2}\.md$/)) {
+      continue;
     }
     try {
       const raw = await adapter.read(id);
