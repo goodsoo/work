@@ -441,7 +441,7 @@ export function MeetingForm({ meetingId, onBack }: Props) {
         className="sticky top-0 z-20 grid items-center gap-2 overflow-hidden px-3 backdrop-blur lg:shrink-0 lg:relative lg:top-auto"
         style={{
           height: "3.5rem",
-          gridTemplateColumns: "1fr auto 1fr",
+          gridTemplateColumns: "minmax(0, 1fr) minmax(0, auto) minmax(0, 1fr)",
           backgroundColor: "var(--bg-overlay)",
           borderBottom: "1px solid var(--border-subtle)",
         }}
@@ -507,8 +507,9 @@ export function MeetingForm({ meetingId, onBack }: Props) {
           className="min-w-0 justify-self-center bg-transparent text-center text-base font-semibold outline-none"
           style={{
             color: "var(--text-primary)",
-            maxWidth: "min(28rem, 100%)",
-            width: `${Math.max((titleDraft || "untitled").length, 6) + 2}ch`,
+            width: `min(${Math.max((titleDraft || "untitled").length, 6) + 2}ch, 100%, 28rem)`,
+            textOverflow: "ellipsis",
+            overflow: "hidden",
           }}
         />
 
