@@ -393,18 +393,18 @@ export function MeetingForm({ meetingId, onBack }: Props) {
 
   return (
     <div className="min-h-svh">
-      {/* Header — 사이드바 헤더와 같은 높이 (3.5rem). 좌 undo/redo + 저장 / 가운데 제목 / 우 편집·복사·삭제.
-          (--app-header-h 는 모바일용 변수라 데스크탑에서 0px — explicit height 사용) */}
+      {/* Header — 사이드바 헤더와 같은 높이 (3.5rem). grid 로 좌/우 그룹 width 변화 무관 제목 viewport-center. */}
       <div
-        className="sticky top-0 z-20 flex min-w-0 shrink-0 items-center gap-2 overflow-hidden px-3 backdrop-blur"
+        className="sticky top-0 z-20 grid items-center gap-2 overflow-hidden px-3 backdrop-blur"
         style={{
           height: "3.5rem",
+          gridTemplateColumns: "1fr auto 1fr",
           backgroundColor: "var(--bg-overlay)",
           borderBottom: "1px solid var(--border-subtle)",
         }}
       >
         {/* Left: undo/redo + save indicator */}
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2 justify-self-start">
           <div
             className="inline-flex overflow-hidden rounded-md"
             style={{ border: "1px solid var(--border-subtle)" }}
@@ -438,7 +438,7 @@ export function MeetingForm({ meetingId, onBack }: Props) {
           />
         </div>
 
-        {/* Center: title */}
+        {/* Center: title — grid auto col 안 dead-center, max-width 로 좌/우 그룹과 겹침 방지 */}
         <input
           ref={titleInputRef}
           type="text"
@@ -451,12 +451,16 @@ export function MeetingForm({ meetingId, onBack }: Props) {
           }}
           placeholder="untitled"
           autoFocus={!data.title}
-          className="min-w-0 flex-1 bg-transparent text-center text-base font-semibold outline-none"
-          style={{ color: "var(--text-primary)" }}
+          className="min-w-0 justify-self-center bg-transparent text-center text-base font-semibold outline-none"
+          style={{
+            color: "var(--text-primary)",
+            maxWidth: "min(28rem, 100%)",
+            width: `${Math.max((meta.title || "untitled").length, 6) + 2}ch`,
+          }}
         />
 
         {/* Right: edit toggle / copy / delete */}
-        <div className="flex shrink-0 items-center gap-1">
+        <div className="flex shrink-0 items-center gap-1 justify-self-end">
           <button
             type="button"
             onClick={() =>
