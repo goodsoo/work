@@ -379,7 +379,7 @@ export function MeetingForm({ meetingId, onBack }: Props) {
     <div className="min-h-svh">
       {/* Header — 사이드바 헤더와 같은 높이. 좌 undo/redo + 저장 / 가운데 제목 / 우 편집·복사·삭제 */}
       <div
-        className="sticky top-0 z-10 flex items-center gap-2 px-3 backdrop-blur"
+        className="sticky top-0 z-10 flex min-w-0 items-center gap-2 overflow-hidden px-3 backdrop-blur"
         style={{
           height: "var(--app-header-h)",
           backgroundColor: "var(--bg-overlay)",
@@ -387,7 +387,7 @@ export function MeetingForm({ meetingId, onBack }: Props) {
         }}
       >
         {/* Left: undo/redo + save indicator */}
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           <div
             className="inline-flex overflow-hidden rounded-md"
             style={{ border: "1px solid var(--border-subtle)" }}
@@ -439,7 +439,7 @@ export function MeetingForm({ meetingId, onBack }: Props) {
         />
 
         {/* Right: edit toggle / copy / delete */}
-        <div className="flex items-center gap-1">
+        <div className="flex shrink-0 items-center gap-1">
           <button
             type="button"
             onClick={() =>
