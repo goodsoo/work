@@ -167,11 +167,10 @@ export async function createMeeting(
   adapter: VaultAdapter,
   input: MeetingInsert,
 ): Promise<Meeting> {
-  const date = input.date ?? new Date().toISOString().slice(0, 10);
   const title = input.title ?? "";
-  const path = await generateMeetingPath(adapter, date, title);
+  const path = await generateMeetingPath(adapter, title);
   const uid = crypto.randomUUID();
-  const meeting = buildMeeting({ ...input, date, title }, path, uid);
+  const meeting = buildMeeting({ ...input, title }, path, uid);
 
   const mainRaw = meetingToMainRaw(meeting);
   const mainMeta = await adapter.write(path, mainRaw);
@@ -198,36 +197,21 @@ export async function updateMeeting(
     throw new Error(`meeting not found: ${id}`);
   }
 
-  // Title/date 변경 시 파일명 rename (메인 + sidecar 묶음).
+  // Title 변경 시 파일명 rename (메인 + sidecar 묶음). title 만 frontmatter 에 안 들어가고
+  // 파일명이 곧 title — rename only → inode 유지 (옵시디안 모델 동일).
   // rename 후 currentId 가 새 path — 이후 모든 patch 는 currentId 기준.
   let currentId = id;
-  if (patch.title !== undefined || patch.date !== undefined) {
-    const current = await readFullMeeting(adapter, id);
-    if (current) {
-      const nextTitle = patch.title !== undefined
-        ? (patch.title ?? "")
-        : current.title;
-      const nextDate = patch.date !== undefined
-        ? (patch.date ?? "")
-        : (current.date ?? "");
-      if (nextDate) {
-        const newPath = await computeRenamedMeetingPath(
-          adapter,
-          id,
-          nextDate,
-          nextTitle,
-        );
-        if (newPath !== id) {
-          await renameMeetingFiles(adapter, id, newPath);
-          currentId = newPath;
-        }
-      }
+  if (patch.title !== undefined) {
+    const nextTitle = patch.title ?? "";
+    const newPath = await computeRenamedMeetingPath(adapter, id, nextTitle);
+    if (newPath !== id) {
+      await renameMeetingFiles(adapter, id, newPath);
+      currentId = newPath;
     }
   }
 
-  // 메인 파일 — frontmatter / content
+  // 메인 파일 — frontmatter / content. title 은 frontmatter 에 안 박힘.
   const fmPatch: Record<string, unknown> = {};
-  if (patch.title !== undefined) fmPatch.title = patch.title ?? "";
   if (patch.date !== undefined) fmPatch.date = patch.date;
   if (patch.time !== undefined) fmPatch.time = patch.time;
   if (patch.attendees !== undefined) {

@@ -49,6 +49,10 @@ import { MarkdownView } from "./MarkdownView";
 import { useViewMode } from "../../hooks/useViewMode";
 import { isTauri } from "../../lib/isTauri";
 import { formatError } from "../../lib/errors";
+import { TitleConflictError } from "../../lib/vault/scan";
+
+// 파일시스템 + 옵시디안 link syntax 금지 문자. title input commit 시 검사.
+const TITLE_UNSAFE_RE = /[/\\:*?"<>|#\^\[\]]/;
 
 type Props = {
   meetingId: string;
@@ -171,6 +175,8 @@ export function MeetingForm({ meetingId, onBack }: Props) {
 
   const [actionError, setActionError] = useState<string | null>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
+  // ESC revert 직후 onBlur 가 commitTitle 다시 발사하는 것 차단용.
+  const skipNextTitleCommit = useRef(false);
 
   // meta 4 field 는 typing 중 mutation X (매번 rename / spinner 깜빡임 회피).
   // onBlur / Enter / tag 추가 같은 명시 시점에만 commit. 메모 전환 시 initialMeta 와 sync.
@@ -181,6 +187,9 @@ export function MeetingForm({ meetingId, onBack }: Props) {
     () => initialMeta.attendees,
   );
   useEffect(() => {
+    // 사용자가 typing 중 (input focus) 이면 server value 로 덮어쓰기 회피.
+    // mutation 인플라이트 중 cache 갱신으로 인한 draft reset 차단.
+    if (document.activeElement === titleInputRef.current) return;
     setTitleDraft(initialMeta.title);
   }, [initialMeta.title]);
   useEffect(() => {
@@ -193,13 +202,36 @@ export function MeetingForm({ meetingId, onBack }: Props) {
     setAttendeesDraft(initialMeta.attendees);
   }, [initialMeta.attendees]);
 
-  function commitTitle() {
+  async function commitTitle() {
+    if (skipNextTitleCommit.current) {
+      skipNextTitleCommit.current = false;
+      return;
+    }
     const trimmed = titleDraft.trim();
     // 빈 → 기존 제목으로 revert. 기존도 빈이면 'untitled'.
     const next = trimmed === "" ? (initialMeta.title || "untitled") : trimmed;
     if (next !== titleDraft) setTitleDraft(next);
     if (next === initialMeta.title) return;
-    updateMutation.mutate({ title: next });
+    // sync 검사 — 금지문자 발견 시 focus 유지 + toast. 사용자가 수정 또는 ESC.
+    if (TITLE_UNSAFE_RE.test(next)) {
+      setActionError(
+        `제목에 다음 문자 사용 불가: / \\ : * ? " < > | # ^ [ ]\n계속 수정하거나 ESC 로 원래 제목 유지하세요.`,
+      );
+      requestAnimationFrame(() => titleInputRef.current?.focus());
+      return;
+    }
+    // async — 디스크 충돌 검사는 updateMeeting 안에서 throw. focus 복귀 후 사용자가 다른 title 시도.
+    try {
+      await updateMutation.mutateAsync({ title: next });
+    } catch (err) {
+      if (err instanceof TitleConflictError) {
+        setActionError(
+          `이미 같은 제목의 메모가 있어요: "${next}"\n계속 수정하거나 ESC 로 원래 제목 유지하세요.`,
+        );
+        requestAnimationFrame(() => titleInputRef.current?.focus());
+      }
+      // 다른 에러 (저장 실패 등) 는 useUpdateMeeting 의 일반 onError 가 일반 토스트로 처리.
+    }
   }
 
   function commitDate() {
@@ -503,6 +535,13 @@ export function MeetingForm({ meetingId, onBack }: Props) {
             if (e.key === "Enter") {
               e.preventDefault();
               // blur 만 — onBlur 가 commitTitle 발사. 직접 호출하면 commit 2번 → mutation race.
+              (e.target as HTMLInputElement).blur();
+            } else if (e.key === "Escape") {
+              e.preventDefault();
+              // 원래 제목으로 revert + blur. 다음 onBlur 의 commitTitle 는 skip.
+              setTitleDraft(initialMeta.title);
+              skipNextTitleCommit.current = true;
+              setActionError(null);
               (e.target as HTMLInputElement).blur();
             }
           }}
