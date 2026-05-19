@@ -9,7 +9,7 @@ type Pos = {
   placement: Placement;
 };
 
-const SHOW_DELAY = 250;
+const SHOW_DELAY = 600;
 const EDGE_THRESHOLD = 60; // 화면 가장자리 감지 픽셀
 const ARROW_SIZE = 5;
 const GAP = 8; // 트리거와 tooltip 사이 간격

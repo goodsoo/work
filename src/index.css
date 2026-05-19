@@ -41,6 +41,7 @@
     --accent-blue: #2563eb;
     --accent-blue-bg: #eff6ff;
     --accent-blue-text: #1d4ed8;
+    --accent-green: #16a34a;
 
     /* Interactive */
     --btn-primary: #18181b;
@@ -82,6 +83,7 @@
     --accent-blue: #60a5fa;
     --accent-blue-bg: rgba(96, 165, 250, 0.1);
     --accent-blue-text: #93c5fd;
+    --accent-green: #4ade80;
 
     /* Interactive */
     --btn-primary: #e4e4e7;
@@ -100,6 +102,9 @@
   html {
     -webkit-text-size-adjust: 100%;
     -webkit-tap-highlight-color: transparent;
+    /* macOS WebKit elastic scroll (rubber band) 제거 — page 전체 bounce 차단.
+       본문 영역 자체 scroll container 는 영향 X. */
+    overscroll-behavior: none;
   }
 
   body {
@@ -109,6 +114,15 @@
     font-feature-settings: "ss10";
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    overscroll-behavior: none;
+  }
+
+  /* Desktop: body scroll 막고 main 안에서만 scroll — viewport 전체 scrollbar 회피 */
+  @media (min-width: 1024px) {
+    html, body {
+      height: 100%;
+      overflow: hidden;
+    }
   }
 
   .font-serif {
@@ -180,5 +194,39 @@
   }
   .animate-page-in {
     animation: fade-in 0.15s ease-out;
+  }
+
+  /* 메모 편집↔보기 토글 fade — 짧고 가벼움 */
+  @keyframes meetingViewFade {
+    from { opacity: 0.35; }
+    to { opacity: 1; }
+  }
+
+  /* 메모 meta 영역 input — 옵시디안 properties 스타일 plain text.
+     WebKit type=date/time 의 강제 native UI 박스 회피 위해 type=text 사용. */
+  .meta-input {
+    appearance: none;
+    -webkit-appearance: none;
+    border: 0;
+    background-color: transparent;
+    outline: none;
+    padding: 0;
+    margin: 0;
+    font-size: 0.875rem;
+    line-height: 1.625rem;
+    color: var(--text-primary);
+    font-family: inherit;
+    min-width: 0;
+  }
+  .meta-input::placeholder { color: var(--text-muted); }
+
+  /* meta row focus-within 강조 — 옵시디안 properties 의 row hover 패턴 */
+  .meta-row {
+    border-radius: 0.375rem;
+    transition: background-color 120ms ease;
+  }
+  .meta-row:focus-within {
+    background-color: var(--bg-surface);
+    box-shadow: inset 0 0 0 1px var(--border-default);
   }
 }

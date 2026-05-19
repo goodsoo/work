@@ -26,8 +26,16 @@ const GUTTER_WIDTH = "1.75rem";
 
 export function SourceBodyEditor({ content, onChange }: Props) {
   const [draft, setDraft] = useState(content);
+  const [caretLine, setCaretLine] = useState<number | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const skipNextValueSyncRef = useRef(true);
+
+  function updateCaretLine() {
+    const el = textareaRef.current;
+    if (!el) return;
+    const pos = el.selectionStart ?? 0;
+    setCaretLine(el.value.slice(0, pos).split("\n").length - 1);
+  }
 
   useEffect(() => {
     if (skipNextValueSyncRef.current) {
@@ -111,7 +119,7 @@ export function SourceBodyEditor({ content, onChange }: Props) {
   }, [draft]);
 
   return (
-    <div className="flex" style={{ minHeight: "60svh" }}>
+    <div className="flex">
       <div
         className="select-none"
         style={{
@@ -122,7 +130,7 @@ export function SourceBodyEditor({ content, onChange }: Props) {
         aria-hidden
       >
         {lineKinds.map((kind, i) => (
-          <GutterMarker key={i} kind={kind} />
+          <GutterMarker key={i} kind={kind} active={i === caretLine} />
         ))}
       </div>
       <textarea
@@ -132,15 +140,23 @@ export function SourceBodyEditor({ content, onChange }: Props) {
           skipNextValueSyncRef.current = true;
           setDraft(e.target.value);
           onChange(e.target.value);
+          updateCaretLine();
         }}
-        placeholder="내용을 입력하세요..."
+        onSelect={updateCaretLine}
+        onKeyUp={updateCaretLine}
+        onClick={updateCaretLine}
+        onFocus={updateCaretLine}
+        onBlur={() => setCaretLine(null)}
+        placeholder="메모 내용을 적어주세요..."
         className="flex-1 resize-none bg-transparent text-base outline-none"
         style={{
           color: "var(--text-primary)",
           lineHeight: LINE_HEIGHT,
           padding: 0,
           paddingLeft: "0.5rem",
+          paddingBottom: "1rem", // 가로 scrollbar 가 마지막 줄 위에 겹치지 않게 여유
           overflowY: "hidden",
+          overscrollBehaviorX: "none", // 좌우만 bounce 제거 — y 는 부모 scroll 로 propagate
         }}
         wrap="off"
       />
@@ -148,7 +164,13 @@ export function SourceBodyEditor({ content, onChange }: Props) {
   );
 }
 
-function GutterMarker({ kind }: { kind: LineKind }) {
+function GutterMarker({
+  kind,
+  active,
+}: {
+  kind: LineKind;
+  active: boolean;
+}) {
   const label = labelForKind(kind);
   const depth =
     "depth" in kind && typeof kind.depth === "number" ? kind.depth : 0;
@@ -163,6 +185,8 @@ function GutterMarker({ kind }: { kind: LineKind }) {
         height: LINE_HEIGHT,
         lineHeight: LINE_HEIGHT,
         opacity: isContinuation ? 0.4 : 1,
+        backgroundColor: active ? "var(--bg-surface-hover)" : undefined,
+        color: active ? "var(--text-primary)" : undefined,
       }}
     >
       <span

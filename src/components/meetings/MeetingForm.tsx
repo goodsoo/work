@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   Trash2,
   AlertCircle,
@@ -9,8 +9,27 @@ import {
   Eye,
   Pencil,
   X,
+  Calendar as CalendarIcon,
+  Clock,
+  Users,
+  Loader2,
+  Circle,
 } from "lucide-react";
+
+// 숫자 + 지정 separator 만 허용 (cmd/ctrl 단축키 + 화살표/backspace/delete/Enter 통과).
+function makeNumericOnly(separators: string) {
+  return (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    if (e.key.length > 1) return;
+    if (/[0-9]/.test(e.key)) return;
+    if (separators.includes(e.key)) return;
+    e.preventDefault();
+  };
+}
+const dateKeyFilter = makeNumericOnly("-");
+const timeKeyFilter = makeNumericOnly(":");
 import {
+  consumeJustCreatedMeetingId,
   useMeeting,
   useMeetings,
   useUpdateMeeting,
@@ -64,13 +83,8 @@ function summariesEqual(a: SummaryDoc, b: SummaryDoc): boolean {
   );
 }
 
-function metasEqual(a: MetaDoc, b: MetaDoc): boolean {
-  return (
-    a.title === b.title &&
-    a.date === b.date &&
-    a.time === b.time &&
-    a.attendees === b.attendees
-  );
+function trimNewlines(s: string): string {
+  return s.replace(/^\n+/, "").replace(/\n+$/, "");
 }
 
 function summaryToPatch(s: SummaryDoc): MeetingUpdate {
@@ -81,14 +95,6 @@ function summaryToPatch(s: SummaryDoc): MeetingUpdate {
   };
 }
 
-function metaToPatch(m: MetaDoc): MeetingUpdate {
-  return {
-    title: m.title.trim() || null,
-    date: m.date || null,
-    time: m.time.trim() || null,
-    attendees: m.attendees.trim() || null,
-  };
-}
 
 type ActiveTab = "body" | "transcript" | "summary";
 
@@ -159,20 +165,84 @@ export function MeetingForm({ meetingId, onBack }: Props) {
     onCommit: (s) => updateMutation.mutate(summaryToPatch(s)),
   });
 
-  const metaHistory = useStateHistory<MetaDoc>({
-    initial: initialMeta,
-    cacheKey: id ? `${id}:meta` : undefined,
-    commitMs: 1000,
-    isEqual: metasEqual,
-    onCommit: (m) => updateMutation.mutate(metaToPatch(m)),
-  });
-
   const body = bodyHistory.value;
   const transcript = transcriptHistory.value;
   const summary = summaryHistory.value;
-  const meta = metaHistory.value;
 
   const [actionError, setActionError] = useState<string | null>(null);
+  const titleInputRef = useRef<HTMLInputElement>(null);
+
+  // meta 4 field 는 typing 중 mutation X (매번 rename / spinner 깜빡임 회피).
+  // onBlur / Enter / tag 추가 같은 명시 시점에만 commit. 메모 전환 시 initialMeta 와 sync.
+  const [titleDraft, setTitleDraft] = useState<string>(() => initialMeta.title);
+  const [dateDraft, setDateDraft] = useState<string>(() => initialMeta.date);
+  const [timeDraft, setTimeDraft] = useState<string>(() => initialMeta.time);
+  const [attendeesDraft, setAttendeesDraft] = useState<string>(
+    () => initialMeta.attendees,
+  );
+  useEffect(() => {
+    setTitleDraft(initialMeta.title);
+  }, [initialMeta.title]);
+  useEffect(() => {
+    setDateDraft(initialMeta.date);
+  }, [initialMeta.date]);
+  useEffect(() => {
+    setTimeDraft(initialMeta.time);
+  }, [initialMeta.time]);
+  useEffect(() => {
+    setAttendeesDraft(initialMeta.attendees);
+  }, [initialMeta.attendees]);
+
+  function commitTitle() {
+    const trimmed = titleDraft.trim();
+    // 빈 → 기존 제목으로 revert. 기존도 빈이면 'untitled'.
+    const next = trimmed === "" ? (initialMeta.title || "untitled") : trimmed;
+    if (next !== titleDraft) setTitleDraft(next);
+    if (next === initialMeta.title) return;
+    updateMutation.mutate({ title: next });
+  }
+
+  function commitDate() {
+    const v = dateDraft.trim();
+    // 빈 OK (날짜 제거). 그 외엔 YYYY-MM-DD + Date 유효.
+    const valid =
+      v === "" ||
+      (/^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(v + "T00:00:00")));
+    if (!valid) {
+      setDateDraft(initialMeta.date); // 형식 안 맞으면 기존으로 revert
+      return;
+    }
+    if (v === initialMeta.date) return;
+    updateMutation.mutate({ date: v || null });
+  }
+
+  function commitTime() {
+    const v = timeDraft.trim();
+    // 빈 OK. 그 외엔 HH:MM + 0-23 / 0-59.
+    let valid = v === "";
+    if (!valid) {
+      const m = v.match(/^(\d{2}):(\d{2})$/);
+      if (m) {
+        const h = parseInt(m[1], 10);
+        const mm = parseInt(m[2], 10);
+        valid = h >= 0 && h <= 23 && mm >= 0 && mm <= 59;
+      }
+    }
+    if (!valid) {
+      setTimeDraft(initialMeta.time);
+      return;
+    }
+    if (v === initialMeta.time) return;
+    updateMutation.mutate({ time: v || null });
+  }
+
+  function commitAttendees(next: string) {
+    // AttendeeTagInput onChange 는 tag 추가/제거 시점 — 이미 명시 intent. 즉시 commit.
+    setAttendeesDraft(next);
+    const trimmed = next.trim();
+    if (trimmed === initialMeta.attendees.trim()) return;
+    updateMutation.mutate({ attendees: trimmed || null });
+  }
   const [activeTab, setActiveTabState] = useState<ActiveTab>(
     () => ACTIVE_TAB_CACHE.get(meetingId) ?? "body",
   );
@@ -197,15 +267,26 @@ export function MeetingForm({ meetingId, onBack }: Props) {
       bodyHistory.flush();
       transcriptHistory.flush();
       summaryHistory.flush();
-      metaHistory.flush();
     }
     window.addEventListener("beforeunload", onBeforeUnload);
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
-  }, [bodyHistory, transcriptHistory, summaryHistory, metaHistory]);
+  }, [bodyHistory, transcriptHistory, summaryHistory]);
 
   // 메모 전환 시 그 메모의 마지막 탭으로 (cache miss 면 본문).
   useEffect(() => {
     setActiveTabState(ACTIVE_TAB_CACHE.get(meetingId) ?? "body");
+  }, [meetingId]);
+
+  // 방금 만든 메모면 title input 자동 focus + select all — 사용자가 default
+  // 'memo' 위에 바로 타이핑하면 새 제목으로 교체.
+  useEffect(() => {
+    if (consumeJustCreatedMeetingId(meetingId)) {
+      // mount 직후 ref attach 되도록 microtask 한 tick 미룸
+      requestAnimationFrame(() => {
+        titleInputRef.current?.focus();
+        titleInputRef.current?.select();
+      });
+    }
   }, [meetingId]);
 
   // 활성 탭의 history (단축키 + 상단 undo/redo 버튼 대상).
@@ -217,7 +298,10 @@ export function MeetingForm({ meetingId, onBack }: Props) {
         ? (transcriptHistory as UseStateHistoryResult<unknown>)
         : (summaryHistory as UseStateHistoryResult<unknown>);
 
-  // 단축키: undo/redo (활성 탭의 stack) + Opt+1/2/3 sub-tab (Tauri only)
+  // 단축키 (Tauri only):
+  //   Cmd/Ctrl+Z/Y/Shift+Z = 활성 탭 stack 의 undo/redo
+  //   Cmd+[ / Cmd+] = sub-tab 좌/우 cycling (메모 ↔ 음성 기록 ↔ 요약)
+  //   Cmd+E = 본문 탭일 때 편집/보기 토글 (옵시디안 패턴)
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       const cmd = e.metaKey || e.ctrlKey;
@@ -236,21 +320,21 @@ export function MeetingForm({ meetingId, onBack }: Props) {
         activeHistory.redo();
         return;
       }
-      // Opt+1/2/3 — Opt+숫자는 macOS 가 ¡™£ 로 바꾸므로 e.code 로 매칭
-      if (!isTauri || !e.altKey || e.metaKey || e.ctrlKey || e.shiftKey) return;
-      if (e.code === "Digit1") {
+      if (!isTauri) return;
+      // Cmd+E — 메모 탭일 때만 편집/보기 토글. 다른 탭이면 무시 (textarea 통과).
+      if (cmd && !e.shiftKey && !e.altKey && k === "e") {
+        if (activeTab !== "body") return;
         e.preventDefault();
-        if (activeTab === "body") {
-          setViewMode(viewMode === "edit" ? "view" : "edit");
-        } else {
-          setActiveTab("body");
-        }
-      } else if (e.code === "Digit2") {
+        setViewMode(viewMode === "edit" ? "view" : "edit");
+        return;
+      }
+      // Cmd+] = 다음 sub-tab, Cmd+[ = 이전 sub-tab. cycling.
+      if (cmd && !e.shiftKey && !e.altKey && (k === "]" || k === "[")) {
         e.preventDefault();
-        setActiveTab("transcript");
-      } else if (e.code === "Digit3") {
-        e.preventDefault();
-        setActiveTab("summary");
+        const order: typeof activeTab[] = ["body", "transcript", "summary"];
+        const idx = order.indexOf(activeTab);
+        const next = k === "]" ? (idx + 1) % order.length : (idx - 1 + order.length) % order.length;
+        setActiveTab(order[next]);
       }
     }
     window.addEventListener("keydown", onKeyDown);
@@ -290,7 +374,10 @@ export function MeetingForm({ meetingId, onBack }: Props) {
   function retrySave() {
     if (updateMutation.isPending) return;
     updateMutation.mutate({
-      ...metaToPatch(meta),
+      title: titleDraft.trim() || initialMeta.title || "untitled",
+      date: dateDraft.trim() || null,
+      time: timeDraft.trim() || null,
+      attendees: attendeesDraft.trim() || null,
       content: body,
       transcript: transcript || null,
       ...summaryToPatch(summary),
@@ -329,25 +416,26 @@ export function MeetingForm({ meetingId, onBack }: Props) {
   const hasAnySummary =
     summary.discussion_items.length + summary.decisions.length + summary.action_items.length > 0;
 
-  const anyPendingEdit =
-    bodyHistory.canUndo ||
-    transcriptHistory.canUndo ||
-    summaryHistory.canUndo ||
-    metaHistory.canUndo;
+  // 미저장 변경 여부 — memory state vs query data (optimistic update 후엔 sync).
+  // typing 직후 ~ commit timer (1초) 까진 true, optimistic update 시점에 false.
+  // body/transcript 는 disk write 시 앞뒤 newline trim 되므로 비교도 normalize.
+  // attendees 는 textarea string vs disk-roundtrip 의 ", " join 차이 회피 위해 parseAttendees 로 array 비교.
+  // title 은 별도 (titleDraft) — typing 중 일치 안 해도 spinner 표시 X (blur/Enter 만 mutation).
+  // meta 4 field 는 draft 라 typing 중 spinner X — commit 후 initialMeta 갱신.
+  const hasUnsavedChange =
+    trimNewlines(body) !== trimNewlines(initialBody) ||
+    trimNewlines(transcript) !== trimNewlines(initialTranscript) ||
+    !summariesEqual(summary, initialSummary);
 
   const meetingForCopy = {
-    title: meta.title || null,
-    date: meta.date || null,
-    time: meta.time || null,
-    attendees: meta.attendees || null,
+    title: initialMeta.title || null,
+    date: initialMeta.date || null,
+    time: initialMeta.time || null,
+    attendees: initialMeta.attendees || null,
     discussion_items: summary.discussion_items,
     decisions: summary.decisions,
     action_items: summary.action_items,
   };
-
-  function setMetaField<K extends keyof MetaDoc>(key: K, value: MetaDoc[K]) {
-    metaHistory.set({ ...meta, [key]: value });
-  }
 
   function setSummaryField<K extends keyof SummaryDoc>(
     key: K,
@@ -357,13 +445,20 @@ export function MeetingForm({ meetingId, onBack }: Props) {
   }
 
   return (
-    <div className="min-h-svh">
-      {/* Top bar — compact, floating feel */}
+    <div className="min-h-svh lg:flex lg:h-screen lg:min-h-0 lg:flex-col">
+      {/* Header — 사이드바 헤더와 같은 높이 (3.5rem). desktop 에선 flex item (top fixed),
+          mobile 은 sticky. grid 로 좌/우 그룹 width 변화 무관 제목 viewport-center. */}
       <div
-        className="sticky top-0 z-10 flex items-center justify-between px-5 py-2 backdrop-blur lg:top-0"
-        style={{ backgroundColor: "var(--bg-overlay)" }}
+        className="sticky top-0 z-20 grid items-center gap-2 overflow-hidden px-3 backdrop-blur lg:shrink-0 lg:relative lg:top-auto"
+        style={{
+          height: "3.5rem",
+          gridTemplateColumns: "1fr auto 1fr",
+          backgroundColor: "var(--bg-overlay)",
+          borderBottom: "1px solid var(--border-subtle)",
+        }}
       >
-        <div className="ml-auto flex items-center gap-2">
+        {/* Left: undo/redo + save indicator */}
+        <div className="flex shrink-0 items-center gap-2 justify-self-start">
           <div
             className="inline-flex overflow-hidden rounded-md"
             style={{ border: "1px solid var(--border-subtle)" }}
@@ -372,7 +467,7 @@ export function MeetingForm({ meetingId, onBack }: Props) {
               type="button"
               onClick={activeHistory.undo}
               disabled={!activeHistory.canUndo}
-              title={`실행 취소 (${activeTab === "body" ? "본문" : activeTab === "transcript" ? "회의 내용" : "요약"})`}
+              title={`실행 취소 (${activeTab === "body" ? "메모" : activeTab === "transcript" ? "음성 기록" : "요약"})`}
               className="px-1.5 py-1 transition disabled:opacity-20"
               style={{ color: "var(--text-secondary)", minHeight: 0 }}
             >
@@ -382,7 +477,7 @@ export function MeetingForm({ meetingId, onBack }: Props) {
               type="button"
               onClick={activeHistory.redo}
               disabled={!activeHistory.canRedo}
-              title={`다시 실행 (${activeTab === "body" ? "본문" : activeTab === "transcript" ? "회의 내용" : "요약"})`}
+              title={`다시 실행 (${activeTab === "body" ? "메모" : activeTab === "transcript" ? "음성 기록" : "요약"})`}
               className="px-1.5 py-1 transition disabled:opacity-20"
               style={{ color: "var(--text-secondary)", borderLeft: "1px solid var(--border-subtle)", minHeight: 0 }}
             >
@@ -390,11 +485,84 @@ export function MeetingForm({ meetingId, onBack }: Props) {
             </button>
           </div>
           <SaveIndicator
-            isPending={updateMutation.isPending}
+            isPending={updateMutation.isPending || hasUnsavedChange}
             isError={updateMutation.isError}
-            hasPendingEdit={anyPendingEdit && !updateMutation.isPending && !updateMutation.isError}
             onRetry={retrySave}
           />
+        </div>
+
+        {/* Center: title — grid auto col 안 dead-center, max-width 로 좌/우 그룹과 겹침 방지.
+            typing 중엔 mutation X — onBlur / Enter 만 commit (매번 rename 회피) */}
+        <input
+          ref={titleInputRef}
+          type="text"
+          value={titleDraft}
+          onChange={(e) => setTitleDraft(e.target.value)}
+          onBlur={commitTitle}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              commitTitle();
+              (e.target as HTMLInputElement).blur();
+            }
+          }}
+          placeholder="untitled"
+          autoFocus={!data.title}
+          className="min-w-0 justify-self-center bg-transparent text-center text-base font-semibold outline-none"
+          style={{
+            color: "var(--text-primary)",
+            maxWidth: "min(28rem, 100%)",
+            width: `${Math.max((titleDraft || "untitled").length, 6) + 2}ch`,
+          }}
+        />
+
+        {/* Right: edit toggle / copy / delete */}
+        <div className="flex shrink-0 items-center gap-1 justify-self-end">
+          <button
+            type="button"
+            onClick={() =>
+              activeTab === "body"
+                ? setViewMode(viewMode === "edit" ? "view" : "edit")
+                : setActiveTab("body")
+            }
+            title={
+              activeTab === "body"
+                ? isTauri
+                  ? `${viewMode === "edit" ? "보기 모드" : "편집 모드"}  ⌘ + E`
+                  : viewMode === "edit"
+                    ? "보기 모드"
+                    : "편집 모드"
+                : "메모 탭으로 이동"
+            }
+            className="rounded-md px-1.5 py-1 transition"
+            style={{
+              border: "1px solid var(--border-subtle)",
+              color: activeTab === "body" ? "var(--text-secondary)" : "var(--text-muted)",
+              minHeight: 0,
+            }}
+          >
+            {viewMode === "edit" ? (
+              <Eye className="h-3.5 w-3.5" />
+            ) : (
+              <Pencil className="h-3.5 w-3.5" />
+            )}
+          </button>
+          <CopyButton meeting={meetingForCopy} onError={setActionError} compact />
+          <button
+            type="button"
+            onClick={handleDelete}
+            disabled={deleteMutation.isPending}
+            title="메모 삭제"
+            aria-label="메모 삭제"
+            className="rounded-md px-1.5 py-1 transition disabled:opacity-40"
+            style={{
+              border: "1px solid var(--border-subtle)",
+              color: "var(--text-muted)",
+              minHeight: 0,
+            }}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
         </div>
       </div>
 
@@ -471,136 +639,129 @@ export function MeetingForm({ meetingId, onBack }: Props) {
         </div>
       ) : null}
 
-      {/* Full-page editor */}
-      <div className="mx-auto max-w-3xl px-6 pb-24 pt-8">
-        {/* Title — large, Notion-style */}
-        <input
-          type="text"
-          value={meta.title}
-          onChange={(e) => setMetaField("title", e.target.value)}
-          placeholder="제목 없음"
-          autoFocus={!data.title}
-          className="w-full bg-transparent text-3xl font-bold outline-none"
-          style={{ color: "var(--text-primary)" }}
-        />
-
-        {/* Metadata — subtle, inline */}
+      {/* Full-page editor — desktop 에선 자체 scroll container (header 옆 scrollbar 회피).
+          outer = full-width scroll, inner = max-w content. */}
+      <div className="lg:flex-1 lg:overflow-y-auto lg:overscroll-none">
+        <div className="mx-auto max-w-3xl px-6 pb-24">
+        {/* Tab nav — 헤더 바로 아래에 sticky. 헤더 (3.5rem) 와 시각적으로 연결. */}
         <div
-          className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm"
-          style={{ color: "var(--text-secondary)" }}
-        >
-          <label className="inline-flex items-center gap-1.5">
-            <span className="text-xs" style={{ color: "var(--text-muted)" }}>날짜</span>
-            <input
-              type="date"
-              value={meta.date}
-              onChange={(e) => setMetaField("date", e.target.value)}
-            />
-          </label>
-          <label className="inline-flex items-center gap-1.5">
-            <span className="text-xs" style={{ color: "var(--text-muted)" }}>시간</span>
-            <input
-              type="text"
-              value={meta.time}
-              onChange={(e) => setMetaField("time", e.target.value)}
-              placeholder="14:00"
-              className="w-20 border-0 bg-transparent text-sm outline-none"
-              style={{ color: "var(--text-secondary)" }}
-            />
-          </label>
-          <div className="inline-flex items-center gap-1.5">
-            <span className="text-xs" style={{ color: "var(--text-muted)" }}>참석</span>
-            <div className="min-w-[12em]">
-              <AttendeeTagInput
-                value={meta.attendees}
-                onChange={(next) => setMetaField("attendees", next)}
-                suggestions={attendeeSuggestions}
-                placeholder="이름"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Tab nav + 액션 (sticky: 메타 아래에서 시작, 스크롤 시 상단 도달하면 고정) */}
-        <div
-          className="sticky z-10 mt-6 flex items-center justify-between"
+          className="sticky top-14 z-10 flex items-center justify-between backdrop-blur lg:top-0"
           style={{
-            top: "2.5rem",
             borderBottom: "1px solid var(--border-subtle)",
-            backgroundColor: "var(--bg-base)",
+            backgroundColor: "var(--bg-overlay)",
           }}
         >
           <div className="flex gap-1">
             <TabBtn
-              label="본문"
-              shortcut={isTauri ? "⌥1" : undefined}
+              label="메모"
+              badge={viewMode === "edit" ? "편집" : "보기"}
+              badgeAccent={viewMode === "edit"}
+              badgeTitle={
+                isTauri
+                  ? `${viewMode === "edit" ? "보기 모드" : "편집 모드"}  ⌘ + E`
+                  : viewMode === "edit"
+                    ? "보기 모드"
+                    : "편집 모드"
+              }
+              onBadgeClick={
+                activeTab === "body"
+                  ? () => setViewMode(viewMode === "edit" ? "view" : "edit")
+                  : undefined
+              }
               active={activeTab === "body"}
               onClick={() => setActiveTab("body")}
             />
             <TabBtn
-              label="회의 내용"
-              shortcut={isTauri ? "⌥2" : undefined}
+              label="음성 기록"
               active={activeTab === "transcript"}
               onClick={() => setActiveTab("transcript")}
             />
             <TabBtn
               label="요약"
-              shortcut={isTauri ? "⌥3" : undefined}
               active={activeTab === "summary"}
               onClick={() => setActiveTab("summary")}
             />
           </div>
           <div className="flex items-center gap-1.5 pb-1">
-            {activeTab === "body" ? (
-              <button
-                type="button"
-                onClick={() =>
-                  setViewMode(viewMode === "edit" ? "view" : "edit")
-                }
-                title={
-                  isTauri
-                    ? `${viewMode === "edit" ? "보기 모드" : "편집 모드"}  ⌥1`
-                    : viewMode === "edit"
-                      ? "보기 모드"
-                      : "편집 모드"
-                }
-                className="rounded-md px-1.5 py-1 transition"
-                style={{
-                  border: "1px solid var(--border-subtle)",
-                  color: "var(--text-secondary)",
-                  minHeight: 0,
-                }}
-              >
-                {viewMode === "edit" ? (
-                  <Eye className="h-3.5 w-3.5" />
-                ) : (
-                  <Pencil className="h-3.5 w-3.5" />
-                )}
-              </button>
-            ) : null}
-            <CopyButton meeting={meetingForCopy} onError={setActionError} compact />
-            <button
-              type="button"
-              onClick={handleDelete}
-              disabled={deleteMutation.isPending}
-              title="메모 삭제"
-              aria-label="메모 삭제"
-              className="rounded-md px-1.5 py-1 transition disabled:opacity-40"
-              style={{
-                border: "1px solid var(--border-subtle)",
-                color: "var(--text-muted)",
-                minHeight: 0,
-              }}
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </button>
+            <CharCountBadge
+              count={
+                activeTab === "body"
+                  ? body.length
+                  : activeTab === "transcript"
+                    ? transcript.length
+                    : summary.discussion_items.reduce((s, i) => s + i.length, 0) +
+                      summary.decisions.reduce((s, i) => s + i.length, 0) +
+                      summary.action_items.reduce((s, i) => s + i.length, 0)
+              }
+            />
           </div>
         </div>
 
-        {/* Tab content wrapper — 탭이 상단 도달할 때까지 페이지 스크롤 가능하도록 minHeight 보장 */}
-        <div className="mt-4" style={{ minHeight: "calc(100svh - 8rem)" }}>
+        {/* Tab content wrapper — 빈 메모일 땐 스크롤 없음, 내용 늘면 자연 scroll */}
+        <div className="mt-4">
         {activeTab === "body" ? (
-          <div>
+          <div
+            key={viewMode}
+            style={{ animation: "meetingViewFade 140ms ease" }}
+          >
+            {/* Metadata — 메모탭 안. 편집 모드 = MetaRow (icon + divider + input).
+                보기 모드 = plain text (icon/divider 없음, 빈 field 안 보임). */}
+            {viewMode === "edit" ? (
+              <div className="mb-4">
+                <MetaRow icon={<CalendarIcon className="h-3.5 w-3.5" />} label="날짜">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={dateDraft}
+                    onChange={(e) => setDateDraft(e.target.value)}
+                    onBlur={commitDate}
+                    onKeyDown={(e) => {
+                      dateKeyFilter(e);
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        commitDate();
+                        (e.target as HTMLInputElement).blur();
+                      }
+                    }}
+                    placeholder="YYYY-MM-DD"
+                    className="meta-input flex-1"
+                    maxLength={10}
+                  />
+                </MetaRow>
+                <MetaRow icon={<Clock className="h-3.5 w-3.5" />} label="시간">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={timeDraft}
+                    onChange={(e) => setTimeDraft(e.target.value)}
+                    onBlur={commitTime}
+                    onKeyDown={(e) => {
+                      timeKeyFilter(e);
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        commitTime();
+                        (e.target as HTMLInputElement).blur();
+                      }
+                    }}
+                    placeholder="HH:MM"
+                    className="meta-input flex-1"
+                    maxLength={5}
+                  />
+                </MetaRow>
+                <MetaRow icon={<Users className="h-3.5 w-3.5" />} label="참석자">
+                  <div className="flex-1">
+                    <AttendeeTagInput
+                      value={attendeesDraft}
+                      onChange={commitAttendees}
+                      suggestions={attendeeSuggestions}
+                      placeholder="이름 입력 후 Enter"
+                    />
+                  </div>
+                </MetaRow>
+              </div>
+            ) : (
+              <MetaReadOnly meta={initialMeta} />
+            )}
             {viewMode === "edit" ? (
               <SourceBodyEditor
                 key={`${meetingId}:body`}
@@ -631,10 +792,10 @@ export function MeetingForm({ meetingId, onBack }: Props) {
             <ClipPromptButton
               buildPrompt={() =>
                 buildClaudePrompt({
-                  title: meta.title || null,
-                  date: meta.date || null,
-                  time: meta.time || null,
-                  attendees: meta.attendees || null,
+                  title: initialMeta.title || null,
+                  date: initialMeta.date || null,
+                  time: initialMeta.time || null,
+                  attendees: initialMeta.attendees || null,
                   content: body,
                   transcript: transcript || null,
                 })
@@ -643,7 +804,7 @@ export function MeetingForm({ meetingId, onBack }: Props) {
                 (body ?? "").trim().length === 0 &&
                 (transcript ?? "").trim().length === 0
               }
-              title="본문과 회의 내용을 묶어 Claude 프롬프트로 복사"
+              title="메모와 음성 기록을 묶어 Claude 프롬프트로 복사"
               onError={setActionError}
             />
             {hasAnySummary ? (
@@ -710,14 +871,92 @@ export function MeetingForm({ meetingId, onBack }: Props) {
               </div>
             ) : (
               <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-                본문이나 회의 내용을 적은 뒤 위 버튼을 눌러 AI 요약을 만들어요.
+                메모나 음성 기록을 적은 뒤 위 버튼을 눌러 AI 요약을 만들어요.
               </p>
             )}
           </div>
         ) : null}
         </div>
 
+        </div>
       </div>
+    </div>
+  );
+}
+
+function CharCountBadge({ count }: { count: number }) {
+  if (count <= 0) return null;
+  return (
+    <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+      {count}자
+    </span>
+  );
+}
+
+// 본문 textarea 의 line gutter 패턴과 동일: icon col (1.75rem) + 우측 divider + 라벨 + 값.
+function MetaRow({
+  icon,
+  label,
+  children,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="meta-row flex" style={{ minHeight: "1.625rem" }}>
+      <div
+        className="flex shrink-0 items-center justify-center"
+        style={{
+          width: "1.75rem",
+          color: "var(--text-muted)",
+          borderRight: "1px solid var(--border-subtle)",
+        }}
+        aria-hidden
+      >
+        {icon}
+      </div>
+      <div
+        className="flex flex-1 items-center gap-3 text-sm"
+        style={{ paddingLeft: "0.5rem", color: "var(--text-primary)" }}
+      >
+        <span
+          className="shrink-0"
+          style={{ color: "var(--text-muted)", width: "3.5rem" }}
+        >
+          {label}
+        </span>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// 보기 모드용 meta — icon/divider 없는 plain text. 빈 field 안 보임.
+// 편집 모드 MetaRow 와 같은 line height (1.625rem) + 라벨 위치 (gutter 1.75rem + paddingLeft 0.5rem).
+function MetaReadOnly({ meta }: { meta: MetaDoc }) {
+  const rows: { label: string; value: string }[] = [];
+  if (meta.date) rows.push({ label: "날짜", value: meta.date });
+  if (meta.time) rows.push({ label: "시간", value: meta.time });
+  if (meta.attendees) rows.push({ label: "참석자", value: meta.attendees });
+  if (rows.length === 0) return null;
+  return (
+    <div className="mb-4 text-sm">
+      {rows.map((r) => (
+        <div
+          key={r.label}
+          className="flex items-center gap-3"
+          style={{ minHeight: "1.625rem" }}
+        >
+          <span
+            className="shrink-0"
+            style={{ color: "var(--text-muted)", width: "3.5rem" }}
+          >
+            {r.label}
+          </span>
+          <span style={{ color: "var(--text-primary)" }}>{r.value}</span>
+        </div>
+      ))}
     </div>
   );
 }
@@ -725,11 +964,19 @@ export function MeetingForm({ meetingId, onBack }: Props) {
 function TabBtn({
   label,
   shortcut,
+  badge,
+  badgeAccent,
+  onBadgeClick,
+  badgeTitle,
   active,
   onClick,
 }: {
   label: string;
   shortcut?: string;
+  badge?: string | null;
+  badgeAccent?: boolean;
+  onBadgeClick?: () => void;
+  badgeTitle?: string;
   active: boolean;
   onClick: () => void;
 }) {
@@ -740,7 +987,7 @@ function TabBtn({
       onClick={onClick}
       title={title}
       aria-current={active ? "page" : undefined}
-      className="px-3 py-2 text-sm transition"
+      className="flex items-center gap-1.5 px-3 py-2 text-sm transition"
       style={{
         color: active ? "var(--text-primary)" : "var(--text-secondary)",
         borderBottom: active
@@ -751,7 +998,46 @@ function TabBtn({
         fontWeight: active ? 600 : 400,
       }}
     >
-      {label}
+      <span>{label}</span>
+      {badge ? (
+        <span
+          role={onBadgeClick ? "button" : undefined}
+          tabIndex={onBadgeClick ? 0 : undefined}
+          title={badgeTitle}
+          onClick={
+            onBadgeClick
+              ? (e) => {
+                  e.stopPropagation();
+                  onBadgeClick();
+                }
+              : undefined
+          }
+          onKeyDown={
+            onBadgeClick
+              ? (e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onBadgeClick();
+                  }
+                }
+              : undefined
+          }
+          className="rounded-md px-1.5 py-0.5 text-xs"
+          style={{
+            backgroundColor: badgeAccent
+              ? "var(--accent-blue-bg)"
+              : "var(--bg-surface-hover)",
+            color: badgeAccent
+              ? "var(--accent-blue-text)"
+              : "var(--text-secondary)",
+            fontWeight: 400,
+            cursor: onBadgeClick ? "pointer" : undefined,
+          }}
+        >
+          {badge}
+        </span>
+      ) : null}
     </button>
   );
 }
@@ -766,6 +1052,14 @@ function TranscriptArea({
   onError: (msg: string) => void;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  // 메모탭 SourceBodyEditor 와 같은 auto-resize 패턴 — 자체 scroll X, outer scroll
+  useLayoutEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = el.scrollHeight + "px";
+  }, [transcript]);
 
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -812,13 +1106,14 @@ function TranscriptArea({
         />
       </div>
       <textarea
+        ref={textareaRef}
         value={transcript}
         onChange={(e) => onChange(e.target.value)}
-        placeholder="회의 녹음의 텍스트 변환 결과를 여기에..."
+        placeholder="음성 녹음의 텍스트 변환 결과를 여기에..."
         className="w-full resize-none bg-transparent text-base leading-relaxed outline-none"
         style={{
           color: "var(--text-primary)",
-          height: "60svh",
+          overflowY: "hidden",
         }}
       />
     </div>
@@ -828,31 +1123,81 @@ function TranscriptArea({
 function SaveIndicator({
   isPending,
   isError,
-  hasPendingEdit,
   onRetry,
 }: {
   isPending: boolean;
   isError: boolean;
-  hasPendingEdit: boolean;
   onRetry: () => void;
 }) {
-  if (isError) {
+  // isPending 은 호출자에서 (mutation isPending OR hasUnsavedChange) 로 옴.
+  // typing 시점부터 spinner — 깜빡임 회피 위해 debounce 없음.
+  const state: "error" | "spinner" | "success" = isError
+    ? "error"
+    : isPending
+      ? "spinner"
+      : "success";
+
+  const dotColor =
+    state === "error"
+      ? "var(--accent-red)"
+      : "var(--accent-green)";
+
+  const title =
+    state === "error"
+      ? "저장 실패 — 재시도"
+      : state === "spinner"
+        ? "저장 중"
+        : "저장됨";
+
+  const inner = (
+    <span
+      className="relative inline-flex items-center justify-center"
+      style={{ width: "0.875rem", height: "0.875rem" }}
+    >
+      {/* spinner — pending 일 때만 fade-in */}
+      <Loader2
+        className="absolute inset-0 h-3.5 w-3.5"
+        style={{
+          color: "var(--text-muted)",
+          opacity: state === "spinner" ? 1 : 0,
+          transition: "opacity 180ms ease",
+          animation: "spin 1.6s linear infinite",
+        }}
+      />
+      {/* 외곽선 원 (border only) — error / success / wait, spinner 와 같은 stroke */}
+      <Circle
+        className="absolute inset-0 h-3.5 w-3.5"
+        style={{
+          color: dotColor,
+          opacity: state === "spinner" ? 0 : 1,
+          transform: state === "spinner" ? "scale(0.6)" : "scale(1)",
+          transition: "opacity 180ms ease, color 180ms ease, transform 180ms ease",
+        }}
+      />
+    </span>
+  );
+
+  if (state === "error") {
     return (
       <button
         type="button"
         onClick={onRetry}
-        className="text-xs underline"
-        style={{ color: "var(--accent-red)", minHeight: 0 }}
+        title={title}
+        aria-label={title}
+        className="rounded p-1"
+        style={{ minHeight: 0 }}
       >
-        저장 실패
+        {inner}
       </button>
     );
   }
-  if (isPending) {
-    return <span className="text-xs" style={{ color: "var(--text-muted)" }}>저장 중...</span>;
-  }
-  if (hasPendingEdit) {
-    return <span className="text-xs" style={{ color: "var(--text-muted)" }}>...</span>;
-  }
-  return null;
+  return (
+    <span
+      title={title}
+      aria-label={title}
+      className="inline-flex items-center p-1"
+    >
+      {inner}
+    </span>
+  );
 }

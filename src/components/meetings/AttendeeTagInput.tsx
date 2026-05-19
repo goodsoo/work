@@ -86,21 +86,14 @@ export function AttendeeTagInput({
   return (
     <div className="relative">
       <div
-        className="flex flex-wrap items-center gap-1 rounded-lg px-2 py-1.5 transition"
-        style={{
-          border: "1px solid var(--border-default)",
-          backgroundColor: "var(--bg-base)",
-        }}
+        className="flex flex-wrap items-center gap-1"
         onClick={() => inputRef.current?.focus()}
       >
         {tags.map((tag, i) => (
           <span
             key={`${tag}-${i}`}
-            className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-sm"
-            style={{
-              backgroundColor: "var(--bg-surface)",
-              color: "var(--text-primary)",
-            }}
+            className="inline-flex items-center gap-0.5 pr-2"
+            style={{ color: "var(--text-primary)" }}
           >
             {tag}
             <button
@@ -111,7 +104,7 @@ export function AttendeeTagInput({
               }}
               aria-label={`${tag} 제거`}
               className="rounded transition"
-              style={{ color: "var(--text-muted)", minHeight: 16, minWidth: 16 }}
+              style={{ color: "var(--text-muted)", minHeight: 14, minWidth: 14 }}
             >
               <X className="h-3 w-3" />
             </button>

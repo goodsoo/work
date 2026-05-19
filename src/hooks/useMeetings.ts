@@ -27,6 +27,54 @@ const meetingsKey = ["meetings"] as const;
 const deletedMeetingsKey = ["meetings", "deleted"] as const;
 const meetingKey = (id: string) => ["meetings", id] as const;
 
+// 새 메모 직후 자동 focus 용 1회성 flag. useCreateMeeting 가 set, MeetingForm 가 consume.
+let _justCreatedMeetingId: string | null = null;
+export function consumeJustCreatedMeetingId(id: string): boolean {
+  if (_justCreatedMeetingId === id) {
+    _justCreatedMeetingId = null;
+    return true;
+  }
+  return false;
+}
+
+// patch 형식 (string | null | array) 을 Meeting 의 정규 type 으로 변환.
+// onMutate 가 `{...prev, ...patch}` 그대로 spread 하면 attendees 가 "alice, bob"
+// 같은 string 으로 덮여서 data.attendees.join() 호출 시 TypeError. title/date 등
+// 같은 패턴 잠재 risk 모두 처리.
+function normalizeAttendeesPatch(v: MeetingUpdate["attendees"]): string[] {
+  if (v === null || v === undefined) return [];
+  if (Array.isArray(v)) {
+    return v.filter((s): s is string => typeof s === "string");
+  }
+  if (typeof v === "string") {
+    return v.trim() === ""
+      ? []
+      : v.split(",").map((s) => s.trim()).filter(Boolean);
+  }
+  return [];
+}
+
+function applyOptimisticPatch(prev: Meeting, patch: MeetingUpdate): Meeting {
+  const out: Meeting = { ...prev };
+  if (patch.title !== undefined) out.title = patch.title ?? "";
+  if (patch.date !== undefined) out.date = patch.date ?? null;
+  if (patch.time !== undefined) out.time = patch.time ?? null;
+  if (patch.attendees !== undefined) {
+    out.attendees = normalizeAttendeesPatch(patch.attendees);
+  }
+  if (patch.tags !== undefined) out.tags = patch.tags ?? [];
+  if (patch.content !== undefined) out.content = patch.content ?? "";
+  if (patch.transcript !== undefined) out.transcript = patch.transcript ?? "";
+  if (patch.discussion_items !== undefined) {
+    out.discussion_items = patch.discussion_items ?? [];
+  }
+  if (patch.decisions !== undefined) out.decisions = patch.decisions ?? [];
+  if (patch.action_items !== undefined) {
+    out.action_items = patch.action_items ?? [];
+  }
+  return out;
+}
+
 export function useMeetings() {
   const { adapter, isReady } = useVault();
   return useQuery({
@@ -61,6 +109,7 @@ export function useCreateMeeting() {
     mutationFn: async (input: MeetingInsert) => {
       const created = await createMeeting(adapter, input);
       markMeetingSelfWrite(watcher, created.id);
+      _justCreatedMeetingId = created.id;
       return created;
     },
     onSuccess: (created) => {
@@ -91,15 +140,10 @@ export function useUpdateMeeting(id: string) {
       const prevDetail = qc.getQueryData<Meeting>(meetingKey(id));
       const prevList = qc.getQueryData<Meeting[]>(meetingsKey);
       if (prevDetail) {
-        qc.setQueryData(meetingKey(id), {
-          ...prevDetail,
-          ...patch,
-        } as Meeting);
+        qc.setQueryData(meetingKey(id), applyOptimisticPatch(prevDetail, patch));
       }
       qc.setQueryData<Meeting[]>(meetingsKey, (curr) =>
-        curr?.map((m) =>
-          m.id === id ? ({ ...m, ...patch } as Meeting) : m,
-        ),
+        curr?.map((m) => (m.id === id ? applyOptimisticPatch(m, patch) : m)),
       );
       return { prevDetail, prevList };
     },
@@ -110,18 +154,19 @@ export function useUpdateMeeting(id: string) {
     onSuccess: (updated) => {
       const newId = updated.id;
       if (newId !== id) {
-        // 파일 rename — 옛 detail query 제거, 새 id 로 detail 셋. list 도 옛 id 항목을
-        // 새 id 로 교체. URL hash 가 옛 id 였으면 새 id 로 갱신.
-        qc.removeQueries({ queryKey: meetingKey(id) });
+        // 파일 rename — 옛 id + 새 id 둘 다 detail 셋 (UI 가 새 id 로 전환할 때까지
+        // 옛 id 도 valid 한 상태 유지 → 노트 선택 끊김 방지). list 도 옛 id 를 새 id 로 교체.
+        // URL hash 갱신 → hashchange listener 가 selectedMeetingId 를 새 id 로 set.
+        // 옛 detail query 는 다음 list refresh 때 GC 자연 처리.
+        qc.setQueryData(meetingKey(id), updated);
         qc.setQueryData(meetingKey(newId), updated);
         qc.setQueryData<Meeting[]>(meetingsKey, (prev) =>
           prev?.map((m) => (m.id === id ? updated : m)),
         );
-        if (typeof window !== "undefined") {
-          const currentHash = window.location.hash;
-          if (currentHash.includes(encodeURIComponent(id)) || currentHash.includes(id)) {
-            window.location.hash = `#meeting-${encodeURIComponent(newId)}`;
-          }
+        if (typeof window !== "undefined" && window.location.hash === `#meeting-${id}`) {
+          // raw path 그대로 — encodeURIComponent 가 `/` 도 escape 해서 listener 가
+          // slice 한 결과가 망가짐. App.tsx 의 readMeetingFromHash 는 raw path 받음.
+          window.location.hash = `#meeting-${newId}`;
         }
       } else {
         qc.setQueryData(meetingKey(id), updated);
