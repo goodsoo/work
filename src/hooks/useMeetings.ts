@@ -27,6 +27,44 @@ const meetingsKey = ["meetings"] as const;
 const deletedMeetingsKey = ["meetings", "deleted"] as const;
 const meetingKey = (id: string) => ["meetings", id] as const;
 
+// patch 형식 (string | null | array) 을 Meeting 의 정규 type 으로 변환.
+// onMutate 가 `{...prev, ...patch}` 그대로 spread 하면 attendees 가 "alice, bob"
+// 같은 string 으로 덮여서 data.attendees.join() 호출 시 TypeError. title/date 등
+// 같은 패턴 잠재 risk 모두 처리.
+function normalizeAttendeesPatch(v: MeetingUpdate["attendees"]): string[] {
+  if (v === null || v === undefined) return [];
+  if (Array.isArray(v)) {
+    return v.filter((s): s is string => typeof s === "string");
+  }
+  if (typeof v === "string") {
+    return v.trim() === ""
+      ? []
+      : v.split(",").map((s) => s.trim()).filter(Boolean);
+  }
+  return [];
+}
+
+function applyOptimisticPatch(prev: Meeting, patch: MeetingUpdate): Meeting {
+  const out: Meeting = { ...prev };
+  if (patch.title !== undefined) out.title = patch.title ?? "";
+  if (patch.date !== undefined) out.date = patch.date ?? null;
+  if (patch.time !== undefined) out.time = patch.time ?? null;
+  if (patch.attendees !== undefined) {
+    out.attendees = normalizeAttendeesPatch(patch.attendees);
+  }
+  if (patch.tags !== undefined) out.tags = patch.tags ?? [];
+  if (patch.content !== undefined) out.content = patch.content ?? "";
+  if (patch.transcript !== undefined) out.transcript = patch.transcript ?? "";
+  if (patch.discussion_items !== undefined) {
+    out.discussion_items = patch.discussion_items ?? [];
+  }
+  if (patch.decisions !== undefined) out.decisions = patch.decisions ?? [];
+  if (patch.action_items !== undefined) {
+    out.action_items = patch.action_items ?? [];
+  }
+  return out;
+}
+
 export function useMeetings() {
   const { adapter, isReady } = useVault();
   return useQuery({
@@ -91,15 +129,10 @@ export function useUpdateMeeting(id: string) {
       const prevDetail = qc.getQueryData<Meeting>(meetingKey(id));
       const prevList = qc.getQueryData<Meeting[]>(meetingsKey);
       if (prevDetail) {
-        qc.setQueryData(meetingKey(id), {
-          ...prevDetail,
-          ...patch,
-        } as Meeting);
+        qc.setQueryData(meetingKey(id), applyOptimisticPatch(prevDetail, patch));
       }
       qc.setQueryData<Meeting[]>(meetingsKey, (curr) =>
-        curr?.map((m) =>
-          m.id === id ? ({ ...m, ...patch } as Meeting) : m,
-        ),
+        curr?.map((m) => (m.id === id ? applyOptimisticPatch(m, patch) : m)),
       );
       return { prevDetail, prevList };
     },
