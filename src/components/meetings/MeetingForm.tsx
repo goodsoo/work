@@ -653,6 +653,7 @@ export function MeetingForm({ meetingId, onBack }: Props) {
             <TabBtn
               label="메모"
               badge={viewMode === "edit" ? "편집" : "보기"}
+              badgeAccent={viewMode === "edit"}
               badgeTitle={
                 isTauri
                   ? `${viewMode === "edit" ? "보기 모드" : "편집 모드"}  ⌘ + E`
@@ -949,6 +950,7 @@ function TabBtn({
   label,
   shortcut,
   badge,
+  badgeAccent,
   onBadgeClick,
   badgeTitle,
   active,
@@ -957,6 +959,7 @@ function TabBtn({
   label: string;
   shortcut?: string;
   badge?: string | null;
+  badgeAccent?: boolean;
   onBadgeClick?: () => void;
   badgeTitle?: string;
   active: boolean;
@@ -1007,8 +1010,12 @@ function TabBtn({
           }
           className="rounded-md px-1.5 py-0.5 text-xs"
           style={{
-            backgroundColor: "var(--bg-surface-hover)",
-            color: "var(--text-secondary)",
+            backgroundColor: badgeAccent
+              ? "var(--accent-blue-bg)"
+              : "var(--bg-surface-hover)",
+            color: badgeAccent
+              ? "var(--accent-blue-text)"
+              : "var(--text-secondary)",
             fontWeight: 400,
             cursor: onBadgeClick ? "pointer" : undefined,
           }}
