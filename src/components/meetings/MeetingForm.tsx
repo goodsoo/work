@@ -288,10 +288,18 @@ export function MeetingForm({ meetingId, onBack }: Props) {
         : (summaryHistory as UseStateHistoryResult<unknown>);
 
   // 단축키 (Tauri only):
-  //   Cmd/Ctrl+Z/Y/Shift+Z = 활성 탭 stack 의 undo/redo
-  //   Cmd+[ / Cmd+] = sub-tab 좌/우 cycling (메모 ↔ 음성 기록 ↔ 요약)
-  //   Cmd+E = 본문 탭일 때 편집/보기 토글 (옵시디안 패턴)
+  //   Cmd/Ctrl+Z/Y/Shift+Z = 활성 탭 stack 의 undo/redo (어디서나)
+  //   Q / W / E = sub-tab 메모 / 음성 기록 / 요약 (input/textarea 밖에서만 — input 안에선
+  //     그 글자 그대로 타이핑). Q + 이미 메모 탭이면 편집/보기 토글. e.code 매칭으로
+  //     한글 IME 켜져 있어도 KeyQ/W/E 매칭.
   useEffect(() => {
+    function isInTextInput(t: EventTarget | null): boolean {
+      if (!(t instanceof HTMLElement)) return false;
+      const tag = t.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true;
+      return t.isContentEditable;
+    }
+
     function onKeyDown(e: KeyboardEvent) {
       const cmd = e.metaKey || e.ctrlKey;
       const k = e.key.toLowerCase();
@@ -310,20 +318,22 @@ export function MeetingForm({ meetingId, onBack }: Props) {
         return;
       }
       if (!isTauri) return;
-      // Cmd+E — 메모 탭일 때만 편집/보기 토글. 다른 탭이면 무시 (textarea 통과).
-      if (cmd && !e.shiftKey && !e.altKey && k === "e") {
-        if (activeTab !== "body") return;
+      // single-key sub-tab — modifier 있으면 무시.
+      if (cmd || e.shiftKey || e.altKey) return;
+      if (isInTextInput(e.target)) return;
+      if (e.code === "KeyQ") {
         e.preventDefault();
-        setViewMode(viewMode === "edit" ? "view" : "edit");
-        return;
-      }
-      // Cmd+] = 다음 sub-tab, Cmd+[ = 이전 sub-tab. cycling.
-      if (cmd && !e.shiftKey && !e.altKey && (k === "]" || k === "[")) {
+        if (activeTab === "body") {
+          setViewMode(viewMode === "edit" ? "view" : "edit");
+        } else {
+          setActiveTab("body");
+        }
+      } else if (e.code === "KeyW") {
         e.preventDefault();
-        const order: typeof activeTab[] = ["body", "transcript", "summary"];
-        const idx = order.indexOf(activeTab);
-        const next = k === "]" ? (idx + 1) % order.length : (idx - 1 + order.length) % order.length;
-        setActiveTab(order[next]);
+        setActiveTab("transcript");
+      } else if (e.code === "KeyE") {
+        e.preventDefault();
+        setActiveTab("summary");
       }
     }
     window.addEventListener("keydown", onKeyDown);
@@ -525,7 +535,7 @@ export function MeetingForm({ meetingId, onBack }: Props) {
             title={
               activeTab === "body"
                 ? isTauri
-                  ? `${viewMode === "edit" ? "보기 모드" : "편집 모드"}  ⌘ + E`
+                  ? `${viewMode === "edit" ? "보기 모드" : "편집 모드"}  Q`
                   : viewMode === "edit"
                     ? "보기 모드"
                     : "편집 모드"
@@ -651,30 +661,19 @@ export function MeetingForm({ meetingId, onBack }: Props) {
           <div className="flex gap-1">
             <TabBtn
               label="메모"
-              badge={viewMode === "edit" ? "편집" : "보기"}
-              badgeAccent={viewMode === "edit"}
-              badgeTitle={
-                isTauri
-                  ? `${viewMode === "edit" ? "보기 모드" : "편집 모드"}  ⌘ + E`
-                  : viewMode === "edit"
-                    ? "보기 모드"
-                    : "편집 모드"
-              }
-              onBadgeClick={
-                activeTab === "body"
-                  ? () => setViewMode(viewMode === "edit" ? "view" : "edit")
-                  : undefined
-              }
+              shortcut={isTauri ? "Q" : undefined}
               active={activeTab === "body"}
               onClick={() => setActiveTab("body")}
             />
             <TabBtn
               label="음성 기록"
+              shortcut={isTauri ? "W" : undefined}
               active={activeTab === "transcript"}
               onClick={() => setActiveTab("transcript")}
             />
             <TabBtn
               label="요약"
+              shortcut={isTauri ? "E" : undefined}
               active={activeTab === "summary"}
               onClick={() => setActiveTab("summary")}
             />
@@ -969,6 +968,20 @@ function TabBtn({
       }}
     >
       <span>{label}</span>
+      {shortcut ? (
+        <kbd
+          aria-hidden
+          className="rounded font-mono text-[10px] leading-none"
+          style={{
+            padding: "2px 5px",
+            border: "1px solid var(--border-subtle)",
+            color: "var(--text-muted)",
+            backgroundColor: "var(--bg-surface)",
+          }}
+        >
+          {shortcut}
+        </kbd>
+      ) : null}
       {badge ? (
         <span
           role={onBadgeClick ? "button" : undefined}
