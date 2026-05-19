@@ -537,13 +537,7 @@ export function MeetingForm({ meetingId, onBack }: Props) {
             <TabBtn
               label="본문"
               shortcut={isTauri ? "⌘+] 다음 · ⌘+[ 이전 · ⌘+E 편집/보기" : undefined}
-              badge={
-                activeTab === "body"
-                  ? viewMode === "edit"
-                    ? "편집"
-                    : "보기"
-                  : null
-              }
+              badge={viewMode === "edit" ? "편집" : "보기"}
               active={activeTab === "body"}
               onClick={() => setActiveTab("body")}
             />
