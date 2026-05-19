@@ -563,50 +563,14 @@ export function MeetingForm({ meetingId, onBack }: Props) {
       ) : null}
 
       {/* Full-page editor */}
-      <div className="mx-auto max-w-3xl px-6 pb-24 pt-5">
-        {/* Metadata — subtle, inline (제목은 헤더로 옮김) */}
+      <div className="mx-auto max-w-3xl px-6 pb-24">
+        {/* Tab nav — 헤더 바로 아래에 sticky. 헤더 (3.5rem) 와 시각적으로 연결. */}
         <div
-          className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm"
-          style={{ color: "var(--text-secondary)" }}
-        >
-          <label className="inline-flex items-center gap-1.5">
-            <span className="text-xs" style={{ color: "var(--text-muted)" }}>날짜</span>
-            <input
-              type="date"
-              value={meta.date}
-              onChange={(e) => setMetaField("date", e.target.value)}
-            />
-          </label>
-          <label className="inline-flex items-center gap-1.5">
-            <span className="text-xs" style={{ color: "var(--text-muted)" }}>시간</span>
-            <input
-              type="time"
-              value={meta.time}
-              onChange={(e) => setMetaField("time", e.target.value)}
-              className="border-0 bg-transparent text-sm outline-none"
-              style={{ color: "var(--text-secondary)" }}
-            />
-          </label>
-          <div className="inline-flex items-center gap-1.5">
-            <span className="text-xs" style={{ color: "var(--text-muted)" }}>참석</span>
-            <div className="min-w-[12em]">
-              <AttendeeTagInput
-                value={meta.attendees}
-                onChange={(next) => setMetaField("attendees", next)}
-                suggestions={attendeeSuggestions}
-                placeholder="이름"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Tab nav + 액션 (sticky: 메타 아래에서 시작, 스크롤 시 상단 도달하면 고정) */}
-        <div
-          className="sticky z-10 mt-6 flex items-center justify-between backdrop-blur"
+          className="sticky z-10 flex items-center justify-between backdrop-blur"
           style={{
             top: "3.5rem",
             borderBottom: "1px solid var(--border-subtle)",
-            backgroundColor: "var(--bg-base)",
+            backgroundColor: "var(--bg-overlay)",
           }}
         >
           <div className="flex gap-1">
@@ -648,6 +612,42 @@ export function MeetingForm({ meetingId, onBack }: Props) {
                 {body.length}자
               </span>
             ) : null}
+          </div>
+        </div>
+
+        {/* Metadata — 탭 아래로 (제목은 헤더, 탭은 헤더 바로 아래 sticky) */}
+        <div
+          className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm"
+          style={{ color: "var(--text-secondary)" }}
+        >
+          <label className="inline-flex items-center gap-1.5">
+            <span className="text-xs" style={{ color: "var(--text-muted)" }}>날짜</span>
+            <input
+              type="date"
+              value={meta.date}
+              onChange={(e) => setMetaField("date", e.target.value)}
+            />
+          </label>
+          <label className="inline-flex items-center gap-1.5">
+            <span className="text-xs" style={{ color: "var(--text-muted)" }}>시간</span>
+            <input
+              type="time"
+              value={meta.time}
+              onChange={(e) => setMetaField("time", e.target.value)}
+              className="border-0 bg-transparent text-sm outline-none"
+              style={{ color: "var(--text-secondary)" }}
+            />
+          </label>
+          <div className="inline-flex items-center gap-1.5">
+            <span className="text-xs" style={{ color: "var(--text-muted)" }}>참석</span>
+            <div className="min-w-[12em]">
+              <AttendeeTagInput
+                value={meta.attendees}
+                onChange={(next) => setMetaField("attendees", next)}
+                suggestions={attendeeSuggestions}
+                placeholder="이름"
+              />
+            </div>
           </div>
         </div>
 
