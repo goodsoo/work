@@ -117,6 +117,14 @@
     overscroll-behavior: none;
   }
 
+  /* Desktop: body scroll 막고 main 안에서만 scroll — viewport 전체 scrollbar 회피 */
+  @media (min-width: 1024px) {
+    html, body {
+      height: 100%;
+      overflow: hidden;
+    }
+  }
+
   .font-serif {
     font-weight: 600;
     letter-spacing: -0.01em;
