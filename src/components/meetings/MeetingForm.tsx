@@ -445,10 +445,11 @@ export function MeetingForm({ meetingId, onBack }: Props) {
   }
 
   return (
-    <div className="min-h-svh">
-      {/* Header — 사이드바 헤더와 같은 높이 (3.5rem). grid 로 좌/우 그룹 width 변화 무관 제목 viewport-center. */}
+    <div className="min-h-svh lg:flex lg:h-screen lg:min-h-0 lg:flex-col">
+      {/* Header — 사이드바 헤더와 같은 높이 (3.5rem). desktop 에선 flex item (top fixed),
+          mobile 은 sticky. grid 로 좌/우 그룹 width 변화 무관 제목 viewport-center. */}
       <div
-        className="sticky top-0 z-20 grid items-center gap-2 overflow-hidden px-3 backdrop-blur"
+        className="sticky top-0 z-20 grid items-center gap-2 overflow-hidden px-3 backdrop-blur lg:shrink-0 lg:relative lg:top-auto"
         style={{
           height: "3.5rem",
           gridTemplateColumns: "1fr auto 1fr",
@@ -638,13 +639,14 @@ export function MeetingForm({ meetingId, onBack }: Props) {
         </div>
       ) : null}
 
-      {/* Full-page editor */}
-      <div className="mx-auto max-w-3xl px-6 pb-24">
+      {/* Full-page editor — desktop 에선 자체 scroll container (header 옆 scrollbar 회피).
+          outer = full-width scroll, inner = max-w content. */}
+      <div className="lg:flex-1 lg:overflow-y-auto">
+        <div className="mx-auto max-w-3xl px-6 pb-24">
         {/* Tab nav — 헤더 바로 아래에 sticky. 헤더 (3.5rem) 와 시각적으로 연결. */}
         <div
-          className="sticky z-10 flex items-center justify-between backdrop-blur"
+          className="sticky top-14 z-10 flex items-center justify-between backdrop-blur lg:top-0"
           style={{
-            top: "3.5rem",
             borderBottom: "1px solid var(--border-subtle)",
             backgroundColor: "var(--bg-overlay)",
           }}
@@ -873,6 +875,7 @@ export function MeetingForm({ meetingId, onBack }: Props) {
         ) : null}
         </div>
 
+        </div>
       </div>
     </div>
   );
