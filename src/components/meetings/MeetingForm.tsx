@@ -217,7 +217,10 @@ export function MeetingForm({ meetingId, onBack }: Props) {
         ? (transcriptHistory as UseStateHistoryResult<unknown>)
         : (summaryHistory as UseStateHistoryResult<unknown>);
 
-  // 단축키: undo/redo (활성 탭의 stack) + Opt+1/2/3 sub-tab (Tauri only)
+  // 단축키 (Tauri only):
+  //   Cmd/Ctrl+Z/Y/Shift+Z = 활성 탭 stack 의 undo/redo
+  //   Cmd+[ / Cmd+] = sub-tab 좌/우 cycling (본문 ↔ 회의 내용 ↔ 요약)
+  //   Cmd+E = 본문 탭일 때 편집/보기 토글 (옵시디안 패턴)
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       const cmd = e.metaKey || e.ctrlKey;
@@ -236,21 +239,21 @@ export function MeetingForm({ meetingId, onBack }: Props) {
         activeHistory.redo();
         return;
       }
-      // Opt+1/2/3 — Opt+숫자는 macOS 가 ¡™£ 로 바꾸므로 e.code 로 매칭
-      if (!isTauri || !e.altKey || e.metaKey || e.ctrlKey || e.shiftKey) return;
-      if (e.code === "Digit1") {
+      if (!isTauri) return;
+      // Cmd+E — 본문 탭일 때만 편집/보기 토글. 다른 탭이면 무시 (textarea 통과).
+      if (cmd && !e.shiftKey && !e.altKey && k === "e") {
+        if (activeTab !== "body") return;
         e.preventDefault();
-        if (activeTab === "body") {
-          setViewMode(viewMode === "edit" ? "view" : "edit");
-        } else {
-          setActiveTab("body");
-        }
-      } else if (e.code === "Digit2") {
+        setViewMode(viewMode === "edit" ? "view" : "edit");
+        return;
+      }
+      // Cmd+] = 다음 sub-tab, Cmd+[ = 이전 sub-tab. cycling.
+      if (cmd && !e.shiftKey && !e.altKey && (k === "]" || k === "[")) {
         e.preventDefault();
-        setActiveTab("transcript");
-      } else if (e.code === "Digit3") {
-        e.preventDefault();
-        setActiveTab("summary");
+        const order: typeof activeTab[] = ["body", "transcript", "summary"];
+        const idx = order.indexOf(activeTab);
+        const next = k === "]" ? (idx + 1) % order.length : (idx - 1 + order.length) % order.length;
+        setActiveTab(order[next]);
       }
     }
     window.addEventListener("keydown", onKeyDown);
@@ -533,19 +536,26 @@ export function MeetingForm({ meetingId, onBack }: Props) {
           <div className="flex gap-1">
             <TabBtn
               label="본문"
-              shortcut={isTauri ? "⌥1" : undefined}
+              shortcut={isTauri ? "⌘[/⌘] 탭 이동 · ⌘E 편집/보기" : undefined}
+              badge={
+                activeTab === "body"
+                  ? viewMode === "edit"
+                    ? "편집"
+                    : "보기"
+                  : null
+              }
               active={activeTab === "body"}
               onClick={() => setActiveTab("body")}
             />
             <TabBtn
               label="회의 내용"
-              shortcut={isTauri ? "⌥2" : undefined}
+              shortcut={isTauri ? "⌘[ / ⌘]" : undefined}
               active={activeTab === "transcript"}
               onClick={() => setActiveTab("transcript")}
             />
             <TabBtn
               label="요약"
-              shortcut={isTauri ? "⌥3" : undefined}
+              shortcut={isTauri ? "⌘[ / ⌘]" : undefined}
               active={activeTab === "summary"}
               onClick={() => setActiveTab("summary")}
             />
@@ -559,7 +569,7 @@ export function MeetingForm({ meetingId, onBack }: Props) {
                 }
                 title={
                   isTauri
-                    ? `${viewMode === "edit" ? "보기 모드" : "편집 모드"}  ⌥1`
+                    ? `${viewMode === "edit" ? "보기 모드" : "편집 모드"}  ⌘E`
                     : viewMode === "edit"
                       ? "보기 모드"
                       : "편집 모드"
@@ -725,11 +735,13 @@ export function MeetingForm({ meetingId, onBack }: Props) {
 function TabBtn({
   label,
   shortcut,
+  badge,
   active,
   onClick,
 }: {
   label: string;
   shortcut?: string;
+  badge?: string | null;
   active: boolean;
   onClick: () => void;
 }) {
@@ -740,7 +752,7 @@ function TabBtn({
       onClick={onClick}
       title={title}
       aria-current={active ? "page" : undefined}
-      className="px-3 py-2 text-sm transition"
+      className="flex items-center gap-1.5 px-3 py-2 text-sm transition"
       style={{
         color: active ? "var(--text-primary)" : "var(--text-secondary)",
         borderBottom: active
@@ -751,7 +763,19 @@ function TabBtn({
         fontWeight: active ? 600 : 400,
       }}
     >
-      {label}
+      <span>{label}</span>
+      {badge ? (
+        <span
+          className="rounded-md px-1.5 py-0.5 text-xs"
+          style={{
+            backgroundColor: "var(--bg-surface-hover)",
+            color: "var(--text-secondary)",
+            fontWeight: 400,
+          }}
+        >
+          {badge}
+        </span>
+      ) : null}
     </button>
   );
 }
