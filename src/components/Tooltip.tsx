@@ -34,7 +34,7 @@ export function GlobalTooltip() {
       const rect = el.getBoundingClientRect();
       const vw = window.innerWidth;
       const vh = window.innerHeight;
-      // 좌측 가장자리 (e.g. ActivityBar) → 오른쪽으로 띄움
+      // 좌측 가장자리 → 오른쪽으로 띄움
       if (rect.left < EDGE_THRESHOLD) {
         return {
           text,

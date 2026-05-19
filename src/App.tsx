@@ -4,7 +4,13 @@ import { AppShell } from "./components/nav/AppShell";
 import { GlobalTooltip } from "./components/Tooltip";
 import type { Tab } from "./components/nav/BottomTabs";
 import { MeetingForm } from "./components/meetings/MeetingForm";
-import { MeetingsSidePanel, CalendarDayPanel, TodosSidePanel } from "./components/nav/SidePanel";
+import {
+  MeetingsSidePanel,
+  MeetingsSidePanelFooter,
+  CalendarDayPanel,
+  TodosSidePanel,
+  type MeetingsView,
+} from "./components/nav/SidePanel";
 import type { TodoCategory } from "./api/todos";
 type TodosFilter = TodoCategory | "all" | "uncategorized";
 import { CalendarPage } from "./pages/CalendarPage";
@@ -62,6 +68,7 @@ function AppContent() {
   const [portfolioFilter, setPortfolioFilter] = useState<ProjectFilter>({
     kind: "all",
   });
+  const [meetingsView, setMeetingsView] = useState<MeetingsView>("list");
   const portfolioSync = useGhSync();
   const { adapter, isReady } = useVault();
   const meetings = useMeetings();
@@ -207,6 +214,8 @@ function AppContent() {
         selectedId={selectedMeetingId}
         onSelect={openMeeting}
         onMeetingPurged={handleMeetingPurged}
+        view={meetingsView}
+        onViewChange={setMeetingsView}
       />
     ) : tab === "calendar" ? (
       <CalendarDayPanel
@@ -231,8 +240,19 @@ function AppContent() {
       />
     ) : undefined;
 
+  // 메모장 list 모드일 때만 도움말 + 휴지통 footer. trash 모드는 footer 비움 (TrashView 의 back 버튼 사용).
+  const sidePanelFooter =
+    tab === "meetings" && meetingsView === "list" ? (
+      <MeetingsSidePanelFooter onTrashOpen={() => setMeetingsView("trash")} />
+    ) : undefined;
+
   return (
-    <AppShell activeTab={tab} onTabChange={changeTab} sidePanel={sidePanel}>
+    <AppShell
+      activeTab={tab}
+      onTabChange={changeTab}
+      sidePanel={sidePanel}
+      sidePanelFooter={sidePanelFooter}
+    >
       {tab === "meetings" ? (
         selectedMeetingId ? (
           <MeetingForm meetingId={selectedMeetingId} onBack={closeMeeting} />

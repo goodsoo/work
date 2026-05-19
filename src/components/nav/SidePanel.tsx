@@ -28,10 +28,14 @@ import { formatError } from "../../lib/errors";
 
 /* ── Meetings Side Panel ── */
 
+export type MeetingsView = "list" | "trash";
+
 type MeetingsPanelProps = {
   selectedId: string | null;
   onSelect: (id: string) => void;
   onMeetingPurged?: (id: string) => void;
+  view: MeetingsView;
+  onViewChange: (view: MeetingsView) => void;
 };
 
 const dateFmt = new Intl.DateTimeFormat("ko-KR", {
@@ -47,11 +51,16 @@ function formatShort(d: string | null): string {
   return dateFmt.format(parsed);
 }
 
-export function MeetingsSidePanel({ selectedId, onSelect, onMeetingPurged }: MeetingsPanelProps) {
+export function MeetingsSidePanel({
+  selectedId,
+  onSelect,
+  onMeetingPurged,
+  view,
+  onViewChange,
+}: MeetingsPanelProps) {
   const { data, isLoading } = useMeetings();
   const createMutation = useCreateMeeting();
   const [createError, setCreateError] = useState<string | null>(null);
-  const [view, setView] = useState<"list" | "trash">("list");
 
   async function handleCreate() {
     setCreateError(null);
@@ -77,7 +86,7 @@ export function MeetingsSidePanel({ selectedId, onSelect, onMeetingPurged }: Mee
   }
 
   if (view === "trash") {
-    return <TrashView onBack={() => setView("list")} onPurged={onMeetingPurged} />;
+    return <TrashView onBack={() => onViewChange("list")} onPurged={onMeetingPurged} />;
   }
 
   return (
@@ -148,22 +157,29 @@ export function MeetingsSidePanel({ selectedId, onSelect, onMeetingPurged }: Mee
           </ul>
         )}
       </div>
-      <div
-        className="flex shrink-0 items-center"
-        style={{ borderTop: "1px solid var(--border-subtle)" }}
+    </div>
+  );
+}
+
+// AppShell.sidePanelFooter slot 으로 주입. 메모장 탭의 list 모드일 때만 보임.
+export function MeetingsSidePanelFooter({
+  onTrashOpen,
+}: {
+  onTrashOpen: () => void;
+}) {
+  return (
+    <div className="flex items-center gap-1">
+      <MarkdownHelp />
+      <button
+        type="button"
+        onClick={onTrashOpen}
+        title="휴지통"
+        aria-label="휴지통"
+        className="flex h-7 w-7 items-center justify-center rounded-md transition"
+        style={{ color: "var(--text-muted)", minHeight: 0 }}
       >
-        <MarkdownHelp />
-        <button
-          type="button"
-          onClick={() => setView("trash")}
-          title="휴지통"
-          aria-label="휴지통"
-          className="ml-auto flex items-center gap-1.5 px-4 py-2.5 text-xs transition"
-          style={{ color: "var(--text-muted)", minHeight: 0 }}
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-        </button>
-      </div>
+        <Trash2 className="h-3.5 w-3.5" />
+      </button>
     </div>
   );
 }
@@ -346,11 +362,12 @@ function MarkdownHelp() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex shrink-0 items-center gap-1.5 px-4 py-2.5 text-xs transition"
+        title="마크다운 도움말"
+        aria-label="마크다운 도움말"
+        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition"
         style={{ color: "var(--text-muted)", minHeight: 0 }}
       >
         <HelpCircle className="h-3.5 w-3.5" />
-        마크다운 도움말
       </button>
       {open ? (
         <div

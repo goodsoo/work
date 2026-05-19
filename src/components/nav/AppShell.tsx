@@ -7,10 +7,9 @@ import {
   SIDE_PANEL_MAX,
 } from "../../hooks/useSidePanelWidth";
 import { useDrawer } from "../../hooks/useDrawer";
-import { BottomTabs, type Tab } from "./BottomTabs";
-import { ActivityBar } from "./ActivityBar";
+import { isTauri } from "../../lib/isTauri";
+import { BottomTabs, TABS, type Tab } from "./BottomTabs";
 
-const ACTIVITY_BAR_WIDTH = 48;
 const MOBILE_DRAWER_WIDTH = 288;
 const SWIPE_CLOSE_THRESHOLD = 60;
 
@@ -18,19 +17,26 @@ type Props = {
   activeTab: Tab;
   onTabChange: (tab: Tab) => void;
   sidePanel?: ReactNode;
+  // SidePanel column 의 footer 왼쪽에 들어가는 페이지별 액션 (예: 메모장의 도움말/휴지통).
+  // 비워두면 footer 에 theme toggle 만 보임.
+  sidePanelFooter?: ReactNode;
   children: ReactNode;
 };
 
-export function AppShell({ activeTab, onTabChange, sidePanel, children }: Props) {
+export function AppShell({
+  activeTab,
+  onTabChange,
+  sidePanel,
+  sidePanelFooter,
+  children,
+}: Props) {
   const { theme, toggle } = useTheme();
   const { width, setWidth } = useSidePanelWidth();
   const drawer = useDrawer();
   const hasSidePanel = sidePanel != null;
   const ThemeIcon = theme === "light" ? Sun : Moon;
 
-  const mainPaddingLeft = hasSidePanel
-    ? `${ACTIVITY_BAR_WIDTH + width}px`
-    : `${ACTIVITY_BAR_WIDTH}px`;
+  const mainPaddingLeft = hasSidePanel ? `${width}px` : "0px";
 
   // BottomTab 변경 시 drawer 자동 닫기
   function handleTabChange(next: Tab) {
@@ -80,9 +86,8 @@ export function AppShell({ activeTab, onTabChange, sidePanel, children }: Props)
       className="min-h-svh"
       style={{ paddingTop: "var(--safe-top)", backgroundColor: "var(--bg-base)" }}
     >
-      {/* Desktop: Activity Bar + Side Panel */}
+      {/* Desktop: Side Panel (상단 탭 row + sidePanel + 하단 테마 토글) */}
       <div className="hidden lg:fixed lg:inset-y-0 lg:left-0 lg:z-20 lg:flex">
-        <ActivityBar activeTab={activeTab} onTabChange={onTabChange} />
         {hasSidePanel ? (
           <div
             className="relative"
@@ -92,7 +97,25 @@ export function AppShell({ activeTab, onTabChange, sidePanel, children }: Props)
               borderRight: "1px solid var(--border-default)",
             }}
           >
-            {sidePanel}
+            <div className="flex h-full flex-col">
+              <TopTabsRow activeTab={activeTab} onTabChange={onTabChange} />
+              <div className="relative min-h-0 flex-1">{sidePanel}</div>
+              <div
+                className="flex shrink-0 items-center justify-between gap-2 px-3 py-2"
+                style={{ borderTop: "1px solid var(--border-subtle)" }}
+              >
+                <div className="flex min-w-0 items-center">{sidePanelFooter}</div>
+                <button
+                  type="button"
+                  onClick={toggle}
+                  title={theme === "light" ? "다크 모드로" : "라이트 모드로"}
+                  className="flex h-7 w-7 items-center justify-center rounded-md transition"
+                  style={{ color: "var(--text-muted)", minHeight: 0 }}
+                >
+                  <ThemeIcon className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </div>
             <SidePanelResizer width={width} onChange={setWidth} />
           </div>
         ) : null}
@@ -197,7 +220,7 @@ function SidePanelResizer({
   useEffect(() => {
     function onMouseMove(e: MouseEvent) {
       if (!draggingRef.current) return;
-      onChange(e.clientX - ACTIVITY_BAR_WIDTH);
+      onChange(e.clientX);
     }
     function onMouseUp() {
       if (!draggingRef.current) return;
@@ -248,5 +271,48 @@ function SidePanelResizer({
         style={{ backgroundColor: "var(--btn-primary)" }}
       />
     </div>
+  );
+}
+
+// SidePanel 상단의 4개 아이콘 탭 row (라벨 없음, flex-1 균등 분할).
+// 라벨/단축키는 title attribute 로 hover tooltip.
+function TopTabsRow({
+  activeTab,
+  onTabChange,
+}: {
+  activeTab: Tab;
+  onTabChange: (tab: Tab) => void;
+}) {
+  return (
+    <nav
+      className="flex shrink-0 items-stretch"
+      style={{ borderBottom: "1px solid var(--border-default)" }}
+      aria-label="primary"
+    >
+      {TABS.map(({ id, label, icon: Icon }, i) => {
+        const active = id === activeTab;
+        const title = isTauri ? `${label}  ⌘${i + 1}` : label;
+        return (
+          <button
+            key={id}
+            type="button"
+            onClick={() => onTabChange(id)}
+            aria-current={active ? "page" : undefined}
+            title={title}
+            aria-label={label}
+            className="flex flex-1 items-center justify-center py-2.5 transition"
+            style={{
+              borderBottom: active
+                ? "2px solid var(--btn-primary)"
+                : "2px solid transparent",
+              color: active ? "var(--text-primary)" : "var(--text-muted)",
+              minHeight: 0,
+            }}
+          >
+            <Icon className="h-[18px] w-[18px]" strokeWidth={active ? 2 : 1.5} />
+          </button>
+        );
+      })}
+    </nav>
   );
 }
