@@ -552,10 +552,13 @@ export function MeetingForm({ meetingId, onBack }: Props) {
           className="min-w-0 justify-self-center bg-transparent text-center text-base font-semibold outline-none"
           style={{
             color: "var(--text-primary)",
-            width: `min(${Math.max((titleDraft || "untitled").length, 6) + 2}ch, 100%, 28rem)`,
+            // field-sizing: input width 가 자동으로 content 길이 따라감 (한글/영문 정확).
+            // max-width 28rem 또는 grid track 안 100% 로 cap, 초과 시 native ellipsis.
+            fieldSizing: "content",
+            maxWidth: "min(100%, 28rem)",
             textOverflow: "ellipsis",
             overflow: "hidden",
-          }}
+          } as React.CSSProperties}
         />
 
         {/* Right: edit toggle / copy / delete */}
