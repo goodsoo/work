@@ -154,7 +154,9 @@ export function SourceBodyEditor({ content, onChange }: Props) {
           lineHeight: LINE_HEIGHT,
           padding: 0,
           paddingLeft: "0.5rem",
+          paddingBottom: "1rem", // 가로 scrollbar 가 마지막 줄 위에 겹치지 않게 여유
           overflowY: "hidden",
+          overscrollBehavior: "none", // 좌우 elastic bounce 제거
         }}
         wrap="off"
       />
