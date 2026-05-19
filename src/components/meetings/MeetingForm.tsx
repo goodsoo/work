@@ -536,10 +536,14 @@ export function MeetingForm({ meetingId, onBack }: Props) {
           <div className="flex gap-1">
             <TabBtn
               label="본문"
-              shortcut={isTauri ? "⌘+] 다음 · ⌘+[ 이전 · ⌘+E 편집/보기" : undefined}
+              shortcut={isTauri ? "⌘ + ] 다음 · ⌘ + [ 이전" : undefined}
               badge={viewMode === "edit" ? "편집" : "보기"}
               badgeTitle={
-                viewMode === "edit" ? "보기 모드로 전환" : "편집 모드로 전환"
+                isTauri
+                  ? `${viewMode === "edit" ? "보기 모드로 전환" : "편집 모드로 전환"}  ⌘ + E`
+                  : viewMode === "edit"
+                    ? "보기 모드로 전환"
+                    : "편집 모드로 전환"
               }
               onBadgeClick={() =>
                 setViewMode(viewMode === "edit" ? "view" : "edit")
@@ -549,13 +553,13 @@ export function MeetingForm({ meetingId, onBack }: Props) {
             />
             <TabBtn
               label="회의 내용"
-              shortcut={isTauri ? "⌘+] 다음 · ⌘+[ 이전" : undefined}
+              shortcut={isTauri ? "⌘ + ] 다음 · ⌘ + [ 이전" : undefined}
               active={activeTab === "transcript"}
               onClick={() => setActiveTab("transcript")}
             />
             <TabBtn
               label="요약"
-              shortcut={isTauri ? "⌘+] 다음 · ⌘+[ 이전" : undefined}
+              shortcut={isTauri ? "⌘ + ] 다음 · ⌘ + [ 이전" : undefined}
               active={activeTab === "summary"}
               onClick={() => setActiveTab("summary")}
             />
@@ -569,7 +573,7 @@ export function MeetingForm({ meetingId, onBack }: Props) {
                 }
                 title={
                   isTauri
-                    ? `${viewMode === "edit" ? "보기 모드" : "편집 모드"}  ⌘+E`
+                    ? `${viewMode === "edit" ? "보기 모드" : "편집 모드"}  ⌘ + E`
                     : viewMode === "edit"
                       ? "보기 모드"
                       : "편집 모드"
