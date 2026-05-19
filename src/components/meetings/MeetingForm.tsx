@@ -904,8 +904,9 @@ function MetaRow({
 // 보기 모드용 meta — icon/divider 없는 plain text. 빈 field 안 보임.
 // 편집 모드 MetaRow 와 같은 line height (1.625rem) + 라벨 위치 (gutter 1.75rem + paddingLeft 0.5rem).
 function MetaReadOnly({ meta }: { meta: MetaDoc }) {
+  const wd = weekdayShort(meta.date);
   const rows: { label: string; value: string }[] = [];
-  if (meta.date) rows.push({ label: "날짜", value: meta.date });
+  if (meta.date) rows.push({ label: "날짜", value: wd ? `${meta.date} (${wd})` : meta.date });
   if (meta.time) rows.push({ label: "시간", value: meta.time });
   if (meta.attendees) rows.push({ label: "참석자", value: meta.attendees });
   if (rows.length === 0) return null;
@@ -1090,9 +1091,9 @@ function TranscriptArea({
 }
 
 /**
- * 너그러운 날짜 input. type=text 자유 입력 + blur/Enter 시 parseLooseDate 로 ISO 정규화.
- * 옆에 요일 chip + 달력 아이콘 (클릭 시 hidden type=date 의 showPicker 호출).
- * 파싱 실패 시 draft 유지 — 사용자가 고치도록. Esc 로 원래 value 복귀.
+ * 너그러운 날짜 input. blur/Enter 시 parseLooseDate → ISO 정규화. 파싱 실패 시
+ * 이전 값으로 revert. blur 상태 + 유효 ISO + 요일 있으면 input value 자체에
+ * " (요일)" 합쳐 표시. focus 가면 ISO 만 (편집 가능).
  */
 function LooseDateInput({
   value,
@@ -1102,7 +1103,7 @@ function LooseDateInput({
   onCommit: (next: string) => void;
 }) {
   const [draft, setDraft] = useState(value);
-  const pickerRef = useRef<HTMLInputElement>(null);
+  const [focused, setFocused] = useState(false);
   useEffect(() => {
     setDraft(value);
   }, [value]);
@@ -1118,86 +1119,48 @@ function LooseDateInput({
     if (iso) {
       setDraft(iso);
       if (iso !== value) onCommit(iso);
+    } else {
+      setDraft(value);
     }
-  }
-
-  function openPicker() {
-    const el = pickerRef.current;
-    if (!el) return;
-    type WithPicker = HTMLInputElement & { showPicker?: () => void };
-    const w = el as WithPicker;
-    if (typeof w.showPicker === "function") {
-      try {
-        w.showPicker();
-        return;
-      } catch {
-        // fall through to click
-      }
-    }
-    el.click();
   }
 
   const wd = weekdayShort(value);
+  const display = !focused && draft && wd ? `${draft} (${wd})` : draft;
+  const widthCh = Math.max(display.length, 10);
 
   return (
-    <span className="inline-flex items-center gap-1">
-      <input
-        type="text"
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={commit}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") {
-            e.preventDefault();
-            e.currentTarget.blur();
-          } else if (e.key === "Escape") {
-            setDraft(value);
-            e.currentTarget.blur();
-          }
-        }}
-        placeholder="5/19 또는 오늘"
-        className="w-32 border-0 bg-transparent text-sm outline-none"
-        style={{ color: "var(--text-secondary)" }}
-      />
-      {wd ? (
-        <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-          ({wd})
-        </span>
-      ) : null}
-      <button
-        type="button"
-        onClick={openPicker}
-        title="달력에서 선택"
-        aria-label="달력에서 선택"
-        className="rounded p-0.5 transition"
-        style={{ color: "var(--text-muted)", minHeight: 0 }}
-      >
-        <CalendarIcon className="h-3.5 w-3.5" />
-      </button>
-      <input
-        ref={pickerRef}
-        type="date"
-        value={value}
-        onChange={(e) => onCommit(e.target.value)}
-        tabIndex={-1}
-        aria-hidden
-        style={{
-          position: "absolute",
-          width: 0,
-          height: 0,
-          padding: 0,
-          border: 0,
-          opacity: 0,
-          pointerEvents: "none",
-        }}
-      />
-    </span>
+    <input
+      type="text"
+      value={display}
+      onChange={(e) => setDraft(e.target.value)}
+      onFocus={() => setFocused(true)}
+      onBlur={() => {
+        setFocused(false);
+        commit();
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          e.currentTarget.blur();
+        } else if (e.key === "Escape") {
+          setDraft(value);
+          e.currentTarget.blur();
+        }
+      }}
+      placeholder="yyyy-mm-dd"
+      maxLength={10}
+      className="border-0 bg-transparent text-sm leading-none outline-none"
+      style={{
+        color: "var(--text-secondary)",
+        width: `${widthCh}ch`,
+      }}
+    />
   );
 }
 
 /**
  * 너그러운 시간 input. blur/Enter 시 parseLooseTime → HH:mm 정규화.
- * 옆에 시계 아이콘 (hidden type=time 의 showPicker).
+ * 파싱 실패 시 이전 값으로 revert.
  */
 function LooseTimeInput({
   value,
@@ -1207,7 +1170,6 @@ function LooseTimeInput({
   onCommit: (next: string) => void;
 }) {
   const [draft, setDraft] = useState(value);
-  const pickerRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     setDraft(value);
   }, [value]);
@@ -1223,73 +1185,34 @@ function LooseTimeInput({
     if (hhmm) {
       setDraft(hhmm);
       if (hhmm !== value) onCommit(hhmm);
+    } else {
+      setDraft(value);
     }
-  }
-
-  function openPicker() {
-    const el = pickerRef.current;
-    if (!el) return;
-    type WithPicker = HTMLInputElement & { showPicker?: () => void };
-    const w = el as WithPicker;
-    if (typeof w.showPicker === "function") {
-      try {
-        w.showPicker();
-        return;
-      } catch {
-        // fall through
-      }
-    }
-    el.click();
   }
 
   return (
-    <span className="inline-flex items-center gap-1">
-      <input
-        type="text"
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={commit}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") {
-            e.preventDefault();
-            e.currentTarget.blur();
-          } else if (e.key === "Escape") {
-            setDraft(value);
-            e.currentTarget.blur();
-          }
-        }}
-        placeholder="14:30 또는 오후 2시"
-        className="w-28 border-0 bg-transparent text-sm outline-none"
-        style={{ color: "var(--text-secondary)" }}
-      />
-      <button
-        type="button"
-        onClick={openPicker}
-        title="시간 선택"
-        aria-label="시간 선택"
-        className="rounded p-0.5 transition"
-        style={{ color: "var(--text-muted)", minHeight: 0 }}
-      >
-        <Clock className="h-3.5 w-3.5" />
-      </button>
-      <input
-        ref={pickerRef}
-        type="time"
-        value={/^\d{2}:\d{2}$/.test(value) ? value : ""}
-        onChange={(e) => onCommit(e.target.value)}
-        tabIndex={-1}
-        aria-hidden
-        style={{
-          position: "absolute",
-          width: 0,
-          height: 0,
-          padding: 0,
-          border: 0,
-          opacity: 0,
-          pointerEvents: "none",
-        }}
-      />
-    </span>
+    <input
+      type="text"
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          e.currentTarget.blur();
+        } else if (e.key === "Escape") {
+          setDraft(value);
+          e.currentTarget.blur();
+        }
+      }}
+      placeholder="hh:mm"
+      maxLength={11}
+      className="border-0 bg-transparent text-sm leading-none outline-none"
+      style={{
+        color: "var(--text-secondary)",
+        width: `${Math.max(draft.length, 5)}ch`,
+      }}
+    />
   );
 }
 
