@@ -683,14 +683,17 @@ export function MeetingForm({ meetingId, onBack }: Props) {
             />
           </div>
           <div className="flex items-center gap-1.5 pb-1">
-            {activeTab === "body" && body.length > 0 ? (
-              <span
-                className="text-xs"
-                style={{ color: "var(--text-muted)" }}
-              >
-                {body.length}자
-              </span>
-            ) : null}
+            <CharCountBadge
+              count={
+                activeTab === "body"
+                  ? body.length
+                  : activeTab === "transcript"
+                    ? transcript.length
+                    : summary.discussion_items.reduce((s, i) => s + i.length, 0) +
+                      summary.decisions.reduce((s, i) => s + i.length, 0) +
+                      summary.action_items.reduce((s, i) => s + i.length, 0)
+              }
+            />
           </div>
         </div>
 
@@ -878,6 +881,15 @@ export function MeetingForm({ meetingId, onBack }: Props) {
         </div>
       </div>
     </div>
+  );
+}
+
+function CharCountBadge({ count }: { count: number }) {
+  if (count <= 0) return null;
+  return (
+    <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+      {count}자
+    </span>
   );
 }
 
