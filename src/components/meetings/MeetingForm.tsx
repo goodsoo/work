@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   Trash2,
   AlertCircle,
@@ -1052,6 +1052,14 @@ function TranscriptArea({
   onError: (msg: string) => void;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  // 메모탭 SourceBodyEditor 와 같은 auto-resize 패턴 — 자체 scroll X, outer scroll
+  useLayoutEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = el.scrollHeight + "px";
+  }, [transcript]);
 
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -1098,13 +1106,14 @@ function TranscriptArea({
         />
       </div>
       <textarea
+        ref={textareaRef}
         value={transcript}
         onChange={(e) => onChange(e.target.value)}
         placeholder="음성 녹음의 텍스트 변환 결과를 여기에..."
         className="w-full resize-none bg-transparent text-base leading-relaxed outline-none"
         style={{
           color: "var(--text-primary)",
-          height: "60svh",
+          overflowY: "hidden",
         }}
       />
     </div>
