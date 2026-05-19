@@ -784,7 +784,7 @@ function MetaRow({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex" style={{ minHeight: "1.625rem" }}>
+    <div className="meta-row flex" style={{ minHeight: "1.625rem" }}>
       <div
         className="flex shrink-0 items-center justify-center"
         style={{
