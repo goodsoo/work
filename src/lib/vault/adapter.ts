@@ -198,16 +198,38 @@ export function createTauriAdapter(): VaultAdapter {
       const unwatch = await tauriWatch(
         r,
         (event) => {
-          // event: { type, paths }. Tauri v2의 raw event를 normalize.
+          // Tauri v2 plugin-fs 의 event.type 은 object — notify-rs EventKind 가
+          // `{ create: { kind: "file" } }`, `{ modify: { kind: "metadata", mode: "..." } }`,
+          // `{ remove: { kind: "file" } }` 식으로 직렬화. 옛 코드는 String(...) 로
+          // 변환해 `.includes` 검사 → "[object Object]" 라 매칭 항상 실패 → 외부 변경이
+          // 사이드바에 영영 반영 안 되던 버그.
+          const eType = (event as { type?: unknown }).type;
+          if (typeof eType !== "object" || eType === null) return;
+          const obj = eType as Record<string, unknown>;
+
+          let kind: VaultWatchEvent["type"] | null = null;
+          if ("create" in obj) kind = "created";
+          else if ("remove" in obj) kind = "deleted";
+          else if ("modify" in obj) {
+            // metadata-only 변경은 macOS Finder/iCloud 가 폴더 touch 시 폭주.
+            // 실제 파일 내용/이름 변화 아니므로 skip.
+            const sub = (obj.modify as { kind?: string })?.kind;
+            if (sub === "metadata") return;
+            // macOS Finder delete = `.Trash` 로 rename. notify-rs 가 from/to 안 줘서
+            // 옛 path 만 옴. 같은 path 가 사라진 것과 동치 → deleted 로 normalize.
+            // vault 안 이동도 같은 처리 — refetch 가 새 위치 발견.
+            if (sub === "rename") kind = "deleted";
+            else kind = "modified";
+          }
+          if (!kind) return;
+
           const paths = (event as { paths?: string[] }).paths ?? [];
           for (const abs of paths) {
             const rel = toRel(r, abs);
-            const t = String((event as { type?: unknown }).type ?? "");
-            if (t.includes("create")) callback({ type: "created", path: rel });
-            else if (t.includes("modify"))
-              callback({ type: "modified", path: rel });
-            else if (t.includes("remove") || t.includes("delete"))
-              callback({ type: "deleted", path: rel });
+            // hidden 파일 (.DS_Store 등) 무시 — vault scan 도 dotfile 제외.
+            const base = rel.split("/").pop() ?? "";
+            if (base.startsWith(".")) continue;
+            callback({ type: kind, path: rel });
           }
         },
         { recursive: true, delayMs: 100 },
