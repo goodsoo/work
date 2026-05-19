@@ -13,6 +13,7 @@ import {
   Clock,
   Users,
   Loader2,
+  Circle,
 } from "lucide-react";
 
 // 숫자 + 지정 separator 만 허용 (cmd/ctrl 단축키 + 화살표/backspace/delete/Enter 통과).
@@ -1051,16 +1052,14 @@ function SaveIndicator({
           transition: "opacity 180ms ease",
         }}
       />
-      {/* dot — error / success / wait */}
-      <span
-        className="absolute rounded-full"
+      {/* 외곽선 원 (border only) — error / success / wait, spinner 와 같은 stroke */}
+      <Circle
+        className="absolute inset-0 h-3.5 w-3.5"
         style={{
-          width: "0.5rem",
-          height: "0.5rem",
-          backgroundColor: dotColor,
+          color: dotColor,
           opacity: state === "spinner" ? 0 : 1,
           transform: state === "spinner" ? "scale(0.6)" : "scale(1)",
-          transition: "opacity 180ms ease, background-color 180ms ease, transform 180ms ease",
+          transition: "opacity 180ms ease, color 180ms ease, transform 180ms ease",
         }}
       />
     </span>
