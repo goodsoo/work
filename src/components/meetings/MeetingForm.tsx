@@ -739,13 +739,21 @@ export function MeetingForm({ meetingId, onBack }: Props) {
                 보기 모드 = plain text (icon/divider 없음, 빈 field 안 보임). */}
             {viewMode === "edit" ? (
               <div className="mb-4">
-                <MetaRow icon={<CalendarIcon className="h-3.5 w-3.5" />} label="날짜">
+                <MetaRow
+                  icon={<CalendarIcon className="h-3.5 w-3.5" />}
+                  iconTitle="허용 형식: YYYY-MM-DD · 5/19 · 5.19 · 5월 19일 · 2026/5/19 · 오늘 · 내일 · 어제 · 모레 · 그제"
+                  label="날짜"
+                >
                   <LooseDateInput
                     value={meta.date}
                     onCommit={commitDate}
                   />
                 </MetaRow>
-                <MetaRow icon={<Clock className="h-3.5 w-3.5" />} label="시간">
+                <MetaRow
+                  icon={<Clock className="h-3.5 w-3.5" />}
+                  iconTitle="허용 형식: HH:MM · 14:30 · 14시 30분 · 오후 2시 · 오전 9:30 · 2pm · 2:30 PM · 1430"
+                  label="시간"
+                >
                   <LooseTimeInput
                     value={meta.time}
                     onCommit={commitTime}
@@ -910,10 +918,12 @@ function CharCountBadge({ count }: { count: number }) {
 // 본문 textarea 의 line gutter 패턴과 동일: icon col (1.75rem) + 우측 divider + 라벨 + 값.
 function MetaRow({
   icon,
+  iconTitle,
   label,
   children,
 }: {
   icon: React.ReactNode;
+  iconTitle?: string;
   label: string;
   children: React.ReactNode;
 }) {
@@ -926,7 +936,8 @@ function MetaRow({
           color: "var(--text-muted)",
           borderRight: "1px solid var(--border-subtle)",
         }}
-        aria-hidden
+        title={iconTitle}
+        aria-label={iconTitle}
       >
         {icon}
       </div>
