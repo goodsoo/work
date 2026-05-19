@@ -16,18 +16,6 @@ import {
   Circle,
 } from "lucide-react";
 
-// 숫자 + 지정 separator 만 허용 (cmd/ctrl 단축키 + 화살표/backspace/delete/Enter 통과).
-function makeNumericOnly(separators: string) {
-  return (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.metaKey || e.ctrlKey || e.altKey) return;
-    if (e.key.length > 1) return;
-    if (/[0-9]/.test(e.key)) return;
-    if (separators.includes(e.key)) return;
-    e.preventDefault();
-  };
-}
-const dateKeyFilter = makeNumericOnly("-");
-const timeKeyFilter = makeNumericOnly(":");
 import {
   consumeJustCreatedMeetingUid,
   useMeeting,
@@ -50,6 +38,7 @@ import { useViewMode } from "../../hooks/useViewMode";
 import { isTauri } from "../../lib/isTauri";
 import { formatError } from "../../lib/errors";
 import { TitleConflictError } from "../../lib/vault/scan";
+import { parseLooseDate, parseLooseTime, weekdayShort } from "../../lib/dates";
 
 // 파일시스템 + 옵시디안 link syntax 금지 문자. title input commit 시 검사.
 const TITLE_UNSAFE_RE = /[/\\:*?"<>|#\^\[\]]/;
@@ -178,11 +167,9 @@ export function MeetingForm({ meetingId, onBack }: Props) {
   // ESC revert 직후 onBlur 가 commitTitle 다시 발사하는 것 차단용.
   const skipNextTitleCommit = useRef(false);
 
-  // meta 4 field 는 typing 중 mutation X (매번 rename / spinner 깜빡임 회피).
-  // onBlur / Enter / tag 추가 같은 명시 시점에만 commit. 메모 전환 시 initialMeta 와 sync.
+  // title/attendees draft 는 typing 중 mutation X (매번 rename / spinner 깜빡임 회피).
+  // date/time 은 LooseDateInput/LooseTimeInput 이 자체 draft + 파싱 처리.
   const [titleDraft, setTitleDraft] = useState<string>(() => initialMeta.title);
-  const [dateDraft, setDateDraft] = useState<string>(() => initialMeta.date);
-  const [timeDraft, setTimeDraft] = useState<string>(() => initialMeta.time);
   const [attendeesDraft, setAttendeesDraft] = useState<string>(
     () => initialMeta.attendees,
   );
@@ -192,12 +179,6 @@ export function MeetingForm({ meetingId, onBack }: Props) {
     if (document.activeElement === titleInputRef.current) return;
     setTitleDraft(initialMeta.title);
   }, [initialMeta.title]);
-  useEffect(() => {
-    setDateDraft(initialMeta.date);
-  }, [initialMeta.date]);
-  useEffect(() => {
-    setTimeDraft(initialMeta.time);
-  }, [initialMeta.time]);
   useEffect(() => {
     setAttendeesDraft(initialMeta.attendees);
   }, [initialMeta.attendees]);
@@ -234,38 +215,14 @@ export function MeetingForm({ meetingId, onBack }: Props) {
     }
   }
 
-  function commitDate() {
-    const v = dateDraft.trim();
-    // 빈 OK (날짜 제거). 그 외엔 YYYY-MM-DD + Date 유효.
-    const valid =
-      v === "" ||
-      (/^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(v + "T00:00:00")));
-    if (!valid) {
-      setDateDraft(initialMeta.date); // 형식 안 맞으면 기존으로 revert
-      return;
-    }
-    if (v === initialMeta.date) return;
-    updateMutation.mutate({ date: v || null });
+  function commitDate(next: string) {
+    if (next === initialMeta.date) return;
+    updateMutation.mutate({ date: next || null });
   }
 
-  function commitTime() {
-    const v = timeDraft.trim();
-    // 빈 OK. 그 외엔 HH:MM + 0-23 / 0-59.
-    let valid = v === "";
-    if (!valid) {
-      const m = v.match(/^(\d{2}):(\d{2})$/);
-      if (m) {
-        const h = parseInt(m[1], 10);
-        const mm = parseInt(m[2], 10);
-        valid = h >= 0 && h <= 23 && mm >= 0 && mm <= 59;
-      }
-    }
-    if (!valid) {
-      setTimeDraft(initialMeta.time);
-      return;
-    }
-    if (v === initialMeta.time) return;
-    updateMutation.mutate({ time: v || null });
+  function commitTime(next: string) {
+    if (next === initialMeta.time) return;
+    updateMutation.mutate({ time: next || null });
   }
 
   function commitAttendees(next: string) {
@@ -407,8 +364,8 @@ export function MeetingForm({ meetingId, onBack }: Props) {
     if (updateMutation.isPending) return;
     updateMutation.mutate({
       title: titleDraft.trim() || initialMeta.title || "untitled",
-      date: dateDraft.trim() || null,
-      time: timeDraft.trim() || null,
+      date: initialMeta.date || null,
+      time: initialMeta.time || null,
       attendees: attendeesDraft.trim() || null,
       content: body,
       transcript: transcript || null,
@@ -748,43 +705,15 @@ export function MeetingForm({ meetingId, onBack }: Props) {
             {viewMode === "edit" ? (
               <div className="mb-4">
                 <MetaRow icon={<CalendarIcon className="h-3.5 w-3.5" />} label="날짜">
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    value={dateDraft}
-                    onChange={(e) => setDateDraft(e.target.value)}
-                    onBlur={commitDate}
-                    onKeyDown={(e) => {
-                      dateKeyFilter(e);
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        // blur 만 — onBlur 가 commitDate. commit 중복 발사 회피.
-                        (e.target as HTMLInputElement).blur();
-                      }
-                    }}
-                    placeholder="YYYY-MM-DD"
-                    className="meta-input flex-1"
-                    maxLength={10}
+                  <LooseDateInput
+                    value={initialMeta.date}
+                    onCommit={commitDate}
                   />
                 </MetaRow>
                 <MetaRow icon={<Clock className="h-3.5 w-3.5" />} label="시간">
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    value={timeDraft}
-                    onChange={(e) => setTimeDraft(e.target.value)}
-                    onBlur={commitTime}
-                    onKeyDown={(e) => {
-                      timeKeyFilter(e);
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        // blur 만 — onBlur 가 commitTime. commit 중복 발사 회피.
-                        (e.target as HTMLInputElement).blur();
-                      }
-                    }}
-                    placeholder="HH:MM"
-                    className="meta-input flex-1"
-                    maxLength={5}
+                  <LooseTimeInput
+                    value={initialMeta.time}
+                    onCommit={commitTime}
                   />
                 </MetaRow>
                 <MetaRow icon={<Users className="h-3.5 w-3.5" />} label="참석자">
@@ -1156,6 +1085,210 @@ function TranscriptArea({
         }}
       />
     </div>
+  );
+}
+
+/**
+ * 너그러운 날짜 input. type=text 자유 입력 + blur/Enter 시 parseLooseDate 로 ISO 정규화.
+ * 옆에 요일 chip + 달력 아이콘 (클릭 시 hidden type=date 의 showPicker 호출).
+ * 파싱 실패 시 draft 유지 — 사용자가 고치도록. Esc 로 원래 value 복귀.
+ */
+function LooseDateInput({
+  value,
+  onCommit,
+}: {
+  value: string;
+  onCommit: (next: string) => void;
+}) {
+  const [draft, setDraft] = useState(value);
+  const pickerRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    setDraft(value);
+  }, [value]);
+
+  function commit() {
+    const trimmed = draft.trim();
+    if (trimmed === "") {
+      if (value !== "") onCommit("");
+      return;
+    }
+    if (trimmed === value) return;
+    const iso = parseLooseDate(trimmed);
+    if (iso) {
+      setDraft(iso);
+      if (iso !== value) onCommit(iso);
+    }
+  }
+
+  function openPicker() {
+    const el = pickerRef.current;
+    if (!el) return;
+    type WithPicker = HTMLInputElement & { showPicker?: () => void };
+    const w = el as WithPicker;
+    if (typeof w.showPicker === "function") {
+      try {
+        w.showPicker();
+        return;
+      } catch {
+        // fall through to click
+      }
+    }
+    el.click();
+  }
+
+  const wd = weekdayShort(value);
+
+  return (
+    <span className="inline-flex items-center gap-1">
+      <input
+        type="text"
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            e.currentTarget.blur();
+          } else if (e.key === "Escape") {
+            setDraft(value);
+            e.currentTarget.blur();
+          }
+        }}
+        placeholder="5/19 또는 오늘"
+        className="w-32 border-0 bg-transparent text-sm outline-none"
+        style={{ color: "var(--text-secondary)" }}
+      />
+      {wd ? (
+        <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+          ({wd})
+        </span>
+      ) : null}
+      <button
+        type="button"
+        onClick={openPicker}
+        title="달력에서 선택"
+        aria-label="달력에서 선택"
+        className="rounded p-0.5 transition"
+        style={{ color: "var(--text-muted)", minHeight: 0 }}
+      >
+        <CalendarIcon className="h-3.5 w-3.5" />
+      </button>
+      <input
+        ref={pickerRef}
+        type="date"
+        value={value}
+        onChange={(e) => onCommit(e.target.value)}
+        tabIndex={-1}
+        aria-hidden
+        style={{
+          position: "absolute",
+          width: 0,
+          height: 0,
+          padding: 0,
+          border: 0,
+          opacity: 0,
+          pointerEvents: "none",
+        }}
+      />
+    </span>
+  );
+}
+
+/**
+ * 너그러운 시간 input. blur/Enter 시 parseLooseTime → HH:mm 정규화.
+ * 옆에 시계 아이콘 (hidden type=time 의 showPicker).
+ */
+function LooseTimeInput({
+  value,
+  onCommit,
+}: {
+  value: string;
+  onCommit: (next: string) => void;
+}) {
+  const [draft, setDraft] = useState(value);
+  const pickerRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    setDraft(value);
+  }, [value]);
+
+  function commit() {
+    const trimmed = draft.trim();
+    if (trimmed === "") {
+      if (value !== "") onCommit("");
+      return;
+    }
+    if (trimmed === value) return;
+    const hhmm = parseLooseTime(trimmed);
+    if (hhmm) {
+      setDraft(hhmm);
+      if (hhmm !== value) onCommit(hhmm);
+    }
+  }
+
+  function openPicker() {
+    const el = pickerRef.current;
+    if (!el) return;
+    type WithPicker = HTMLInputElement & { showPicker?: () => void };
+    const w = el as WithPicker;
+    if (typeof w.showPicker === "function") {
+      try {
+        w.showPicker();
+        return;
+      } catch {
+        // fall through
+      }
+    }
+    el.click();
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1">
+      <input
+        type="text"
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            e.currentTarget.blur();
+          } else if (e.key === "Escape") {
+            setDraft(value);
+            e.currentTarget.blur();
+          }
+        }}
+        placeholder="14:30 또는 오후 2시"
+        className="w-28 border-0 bg-transparent text-sm outline-none"
+        style={{ color: "var(--text-secondary)" }}
+      />
+      <button
+        type="button"
+        onClick={openPicker}
+        title="시간 선택"
+        aria-label="시간 선택"
+        className="rounded p-0.5 transition"
+        style={{ color: "var(--text-muted)", minHeight: 0 }}
+      >
+        <Clock className="h-3.5 w-3.5" />
+      </button>
+      <input
+        ref={pickerRef}
+        type="time"
+        value={/^\d{2}:\d{2}$/.test(value) ? value : ""}
+        onChange={(e) => onCommit(e.target.value)}
+        tabIndex={-1}
+        aria-hidden
+        style={{
+          position: "absolute",
+          width: 0,
+          height: 0,
+          padding: 0,
+          border: 0,
+          opacity: 0,
+          pointerEvents: "none",
+        }}
+      />
+    </span>
   );
 }
 
