@@ -1040,11 +1040,12 @@ function SaveIndicator({
     >
       {/* spinner — pending 일 때만 fade-in */}
       <Loader2
-        className="absolute inset-0 h-3.5 w-3.5 animate-spin"
+        className="absolute inset-0 h-3.5 w-3.5"
         style={{
           color: "var(--text-muted)",
           opacity: state === "spinner" ? 1 : 0,
           transition: "opacity 180ms ease",
+          animation: "spin 1.6s linear infinite",
         }}
       />
       {/* 외곽선 원 (border only) — error / success / wait, spinner 와 같은 stroke */}
