@@ -116,10 +116,8 @@ function summaryToPatch(s: SummaryDoc): MeetingUpdate {
 }
 
 function metaToPatch(m: MetaDoc): MeetingUpdate {
-  const trimmedTitle = m.title.trim();
+  // title 은 별도 처리 (blur / Enter 시점에만 mutation) — 매 typing 마다 rename 회피.
   return {
-    // 빈 title 은 untitled 강제 — 파일명/사이드바 일관성. onBlur 가 input value 도 set.
-    title: trimmedTitle === "" ? "untitled" : trimmedTitle,
     date: m.date || null,
     time: m.time.trim() || null,
     attendees: m.attendees.trim() || null,
@@ -210,6 +208,18 @@ export function MeetingForm({ meetingId, onBack }: Props) {
 
   const [actionError, setActionError] = useState<string | null>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
+  // title 은 metaHistory 와 분리 — typing 중엔 mutation X (매번 rename 회피),
+  // onBlur / Enter 시점에만 commit. 메모 전환 시 initialMeta.title 로 sync.
+  const [titleDraft, setTitleDraft] = useState<string>(() => initialMeta.title);
+  useEffect(() => {
+    setTitleDraft(initialMeta.title);
+  }, [initialMeta.title]);
+  function commitTitle() {
+    const next = titleDraft.trim() || "untitled";
+    if (next !== titleDraft) setTitleDraft(next);
+    if (next === initialMeta.title) return;
+    updateMutation.mutate({ title: next });
+  }
   const [activeTab, setActiveTabState] = useState<ActiveTab>(
     () => ACTIVE_TAB_CACHE.get(meetingId) ?? "body",
   );
@@ -385,6 +395,7 @@ export function MeetingForm({ meetingId, onBack }: Props) {
   // typing 직후 ~ commit timer (1초) 까진 true, optimistic update 시점에 false.
   // body/transcript 는 disk write 시 앞뒤 newline trim 되므로 비교도 normalize.
   // attendees 는 textarea string vs disk-roundtrip 의 ", " join 차이 회피 위해 parseAttendees 로 array 비교.
+  // title 은 별도 (titleDraft) — typing 중 일치 안 해도 spinner 표시 X (blur/Enter 만 mutation).
   const hasUnsavedChange =
     trimNewlines(body) !== trimNewlines(initialBody) ||
     trimNewlines(transcript) !== trimNewlines(initialTranscript) ||
@@ -458,15 +469,19 @@ export function MeetingForm({ meetingId, onBack }: Props) {
           />
         </div>
 
-        {/* Center: title — grid auto col 안 dead-center, max-width 로 좌/우 그룹과 겹침 방지 */}
+        {/* Center: title — grid auto col 안 dead-center, max-width 로 좌/우 그룹과 겹침 방지.
+            typing 중엔 mutation X — onBlur / Enter 만 commit (매번 rename 회피) */}
         <input
           ref={titleInputRef}
           type="text"
-          value={meta.title}
-          onChange={(e) => setMetaField("title", e.target.value)}
-          onBlur={() => {
-            if (meta.title.trim() === "") {
-              setMetaField("title", "untitled");
+          value={titleDraft}
+          onChange={(e) => setTitleDraft(e.target.value)}
+          onBlur={commitTitle}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              commitTitle();
+              (e.target as HTMLInputElement).blur();
             }
           }}
           placeholder="untitled"
@@ -475,7 +490,7 @@ export function MeetingForm({ meetingId, onBack }: Props) {
           style={{
             color: "var(--text-primary)",
             maxWidth: "min(28rem, 100%)",
-            width: `${Math.max((meta.title || "untitled").length, 6) + 2}ch`,
+            width: `${Math.max((titleDraft || "untitled").length, 6) + 2}ch`,
           }}
         />
 
