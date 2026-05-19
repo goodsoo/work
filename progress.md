@@ -2,75 +2,61 @@
 
 다음 세션이 빠르게 파악할 수 있도록 짧게 유지.
 
-## 현재 상태 (2026-05-18 밤, 5 PR 분할 ship + CI + Vercel 비활성화 + PR template 완료 후)
+## 현재 상태 (2026-05-19 밤, V0.7.1 land 직후)
 
-**goodsoo/work PR 워크플로 + CI 셋업 완료**. 23 commit 을 5 PR 로 분할 머지, GitHub Actions CI 작동 확인, V0.7 portfolio 자동 수집 대상 PR 5장 누적. **다음 세션 = 모바일 layout 통일 (drawer)** — 기획 완료, 구현 대기.
+**V0.7.1 vault hardening 완료** (PR #11). dogfood 중 발견한 메모 사라짐 추적 → 다섯 root cause 일괄 fix + frontmatter UUID id 도입 + Title-as-Filename 모델 전환. 이제 cache 침범 / partial write / event matching / mutation race 카테고리 모두 차단. **다음 세션 = 진입점 미정** — V0.7.x 후보 (Tauri 2 Mobile, 전체 재동기화 등) 또는 V0.6.1 robustness 후속 중 dogfood 결과로 결정.
 
-## 다음 세션 진입점 — 모바일 drawer 구현
+## 이번 세션에 한 일 (2026-05-19)
 
-기획은 끝났고 구현만 남음. 결정사항/변경 파일 todo.md 의 "다음 세션 진입" 섹션 참조. 핵심 요약:
+### PR #11 land — vault 데이터 손실 race 5종 + UUID identity 모델
 
-- **목표**: 모바일도 데스크탑과 같은 3-pane 구조. SidePanel 을 overlay drawer 로. BottomTabs 유지.
-- **트리거**: 모바일 헤더 좌측 햄버거. drawer 폭 288 (데스크탑 기본 동일). dim 탭 + 좌 swipe 닫기.
-- **drawer 내용**: SidePanel 만 (ActivityBar 제외 — 모바일에선 BottomTabs 가 그 역할).
-- **결정사항**:
-  - 메모 선택 시 drawer 자동 닫기
-  - BottomTab 변경 시 drawer 자동 닫기
-  - 햄버거 = 토글 (✕ 로 안 바꿈)
-  - 모바일 초기 drawer 닫힘 상태. 메모장 진입 시 desktop 과 같은 auto-select.
-  - swipe-from-edge 으로 열기는 v1 미구현
-  - dim 이 헤더/BottomTabs 까지 덮는지는 구현 직전 결정
-- **변경 파일**:
-  - `AppShell.tsx`: drawer state + 햄버거 + overlay + body scroll lock + swipe + `DrawerContext` provider
-  - `App.tsx`: 메모장 탭의 `lg:hidden` / `hidden lg:block` 분기 제거 → 단일 렌더, `MeetingsPage` 의 자동 선택 로직 흡수
-  - `MeetingForm.tsx`: `lg:hidden` 뒤로가기 버튼 2개 (line 306, 377) 제거
-  - 각 SidePanel: item onClick 안에서 `useDrawer().close()` 호출
-  - `MeetingsPage.tsx`: **파일 자체 삭제** (역할 사라짐)
-- **invariant 부가 효과**: 이번 변경으로 모바일도 항상 form 표시 → "선택 0 개 안 됨" invariant 자연스럽게 만족.
+8 commit, main 8a65e4a 머지. 카테고리 `backend`. portfolio 카드 다음 sync 때 자동 생성.
 
-## 이번 세션에 한 일 (2026-05-18 밤)
+다섯 root cause:
+1. **`adapter.write` 동시성** — 공유 `.tmp` 파일이 두 동시 write 가 race → 첫 rename 으로 tmp 소진 + 두 번째 remove 가 결과 파일 삭제 → 두 번째 rename ENOENT → 파일이 진짜 사라짐. per-path mutex + 고유 tmp 이름 (`${abs}.${random}.tmp`) 으로 차단.
+2. **`useUpdateMeeting` mutation race** — 병렬 mutation 의 closure 가 옛 id 들고 rename 후 stale ENOENT. React Query v5 `scope: { id: meeting:${uid} }` 직렬화 + mutationFn 의 effective id 재조회.
+3. **Enter→blur 중복 발사** — title input 의 Enter handler 가 `commitTitle()` + `blur()` 둘 다 호출 → onBlur 가 commitTitle 또 발사. Enter 에서 commitTitle 호출 제거, blur 만.
+4. **vault watcher event type 매칭** — Tauri v2 plugin-fs event `type` 이 object (`{create:{kind:"file"}}` 등) 인데 옛 `String(...)` 검사가 `"[object Object]"` 라 항상 실패 → 외부 변경 영영 반영 X. object key 분기 + metadata noise skip + macOS `.Trash` rename → deleted.
+5. **path collision 침범** — 옛 메모 삭제 후 새 메모가 같은 path 차지 시 `HISTORY_CACHE` 의 옛 entry 가 새 entity 에 침범. 처음엔 cleanup 코드로 막으려 했으나 silent failure burden 영구. → 옵시디안 community 표준 (`obsidian-unique-identifiers` plugin 패턴) 채택, frontmatter `id: <uuid>` 도입, 모든 client cache key 를 uid 기반으로.
 
-- **23 commit 5 PR 분할 ship** — 그동안 main 에 직커밋 누적되어 있던 V0.5.3~V0.7 + legacy 카드 작업 23 commit 을 retroactive 하게 5 PR 로 분할:
-  - **PR #1** V0.5.x polish (12) — 캘린더 연속 스크롤 + 메모 history 분리 + soft delete 등
-  - **PR #2** V0.6 vault 마이그레이션 (6) — Supabase 제거 + 로컬 md vault, Phase 1~5
-  - **PR #3** V0.7 portfolio (7) — "내 작업" 탭 + parser fix + legacy 카드 프롬프트
-  - **PR #4** ops (1) — `.github/workflows/ci.yml` + `vercel.json` (main deploy 비활성화)
-  - **PR #5** PR body 7섹션 양식 (1) — `buildPRGuidePrompt()` + 사이드바 가이드 프롬프트 복사 버튼
-  - 분할 방법: 분기점 commit 에 branch 만들기 → 차례로 push + PR + rebase merge. CI + Vercel 모두 pass.
-- **CI 작동 확인** — `.github/workflows/ci.yml` 첫 작동 (PR #4 에서 19초, PR #5 에서 22초). `bun install --frozen-lockfile` → typecheck → test:run, 90/90 pass.
-- **V0.7 portfolio 자동 수집 대상 = 머지된 PR 5장** — dogfood: "내 작업" 사이드바 sync 누르면 5장 카드 자동 누적되는지 사용자가 직접 검증 예정.
+### 부수 변경 — Title-as-Filename 모델
 
-**직전 세션 (2026-05-18 저녁) 작업** (이미 ship): legacy 카드 작성 프롬프트 + 복사 버튼 (`9f7ffed`) / goodsoo/work 자체 legacy 카드 5장 생성 (vault `portfolio/goodsoo-work-*.md`).
+- 파일명 = `meetings/{title}.md` only. date 빠짐 (frontmatter optional). frontmatter title 도 제거 (파일명이 곧 title, 옵시디안 default).
+- 옛 모델의 모순 해소 — date 가 optional 인데 파일명엔 무조건 박혀있던 불일치.
+- title 변경 = pure disk rename → inode 유지 (옵시디안 모델 동일).
+- 충돌 자동 -2 안 함 → `TitleConflictError` throw → toast + ESC revert + focus 유지.
+- 금지문자 (`/ \ : * ? " < > | # ^ [ ]`) commit 시점 검사 → toast.
+- `slugify` 단순화 — 한글/공백 그대로, 위험문자만 치환.
 
-## V0.7 핵심 결정 요약
+### 의사결정 컨텍스트
 
-- **자동 분류**: `projects.md` 의 `projects[].repos: ["owner/repo"]` 매핑으로 신규 카드 자동 부여. 본인 명시 분류 (`project: <slug>`) 는 sync 가 보존.
-- **rename 자동 감지**: `github_pr_id` (GitHub 내부 영구 PR ID) frontmatter 매칭. owner/repo rename 시 파일 + `_attachments/{slug}/` + `projects.md repos` 자동 갱신.
-- **legacy 카드**: `pr_number=0` 허용. PR 안 만든 commit 도 schema 통과.
-- **카드 자동 삭제 0**: repo 삭제되어도 vault 카드 보존.
-- **gh CLI 위임**: 우리 앱은 GitHub 계정 정보 0 보관.
+- **다른 AI 자문** — cleanup 코드 (path 기반 cache + delete/rename 시 청소) 는 silent failure 위험 영구 burden 으로 평가. 옵시디안 community 표준 + 데이터 손실 0 우선순위에서 UUID frontmatter 가 옳음.
+- **inode-기반 cache + in-place write** 대안은 iCloud daemon partial sync 위험과 정면 충돌 — V0.6 의 모바일 옵시디안 sync use case 와 양립 불가.
+- **TitleConflictError 자동 -2 안 함** — 사용자가 의도한 title 과 silently 다른 파일명 생성 회피. UX 의 정직성 우선.
 
 ## 알아야 할 컨텍스트
 
-- **design doc v2.3** = V0.7 source of truth. `~/.gstack/projects/goodsoob-work/ham-main-design-20260518-105501.md`.
-- **vault 위치**: `/Users/ham/Library/Mobile Documents/com~apple~CloudDocs/Goodsoob/` (iCloud Drive, 옵시디안 호환).
-- **portfolio capability**: `fs:scope` 에 dotfile path 명시. 새 capability 변경 시 `tauri:dev` 재시작 필요. Rust 변경 없으면 HMR 만으로 충분.
-- **selection invariant**: "노트 0개 경우 제외하고 항상 최소 1개 선택" — 사용자 명시 요구. 현재 desktop 은 만족, 모바일은 drawer 구현 후 자연스럽게 만족.
+- **vault 모델 V0.7.1** — main meeting 의 frontmatter = `id: <uuid>` + `date` (optional) + `time` + `attendees` + `tags`. **frontmatter 에 title 없음**. 파일명 = `meetings/{title}.md`. 옛 V0.6 메모 (date prefix + frontmatter title) 는 lazy migration — 첫 read 시 uid 발급 + frontmatter rewrite.
+- **client cache key 통일** — React Query queryKey / `HISTORY_CACHE` / URL hash / hook signature 모두 uid 기반. `useUpdateMeeting(uid)` 가 mutationFn 시점에 list cache 의 path lookup.
+- **vault 위치**: `/Users/ham/Library/Mobile Documents/iCloud~md~obsidian/Documents/goodsoob/` (사용자 dogfood vault).
+- **현재 worktree 상태**: `goodsoob-work` (main repo, `feat/meetings-ux-polish` checkout — chip 작업 다른 세션), `goodsoob-work-ux` (`feat/keyboard-shortcuts-and-loose-datetime` — 단축키 + datetime 작업 다른 세션). 두 작업 모두 main 의 V0.7.1 변경과 conflict 가능 — merge 시 자연 처리.
 
-## V0.6.1 후속 (V0.7 dogfood 와 병행)
+## V0.6.1 후속 (dogfood 와 병행)
 
-- [x] parser KNOWN_H1 만 섹션 경계 (이번 세션 완료)
 - [ ] Conflict resolution 모달 (현재 throw 만)
 - [ ] Vault 변경 UI (설정 페이지)
 - [ ] iCloud `(conflicted copy)` 파일 무시 룰
 - [ ] vault 스캔 성능 실측 + frontmatter-only fast path
 - [ ] vault 폴더 사라짐 graceful
+- [ ] frontmatter parse 실패 graceful fallback (PR #11 후 추가) — YAML 깨졌을 때 빈 frontmatter + body 그대로 → 사이드바 표시 보장.
+- [ ] uid 중복 감지 + 후순위 재발급 (PR #11 후 추가)
+- [ ] 깨진 파일 사용자 alert — 사이드바 banner (PR #11 후 추가)
 
 ## 미해결
 
-- 캘린더 스크롤 상태 페이지 전환 시 보존 (V0.5.4 부터 carry-over).
+- 캘린더 스크롤 상태 페이지 전환 시 보존.
 - 에러 상태 패딩 통일 (p-3/p-4 혼재).
-- V0.5.3~V0.5.4 lint 11 errors (기존 코드 react-hooks/refs 등) — dogfood 단계에서 정리.
+- V0.5.3~V0.5.4 lint 11 errors (기존 코드 react-hooks/refs) — dogfood 단계에서 정리.
 - `syncPortfolio` 안 `[syncPortfolio]` 진단 console.log — dogfood 안정화 후 제거.
-- `backup-pre-pr-split` branch 안전망 — PR 분할 작업의 백업. dogfood 며칠 후 안전 확인되면 삭제.
-- **Vercel 대시보드 disconnect** (선택) — `vercel.json` 으로 deploy 는 막혔지만 GitHub 연동은 남아있음. PR 마다 Vercel preview check 가 도는 중. 진짜 정리하려면 대시보드에서 disconnect.
+- `backup-pre-pr-split` branch 안전망 — dogfood 며칠 후 삭제 결정.
+- Vercel 대시보드 disconnect (선택).
