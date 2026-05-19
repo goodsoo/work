@@ -165,7 +165,8 @@ export function AppShell({ activeTab, onTabChange, sidePanel, children }: Props)
         </>
       ) : null}
 
-      {/* Main content */}
+      {/* Main content — desktop 에선 자체 scroll container (스크롤바가 viewport
+          전체가 아니라 main 안에만 표시). sticky header/tab row 도 main scroll 기준. */}
       <main
         key={activeTab}
         style={
@@ -174,7 +175,7 @@ export function AppShell({ activeTab, onTabChange, sidePanel, children }: Props)
             ["--gs-main-pl" as string]: mainPaddingLeft,
           } as React.CSSProperties
         }
-        className="animate-page-in lg:!pb-0 lg:[padding-left:var(--gs-main-pl)]"
+        className="animate-page-in lg:!pb-0 lg:h-screen lg:overflow-y-auto lg:[padding-left:var(--gs-main-pl)]"
       >
         {children}
       </main>
