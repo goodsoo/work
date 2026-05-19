@@ -10,7 +10,6 @@ import {
   Pencil,
   X,
   Calendar as CalendarIcon,
-  Clock,
   Users,
 } from "lucide-react";
 import {
@@ -626,22 +625,15 @@ export function MeetingForm({ meetingId, onBack }: Props) {
         >
           <dt className="inline-flex items-center gap-1.5 text-sm" style={{ color: "var(--text-muted)" }}>
             <CalendarIcon className="h-3.5 w-3.5" />
-            날짜
+            일시
           </dt>
-          <dd>
+          <dd className="inline-flex items-center gap-3">
             <input
               type="date"
               value={meta.date}
               onChange={(e) => setMetaField("date", e.target.value)}
               className="meta-input"
             />
-          </dd>
-
-          <dt className="inline-flex items-center gap-1.5 text-sm" style={{ color: "var(--text-muted)" }}>
-            <Clock className="h-3.5 w-3.5" />
-            시간
-          </dt>
-          <dd>
             <input
               type="time"
               value={meta.time}
