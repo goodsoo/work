@@ -120,10 +120,11 @@ export function SourceBodyEditor({ content, onChange }: Props) {
 
   return (
     <div
-      className="flex rounded-md"
+      className="flex"
       style={{
         minHeight: "60svh",
-        backgroundColor: "var(--bg-surface)",
+        // 옵션 2: 좌측 외부 bar 2px accent — "편집 중" 인디케이터
+        borderLeft: "2px solid var(--accent-blue)",
       }}
     >
       <div
@@ -131,7 +132,8 @@ export function SourceBodyEditor({ content, onChange }: Props) {
         style={{
           width: GUTTER_WIDTH,
           color: "var(--text-muted)",
-          borderRight: "1px solid var(--border-subtle)",
+          // 옵션 1: gutter divider 색 강조 (옛 --border-subtle → --accent-blue)
+          borderRight: "1px solid var(--accent-blue)",
         }}
         aria-hidden
       >
