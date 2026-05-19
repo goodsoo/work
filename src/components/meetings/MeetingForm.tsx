@@ -377,11 +377,12 @@ export function MeetingForm({ meetingId, onBack }: Props) {
 
   return (
     <div className="min-h-svh">
-      {/* Header — 사이드바 헤더와 같은 높이. 좌 undo/redo + 저장 / 가운데 제목 / 우 편집·복사·삭제 */}
+      {/* Header — 사이드바 헤더와 같은 높이 (3.5rem). 좌 undo/redo + 저장 / 가운데 제목 / 우 편집·복사·삭제.
+          (--app-header-h 는 모바일용 변수라 데스크탑에서 0px — explicit height 사용) */}
       <div
-        className="sticky top-0 z-10 flex min-w-0 items-center gap-2 overflow-hidden px-3 backdrop-blur"
+        className="sticky top-0 z-20 flex min-w-0 shrink-0 items-center gap-2 overflow-hidden px-3 backdrop-blur"
         style={{
-          height: "var(--app-header-h)",
+          height: "3.5rem",
           backgroundColor: "var(--bg-overlay)",
           borderBottom: "1px solid var(--border-subtle)",
         }}
@@ -601,9 +602,9 @@ export function MeetingForm({ meetingId, onBack }: Props) {
 
         {/* Tab nav + 액션 (sticky: 메타 아래에서 시작, 스크롤 시 상단 도달하면 고정) */}
         <div
-          className="sticky z-10 mt-6 flex items-center justify-between"
+          className="sticky z-10 mt-6 flex items-center justify-between backdrop-blur"
           style={{
-            top: "2.5rem",
+            top: "3.5rem",
             borderBottom: "1px solid var(--border-subtle)",
             backgroundColor: "var(--bg-base)",
           }}
