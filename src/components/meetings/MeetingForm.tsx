@@ -14,6 +14,18 @@ import {
   Users,
 } from "lucide-react";
 
+function pad2(n: number): string {
+  return n.toString().padStart(2, "0");
+}
+function formatNowDate(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+}
+function formatNowTime(): string {
+  const d = new Date();
+  return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+}
+
 // 숫자 + 지정 separator 만 허용 (cmd/ctrl 단축키 + 화살표/backspace/delete/Enter 통과).
 function makeNumericOnly(separators: string) {
   return (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -101,8 +113,8 @@ function summaryToPatch(s: SummaryDoc): MeetingUpdate {
 function metaToPatch(m: MetaDoc): MeetingUpdate {
   const trimmedTitle = m.title.trim();
   return {
-    // 빈 title 은 patch 제외 — 빈 제목 commit 회피. onBlur 가 input value 도 reset.
-    title: trimmedTitle === "" ? undefined : trimmedTitle,
+    // 빈 title 은 untitled 강제 — 파일명/사이드바 일관성. onBlur 가 input value 도 set.
+    title: trimmedTitle === "" ? "untitled" : trimmedTitle,
     date: m.date || null,
     time: m.time.trim() || null,
     attendees: m.attendees.trim() || null,
@@ -193,6 +205,9 @@ export function MeetingForm({ meetingId, onBack }: Props) {
 
   const [actionError, setActionError] = useState<string | null>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
+  // placeholder 는 mount 시 1회 — 매 분 갱신은 over-engineering.
+  const datePlaceholder = useMemo(() => formatNowDate(), []);
+  const timePlaceholder = useMemo(() => formatNowTime(), []);
   const [activeTab, setActiveTabState] = useState<ActiveTab>(
     () => ACTIVE_TAB_CACHE.get(meetingId) ?? "body",
   );
@@ -445,11 +460,11 @@ export function MeetingForm({ meetingId, onBack }: Props) {
           value={meta.title}
           onChange={(e) => setMetaField("title", e.target.value)}
           onBlur={() => {
-            if (meta.title.trim() === "" && data?.title) {
-              setMetaField("title", data.title);
+            if (meta.title.trim() === "") {
+              setMetaField("title", "untitled");
             }
           }}
-          placeholder="제목 없음"
+          placeholder="제목을 입력해주세요"
           autoFocus={!data.title}
           className="min-w-0 flex-1 bg-transparent text-center text-base font-semibold outline-none"
           style={{ color: "var(--text-primary)" }}
@@ -640,7 +655,7 @@ export function MeetingForm({ meetingId, onBack }: Props) {
               value={meta.date}
               onChange={(e) => setMetaField("date", e.target.value)}
               onKeyDown={dateKeyFilter}
-              placeholder="2026-05-19"
+              placeholder={datePlaceholder}
               className="meta-input flex-1"
               maxLength={10}
             />
@@ -652,7 +667,7 @@ export function MeetingForm({ meetingId, onBack }: Props) {
               value={meta.time}
               onChange={(e) => setMetaField("time", e.target.value)}
               onKeyDown={timeKeyFilter}
-              placeholder="14:00"
+              placeholder={timePlaceholder}
               className="meta-input flex-1"
               maxLength={5}
             />

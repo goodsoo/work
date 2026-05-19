@@ -152,7 +152,7 @@ export async function createMeeting(
   input: MeetingInsert,
 ): Promise<Meeting> {
   const date = input.date ?? new Date().toISOString().slice(0, 10);
-  const title = input.title ?? "메모";
+  const title = input.title ?? "";
   const path = await generateMeetingPath(adapter, date, title);
   const meeting = buildMeeting({ ...input, date, title }, path);
 
