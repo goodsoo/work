@@ -502,7 +502,7 @@ export function MeetingForm({ meetingId, onBack }: Props) {
           onKeyDown={(e) => {
             if (e.key === "Enter") {
               e.preventDefault();
-              commitTitle();
+              // blur 만 — onBlur 가 commitTitle 발사. 직접 호출하면 commit 2번 → mutation race.
               (e.target as HTMLInputElement).blur();
             }
           }}
@@ -719,7 +719,7 @@ export function MeetingForm({ meetingId, onBack }: Props) {
                       dateKeyFilter(e);
                       if (e.key === "Enter") {
                         e.preventDefault();
-                        commitDate();
+                        // blur 만 — onBlur 가 commitDate. commit 중복 발사 회피.
                         (e.target as HTMLInputElement).blur();
                       }
                     }}
@@ -739,7 +739,7 @@ export function MeetingForm({ meetingId, onBack }: Props) {
                       timeKeyFilter(e);
                       if (e.key === "Enter") {
                         e.preventDefault();
-                        commitTime();
+                        // blur 만 — onBlur 가 commitTime. commit 중복 발사 회피.
                         (e.target as HTMLInputElement).blur();
                       }
                     }}
