@@ -617,17 +617,9 @@ export function MeetingForm({ meetingId, onBack }: Props) {
           </div>
         </div>
 
-        {/* Metadata — 본문 textarea 와 같은 plain 톤. 라벨 (icon + 한국어) 은
-            gutter 처럼 좁은 col, 값은 plain input. background 강조 없음. */}
-        <dl
-          className="mt-4 grid items-center gap-x-3 gap-y-0 text-base"
-          style={{ gridTemplateColumns: "5rem 1fr", color: "var(--text-primary)" }}
-        >
-          <dt className="inline-flex items-center gap-1.5 text-sm" style={{ color: "var(--text-muted)" }}>
-            <CalendarIcon className="h-3.5 w-3.5" />
-            일시
-          </dt>
-          <dd className="inline-flex items-center gap-3">
+        {/* Metadata — 본문 textarea 의 gutter 패턴과 동일. icon col + divider + 라벨 + 값. */}
+        <div className="mt-4">
+          <MetaRow icon={<CalendarIcon className="h-3.5 w-3.5" />} label="일시">
             <input
               type="date"
               value={meta.date}
@@ -640,21 +632,18 @@ export function MeetingForm({ meetingId, onBack }: Props) {
               onChange={(e) => setMetaField("time", e.target.value)}
               className="meta-input"
             />
-          </dd>
-
-          <dt className="inline-flex items-center gap-1.5 self-start pt-1 text-sm" style={{ color: "var(--text-muted)" }}>
-            <Users className="h-3.5 w-3.5" />
-            참석자
-          </dt>
-          <dd className="py-0.5">
-            <AttendeeTagInput
-              value={meta.attendees}
-              onChange={(next) => setMetaField("attendees", next)}
-              suggestions={attendeeSuggestions}
-              placeholder="이름 입력 후 Enter"
-            />
-          </dd>
-        </dl>
+          </MetaRow>
+          <MetaRow icon={<Users className="h-3.5 w-3.5" />} label="참석자">
+            <div className="flex-1">
+              <AttendeeTagInput
+                value={meta.attendees}
+                onChange={(next) => setMetaField("attendees", next)}
+                suggestions={attendeeSuggestions}
+                placeholder="이름 입력 후 Enter"
+              />
+            </div>
+          </MetaRow>
+        </div>
 
         {/* Tab content wrapper — 탭이 상단 도달할 때까지 페이지 스크롤 가능하도록 minHeight 보장 */}
         <div className="mt-4" style={{ minHeight: "calc(100svh - 8rem)" }}>
@@ -779,6 +768,45 @@ export function MeetingForm({ meetingId, onBack }: Props) {
         ) : null}
         </div>
 
+      </div>
+    </div>
+  );
+}
+
+// 본문 textarea 의 line gutter 패턴과 동일: icon col (1.75rem) + 우측 divider + 라벨 + 값.
+function MetaRow({
+  icon,
+  label,
+  children,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex" style={{ minHeight: "1.625rem" }}>
+      <div
+        className="flex shrink-0 items-center justify-center"
+        style={{
+          width: "1.75rem",
+          color: "var(--text-muted)",
+          borderRight: "1px solid var(--border-subtle)",
+        }}
+        aria-hidden
+      >
+        {icon}
+      </div>
+      <div
+        className="flex flex-1 items-center gap-3"
+        style={{ paddingLeft: "0.5rem", color: "var(--text-primary)" }}
+      >
+        <span
+          className="shrink-0 text-sm"
+          style={{ color: "var(--text-muted)", width: "3.5rem" }}
+        >
+          {label}
+        </span>
+        {children}
       </div>
     </div>
   );
