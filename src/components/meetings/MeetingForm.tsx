@@ -377,12 +377,17 @@ export function MeetingForm({ meetingId, onBack }: Props) {
 
   return (
     <div className="min-h-svh">
-      {/* Top bar — compact, floating feel */}
+      {/* Header — 사이드바 헤더와 같은 높이. 좌 undo/redo + 저장 / 가운데 제목 / 우 편집·복사·삭제 */}
       <div
-        className="sticky top-0 z-10 flex items-center justify-between px-5 py-2 backdrop-blur lg:top-0"
-        style={{ backgroundColor: "var(--bg-overlay)" }}
+        className="sticky top-0 z-10 flex items-center gap-2 px-3 backdrop-blur"
+        style={{
+          height: "var(--app-header-h)",
+          backgroundColor: "var(--bg-overlay)",
+          borderBottom: "1px solid var(--border-subtle)",
+        }}
       >
-        <div className="ml-auto flex items-center gap-2">
+        {/* Left: undo/redo + save indicator */}
+        <div className="flex items-center gap-2">
           <div
             className="inline-flex overflow-hidden rounded-md"
             style={{ border: "1px solid var(--border-subtle)" }}
@@ -414,6 +419,72 @@ export function MeetingForm({ meetingId, onBack }: Props) {
             hasPendingEdit={anyPendingEdit && !updateMutation.isPending && !updateMutation.isError}
             onRetry={retrySave}
           />
+        </div>
+
+        {/* Center: title */}
+        <input
+          ref={titleInputRef}
+          type="text"
+          value={meta.title}
+          onChange={(e) => setMetaField("title", e.target.value)}
+          onBlur={() => {
+            if (meta.title.trim() === "" && data?.title) {
+              setMetaField("title", data.title);
+            }
+          }}
+          placeholder="제목 없음"
+          autoFocus={!data.title}
+          className="min-w-0 flex-1 bg-transparent text-center text-base font-semibold outline-none"
+          style={{ color: "var(--text-primary)" }}
+        />
+
+        {/* Right: edit toggle / copy / delete */}
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() =>
+              activeTab === "body"
+                ? setViewMode(viewMode === "edit" ? "view" : "edit")
+                : setActiveTab("body")
+            }
+            title={
+              activeTab === "body"
+                ? isTauri
+                  ? `${viewMode === "edit" ? "보기 모드" : "편집 모드"}  ⌘ + E`
+                  : viewMode === "edit"
+                    ? "보기 모드"
+                    : "편집 모드"
+                : "메모 탭으로 이동"
+            }
+            className="rounded-md px-1.5 py-1 transition"
+            style={{
+              border: "1px solid var(--border-subtle)",
+              color: activeTab === "body" ? "var(--text-secondary)" : "var(--text-muted)",
+              minHeight: 0,
+            }}
+          >
+            {viewMode === "edit" ? (
+              <Eye className="h-3.5 w-3.5" />
+            ) : (
+              <Pencil className="h-3.5 w-3.5" />
+            )}
+          </button>
+          <CopyButton meeting={meetingForCopy} onError={setActionError} compact />
+          <button
+            type="button"
+            onClick={handleDelete}
+            disabled={deleteMutation.isPending}
+            title="메모 삭제"
+            aria-label="메모 삭제"
+            className="rounded-md px-1.5 py-1 transition disabled:opacity-40"
+            style={{
+              border: "1px solid var(--border-subtle)",
+              color: "var(--text-muted)",
+              minHeight: 0,
+            }}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
         </div>
       </div>
 
@@ -491,27 +562,10 @@ export function MeetingForm({ meetingId, onBack }: Props) {
       ) : null}
 
       {/* Full-page editor */}
-      <div className="mx-auto max-w-3xl px-6 pb-24 pt-8">
-        {/* Title — large, Notion-style */}
-        <input
-          ref={titleInputRef}
-          type="text"
-          value={meta.title}
-          onChange={(e) => setMetaField("title", e.target.value)}
-          onBlur={() => {
-            if (meta.title.trim() === "" && data?.title) {
-              setMetaField("title", data.title);
-            }
-          }}
-          placeholder="제목 없음"
-          autoFocus={!data.title}
-          className="w-full bg-transparent text-3xl font-bold outline-none"
-          style={{ color: "var(--text-primary)" }}
-        />
-
-        {/* Metadata — subtle, inline */}
+      <div className="mx-auto max-w-3xl px-6 pb-24 pt-5">
+        {/* Metadata — subtle, inline (제목은 헤더로 옮김) */}
         <div
-          className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm"
+          className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm"
           style={{ color: "var(--text-secondary)" }}
         >
           <label className="inline-flex items-center gap-1.5">
@@ -593,54 +647,6 @@ export function MeetingForm({ meetingId, onBack }: Props) {
                 {body.length}자
               </span>
             ) : null}
-            <AutoSaveIndicator
-              isPending={updateMutation.isPending}
-              isSuccess={updateMutation.isSuccess}
-              isError={updateMutation.isError}
-            />
-            {activeTab === "body" ? (
-              <button
-                type="button"
-                onClick={() =>
-                  setViewMode(viewMode === "edit" ? "view" : "edit")
-                }
-                title={
-                  isTauri
-                    ? `${viewMode === "edit" ? "보기 모드" : "편집 모드"}  ⌘ + E`
-                    : viewMode === "edit"
-                      ? "보기 모드"
-                      : "편집 모드"
-                }
-                className="rounded-md px-1.5 py-1 transition"
-                style={{
-                  border: "1px solid var(--border-subtle)",
-                  color: "var(--text-secondary)",
-                  minHeight: 0,
-                }}
-              >
-                {viewMode === "edit" ? (
-                  <Eye className="h-3.5 w-3.5" />
-                ) : (
-                  <Pencil className="h-3.5 w-3.5" />
-                )}
-              </button>
-            ) : null}
-            <CopyButton meeting={meetingForCopy} onError={setActionError} compact />
-            <button
-              type="button"
-              onClick={handleDelete}
-              disabled={deleteMutation.isPending}
-              title="메모 삭제"
-              aria-label="메모 삭제"
-              className="rounded-md px-1.5 py-1 transition disabled:opacity-40"
-              style={{
-                border: "1px solid var(--border-subtle)",
-                color: "var(--text-muted)",
-                minHeight: 0,
-              }}
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </button>
           </div>
         </div>
 
@@ -844,30 +850,6 @@ function TabBtn({
         </span>
       ) : null}
     </button>
-  );
-}
-
-function AutoSaveIndicator({
-  isPending,
-  isSuccess,
-  isError,
-}: {
-  isPending: boolean;
-  isSuccess: boolean;
-  isError: boolean;
-}) {
-  let label: string | null = null;
-  let color = "var(--text-muted)";
-  if (isPending) label = "저장 중…";
-  else if (isError) {
-    label = "저장 실패";
-    color = "var(--accent-red-text)";
-  } else if (isSuccess) label = "저장됨";
-  if (!label) return null;
-  return (
-    <span className="text-xs" style={{ color }} aria-live="polite">
-      {label}
-    </span>
   );
 }
 
