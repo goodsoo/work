@@ -1194,11 +1194,18 @@ function LooseDateInput({
 }) {
   const [draft, setDraft] = useState(value);
   const [focused, setFocused] = useState(false);
+  // ESC → blur 시 commit skip flag. setDraft 가 async 라 commit 클로저가
+  // stale draft 읽고 수정값을 저장하는 버그 방지.
+  const skipCommitRef = useRef(false);
   useEffect(() => {
     setDraft(value);
   }, [value]);
 
   function commit() {
+    if (skipCommitRef.current) {
+      skipCommitRef.current = false;
+      return;
+    }
     const trimmed = draft.trim();
     if (trimmed === "") {
       if (value !== "") onCommit("");
@@ -1233,6 +1240,7 @@ function LooseDateInput({
           e.preventDefault();
           e.currentTarget.blur();
         } else if (e.key === "Escape") {
+          skipCommitRef.current = true;
           setDraft(value);
           e.currentTarget.blur();
         }
@@ -1260,11 +1268,16 @@ function LooseTimeInput({
   onCommit: (next: string) => void;
 }) {
   const [draft, setDraft] = useState(value);
+  const skipCommitRef = useRef(false);
   useEffect(() => {
     setDraft(value);
   }, [value]);
 
   function commit() {
+    if (skipCommitRef.current) {
+      skipCommitRef.current = false;
+      return;
+    }
     const trimmed = draft.trim();
     if (trimmed === "") {
       if (value !== "") onCommit("");
@@ -1291,6 +1304,7 @@ function LooseTimeInput({
           e.preventDefault();
           e.currentTarget.blur();
         } else if (e.key === "Escape") {
+          skipCommitRef.current = true;
           setDraft(value);
           e.currentTarget.blur();
         }

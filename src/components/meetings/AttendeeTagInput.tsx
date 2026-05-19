@@ -20,6 +20,10 @@ export function AttendeeTagInput({
   const [open, setOpen] = useState(false);
   const [highlight, setHighlight] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  // ESC → blur 시 onBlur 의 addTag 를 한 번 skip. setDraft("") 가 async 라
+  // onBlur 클로저가 stale draft 보고 typing 중이던 텍스트를 태그로 commit
+  // 하는 버그 방지.
+  const skipBlurAddRef = useRef(false);
 
   const tagsLower = useMemo(() => tags.map((t) => t.toLowerCase()), [tags]);
 
@@ -81,8 +85,8 @@ export function AttendeeTagInput({
     } else if (e.key === "Escape") {
       e.preventDefault();
       setOpen(false);
-      // typing 중인 새 tag draft 폐기 (onBlur 의 addTag 도 막힘) + blur.
-      // 이미 commit 된 tags (= value) 는 그대로 유지.
+      // typing 중인 새 tag draft 폐기 + blur. 이미 commit 된 tags 는 유지.
+      skipBlurAddRef.current = true;
       setDraft("");
       inputRef.current?.blur();
     }
@@ -127,6 +131,10 @@ export function AttendeeTagInput({
           onFocus={() => setOpen(true)}
           onBlur={() => {
             setTimeout(() => setOpen(false), 100);
+            if (skipBlurAddRef.current) {
+              skipBlurAddRef.current = false;
+              return;
+            }
             if (draft.trim()) addTag(draft);
           }}
           onKeyDown={onKeyDown}
