@@ -10,6 +10,7 @@ import {
   Pencil,
   X,
   Calendar as CalendarIcon,
+  Clock,
   Users,
 } from "lucide-react";
 import {
@@ -620,22 +621,34 @@ export function MeetingForm({ meetingId, onBack }: Props) {
         {/* Metadata — 본문 textarea 의 gutter 패턴과 동일. icon col + divider + 라벨 + 값. */}
         <div className="mt-4">
           <MetaRow icon={<CalendarIcon className="h-3.5 w-3.5" />} label="날짜">
-            <input
-              type="text"
-              value={meta.date}
-              onChange={(e) => setMetaField("date", e.target.value)}
-              placeholder="2026-05-19"
-              className="meta-input"
-              style={{ width: "7rem" }}
-            />
-            <input
-              type="text"
-              value={meta.time}
-              onChange={(e) => setMetaField("time", e.target.value)}
-              placeholder="14:00"
-              className="meta-input"
-              style={{ width: "4rem" }}
-            />
+            <span
+              className="inline-flex items-center gap-1.5"
+              style={{ color: "var(--text-muted)" }}
+            >
+              <CalendarIcon className="h-3 w-3" />
+              <input
+                type="text"
+                value={meta.date}
+                onChange={(e) => setMetaField("date", e.target.value)}
+                placeholder="2026-05-19"
+                className="meta-input"
+                style={{ width: "6.5rem" }}
+              />
+            </span>
+            <span
+              className="inline-flex items-center gap-1.5"
+              style={{ color: "var(--text-muted)" }}
+            >
+              <Clock className="h-3 w-3" />
+              <input
+                type="text"
+                value={meta.time}
+                onChange={(e) => setMetaField("time", e.target.value)}
+                placeholder="14:00"
+                className="meta-input"
+                style={{ width: "3.5rem" }}
+              />
+            </span>
           </MetaRow>
           <MetaRow icon={<Users className="h-3.5 w-3.5" />} label="참석자">
             <div className="flex-1">
@@ -801,11 +814,11 @@ function MetaRow({
         {icon}
       </div>
       <div
-        className="flex flex-1 items-center gap-3"
+        className="flex flex-1 items-center gap-3 text-sm"
         style={{ paddingLeft: "0.5rem", color: "var(--text-primary)" }}
       >
         <span
-          className="shrink-0 text-sm"
+          className="shrink-0"
           style={{ color: "var(--text-muted)", width: "3.5rem" }}
         >
           {label}
