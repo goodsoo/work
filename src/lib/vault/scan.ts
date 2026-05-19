@@ -151,7 +151,7 @@ export function fileToMeeting(
   return {
     id: filePath,
     uid: fmString(fm.id) ?? "", // 빈 string 면 lazy migration (scanMeetings / getMeeting 가 발급).
-    title: fmString(fm.title) ?? filePathToTitle(filePath),
+    title: filePathToTitle(filePath),
     date: fmString(fm.date),
     time: fmString(fm.time),
     attendees: fmStringArray(fm.attendees),
@@ -272,8 +272,7 @@ export function slugify(title: string): string {
 
 function filePathToTitle(filePath: string): string {
   const base = filePath.split("/").pop() ?? filePath;
-  const m = base.match(/^\d{4}-\d{2}-\d{2}-(.+)\.md$/);
-  return m ? m[1].replace(/-/g, " ") : base.replace(/\.md$/, "");
+  return base.replace(/\.md$/, "");
 }
 
 function filePathToDate(filePath: string): string {
