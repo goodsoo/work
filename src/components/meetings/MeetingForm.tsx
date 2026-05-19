@@ -41,7 +41,6 @@ import { useCreateTodo } from "../../hooks/useTodos";
 import type { MeetingUpdate } from "../../api/meetings";
 import { ClipPromptButton } from "../common/ClipPromptButton";
 import { buildClaudePrompt } from "../../lib/clipboardPrompt";
-import { parseAttendees } from "../../lib/attendees";
 import { CopyButton } from "./CopyButton";
 import { EditableList } from "./EditableList";
 import { AttendeeTagInput } from "./AttendeeTagInput";
@@ -84,25 +83,6 @@ function summariesEqual(a: SummaryDoc, b: SummaryDoc): boolean {
   );
 }
 
-function metasEqual(a: MetaDoc, b: MetaDoc): boolean {
-  return (
-    a.title === b.title &&
-    a.date === b.date &&
-    a.time === b.time &&
-    a.attendees === b.attendees
-  );
-}
-
-// hasUnsavedChange 용 — disk roundtrip 후 형식 차이 (예: 'alice,bob' vs 'alice, bob') 무시.
-function metasEqualNormalized(a: MetaDoc, b: MetaDoc): boolean {
-  return (
-    a.title === b.title &&
-    a.date === b.date &&
-    a.time === b.time &&
-    arraysEqual(parseAttendees(a.attendees), parseAttendees(b.attendees))
-  );
-}
-
 function trimNewlines(s: string): string {
   return s.replace(/^\n+/, "").replace(/\n+$/, "");
 }
@@ -115,14 +95,6 @@ function summaryToPatch(s: SummaryDoc): MeetingUpdate {
   };
 }
 
-function metaToPatch(m: MetaDoc): MeetingUpdate {
-  // title 은 별도 처리 (blur / Enter 시점에만 mutation) — 매 typing 마다 rename 회피.
-  return {
-    date: m.date || null,
-    time: m.time.trim() || null,
-    attendees: m.attendees.trim() || null,
-  };
-}
 
 type ActiveTab = "body" | "transcript" | "summary";
 
@@ -193,32 +165,83 @@ export function MeetingForm({ meetingId, onBack }: Props) {
     onCommit: (s) => updateMutation.mutate(summaryToPatch(s)),
   });
 
-  const metaHistory = useStateHistory<MetaDoc>({
-    initial: initialMeta,
-    cacheKey: id ? `${id}:meta` : undefined,
-    commitMs: 1000,
-    isEqual: metasEqual,
-    onCommit: (m) => updateMutation.mutate(metaToPatch(m)),
-  });
-
   const body = bodyHistory.value;
   const transcript = transcriptHistory.value;
   const summary = summaryHistory.value;
-  const meta = metaHistory.value;
 
   const [actionError, setActionError] = useState<string | null>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
-  // title 은 metaHistory 와 분리 — typing 중엔 mutation X (매번 rename 회피),
-  // onBlur / Enter 시점에만 commit. 메모 전환 시 initialMeta.title 로 sync.
+
+  // meta 4 field 는 typing 중 mutation X (매번 rename / spinner 깜빡임 회피).
+  // onBlur / Enter / tag 추가 같은 명시 시점에만 commit. 메모 전환 시 initialMeta 와 sync.
   const [titleDraft, setTitleDraft] = useState<string>(() => initialMeta.title);
+  const [dateDraft, setDateDraft] = useState<string>(() => initialMeta.date);
+  const [timeDraft, setTimeDraft] = useState<string>(() => initialMeta.time);
+  const [attendeesDraft, setAttendeesDraft] = useState<string>(
+    () => initialMeta.attendees,
+  );
   useEffect(() => {
     setTitleDraft(initialMeta.title);
   }, [initialMeta.title]);
+  useEffect(() => {
+    setDateDraft(initialMeta.date);
+  }, [initialMeta.date]);
+  useEffect(() => {
+    setTimeDraft(initialMeta.time);
+  }, [initialMeta.time]);
+  useEffect(() => {
+    setAttendeesDraft(initialMeta.attendees);
+  }, [initialMeta.attendees]);
+
   function commitTitle() {
-    const next = titleDraft.trim() || "untitled";
+    const trimmed = titleDraft.trim();
+    // 빈 → 기존 제목으로 revert. 기존도 빈이면 'untitled'.
+    const next = trimmed === "" ? (initialMeta.title || "untitled") : trimmed;
     if (next !== titleDraft) setTitleDraft(next);
     if (next === initialMeta.title) return;
     updateMutation.mutate({ title: next });
+  }
+
+  function commitDate() {
+    const v = dateDraft.trim();
+    // 빈 OK (날짜 제거). 그 외엔 YYYY-MM-DD + Date 유효.
+    const valid =
+      v === "" ||
+      (/^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(v + "T00:00:00")));
+    if (!valid) {
+      setDateDraft(initialMeta.date); // 형식 안 맞으면 기존으로 revert
+      return;
+    }
+    if (v === initialMeta.date) return;
+    updateMutation.mutate({ date: v || null });
+  }
+
+  function commitTime() {
+    const v = timeDraft.trim();
+    // 빈 OK. 그 외엔 HH:MM + 0-23 / 0-59.
+    let valid = v === "";
+    if (!valid) {
+      const m = v.match(/^(\d{2}):(\d{2})$/);
+      if (m) {
+        const h = parseInt(m[1], 10);
+        const mm = parseInt(m[2], 10);
+        valid = h >= 0 && h <= 23 && mm >= 0 && mm <= 59;
+      }
+    }
+    if (!valid) {
+      setTimeDraft(initialMeta.time);
+      return;
+    }
+    if (v === initialMeta.time) return;
+    updateMutation.mutate({ time: v || null });
+  }
+
+  function commitAttendees(next: string) {
+    // AttendeeTagInput onChange 는 tag 추가/제거 시점 — 이미 명시 intent. 즉시 commit.
+    setAttendeesDraft(next);
+    const trimmed = next.trim();
+    if (trimmed === initialMeta.attendees.trim()) return;
+    updateMutation.mutate({ attendees: trimmed || null });
   }
   const [activeTab, setActiveTabState] = useState<ActiveTab>(
     () => ACTIVE_TAB_CACHE.get(meetingId) ?? "body",
@@ -244,11 +267,10 @@ export function MeetingForm({ meetingId, onBack }: Props) {
       bodyHistory.flush();
       transcriptHistory.flush();
       summaryHistory.flush();
-      metaHistory.flush();
     }
     window.addEventListener("beforeunload", onBeforeUnload);
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
-  }, [bodyHistory, transcriptHistory, summaryHistory, metaHistory]);
+  }, [bodyHistory, transcriptHistory, summaryHistory]);
 
   // 메모 전환 시 그 메모의 마지막 탭으로 (cache miss 면 본문).
   useEffect(() => {
@@ -352,7 +374,10 @@ export function MeetingForm({ meetingId, onBack }: Props) {
   function retrySave() {
     if (updateMutation.isPending) return;
     updateMutation.mutate({
-      ...metaToPatch(meta),
+      title: titleDraft.trim() || initialMeta.title || "untitled",
+      date: dateDraft.trim() || null,
+      time: timeDraft.trim() || null,
+      attendees: attendeesDraft.trim() || null,
       content: body,
       transcript: transcript || null,
       ...summaryToPatch(summary),
@@ -396,25 +421,21 @@ export function MeetingForm({ meetingId, onBack }: Props) {
   // body/transcript 는 disk write 시 앞뒤 newline trim 되므로 비교도 normalize.
   // attendees 는 textarea string vs disk-roundtrip 의 ", " join 차이 회피 위해 parseAttendees 로 array 비교.
   // title 은 별도 (titleDraft) — typing 중 일치 안 해도 spinner 표시 X (blur/Enter 만 mutation).
+  // meta 4 field 는 draft 라 typing 중 spinner X — commit 후 initialMeta 갱신.
   const hasUnsavedChange =
     trimNewlines(body) !== trimNewlines(initialBody) ||
     trimNewlines(transcript) !== trimNewlines(initialTranscript) ||
-    !summariesEqual(summary, initialSummary) ||
-    !metasEqualNormalized(meta, initialMeta);
+    !summariesEqual(summary, initialSummary);
 
   const meetingForCopy = {
-    title: meta.title || null,
-    date: meta.date || null,
-    time: meta.time || null,
-    attendees: meta.attendees || null,
+    title: initialMeta.title || null,
+    date: initialMeta.date || null,
+    time: initialMeta.time || null,
+    attendees: initialMeta.attendees || null,
     discussion_items: summary.discussion_items,
     decisions: summary.decisions,
     action_items: summary.action_items,
   };
-
-  function setMetaField<K extends keyof MetaDoc>(key: K, value: MetaDoc[K]) {
-    metaHistory.set({ ...meta, [key]: value });
-  }
 
   function setSummaryField<K extends keyof SummaryDoc>(
     key: K,
@@ -676,9 +697,17 @@ export function MeetingForm({ meetingId, onBack }: Props) {
             <input
               type="text"
               inputMode="numeric"
-              value={meta.date}
-              onChange={(e) => setMetaField("date", e.target.value)}
-              onKeyDown={dateKeyFilter}
+              value={dateDraft}
+              onChange={(e) => setDateDraft(e.target.value)}
+              onBlur={commitDate}
+              onKeyDown={(e) => {
+                dateKeyFilter(e);
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  commitDate();
+                  (e.target as HTMLInputElement).blur();
+                }
+              }}
               placeholder="YYYY-MM-DD"
               className="meta-input flex-1"
               maxLength={10}
@@ -688,9 +717,17 @@ export function MeetingForm({ meetingId, onBack }: Props) {
             <input
               type="text"
               inputMode="numeric"
-              value={meta.time}
-              onChange={(e) => setMetaField("time", e.target.value)}
-              onKeyDown={timeKeyFilter}
+              value={timeDraft}
+              onChange={(e) => setTimeDraft(e.target.value)}
+              onBlur={commitTime}
+              onKeyDown={(e) => {
+                timeKeyFilter(e);
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  commitTime();
+                  (e.target as HTMLInputElement).blur();
+                }
+              }}
               placeholder="HH:MM"
               className="meta-input flex-1"
               maxLength={5}
@@ -699,8 +736,8 @@ export function MeetingForm({ meetingId, onBack }: Props) {
           <MetaRow icon={<Users className="h-3.5 w-3.5" />} label="참석자">
             <div className="flex-1">
               <AttendeeTagInput
-                value={meta.attendees}
-                onChange={(next) => setMetaField("attendees", next)}
+                value={attendeesDraft}
+                onChange={commitAttendees}
                 suggestions={attendeeSuggestions}
                 placeholder="이름 입력 후 Enter"
               />
@@ -745,10 +782,10 @@ export function MeetingForm({ meetingId, onBack }: Props) {
             <ClipPromptButton
               buildPrompt={() =>
                 buildClaudePrompt({
-                  title: meta.title || null,
-                  date: meta.date || null,
-                  time: meta.time || null,
-                  attendees: meta.attendees || null,
+                  title: initialMeta.title || null,
+                  date: initialMeta.date || null,
+                  time: initialMeta.time || null,
+                  attendees: initialMeta.attendees || null,
                   content: body,
                   transcript: transcript || null,
                 })
