@@ -49,10 +49,11 @@ function normalizeAttendees(v: MeetingInsert["attendees"]): string[] {
   return [];
 }
 
-function buildMeeting(input: MeetingInsert, id: string): Meeting {
+function buildMeeting(input: MeetingInsert, id: string, uid: string): Meeting {
   const now = new Date().toISOString();
   return {
     id,
+    uid,
     title: input.title ?? "",
     date: input.date ?? null,
     time: input.time ?? null,
@@ -71,13 +72,14 @@ function buildMeeting(input: MeetingInsert, id: string): Meeting {
 }
 
 // 한 회의 sidecar 까지 read 해서 합쳐 반환. sidecar 없으면 그 필드는 빈 값.
+// uid 없는 옛 메모는 lazy 발급 + frontmatter rewrite (scanMeetings 가 못 잡은 경로 보완).
 async function readFullMeeting(
   adapter: VaultAdapter,
   id: string,
 ): Promise<Meeting | null> {
   if (!(await adapter.exists(id))) return null;
-  const mainRaw = await adapter.read(id);
-  const meta = await adapter.readMeta(id);
+  let mainRaw = await adapter.read(id);
+  let meta = await adapter.readMeta(id);
   const tPath = transcriptPath(id);
   const sPath = summaryPath(id);
   const transcriptRaw = (await adapter.exists(tPath))
@@ -86,7 +88,21 @@ async function readFullMeeting(
   const summaryRaw = (await adapter.exists(sPath))
     ? await adapter.read(sPath)
     : "";
-  return fileToMeeting(id, mainRaw, transcriptRaw, summaryRaw, meta.mtime);
+  let m = fileToMeeting(id, mainRaw, transcriptRaw, summaryRaw, meta.mtime);
+  if (m.uid === "") {
+    const uid = crypto.randomUUID();
+    const updated = { ...m, uid };
+    try {
+      const newRaw = meetingToMainRaw(updated);
+      const newMeta = await adapter.write(id, newRaw, meta.mtime);
+      mainRaw = newRaw;
+      meta = newMeta;
+      m = fileToMeeting(id, mainRaw, transcriptRaw, summaryRaw, meta.mtime);
+    } catch {
+      m = { ...m, uid };
+    }
+  }
+  return m;
 }
 
 export async function listMeetings(adapter: VaultAdapter): Promise<Meeting[]> {
@@ -151,10 +167,10 @@ export async function createMeeting(
   adapter: VaultAdapter,
   input: MeetingInsert,
 ): Promise<Meeting> {
-  const date = input.date ?? new Date().toISOString().slice(0, 10);
   const title = input.title ?? "";
-  const path = await generateMeetingPath(adapter, date, title);
-  const meeting = buildMeeting({ ...input, date, title }, path);
+  const path = await generateMeetingPath(adapter, title);
+  const uid = crypto.randomUUID();
+  const meeting = buildMeeting({ ...input, title }, path, uid);
 
   const mainRaw = meetingToMainRaw(meeting);
   const mainMeta = await adapter.write(path, mainRaw);
@@ -181,36 +197,21 @@ export async function updateMeeting(
     throw new Error(`meeting not found: ${id}`);
   }
 
-  // Title/date 변경 시 파일명 rename (메인 + sidecar 묶음).
+  // Title 변경 시 파일명 rename (메인 + sidecar 묶음). title 만 frontmatter 에 안 들어가고
+  // 파일명이 곧 title — rename only → inode 유지 (옵시디안 모델 동일).
   // rename 후 currentId 가 새 path — 이후 모든 patch 는 currentId 기준.
   let currentId = id;
-  if (patch.title !== undefined || patch.date !== undefined) {
-    const current = await readFullMeeting(adapter, id);
-    if (current) {
-      const nextTitle = patch.title !== undefined
-        ? (patch.title ?? "")
-        : current.title;
-      const nextDate = patch.date !== undefined
-        ? (patch.date ?? "")
-        : (current.date ?? "");
-      if (nextDate) {
-        const newPath = await computeRenamedMeetingPath(
-          adapter,
-          id,
-          nextDate,
-          nextTitle,
-        );
-        if (newPath !== id) {
-          await renameMeetingFiles(adapter, id, newPath);
-          currentId = newPath;
-        }
-      }
+  if (patch.title !== undefined) {
+    const nextTitle = patch.title ?? "";
+    const newPath = await computeRenamedMeetingPath(adapter, id, nextTitle);
+    if (newPath !== id) {
+      await renameMeetingFiles(adapter, id, newPath);
+      currentId = newPath;
     }
   }
 
-  // 메인 파일 — frontmatter / content
+  // 메인 파일 — frontmatter / content. title 은 frontmatter 에 안 박힘.
   const fmPatch: Record<string, unknown> = {};
-  if (patch.title !== undefined) fmPatch.title = patch.title ?? "";
   if (patch.date !== undefined) fmPatch.date = patch.date;
   if (patch.time !== undefined) fmPatch.time = patch.time;
   if (patch.attendees !== undefined) {
@@ -256,7 +257,7 @@ export async function updateMeeting(
   ) {
     const sPath = summaryPath(currentId);
     // 현재 상태 read (sidecar 가 있으면 그 H2 list 보존)
-    const current = (await readFullMeeting(adapter, currentId)) ?? buildMeeting({}, currentId);
+    const current = (await readFullMeeting(adapter, currentId)) ?? buildMeeting({}, currentId, "");
     const merged = {
       discussion_items: patch.discussion_items ?? current.discussion_items,
       decisions: patch.decisions ?? current.decisions,

@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import {
   createMeeting,
   deleteMeeting,
@@ -16,31 +16,35 @@ import { summaryPath, transcriptPath } from "../lib/vault/scan";
 import { useVault } from "../lib/vault/useVault";
 import type { VaultWatcher } from "../lib/vault/watcher";
 
-// 한 회의는 메인 + 2 sidecar 파일이라 자기 write 마크도 셋 다.
-function markMeetingSelfWrite(watcher: VaultWatcher, id: string): void {
-  watcher.markSelfWrite(id);
-  watcher.markSelfWrite(transcriptPath(id));
-  watcher.markSelfWrite(summaryPath(id));
+// 한 회의는 메인 + 2 sidecar 파일이라 자기 write 마크도 셋 다. path 기반.
+function markMeetingSelfWrite(watcher: VaultWatcher, path: string): void {
+  watcher.markSelfWrite(path);
+  watcher.markSelfWrite(transcriptPath(path));
+  watcher.markSelfWrite(summaryPath(path));
 }
 
 const meetingsKey = ["meetings"] as const;
 const deletedMeetingsKey = ["meetings", "deleted"] as const;
-const meetingKey = (id: string) => ["meetings", id] as const;
+// detail cache key 는 uid (frontmatter 의 영구 id) 기반. path rename 에 영향 받지 않음.
+const meetingKey = (uid: string) => ["meetings", "detail", uid] as const;
+
+// uid → file path lookup. list query cache 에 의존. list 가 active 면 항상 valid.
+function uidToPath(qc: QueryClient, uid: string): string | undefined {
+  const list = qc.getQueryData<Meeting[]>(meetingsKey);
+  return list?.find((m) => m.uid === uid)?.id;
+}
 
 // 새 메모 직후 자동 focus 용 1회성 flag. useCreateMeeting 가 set, MeetingForm 가 consume.
-let _justCreatedMeetingId: string | null = null;
-export function consumeJustCreatedMeetingId(id: string): boolean {
-  if (_justCreatedMeetingId === id) {
-    _justCreatedMeetingId = null;
+let _justCreatedMeetingUid: string | null = null;
+export function consumeJustCreatedMeetingUid(uid: string): boolean {
+  if (_justCreatedMeetingUid === uid) {
+    _justCreatedMeetingUid = null;
     return true;
   }
   return false;
 }
 
 // patch 형식 (string | null | array) 을 Meeting 의 정규 type 으로 변환.
-// onMutate 가 `{...prev, ...patch}` 그대로 spread 하면 attendees 가 "alice, bob"
-// 같은 string 으로 덮여서 data.attendees.join() 호출 시 TypeError. title/date 등
-// 같은 패턴 잠재 risk 모두 처리.
 function normalizeAttendeesPatch(v: MeetingUpdate["attendees"]): string[] {
   if (v === null || v === undefined) return [];
   if (Array.isArray(v)) {
@@ -93,12 +97,18 @@ export function useDeletedMeetings() {
   });
 }
 
-export function useMeeting(id: string | undefined) {
+export function useMeeting(uid: string | undefined) {
   const { adapter, isReady } = useVault();
+  const qc = useQueryClient();
   return useQuery({
-    queryKey: id ? meetingKey(id) : ["meetings", "none"],
-    queryFn: () => getMeeting(adapter, id!),
-    enabled: !!id && isReady,
+    queryKey: uid ? meetingKey(uid) : ["meetings", "none"],
+    queryFn: async () => {
+      if (!uid) return null;
+      const path = uidToPath(qc, uid);
+      if (!path) return null; // list cache miss — 다음 list refetch 후 사용자가 재시도.
+      return getMeeting(adapter, path);
+    },
+    enabled: !!uid && isReady,
   });
 }
 
@@ -109,71 +119,59 @@ export function useCreateMeeting() {
     mutationFn: async (input: MeetingInsert) => {
       const created = await createMeeting(adapter, input);
       markMeetingSelfWrite(watcher, created.id);
-      _justCreatedMeetingId = created.id;
+      _justCreatedMeetingUid = created.uid;
       return created;
     },
     onSuccess: (created) => {
       qc.setQueryData<Meeting[]>(meetingsKey, (prev) =>
         prev ? [created, ...prev] : [created],
       );
-      qc.setQueryData(meetingKey(created.id), created);
+      qc.setQueryData(meetingKey(created.uid), created);
       qc.invalidateQueries({ queryKey: ["todos"] });
     },
   });
 }
 
-export function useUpdateMeeting(id: string) {
+export function useUpdateMeeting(uid: string) {
   const { adapter, watcher } = useVault();
   const qc = useQueryClient();
   return useMutation({
+    // 같은 메모에 대한 mutation 직렬화 (uid 기반 scope — path rename 무관).
+    scope: { id: `meeting:${uid}` },
     mutationFn: async (patch: MeetingUpdate) => {
-      // rename 가능성 — 양쪽 path 다 markSelfWrite 해서 watcher 가 자기 변경 무시.
-      markMeetingSelfWrite(watcher, id);
-      const updated = await updateMeeting(adapter, id, patch);
-      if (updated.id !== id) {
+      // uid 는 영구 — list cache 에서 현재 path 조회.
+      const path = uidToPath(qc, uid);
+      if (!path) throw new Error(`meeting not found: uid=${uid}`);
+      markMeetingSelfWrite(watcher, path);
+      const updated = await updateMeeting(adapter, path, patch);
+      if (updated.id !== path) {
+        // rename 발생 — 새 path 도 self-write 마크.
         markMeetingSelfWrite(watcher, updated.id);
       }
       return updated;
     },
     onMutate: async (patch) => {
-      await qc.cancelQueries({ queryKey: meetingKey(id) });
-      const prevDetail = qc.getQueryData<Meeting>(meetingKey(id));
-      const prevList = qc.getQueryData<Meeting[]>(meetingsKey);
+      await qc.cancelQueries({ queryKey: meetingKey(uid) });
+      const prevDetail = qc.getQueryData<Meeting>(meetingKey(uid));
       if (prevDetail) {
-        qc.setQueryData(meetingKey(id), applyOptimisticPatch(prevDetail, patch));
+        qc.setQueryData(meetingKey(uid), applyOptimisticPatch(prevDetail, patch));
       }
       qc.setQueryData<Meeting[]>(meetingsKey, (curr) =>
-        curr?.map((m) => (m.id === id ? applyOptimisticPatch(m, patch) : m)),
+        curr?.map((m) => (m.uid === uid ? applyOptimisticPatch(m, patch) : m)),
       );
-      return { prevDetail, prevList };
+      return { prevDetail };
     },
     onError: (_err, _vars, ctx) => {
-      if (ctx?.prevDetail) qc.setQueryData(meetingKey(id), ctx.prevDetail);
-      if (ctx?.prevList) qc.setQueryData(meetingsKey, ctx.prevList);
+      if (ctx?.prevDetail) qc.setQueryData(meetingKey(uid), ctx.prevDetail);
+      qc.invalidateQueries({ queryKey: meetingsKey });
     },
     onSuccess: (updated) => {
-      const newId = updated.id;
-      if (newId !== id) {
-        // 파일 rename — 옛 id + 새 id 둘 다 detail 셋 (UI 가 새 id 로 전환할 때까지
-        // 옛 id 도 valid 한 상태 유지 → 노트 선택 끊김 방지). list 도 옛 id 를 새 id 로 교체.
-        // URL hash 갱신 → hashchange listener 가 selectedMeetingId 를 새 id 로 set.
-        // 옛 detail query 는 다음 list refresh 때 GC 자연 처리.
-        qc.setQueryData(meetingKey(id), updated);
-        qc.setQueryData(meetingKey(newId), updated);
-        qc.setQueryData<Meeting[]>(meetingsKey, (prev) =>
-          prev?.map((m) => (m.id === id ? updated : m)),
-        );
-        if (typeof window !== "undefined" && window.location.hash === `#meeting-${id}`) {
-          // raw path 그대로 — encodeURIComponent 가 `/` 도 escape 해서 listener 가
-          // slice 한 결과가 망가짐. App.tsx 의 readMeetingFromHash 는 raw path 받음.
-          window.location.hash = `#meeting-${newId}`;
-        }
-      } else {
-        qc.setQueryData(meetingKey(id), updated);
-        qc.setQueryData<Meeting[]>(meetingsKey, (prev) =>
-          prev?.map((m) => (m.id === id ? updated : m)),
-        );
-      }
+      // uid 는 변하지 않음 — cache key 그대로. path 만 변할 수 있고 list 의 그 entry 의 id 가 갱신됨.
+      // 옛 path 의 cache 청소 / hash 갱신 / 옛 detail query 보존 같은 복잡 흐름 다 사라짐.
+      qc.setQueryData(meetingKey(uid), updated);
+      qc.setQueryData<Meeting[]>(meetingsKey, (prev) =>
+        prev?.map((m) => (m.uid === uid ? updated : m)),
+      );
       qc.invalidateQueries({ queryKey: ["todos"] });
     },
   });
@@ -183,15 +181,18 @@ export function useDeleteMeeting() {
   const { adapter, watcher } = useVault();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (id: string) => {
-      await deleteMeeting(adapter, id);
-      markMeetingSelfWrite(watcher, id);
+    mutationFn: async (uid: string) => {
+      const path = uidToPath(qc, uid);
+      if (!path) throw new Error(`meeting not found: uid=${uid}`);
+      await deleteMeeting(adapter, path);
+      markMeetingSelfWrite(watcher, path);
+      return uid;
     },
-    onSuccess: (_void, id) => {
+    onSuccess: (uid) => {
       qc.setQueryData<Meeting[]>(meetingsKey, (prev) =>
-        prev?.filter((m) => m.id !== id),
+        prev?.filter((m) => m.uid !== uid),
       );
-      qc.removeQueries({ queryKey: meetingKey(id) });
+      qc.removeQueries({ queryKey: meetingKey(uid) });
       qc.invalidateQueries({ queryKey: deletedMeetingsKey });
       qc.invalidateQueries({ queryKey: ["todos"] });
     },
@@ -210,7 +211,7 @@ export function useRestoreMeeting() {
       qc.setQueryData<Meeting[]>(meetingsKey, (prev) =>
         prev ? [restored, ...prev] : [restored],
       );
-      qc.setQueryData(meetingKey(restored.id), restored);
+      qc.setQueryData(meetingKey(restored.uid), restored);
       qc.invalidateQueries({ queryKey: ["todos"] });
     },
   });

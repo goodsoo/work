@@ -65,6 +65,25 @@ function joinAbs(root: string, rel: string): string {
   return p === "" ? r : `${r}/${p}`;
 }
 
+// 같은 abs path 에 대한 write 직렬화. 두 동시 write 가 공유 tmp 를 만져
+// 첫 번째 rename 으로 tmp 소진 → 두 번째 remove 가 결과 파일 삭제 → 두 번째
+// rename 이 ENOENT 떨어지며 파일이 진짜 사라지는 race 차단. POSIX rename 자체는
+// atomic 이지만 'remove → rename' 시퀀스는 비-원자라 lock 필요.
+const writeLocks = new Map<string, Promise<unknown>>();
+export async function withWriteLock<T>(
+  key: string,
+  fn: () => Promise<T>,
+): Promise<T> {
+  const prev = writeLocks.get(key) ?? Promise.resolve();
+  const next = prev.then(fn, fn);
+  writeLocks.set(key, next);
+  try {
+    return await next;
+  } finally {
+    if (writeLocks.get(key) === next) writeLocks.delete(key);
+  }
+}
+
 function toRel(root: string, abs: string): string {
   const r = root.endsWith("/") ? root : root + "/";
   return abs.startsWith(r) ? abs.slice(r.length) : abs;
@@ -119,31 +138,37 @@ export function createTauriAdapter(): VaultAdapter {
     ): Promise<FileMeta> {
       const abs = joinAbs(requireRoot(), relPath);
 
-      if (expectedMtime !== undefined) {
-        const existed = await tauriExists(abs);
-        if (existed) {
-          const s = await tauriStat(abs);
-          const actual = s.mtime ? new Date(s.mtime).getTime() : 0;
-          // 1초 미만 차이는 같은 write 로 간주 (파일 시스템 mtime resolution)
-          if (Math.abs(actual - expectedMtime) > 1000) {
-            throw new ConflictError(relPath, expectedMtime, actual);
+      return withWriteLock(abs, async () => {
+        if (expectedMtime !== undefined) {
+          const existed = await tauriExists(abs);
+          if (existed) {
+            const s = await tauriStat(abs);
+            const actual = s.mtime ? new Date(s.mtime).getTime() : 0;
+            // 1초 미만 차이는 같은 write 로 간주 (파일 시스템 mtime resolution)
+            if (Math.abs(actual - expectedMtime) > 1000) {
+              throw new ConflictError(relPath, expectedMtime, actual);
+            }
           }
         }
-      }
 
-      // Atomic write: tmp file → rename
-      const tmp = abs + ".tmp";
-      await writeTextFile(tmp, content);
-      // remove existing then rename (Tauri rename은 dest 존재 시 실패할 수 있음)
-      const existed = await tauriExists(abs);
-      if (existed) await tauriRemove(abs);
-      await tauriRename(tmp, abs);
+        // Atomic write: 고유 tmp file → rename. tmp 이름이 attempt 마다 고유라
+        // lock 가 어떤 이유로 풀려도 tmp 충돌 X.
+        const suffix = `${Date.now().toString(36)}-${Math.random()
+          .toString(36)
+          .slice(2, 10)}`;
+        const tmp = `${abs}.${suffix}.tmp`;
+        await writeTextFile(tmp, content);
+        // remove existing then rename (Tauri rename은 dest 존재 시 실패할 수 있음)
+        const existed = await tauriExists(abs);
+        if (existed) await tauriRemove(abs);
+        await tauriRename(tmp, abs);
 
-      const s = await tauriStat(abs);
-      return {
-        mtime: s.mtime ? new Date(s.mtime).getTime() : Date.now(),
-        size: s.size,
-      };
+        const s = await tauriStat(abs);
+        return {
+          mtime: s.mtime ? new Date(s.mtime).getTime() : Date.now(),
+          size: s.size,
+        };
+      });
     },
 
     async delete(relPath: string): Promise<void> {
@@ -173,16 +198,38 @@ export function createTauriAdapter(): VaultAdapter {
       const unwatch = await tauriWatch(
         r,
         (event) => {
-          // event: { type, paths }. Tauri v2의 raw event를 normalize.
+          // Tauri v2 plugin-fs 의 event.type 은 object — notify-rs EventKind 가
+          // `{ create: { kind: "file" } }`, `{ modify: { kind: "metadata", mode: "..." } }`,
+          // `{ remove: { kind: "file" } }` 식으로 직렬화. 옛 코드는 String(...) 로
+          // 변환해 `.includes` 검사 → "[object Object]" 라 매칭 항상 실패 → 외부 변경이
+          // 사이드바에 영영 반영 안 되던 버그.
+          const eType = (event as { type?: unknown }).type;
+          if (typeof eType !== "object" || eType === null) return;
+          const obj = eType as Record<string, unknown>;
+
+          let kind: VaultWatchEvent["type"] | null = null;
+          if ("create" in obj) kind = "created";
+          else if ("remove" in obj) kind = "deleted";
+          else if ("modify" in obj) {
+            // metadata-only 변경은 macOS Finder/iCloud 가 폴더 touch 시 폭주.
+            // 실제 파일 내용/이름 변화 아니므로 skip.
+            const sub = (obj.modify as { kind?: string })?.kind;
+            if (sub === "metadata") return;
+            // macOS Finder delete = `.Trash` 로 rename. notify-rs 가 from/to 안 줘서
+            // 옛 path 만 옴. 같은 path 가 사라진 것과 동치 → deleted 로 normalize.
+            // vault 안 이동도 같은 처리 — refetch 가 새 위치 발견.
+            if (sub === "rename") kind = "deleted";
+            else kind = "modified";
+          }
+          if (!kind) return;
+
           const paths = (event as { paths?: string[] }).paths ?? [];
           for (const abs of paths) {
             const rel = toRel(r, abs);
-            const t = String((event as { type?: unknown }).type ?? "");
-            if (t.includes("create")) callback({ type: "created", path: rel });
-            else if (t.includes("modify"))
-              callback({ type: "modified", path: rel });
-            else if (t.includes("remove") || t.includes("delete"))
-              callback({ type: "deleted", path: rel });
+            // hidden 파일 (.DS_Store 등) 무시 — vault scan 도 dotfile 제외.
+            const base = rel.split("/").pop() ?? "";
+            if (base.startsWith(".")) continue;
+            callback({ type: kind, path: rel });
           }
         },
         { recursive: true, delayMs: 100 },

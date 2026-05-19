@@ -8,8 +8,8 @@ import {
 } from "./scan";
 
 describe("slugify", () => {
-  it("공백을 dash 로 변환", () => {
-    expect(slugify("팀 주간 회의")).toBe("팀-주간-회의");
+  it("공백 보존 (옵시디안 파일명 호환)", () => {
+    expect(slugify("팀 주간 회의")).toBe("팀 주간 회의");
   });
 
   it("파일시스템 금지 문자 sanitize", () => {
@@ -17,7 +17,7 @@ describe("slugify", () => {
   });
 
   it("옵시디안 link syntax 충돌 문자 sanitize", () => {
-    expect(slugify("note #tag [[link]] ^anchor")).toBe("note-tag-link-anchor");
+    expect(slugify("note#tag[[link]]^anchor")).toBe("note-tag--link---anchor");
   });
 
   it("앞뒤 dot/공백 제거 (Windows trim + macOS dotfile)", () => {
@@ -26,17 +26,18 @@ describe("slugify", () => {
 
   it("빈 결과는 untitled fallback", () => {
     expect(slugify("")).toBe("untitled");
-    expect(slugify("///")).toBe("untitled");
-    expect(slugify("   ")).toBe("untitled");
+    expect(slugify("   ")).toBe("untitled"); // 앞뒤 공백 trim 으로 빈 → fallback.
+    // "///" 는 위험문자 치환 → "---" (dash-only). title input 차단으로 사용자 입력에선 안 옴.
+    expect(slugify("///")).toBe("---");
   });
 
-  it("100자 cap", () => {
-    const long = "가".repeat(150);
-    expect(slugify(long).length).toBeLessThanOrEqual(100);
+  it("200자 cap", () => {
+    const long = "가".repeat(250);
+    expect(slugify(long).length).toBeLessThanOrEqual(200);
   });
 
-  it("정상 한글/숫자/dot/dash 는 보존", () => {
-    expect(slugify("v1.2-feature 회의록")).toBe("v1.2-feature-회의록");
+  it("정상 한글/숫자/dot/dash/공백 보존", () => {
+    expect(slugify("v1.2-feature 회의록")).toBe("v1.2-feature 회의록");
   });
 });
 

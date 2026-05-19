@@ -108,7 +108,7 @@ function AppContent() {
     if (!list || list.length === 0) return;
     autoSelectedRef.current = true;
     didAutoSelectThisSession = true;
-    openMeeting(list[0].id);
+    openMeeting(list[0].uid);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, selectedMeetingId, meetings.data]);
 

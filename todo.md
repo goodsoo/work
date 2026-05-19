@@ -12,6 +12,9 @@
 - [ ] **vault 스캔 성능 실측**. 수백 파일 < 50ms 가설 검증. 실측 후 frontmatter only 부분 캐시 도입할지 결정.
 - [ ] **iCloud sync 충돌 파일 무시 룰**. `(conflicted copy)` 같은 OS sync 자체 파일 vault 스캔에서 제외.
 - [ ] **vault 폴더 사라짐 graceful 처리**. 외장 디스크 disconnect 시 모달.
+- [ ] **frontmatter parse 실패 시 graceful fallback**. 외부 에디터 실수로 YAML 깨졌을 때 (`:` 빠짐, 닫는 `---` 없음 등) parseVaultFile 가 throw → scanMeetings 가 catch → 그 메모 사이드바에서 사라짐. 개선: frontmatter 깨지면 빈 frontmatter + body 그대로 → title=파일명, date=null 로 사이드바에 표시. 사용자가 열어서 직접 수정 가능. **데이터 표시 보장** (디스크 truth 그대로 살아있음).
+- [ ] **uid 중복 감지 + 후순위 재발급**. scanMeetings 끝에 `Set<uid>` 검사 — 외부 복사 / merge 로 두 파일이 같은 uuid 가지면 mtime 늦은 메모 재발급 + write. 현재는 두 entry 다 list 에 등장 → React key 충돌.
+- [ ] **깨진 파일 사용자 alert**. 파싱 실패 / 충돌 파일 발견 시 사이드바 banner: "N 개 메모를 읽지 못했어요. 클릭해서 확인" → 디스크 path 표시. UX 약점 (메모 사라진 듯 보임) 해소.
 
 ---
 

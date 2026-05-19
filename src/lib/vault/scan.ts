@@ -12,6 +12,7 @@ import { extractTodos, type TodoItem } from "./tasks";
 
 export interface MeetingMeta {
   id: string; // 메인 파일 path (e.g. "meetings/2026-05-16-팀-주간회의.md")
+  uid: string; // frontmatter 의 영구 id (uuid). path 변해도 그대로. cache key 의 진실.
   title: string;
   date: string | null;
   time: string | null;
@@ -149,7 +150,8 @@ export function fileToMeeting(
 
   return {
     id: filePath,
-    title: fmString(fm.title) ?? filePathToTitle(filePath),
+    uid: fmString(fm.id) ?? "", // 빈 string 면 lazy migration (scanMeetings / getMeeting 가 발급).
+    title: filePathToTitle(filePath),
     date: fmString(fm.date),
     time: fmString(fm.time),
     attendees: fmStringArray(fm.attendees),
@@ -192,8 +194,10 @@ export function fileToJournal(
 // Build Meeting → 3 raw files
 
 export function meetingToMainRaw(meeting: Meeting): string {
+  // title 은 파일명이 곧 title — frontmatter 안 박음. title 변경 = pure disk rename →
+  // inode 유지 (옵시디안 모델 정확 일치). frontmatter patch write 안 발사.
   const frontmatter: Record<string, unknown> = {
-    title: meeting.title,
+    id: meeting.uid, // 옵시디안 community 표준 (obsidian-unique-identifiers 등) — frontmatter `id` 가 영구 식별자.
   };
   if (meeting.date) frontmatter.date = meeting.date;
   if (meeting.time) frontmatter.time = meeting.time;
@@ -262,15 +266,13 @@ export function slugify(title: string): string {
   let s = title.replace(UNSAFE_FILENAME_RE, "-");
   // 앞뒤 dot/공백 제거 — Windows trim + macOS dotfile 회피
   s = s.replace(/^[.\s]+|[.\s]+$/g, "");
-  s = s.replace(/\s+/g, "-").replace(/-{2,}/g, "-").replace(/^-+|-+$/g, "");
-  if (s.length > 100) s = s.slice(0, 100).replace(/-+$/, "");
+  if (s.length > 200) s = s.slice(0, 200).replace(/[.\s]+$/, "");
   return s || "untitled";
 }
 
 function filePathToTitle(filePath: string): string {
   const base = filePath.split("/").pop() ?? filePath;
-  const m = base.match(/^\d{4}-\d{2}-\d{2}-(.+)\.md$/);
-  return m ? m[1].replace(/-/g, " ") : base.replace(/\.md$/, "");
+  return base.replace(/\.md$/, "");
 }
 
 function filePathToDate(filePath: string): string {
@@ -279,42 +281,50 @@ function filePathToDate(filePath: string): string {
   return m ? m[1] : "";
 }
 
-// meetings/YYYY-MM-DD-{slug}.md, 충돌 시 -2 suffix
+// meetings/{slug}.md — date 없음. date 는 순수 frontmatter optional.
+// 새 메모 default ("untitled") 충돌 시만 -2 suffix. 사용자 명시 title 의 충돌은
+// computeRenamedMeetingPath 가 throw 로 처리 (자동 -2 안 함).
 export async function generateMeetingPath(
   adapter: VaultAdapter,
-  date: string,
   title: string,
 ): Promise<string> {
   const slug = slugify(title);
-  const base = `meetings/${date}-${slug}`;
-  let candidate = `${base}.md`;
+  let candidate = `meetings/${slug}.md`;
   let n = 2;
   while (await adapter.exists(candidate)) {
-    candidate = `${base}-${n}.md`;
+    candidate = `meetings/${slug}-${n}.md`;
     n++;
   }
   return candidate;
 }
 
-// title/date 변경 시 새 path 계산. 자기 자신과 같으면 그대로 (no-op).
-// 다른 메모와 충돌 시 -2, -3 suffix.
+// title 변경 전용 충돌 에러. 사용자가 toast 보고 다른 title 로 재시도.
+export class TitleConflictError extends Error {
+  slug: string;
+  path: string;
+  constructor(slug: string, path: string) {
+    super(`title already in use: ${slug}`);
+    this.name = "TitleConflictError";
+    this.slug = slug;
+    this.path = path;
+  }
+}
+
+// title 변경 시 새 path 계산. 같으면 currentId 반환 (no-op).
+// 다른 메모와 충돌 시 throw — 사용자가 다른 title 로 재시도해야 함.
+// 자동 -2 suffix 안 함 (의도된 title 과 다른 파일명을 silently 만들지 않기 위해).
 export async function computeRenamedMeetingPath(
   adapter: VaultAdapter,
   currentId: string,
-  newDate: string,
   newTitle: string,
 ): Promise<string> {
   const slug = slugify(newTitle);
-  const base = `meetings/${newDate}-${slug}`;
-  const target = `${base}.md`;
-  if (target === currentId) return currentId; // 변경 없음
-  let candidate = target;
-  let n = 2;
-  while (candidate !== currentId && (await adapter.exists(candidate))) {
-    candidate = `${base}-${n}.md`;
-    n++;
+  const target = `meetings/${slug}.md`;
+  if (target === currentId) return currentId;
+  if (await adapter.exists(target)) {
+    throw new TitleConflictError(slug, target);
   }
-  return candidate;
+  return target;
 }
 
 // 메인 + 두 sidecar 한 묶음 rename. sidecar 가 없으면 skip.
@@ -351,12 +361,29 @@ export async function scanMeetings(adapter: VaultAdapter): Promise<MeetingMeta[]
     if (!path.endsWith(".md")) continue;
     if (isMeetingSidecar(path)) continue; // sidecar 는 scan 대상 X
     try {
-      const raw = await adapter.read(path);
-      const meta = await adapter.readMeta(path);
-      // meta-only — sidecar 안 읽어도 OK. fileToMeeting 으로 frontmatter 만 회수.
-      const m = fileToMeeting(path, raw, "", "", meta.mtime);
+      let raw = await adapter.read(path);
+      let meta = await adapter.readMeta(path);
+      let m = fileToMeeting(path, raw, "", "", meta.mtime);
+      // Lazy migration — 옛 V0.6 메모 (frontmatter id 없음) 처음 만나면 uuid 발급 + rewrite.
+      // 한 번만 발생. 옵시디안 community 표준 (frontmatter `id` 영구 식별자) 으로 통일.
+      if (m.uid === "") {
+        const uid = crypto.randomUUID();
+        const updated = { ...m, uid };
+        try {
+          const newRaw = meetingToMainRaw(updated);
+          const newMeta = await adapter.write(path, newRaw, meta.mtime);
+          raw = newRaw;
+          meta = newMeta;
+          m = fileToMeeting(path, raw, "", "", meta.mtime);
+        } catch {
+          // write 실패 시 (권한 / sync conflict) — 메모리 uid 만 채워서 list 표시.
+          // 다음 scan 또는 사용자 edit 시 다시 시도.
+          m = { ...m, uid };
+        }
+      }
       results.push({
         id: m.id,
+        uid: m.uid,
         title: m.title,
         date: m.date,
         time: m.time,
