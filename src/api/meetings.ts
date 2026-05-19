@@ -49,10 +49,11 @@ function normalizeAttendees(v: MeetingInsert["attendees"]): string[] {
   return [];
 }
 
-function buildMeeting(input: MeetingInsert, id: string): Meeting {
+function buildMeeting(input: MeetingInsert, id: string, uid: string): Meeting {
   const now = new Date().toISOString();
   return {
     id,
+    uid,
     title: input.title ?? "",
     date: input.date ?? null,
     time: input.time ?? null,
@@ -71,13 +72,14 @@ function buildMeeting(input: MeetingInsert, id: string): Meeting {
 }
 
 // 한 회의 sidecar 까지 read 해서 합쳐 반환. sidecar 없으면 그 필드는 빈 값.
+// uid 없는 옛 메모는 lazy 발급 + frontmatter rewrite (scanMeetings 가 못 잡은 경로 보완).
 async function readFullMeeting(
   adapter: VaultAdapter,
   id: string,
 ): Promise<Meeting | null> {
   if (!(await adapter.exists(id))) return null;
-  const mainRaw = await adapter.read(id);
-  const meta = await adapter.readMeta(id);
+  let mainRaw = await adapter.read(id);
+  let meta = await adapter.readMeta(id);
   const tPath = transcriptPath(id);
   const sPath = summaryPath(id);
   const transcriptRaw = (await adapter.exists(tPath))
@@ -86,7 +88,21 @@ async function readFullMeeting(
   const summaryRaw = (await adapter.exists(sPath))
     ? await adapter.read(sPath)
     : "";
-  return fileToMeeting(id, mainRaw, transcriptRaw, summaryRaw, meta.mtime);
+  let m = fileToMeeting(id, mainRaw, transcriptRaw, summaryRaw, meta.mtime);
+  if (m.uid === "") {
+    const uid = crypto.randomUUID();
+    const updated = { ...m, uid };
+    try {
+      const newRaw = meetingToMainRaw(updated);
+      const newMeta = await adapter.write(id, newRaw, meta.mtime);
+      mainRaw = newRaw;
+      meta = newMeta;
+      m = fileToMeeting(id, mainRaw, transcriptRaw, summaryRaw, meta.mtime);
+    } catch {
+      m = { ...m, uid };
+    }
+  }
+  return m;
 }
 
 export async function listMeetings(adapter: VaultAdapter): Promise<Meeting[]> {
@@ -154,7 +170,8 @@ export async function createMeeting(
   const date = input.date ?? new Date().toISOString().slice(0, 10);
   const title = input.title ?? "";
   const path = await generateMeetingPath(adapter, date, title);
-  const meeting = buildMeeting({ ...input, date, title }, path);
+  const uid = crypto.randomUUID();
+  const meeting = buildMeeting({ ...input, date, title }, path, uid);
 
   const mainRaw = meetingToMainRaw(meeting);
   const mainMeta = await adapter.write(path, mainRaw);
@@ -256,7 +273,7 @@ export async function updateMeeting(
   ) {
     const sPath = summaryPath(currentId);
     // 현재 상태 read (sidecar 가 있으면 그 H2 list 보존)
-    const current = (await readFullMeeting(adapter, currentId)) ?? buildMeeting({}, currentId);
+    const current = (await readFullMeeting(adapter, currentId)) ?? buildMeeting({}, currentId, "");
     const merged = {
       discussion_items: patch.discussion_items ?? current.discussion_items,
       decisions: patch.decisions ?? current.decisions,

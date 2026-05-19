@@ -29,7 +29,7 @@ function makeNumericOnly(separators: string) {
 const dateKeyFilter = makeNumericOnly("-");
 const timeKeyFilter = makeNumericOnly(":");
 import {
-  consumeJustCreatedMeetingId,
+  consumeJustCreatedMeetingUid,
   useMeeting,
   useMeetings,
   useUpdateMeeting,
@@ -280,7 +280,7 @@ export function MeetingForm({ meetingId, onBack }: Props) {
   // 방금 만든 메모면 title input 자동 focus + select all — 사용자가 default
   // 'memo' 위에 바로 타이핑하면 새 제목으로 교체.
   useEffect(() => {
-    if (consumeJustCreatedMeetingId(meetingId)) {
+    if (consumeJustCreatedMeetingUid(meetingId)) {
       // mount 직후 ref attach 되도록 microtask 한 tick 미룸
       requestAnimationFrame(() => {
         titleInputRef.current?.focus();
@@ -345,7 +345,7 @@ export function MeetingForm({ meetingId, onBack }: Props) {
     if (!data) return;
     if (!window.confirm("이 메모를 휴지통으로 옮길까요?")) return;
     try {
-      await deleteMutation.mutateAsync(data.id);
+      await deleteMutation.mutateAsync(data.uid);
       onBack();
     } catch (e) {
       setActionError(formatError(e));

@@ -79,7 +79,7 @@ export function MeetingsSidePanel({
         decisions: null,
         action_items: null,
       });
-      onSelect(created.id);
+      onSelect(created.uid);
     } catch (e) {
       setCreateError(formatError(e));
     }
@@ -148,10 +148,10 @@ export function MeetingsSidePanel({
           <ul className="p-2">
             {data.map((m) => (
               <MeetingItem
-                key={m.id}
+                key={m.uid}
                 meeting={m}
-                active={m.id === selectedId}
-                onClick={() => onSelect(m.id)}
+                active={m.uid === selectedId}
+                onClick={() => onSelect(m.uid)}
               />
             ))}
           </ul>
@@ -644,9 +644,9 @@ export function CalendarDayPanel({
             {/* Meetings */}
             {meetings.map((m) => (
               <button
-                key={m.id}
+                key={m.uid}
                 type="button"
-                onClick={() => onOpenMeeting(m.id)}
+                onClick={() => onOpenMeeting(m.uid)}
                 className="flex w-full items-start gap-2 rounded-md px-3 py-2 text-left transition"
                 style={{ minHeight: 0 }}
               >

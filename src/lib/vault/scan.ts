@@ -12,6 +12,7 @@ import { extractTodos, type TodoItem } from "./tasks";
 
 export interface MeetingMeta {
   id: string; // 메인 파일 path (e.g. "meetings/2026-05-16-팀-주간회의.md")
+  uid: string; // frontmatter 의 영구 id (uuid). path 변해도 그대로. cache key 의 진실.
   title: string;
   date: string | null;
   time: string | null;
@@ -149,6 +150,7 @@ export function fileToMeeting(
 
   return {
     id: filePath,
+    uid: fmString(fm.id) ?? "", // 빈 string 면 lazy migration (scanMeetings / getMeeting 가 발급).
     title: fmString(fm.title) ?? filePathToTitle(filePath),
     date: fmString(fm.date),
     time: fmString(fm.time),
@@ -193,6 +195,7 @@ export function fileToJournal(
 
 export function meetingToMainRaw(meeting: Meeting): string {
   const frontmatter: Record<string, unknown> = {
+    id: meeting.uid, // 옵시디안 community 표준 (obsidian-unique-identifiers 등) — frontmatter `id` 가 영구 식별자.
     title: meeting.title,
   };
   if (meeting.date) frontmatter.date = meeting.date;
@@ -351,12 +354,29 @@ export async function scanMeetings(adapter: VaultAdapter): Promise<MeetingMeta[]
     if (!path.endsWith(".md")) continue;
     if (isMeetingSidecar(path)) continue; // sidecar 는 scan 대상 X
     try {
-      const raw = await adapter.read(path);
-      const meta = await adapter.readMeta(path);
-      // meta-only — sidecar 안 읽어도 OK. fileToMeeting 으로 frontmatter 만 회수.
-      const m = fileToMeeting(path, raw, "", "", meta.mtime);
+      let raw = await adapter.read(path);
+      let meta = await adapter.readMeta(path);
+      let m = fileToMeeting(path, raw, "", "", meta.mtime);
+      // Lazy migration — 옛 V0.6 메모 (frontmatter id 없음) 처음 만나면 uuid 발급 + rewrite.
+      // 한 번만 발생. 옵시디안 community 표준 (frontmatter `id` 영구 식별자) 으로 통일.
+      if (m.uid === "") {
+        const uid = crypto.randomUUID();
+        const updated = { ...m, uid };
+        try {
+          const newRaw = meetingToMainRaw(updated);
+          const newMeta = await adapter.write(path, newRaw, meta.mtime);
+          raw = newRaw;
+          meta = newMeta;
+          m = fileToMeeting(path, raw, "", "", meta.mtime);
+        } catch {
+          // write 실패 시 (권한 / sync conflict) — 메모리 uid 만 채워서 list 표시.
+          // 다음 scan 또는 사용자 edit 시 다시 시도.
+          m = { ...m, uid };
+        }
+      }
       results.push({
         id: m.id,
+        uid: m.uid,
         title: m.title,
         date: m.date,
         time: m.time,

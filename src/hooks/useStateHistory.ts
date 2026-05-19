@@ -4,6 +4,8 @@ type CachedState<T> = { value: T; history: T[]; pointer: number };
 
 // Module-level cache shared across all useStateHistory instances.
 // Persists across component remounts so undo/redo survives navigation.
+// cacheKey 는 영구 uid 기반 (`${uid}:body` 등) — 같은 file path 를 다른 entity 가
+// 차지해도 uid 다름 → cache 침범 없음. cleanup 코드 burden 없음.
 const HISTORY_CACHE = new Map<string, CachedState<unknown>>();
 
 export type UseStateHistoryOptions<T> = {
