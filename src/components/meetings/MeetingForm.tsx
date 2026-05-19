@@ -9,6 +9,9 @@ import {
   Eye,
   Pencil,
   X,
+  Calendar as CalendarIcon,
+  Clock,
+  Users,
 } from "lucide-react";
 import {
   consumeJustCreatedMeetingId,
@@ -615,41 +618,59 @@ export function MeetingForm({ meetingId, onBack }: Props) {
           </div>
         </div>
 
-        {/* Metadata — 탭 아래로 (제목은 헤더, 탭은 헤더 바로 아래 sticky) */}
-        <div
-          className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm"
-          style={{ color: "var(--text-secondary)" }}
+        {/* Metadata — 탭 아래로 (제목은 헤더, 탭은 헤더 바로 아래 sticky).
+            Notion-style 정렬: 라벨 col 고정 width, 값 col 1fr — 시각 cohesion. */}
+        <dl
+          className="mt-5 grid items-start gap-x-3 gap-y-2 text-sm"
+          style={{ gridTemplateColumns: "4rem 1fr", color: "var(--text-secondary)" }}
         >
-          <label className="inline-flex items-center gap-1.5">
-            <span className="text-xs" style={{ color: "var(--text-muted)" }}>날짜</span>
+          <dt className="self-center text-xs" style={{ color: "var(--text-muted)" }}>
+            <span className="inline-flex items-center gap-1.5">
+              <CalendarIcon className="h-3.5 w-3.5" />
+              날짜
+            </span>
+          </dt>
+          <dd>
             <input
               type="date"
               value={meta.date}
               onChange={(e) => setMetaField("date", e.target.value)}
+              className="meta-input"
+              style={{ color: "var(--text-secondary)" }}
             />
-          </label>
-          <label className="inline-flex items-center gap-1.5">
-            <span className="text-xs" style={{ color: "var(--text-muted)" }}>시간</span>
+          </dd>
+
+          <dt className="self-center text-xs" style={{ color: "var(--text-muted)" }}>
+            <span className="inline-flex items-center gap-1.5">
+              <Clock className="h-3.5 w-3.5" />
+              시간
+            </span>
+          </dt>
+          <dd>
             <input
               type="time"
               value={meta.time}
               onChange={(e) => setMetaField("time", e.target.value)}
-              className="border-0 bg-transparent text-sm outline-none"
+              className="meta-input"
               style={{ color: "var(--text-secondary)" }}
             />
-          </label>
-          <div className="inline-flex items-center gap-1.5">
-            <span className="text-xs" style={{ color: "var(--text-muted)" }}>참석</span>
-            <div className="min-w-[12em]">
-              <AttendeeTagInput
-                value={meta.attendees}
-                onChange={(next) => setMetaField("attendees", next)}
-                suggestions={attendeeSuggestions}
-                placeholder="이름"
-              />
-            </div>
-          </div>
-        </div>
+          </dd>
+
+          <dt className="self-start pt-1.5 text-xs" style={{ color: "var(--text-muted)" }}>
+            <span className="inline-flex items-center gap-1.5">
+              <Users className="h-3.5 w-3.5" />
+              참석자
+            </span>
+          </dt>
+          <dd>
+            <AttendeeTagInput
+              value={meta.attendees}
+              onChange={(next) => setMetaField("attendees", next)}
+              suggestions={attendeeSuggestions}
+              placeholder="이름 입력 후 Enter"
+            />
+          </dd>
+        </dl>
 
         {/* Tab content wrapper — 탭이 상단 도달할 때까지 페이지 스크롤 가능하도록 minHeight 보장 */}
         <div className="mt-4" style={{ minHeight: "calc(100svh - 8rem)" }}>
