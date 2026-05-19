@@ -65,7 +65,7 @@ describe("meetingToMarkdown", () => {
       action_items: null,
     });
 
-    expect(md.startsWith("## 회의록")).toBe(true);
+    expect(md.startsWith("## 메모")).toBe(true);
     expect(md).toContain("일시: 2026.05.06 (수)");
     expect(md).not.toContain("참석:");
     expect(md).toContain("### 논의 사항");
