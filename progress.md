@@ -2,44 +2,37 @@
 
 다음 세션이 빠르게 파악할 수 있도록 짧게 유지.
 
-## 현재 상태 (2026-05-19 밤, V0.7.1 land 직후)
+## 현재 상태 (2026-05-20, PR #12 land 직후)
 
-**V0.7.1 vault hardening 완료** (PR #11). dogfood 중 발견한 메모 사라짐 추적 → 다섯 root cause 일괄 fix + frontmatter UUID id 도입 + Title-as-Filename 모델 전환. 이제 cache 침범 / partial write / event matching / mutation race 카테고리 모두 차단. **다음 세션 = 진입점 미정** — V0.7.x 후보 (Tauri 2 Mobile, 전체 재동기화 등) 또는 V0.6.1 robustness 후속 중 dogfood 결과로 결정.
+**메모장 키보드 흐름 + 너그러운 날짜·시간 입력** 완료 (PR #12, main `660b48a`). 14 feature commit + 2 fix commit. Tauri 데스크탑에서 메모 작성을 키보드만으로 끝낼 수 있게 단축키 정리 + LooseDate/Time 자유 형식 입력 + undo/redo 1-stack 통합. ESC 동작 확장 검토 중 발견한 두 회귀 (메타 input revert / 휴지통 V0.7.1 호환) 도 같은 PR 에 묶음.
 
-## 이번 세션에 한 일 (2026-05-19)
+**다음 세션 진입점 미정** — V0.7.x 후보 (Tauri 2 Mobile, 전체 재동기화 등) 또는 V0.6.1 robustness 후속 중 dogfood 결과로 결정.
 
-### PR #11 land — vault 데이터 손실 race 5종 + UUID identity 모델
+## 이번 세션에 한 일 (2026-05-20)
 
-8 commit, main 8a65e4a 머지. 카테고리 `backend`. portfolio 카드 다음 sync 때 자동 생성.
+### PR #12 land — 메모장 키보드 흐름 + 날짜·시간 파싱 넓히기
 
-다섯 root cause:
-1. **`adapter.write` 동시성** — 공유 `.tmp` 파일이 두 동시 write 가 race → 첫 rename 으로 tmp 소진 + 두 번째 remove 가 결과 파일 삭제 → 두 번째 rename ENOENT → 파일이 진짜 사라짐. per-path mutex + 고유 tmp 이름 (`${abs}.${random}.tmp`) 으로 차단.
-2. **`useUpdateMeeting` mutation race** — 병렬 mutation 의 closure 가 옛 id 들고 rename 후 stale ENOENT. React Query v5 `scope: { id: meeting:${uid} }` 직렬화 + mutationFn 의 effective id 재조회.
-3. **Enter→blur 중복 발사** — title input 의 Enter handler 가 `commitTitle()` + `blur()` 둘 다 호출 → onBlur 가 commitTitle 또 발사. Enter 에서 commitTitle 호출 제거, blur 만.
-4. **vault watcher event type 매칭** — Tauri v2 plugin-fs event `type` 이 object (`{create:{kind:"file"}}` 등) 인데 옛 `String(...)` 검사가 `"[object Object]"` 라 항상 실패 → 외부 변경 영영 반영 X. object key 분기 + metadata noise skip + macOS `.Trash` rename → deleted.
-5. **path collision 침범** — 옛 메모 삭제 후 새 메모가 같은 path 차지 시 `HISTORY_CACHE` 의 옛 entry 가 새 entity 에 침범. 처음엔 cleanup 코드로 막으려 했으나 silent failure burden 영구. → 옵시디안 community 표준 (`obsidian-unique-identifiers` plugin 패턴) 채택, frontmatter `id: <uuid>` 도입, 모든 client cache key 를 uid 기반으로.
+브랜치 `feat/keyboard-shortcuts-and-loose-datetime` 의 14 feature commit 검토 중 발견된 2 bug 를 추가 fix 한 후 머지. 카테고리 `ui_ux`.
 
-### 부수 변경 — Title-as-Filename 모델
+검토 중 발견·fix 한 2 bug:
 
-- 파일명 = `meetings/{title}.md` only. date 빠짐 (frontmatter optional). frontmatter title 도 제거 (파일명이 곧 title, 옵시디안 default).
-- 옛 모델의 모순 해소 — date 가 optional 인데 파일명엔 무조건 박혀있던 불일치.
-- title 변경 = pure disk rename → inode 유지 (옵시디안 모델 동일).
-- 충돌 자동 -2 안 함 → `TitleConflictError` throw → toast + ESC revert + focus 유지.
-- 금지문자 (`/ \ : * ? " < > | # ^ [ ]`) commit 시점 검사 → toast.
-- `slugify` 단순화 — 한글/공백 그대로, 위험문자만 치환.
+1. **ESC revert race** — LooseDate/Time + AttendeeTagInput 의 ESC 핸들러가 `setDraft(value)` (async) + `blur()` (sync) 호출 → `onBlur → commit()` 가 stale draft 클로저 읽고 수정값을 저장. ESC 가 blur 만 하고 revert 안 되던 회귀. ref flag (`skipCommitRef` / `skipBlurAddRef`) 로 다음 blur 의 commit 한 번 skip.
+2. **휴지통 V0.7.1 호환** — `listDeletedMeetings` + `restoreFromTrash` 가 옛 V0.6 date-prefix 패턴 강제. V0.7.1 title-as-filename 메모 삭제 시 휴지통에 안 나타나고 복원 시 vault 루트로 떨어지던 회귀. 순수 일기 패턴 (`YYYY-MM-DD.md`) 만 제외하도록 invert — legacy + V0.7.1 둘 다 메모로.
 
-### 의사결정 컨텍스트
-
-- **다른 AI 자문** — cleanup 코드 (path 기반 cache + delete/rename 시 청소) 는 silent failure 위험 영구 burden 으로 평가. 옵시디안 community 표준 + 데이터 손실 0 우선순위에서 UUID frontmatter 가 옳음.
-- **inode-기반 cache + in-place write** 대안은 iCloud daemon partial sync 위험과 정면 충돌 — V0.6 의 모바일 옵시디안 sync use case 와 양립 불가.
-- **TitleConflictError 자동 -2 안 함** — 사용자가 의도한 title 과 silently 다른 파일명 생성 회피. UX 의 정직성 우선.
+브랜치 본체 (다른 세션 작업) 의 핵심 변경:
+- Tauri 단축키 (Q/W/E single-key sub-tab + Cmd+N/Backspace/↑↓/1-4 페이지 등). 브라우저는 시스템 단축키 충돌로 skip.
+- `lib/dates.ts` 신규 — parseLooseDate/Time + 요일 단축 ("월" → 가장 가까운 그 요일).
+- undo/redo 1 stack docHistory — 본문/transcript/요약/meta 도큐먼트 timeline. 제목은 native input undo + rename 별도.
+- 본문 line gutter 클릭 줄 선택, GlobalTooltip wrap, 헤더 height 통일, breakpoint 640px 등 polish.
 
 ## 알아야 할 컨텍스트
 
 - **vault 모델 V0.7.1** — main meeting 의 frontmatter = `id: <uuid>` + `date` (optional) + `time` + `attendees` + `tags`. **frontmatter 에 title 없음**. 파일명 = `meetings/{title}.md`. 옛 V0.6 메모 (date prefix + frontmatter title) 는 lazy migration — 첫 read 시 uid 발급 + frontmatter rewrite.
 - **client cache key 통일** — React Query queryKey / `HISTORY_CACHE` / URL hash / hook signature 모두 uid 기반. `useUpdateMeeting(uid)` 가 mutationFn 시점에 list cache 의 path lookup.
 - **vault 위치**: `/Users/ham/Library/Mobile Documents/iCloud~md~obsidian/Documents/goodsoob/` (사용자 dogfood vault).
-- **현재 worktree 상태**: `goodsoob-work` (main repo, `feat/meetings-ux-polish` checkout — chip 작업 다른 세션), `goodsoob-work-ux` (`feat/keyboard-shortcuts-and-loose-datetime` — 단축키 + datetime 작업 다른 세션). 두 작업 모두 main 의 V0.7.1 변경과 conflict 가능 — merge 시 자연 처리.
+- **휴지통 필터 invert** (V0.7.1 후속): `listDeletedMeetings` (`src/api/meetings.ts:134`) + `restoreFromTrash` (`src/lib/vault/scan.ts:488`) 가 V0.6 date-prefix 강제 → 순수 일기 패턴만 제외하는 negative filter 로. 새 메모 카테고리 (예: 미래에 portfolio 가 trash 사용) 추가하면 이 자리도 같이 봐야 함.
+- **ESC race 패턴** — input 컴포넌트의 ESC 핸들러에서 `setDraft(value)` 후 `blur()` 호출 시 onBlur 가 stale draft commit 하는 race. ref flag (`skipCommitRef`) 로 다음 commit skip. 새 input 컴포넌트 만들 때 같은 패턴 의식.
+- **현재 worktree 상태**: `goodsoob-work` (main repo, `feat/meetings-ux-polish` — chip 작업 다른 세션), `goodsoob-work-ux` (방금 main 으로 복귀).
 
 ## V0.6.1 후속 (dogfood 와 병행)
 
@@ -48,9 +41,9 @@
 - [ ] iCloud `(conflicted copy)` 파일 무시 룰
 - [ ] vault 스캔 성능 실측 + frontmatter-only fast path
 - [ ] vault 폴더 사라짐 graceful
-- [ ] frontmatter parse 실패 graceful fallback (PR #11 후 추가) — YAML 깨졌을 때 빈 frontmatter + body 그대로 → 사이드바 표시 보장.
-- [ ] uid 중복 감지 + 후순위 재발급 (PR #11 후 추가)
-- [ ] 깨진 파일 사용자 alert — 사이드바 banner (PR #11 후 추가)
+- [ ] frontmatter parse 실패 graceful fallback — YAML 깨졌을 때 빈 frontmatter + body 그대로 → 사이드바 표시 보장.
+- [ ] uid 중복 감지 + 후순위 재발급
+- [ ] 깨진 파일 사용자 alert — 사이드바 banner
 
 ## 미해결
 
