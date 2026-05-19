@@ -126,11 +126,17 @@ export function useUpdateMeeting(id: string) {
   const { adapter, watcher } = useVault();
   const qc = useQueryClient();
   return useMutation({
+    // 같은 메모에 대한 mutation 을 직렬화. 한쪽 mutation 의 title rename 이
+    // 진행 중일 때 다른 patch 가 OLD id 로 race 걸려 데이터 손실되던 버그 차단.
+    scope: { id: `meeting:${id}` },
     mutationFn: async (patch: MeetingUpdate) => {
-      // rename 가능성 — 양쪽 path 다 markSelfWrite 해서 watcher 가 자기 변경 무시.
-      markMeetingSelfWrite(watcher, id);
-      const updated = await updateMeeting(adapter, id, patch);
-      if (updated.id !== id) {
+      // 이전 mutation 이 rename 했을 수 있음 → queryCache 에 갱신된 path 가 있으면
+      // 그쪽으로 retarget. closure 의 OLD id 만 쓰면 rename 후 ENOENT 떨어짐.
+      const latest = qc.getQueryData<Meeting>(meetingKey(id));
+      const effectiveId = latest?.id ?? id;
+      markMeetingSelfWrite(watcher, effectiveId);
+      const updated = await updateMeeting(adapter, effectiveId, patch);
+      if (updated.id !== effectiveId) {
         markMeetingSelfWrite(watcher, updated.id);
       }
       return updated;
@@ -138,31 +144,30 @@ export function useUpdateMeeting(id: string) {
     onMutate: async (patch) => {
       await qc.cancelQueries({ queryKey: meetingKey(id) });
       const prevDetail = qc.getQueryData<Meeting>(meetingKey(id));
-      const prevList = qc.getQueryData<Meeting[]>(meetingsKey);
       if (prevDetail) {
         qc.setQueryData(meetingKey(id), applyOptimisticPatch(prevDetail, patch));
       }
       qc.setQueryData<Meeting[]>(meetingsKey, (curr) =>
         curr?.map((m) => (m.id === id ? applyOptimisticPatch(m, patch) : m)),
       );
-      return { prevDetail, prevList };
+      return { prevDetail };
     },
     onError: (_err, _vars, ctx) => {
+      // prevList 복원하면 직전 succeed 한 sibling mutation 의 rename 을 덮어써
+      // list 가 stale OLD_id 가리키게 됨 (= 메모장 사라짐 버그). 대신 invalidate
+      // 로 디스크 재스캔 시켜 truth 회복.
       if (ctx?.prevDetail) qc.setQueryData(meetingKey(id), ctx.prevDetail);
-      if (ctx?.prevList) qc.setQueryData(meetingsKey, ctx.prevList);
+      qc.invalidateQueries({ queryKey: meetingsKey });
     },
     onSuccess: (updated) => {
       const newId = updated.id;
       if (newId !== id) {
         // 파일 rename — 옛 id + 새 id 둘 다 detail 셋 (UI 가 새 id 로 전환할 때까지
-        // 옛 id 도 valid 한 상태 유지 → 노트 선택 끊김 방지). list 도 옛 id 를 새 id 로 교체.
+        // 옛 id 도 valid 한 상태 유지 → 노트 선택 끊김 방지).
         // URL hash 갱신 → hashchange listener 가 selectedMeetingId 를 새 id 로 set.
         // 옛 detail query 는 다음 list refresh 때 GC 자연 처리.
         qc.setQueryData(meetingKey(id), updated);
         qc.setQueryData(meetingKey(newId), updated);
-        qc.setQueryData<Meeting[]>(meetingsKey, (prev) =>
-          prev?.map((m) => (m.id === id ? updated : m)),
-        );
         if (typeof window !== "undefined" && window.location.hash === `#meeting-${id}`) {
           // raw path 그대로 — encodeURIComponent 가 `/` 도 escape 해서 listener 가
           // slice 한 결과가 망가짐. App.tsx 의 readMeetingFromHash 는 raw path 받음.
@@ -170,10 +175,11 @@ export function useUpdateMeeting(id: string) {
         }
       } else {
         qc.setQueryData(meetingKey(id), updated);
-        qc.setQueryData<Meeting[]>(meetingsKey, (prev) =>
-          prev?.map((m) => (m.id === id ? updated : m)),
-        );
       }
+      // list 는 OLD id 또는 NEW id 어느 쪽으로도 들어있을 수 있음 (병렬 rename mutation 영향).
+      qc.setQueryData<Meeting[]>(meetingsKey, (prev) =>
+        prev?.map((m) => (m.id === id || m.id === newId ? updated : m)),
+      );
       qc.invalidateQueries({ queryKey: ["todos"] });
     },
   });
