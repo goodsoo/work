@@ -691,60 +691,6 @@ export function MeetingForm({ meetingId, onBack }: Props) {
           </div>
         </div>
 
-        {/* Metadata — 본문 textarea 의 gutter 패턴과 동일. icon col + divider + 라벨 + 값. */}
-        <div className="mt-4">
-          <MetaRow icon={<CalendarIcon className="h-3.5 w-3.5" />} label="날짜">
-            <input
-              type="text"
-              inputMode="numeric"
-              value={dateDraft}
-              onChange={(e) => setDateDraft(e.target.value)}
-              onBlur={commitDate}
-              onKeyDown={(e) => {
-                dateKeyFilter(e);
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  commitDate();
-                  (e.target as HTMLInputElement).blur();
-                }
-              }}
-              placeholder="YYYY-MM-DD"
-              className="meta-input flex-1"
-              maxLength={10}
-            />
-          </MetaRow>
-          <MetaRow icon={<Clock className="h-3.5 w-3.5" />} label="시간">
-            <input
-              type="text"
-              inputMode="numeric"
-              value={timeDraft}
-              onChange={(e) => setTimeDraft(e.target.value)}
-              onBlur={commitTime}
-              onKeyDown={(e) => {
-                timeKeyFilter(e);
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  commitTime();
-                  (e.target as HTMLInputElement).blur();
-                }
-              }}
-              placeholder="HH:MM"
-              className="meta-input flex-1"
-              maxLength={5}
-            />
-          </MetaRow>
-          <MetaRow icon={<Users className="h-3.5 w-3.5" />} label="참석자">
-            <div className="flex-1">
-              <AttendeeTagInput
-                value={attendeesDraft}
-                onChange={commitAttendees}
-                suggestions={attendeeSuggestions}
-                placeholder="이름 입력 후 Enter"
-              />
-            </div>
-          </MetaRow>
-        </div>
-
         {/* Tab content wrapper — 탭이 상단 도달할 때까지 페이지 스크롤 가능하도록 minHeight 보장 */}
         <div className="mt-4" style={{ minHeight: "calc(100svh - 8rem)" }}>
         {activeTab === "body" ? (
@@ -752,6 +698,64 @@ export function MeetingForm({ meetingId, onBack }: Props) {
             key={viewMode}
             style={{ animation: "meetingViewFade 140ms ease" }}
           >
+            {/* Metadata — 메모탭 안. 편집 모드 = MetaRow (icon + divider + input).
+                보기 모드 = plain text (icon/divider 없음, 빈 field 안 보임). */}
+            {viewMode === "edit" ? (
+              <div className="mb-4">
+                <MetaRow icon={<CalendarIcon className="h-3.5 w-3.5" />} label="날짜">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={dateDraft}
+                    onChange={(e) => setDateDraft(e.target.value)}
+                    onBlur={commitDate}
+                    onKeyDown={(e) => {
+                      dateKeyFilter(e);
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        commitDate();
+                        (e.target as HTMLInputElement).blur();
+                      }
+                    }}
+                    placeholder="YYYY-MM-DD"
+                    className="meta-input flex-1"
+                    maxLength={10}
+                  />
+                </MetaRow>
+                <MetaRow icon={<Clock className="h-3.5 w-3.5" />} label="시간">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={timeDraft}
+                    onChange={(e) => setTimeDraft(e.target.value)}
+                    onBlur={commitTime}
+                    onKeyDown={(e) => {
+                      timeKeyFilter(e);
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        commitTime();
+                        (e.target as HTMLInputElement).blur();
+                      }
+                    }}
+                    placeholder="HH:MM"
+                    className="meta-input flex-1"
+                    maxLength={5}
+                  />
+                </MetaRow>
+                <MetaRow icon={<Users className="h-3.5 w-3.5" />} label="참석자">
+                  <div className="flex-1">
+                    <AttendeeTagInput
+                      value={attendeesDraft}
+                      onChange={commitAttendees}
+                      suggestions={attendeeSuggestions}
+                      placeholder="이름 입력 후 Enter"
+                    />
+                  </div>
+                </MetaRow>
+              </div>
+            ) : (
+              <MetaReadOnly meta={initialMeta} />
+            )}
             {viewMode === "edit" ? (
               <SourceBodyEditor
                 key={`${meetingId}:body`}
@@ -909,6 +913,36 @@ function MetaRow({
         {children}
       </div>
     </div>
+  );
+}
+
+// 보기 모드용 meta — icon/divider 없는 plain text. 빈 field 안 보임.
+function MetaReadOnly({ meta }: { meta: MetaDoc }) {
+  const rows: { label: string; value: string }[] = [];
+  if (meta.date) rows.push({ label: "날짜", value: meta.date });
+  if (meta.time) rows.push({ label: "시간", value: meta.time });
+  if (meta.attendees) rows.push({ label: "참석자", value: meta.attendees });
+  if (rows.length === 0) return null;
+  return (
+    <dl
+      className="mb-4 grid items-baseline gap-x-3 gap-y-0.5 text-sm"
+      style={{ gridTemplateColumns: "auto 1fr" }}
+    >
+      {rows.map((r) => (
+        <FragmentRow key={r.label} label={r.label} value={r.value} />
+      ))}
+    </dl>
+  );
+}
+
+function FragmentRow({ label, value }: { label: string; value: string }) {
+  return (
+    <>
+      <dt style={{ color: "var(--text-muted)", paddingLeft: "0.5rem" }}>
+        {label}
+      </dt>
+      <dd style={{ color: "var(--text-primary)" }}>{value}</dd>
+    </>
   );
 }
 
