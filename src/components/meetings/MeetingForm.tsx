@@ -320,6 +320,23 @@ export function MeetingForm({ meetingId, onBack }: Props) {
     }
   }, [meetingId]);
 
+  // ESC: 활성 input/textarea/contenteditable 의 focus 제거. 제목/날짜/시간/참석자는
+  // 각자 onKeyDown 의 Esc 핸들러가 먼저 발동해 draft → 이전값 revert + 자체 blur.
+  // 본문/음성 기록 textarea 는 값 유지 + 여기서 blur 만.
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key !== "Escape") return;
+      const a = document.activeElement as HTMLElement | null;
+      if (!a) return;
+      const tag = a.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || a.isContentEditable) {
+        a.blur();
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
   // 단축키 (Tauri only):
   //   Cmd/Ctrl+Z/Y/Shift+Z = docHistory undo/redo (전체 도큐먼트 timeline. 제목 제외).
   //     focus 가 제목 input 이면 native input undo 사용 (preventDefault X).

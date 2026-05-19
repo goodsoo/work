@@ -79,7 +79,12 @@ export function AttendeeTagInput({
       setOpen(true);
       setHighlight((h) => (h - 1 + filtered.length) % filtered.length);
     } else if (e.key === "Escape") {
+      e.preventDefault();
       setOpen(false);
+      // typing 중인 새 tag draft 폐기 (onBlur 의 addTag 도 막힘) + blur.
+      // 이미 commit 된 tags (= value) 는 그대로 유지.
+      setDraft("");
+      inputRef.current?.blur();
     }
   }
 
