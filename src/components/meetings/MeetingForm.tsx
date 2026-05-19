@@ -917,6 +917,7 @@ function MetaRow({
 }
 
 // 보기 모드용 meta — icon/divider 없는 plain text. 빈 field 안 보임.
+// 편집 모드 MetaRow 와 같은 line height (1.625rem) + 라벨 위치 (gutter 1.75rem + paddingLeft 0.5rem).
 function MetaReadOnly({ meta }: { meta: MetaDoc }) {
   const rows: { label: string; value: string }[] = [];
   if (meta.date) rows.push({ label: "날짜", value: meta.date });
@@ -924,25 +925,23 @@ function MetaReadOnly({ meta }: { meta: MetaDoc }) {
   if (meta.attendees) rows.push({ label: "참석자", value: meta.attendees });
   if (rows.length === 0) return null;
   return (
-    <dl
-      className="mb-4 grid items-baseline gap-x-3 gap-y-0.5 text-sm"
-      style={{ gridTemplateColumns: "auto 1fr" }}
-    >
+    <div className="mb-4 text-sm">
       {rows.map((r) => (
-        <FragmentRow key={r.label} label={r.label} value={r.value} />
+        <div
+          key={r.label}
+          className="flex items-center gap-3"
+          style={{ minHeight: "1.625rem", paddingLeft: "2.25rem" }}
+        >
+          <span
+            className="shrink-0"
+            style={{ color: "var(--text-muted)", width: "3.5rem" }}
+          >
+            {r.label}
+          </span>
+          <span style={{ color: "var(--text-primary)" }}>{r.value}</span>
+        </div>
       ))}
-    </dl>
-  );
-}
-
-function FragmentRow({ label, value }: { label: string; value: string }) {
-  return (
-    <>
-      <dt style={{ color: "var(--text-muted)", paddingLeft: "0.5rem" }}>
-        {label}
-      </dt>
-      <dd style={{ color: "var(--text-primary)" }}>{value}</dd>
-    </>
+    </div>
   );
 }
 
