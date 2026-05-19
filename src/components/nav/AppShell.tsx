@@ -87,7 +87,7 @@ export function AppShell({
       style={{ paddingTop: "var(--safe-top)", backgroundColor: "var(--bg-base)" }}
     >
       {/* Desktop: Side Panel (상단 탭 row + sidePanel + 하단 테마 토글) */}
-      <div className="hidden lg:fixed lg:inset-y-0 lg:left-0 lg:z-20 lg:flex">
+      <div className="hidden lg:fixed lg:inset-y-0 lg:left-0 lg:z-30 lg:flex">
         {hasSidePanel ? (
           <div
             className="relative"
@@ -258,7 +258,7 @@ function SidePanelResizer({
       onMouseDown={startDrag}
       onDoubleClick={onDoubleClick}
       title="드래그하여 너비 조절 (더블클릭 = 기본값)"
-      className="group absolute inset-y-0 -right-1 z-10 w-2 cursor-col-resize"
+      className="group absolute inset-y-0 -right-1 z-30 w-2 cursor-col-resize"
     >
       <div
         className="ml-auto h-full transition"

@@ -9,6 +9,10 @@
     "Segoe UI", Roboto, sans-serif;
   --font-serif: "Pretendard Variable", "Pretendard", Georgia, serif;
   --font-mono: ui-monospace, "SF Mono", "Menlo", Consolas, monospace;
+
+  /* desktop 3-pane layout trigger. 기본 lg=1024px 보다 일찍 들어가도록 640px 로
+     낮춤. 코드의 `lg:` 유틸리티 + raw @media (min-width: ...) 모두 이 값 기준. */
+  --breakpoint-lg: 640px;
 }
 
 @layer base {
@@ -91,7 +95,7 @@
     --focus-ring: #60a5fa;
   }
 
-  @media (min-width: 1024px) {
+  @media (min-width: 640px) {
     :root {
       --app-header-h: 0px;
     }
@@ -118,7 +122,7 @@
   }
 
   /* Desktop: body scroll 막고 main 안에서만 scroll — viewport 전체 scrollbar 회피 */
-  @media (min-width: 1024px) {
+  @media (min-width: 640px) {
     html, body {
       height: 100%;
       overflow: hidden;
