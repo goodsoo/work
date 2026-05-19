@@ -741,7 +741,7 @@ export function MeetingForm({ meetingId, onBack }: Props) {
               <div className="mb-4">
                 <MetaRow
                   icon={<CalendarIcon className="h-3.5 w-3.5" />}
-                  iconTitle="허용 형식: YYYY-MM-DD · 5/19 · 5.19 · 5월 19일 · 2026/5/19 · 오늘 · 내일 · 어제 · 모레 · 그제"
+                  iconTitle="허용 형식: YYYY-MM-DD · 5/19 · 5.19 · 5월 19일 · 2026/5/19 · 오늘 · 내일 · 어제 · 모레 · 그제 · 월/화/수… (가장 최근 그 요일)"
                   label="날짜"
                 >
                   <LooseDateInput

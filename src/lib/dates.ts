@@ -113,6 +113,23 @@ export function parseLooseDate(
   if (s === "모레") return addDaysIso(refIso, 2);
   if (s === "그제" || s === "그저께") return addDaysIso(refIso, -2);
 
+  // 요일 단축: 오늘 포함 가장 최근 (과거 방향) 의 해당 요일.
+  // Sun=0, Mon=1, ..., Sat=6 (Date.getDay 기준).
+  const wdays = ["일", "월", "화", "수", "목", "금", "토"];
+  const wIdx = wdays.indexOf(s);
+  if (wIdx !== -1) {
+    const todayIdx = reference.getDay();
+    const diff = (todayIdx - wIdx + 7) % 7;
+    return addDaysIso(refIso, -diff);
+  }
+  // "월요일" 같은 풀 한글도 동일 처리.
+  if (/^[일월화수목금토]요일$/.test(s)) {
+    const wIdx2 = wdays.indexOf(s.charAt(0));
+    const todayIdx = reference.getDay();
+    const diff = (todayIdx - wIdx2 + 7) % 7;
+    return addDaysIso(refIso, -diff);
+  }
+
   // 압축 yyyymmdd 또는 yymmdd
   if (/^\d{8}$/.test(s)) {
     const y = parseInt(s.slice(0, 4), 10);
