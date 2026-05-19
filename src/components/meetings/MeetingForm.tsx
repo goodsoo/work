@@ -538,6 +538,12 @@ export function MeetingForm({ meetingId, onBack }: Props) {
               label="본문"
               shortcut={isTauri ? "⌘+] 다음 · ⌘+[ 이전 · ⌘+E 편집/보기" : undefined}
               badge={viewMode === "edit" ? "편집" : "보기"}
+              badgeTitle={
+                viewMode === "edit" ? "보기 모드로 전환" : "편집 모드로 전환"
+              }
+              onBadgeClick={() =>
+                setViewMode(viewMode === "edit" ? "view" : "edit")
+              }
               active={activeTab === "body"}
               onClick={() => setActiveTab("body")}
             />
@@ -730,12 +736,16 @@ function TabBtn({
   label,
   shortcut,
   badge,
+  onBadgeClick,
+  badgeTitle,
   active,
   onClick,
 }: {
   label: string;
   shortcut?: string;
   badge?: string | null;
+  onBadgeClick?: () => void;
+  badgeTitle?: string;
   active: boolean;
   onClick: () => void;
 }) {
@@ -760,11 +770,34 @@ function TabBtn({
       <span>{label}</span>
       {badge ? (
         <span
+          role={onBadgeClick ? "button" : undefined}
+          tabIndex={onBadgeClick ? 0 : undefined}
+          title={badgeTitle}
+          onClick={
+            onBadgeClick
+              ? (e) => {
+                  e.stopPropagation();
+                  onBadgeClick();
+                }
+              : undefined
+          }
+          onKeyDown={
+            onBadgeClick
+              ? (e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onBadgeClick();
+                  }
+                }
+              : undefined
+          }
           className="rounded-md px-1.5 py-0.5 text-xs"
           style={{
             backgroundColor: "var(--bg-surface-hover)",
             color: "var(--text-secondary)",
             fontWeight: 400,
+            cursor: onBadgeClick ? "pointer" : undefined,
           }}
         >
           {badge}
