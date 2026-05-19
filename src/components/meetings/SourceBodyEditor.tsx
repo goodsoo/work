@@ -119,7 +119,7 @@ export function SourceBodyEditor({ content, onChange }: Props) {
   }, [draft]);
 
   return (
-    <div className="flex" style={{ minHeight: "60svh" }}>
+    <div className="flex">
       <div
         className="select-none"
         style={{

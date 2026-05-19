@@ -692,8 +692,8 @@ export function MeetingForm({ meetingId, onBack }: Props) {
           </div>
         </div>
 
-        {/* Tab content wrapper — 탭이 상단 도달할 때까지 페이지 스크롤 가능하도록 minHeight 보장 */}
-        <div className="mt-4" style={{ minHeight: "calc(100svh - 8rem)" }}>
+        {/* Tab content wrapper — 빈 메모일 땐 스크롤 없음, 내용 늘면 자연 scroll */}
+        <div className="mt-4">
         {activeTab === "body" ? (
           <div
             key={viewMode}
