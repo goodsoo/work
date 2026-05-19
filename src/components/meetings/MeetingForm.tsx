@@ -536,7 +536,6 @@ export function MeetingForm({ meetingId, onBack }: Props) {
           <div className="flex gap-1">
             <TabBtn
               label="본문"
-              shortcut={isTauri ? "⌘ + ] 다음 · ⌘ + [ 이전" : undefined}
               badge={viewMode === "edit" ? "편집" : "보기"}
               badgeTitle={
                 isTauri
@@ -553,13 +552,11 @@ export function MeetingForm({ meetingId, onBack }: Props) {
             />
             <TabBtn
               label="회의 내용"
-              shortcut={isTauri ? "⌘ + ] 다음 · ⌘ + [ 이전" : undefined}
               active={activeTab === "transcript"}
               onClick={() => setActiveTab("transcript")}
             />
             <TabBtn
               label="요약"
-              shortcut={isTauri ? "⌘ + ] 다음 · ⌘ + [ 이전" : undefined}
               active={activeTab === "summary"}
               onClick={() => setActiveTab("summary")}
             />

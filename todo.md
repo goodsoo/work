@@ -89,6 +89,10 @@
   - 결정사항: 메모 선택 시 자동 drawer 닫기, BottomTab 변경 시 자동 닫기, 햄버거 = 토글 (✕ 로 변경 X), drawer 가 헤더 + BottomTabs 까지 dim 으로 덮을지는 구현 직전 결정. v1 에서 swipe-from-edge 열기 미구현.
   - 자세한 기획: `progress.md` 참조.
 
+## 🟡 UX 후보
+
+- [ ] **단축키 cheatsheet 모달** (옵시디안 패턴). `?` 같은 단축키로 모달 띄움 — 페이지 탭 (Cmd+1/2/3/4) / 메모 sub-tab (Cmd+[/]) / 편집-보기 토글 (Cmd+E) / undo (Cmd+Z) 등 모든 단축키 한 곳에. sub-tab tooltip 에서 단축키 표시는 이미 제거된 상태 (`MeetingForm.tsx` TabBtn). 모달 진입점 (`?` 키 또는 우상단 keyboard 아이콘) + 모달 본체 (디자인 토큰 기반).
+
 ## 🟡 디자인 / UI 폴리싱 (남은 작업)
 
 - [ ] **에러 상태 패딩 통일**. p-3 / p-4 혼재.
