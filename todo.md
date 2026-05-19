@@ -67,6 +67,7 @@
 - [ ] **"GitHub 에서 사라진 카드 식별" 도구** — 본인 클릭 시 "이 카드 PR 이 GitHub 에 없습니다. 보관/휴지통/무시?" 선택. 자동 삭제 절대 X.
 - [ ] **portfolio 진단 console.log 제거** — `syncPortfolio` 안 `[syncPortfolio]` log. dogfood 안정화 후.
 - [ ] **commit cluster 카드 모델** (Plan B) — owner repo PR 워크플로 전환 부담 크면 → branch 단위 cluster + AI 입력 commit messages.
+- [ ] **PR body 이미지 자동 import → screenshots frontmatter**. sync 가 PR body 의 `<img src>` / `![](url)` 패턴 추출 → URL fetch → `_attachments/{slug}/before-N.png` 다운로드 → screenshots 자동 채움. 본인이 dropzone 으로 박은 거 있으면 보존. dogfood 가치: 매 PR 마다 카드 dropzone 으로 두 번 더 박는 수고 제거. private repo URL 은 gh auth token 활용. PR #9 (`feat(nav): SidePanel 상단 탭`) 부터 적용되면 첫 효과 확인.
 
 ## 🟡 V0.7 다른 후보 (V0.7 dogfood 후 진입)
 
