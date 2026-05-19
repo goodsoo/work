@@ -540,10 +540,10 @@ export function MeetingForm({ meetingId, onBack }: Props) {
               badge={viewMode === "edit" ? "편집" : "보기"}
               badgeTitle={
                 isTauri
-                  ? `${viewMode === "edit" ? "보기 모드로 전환" : "편집 모드로 전환"}  ⌘ + E`
+                  ? `${viewMode === "edit" ? "보기 모드" : "편집 모드"}  ⌘ + E`
                   : viewMode === "edit"
-                    ? "보기 모드로 전환"
-                    : "편집 모드로 전환"
+                    ? "보기 모드"
+                    : "편집 모드"
               }
               onBadgeClick={() =>
                 setViewMode(viewMode === "edit" ? "view" : "edit")
