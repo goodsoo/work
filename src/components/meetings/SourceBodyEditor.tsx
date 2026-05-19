@@ -156,7 +156,7 @@ export function SourceBodyEditor({ content, onChange }: Props) {
           paddingLeft: "0.5rem",
           paddingBottom: "1rem", // 가로 scrollbar 가 마지막 줄 위에 겹치지 않게 여유
           overflowY: "hidden",
-          overscrollBehavior: "none", // 좌우 elastic bounce 제거
+          overscrollBehaviorX: "none", // 좌우만 bounce 제거 — y 는 부모 scroll 로 propagate
         }}
         wrap="off"
       />
