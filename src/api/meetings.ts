@@ -107,7 +107,7 @@ export async function listDeletedMeetings(
   adapter: VaultAdapter,
 ): Promise<Meeting[]> {
   const trashed = await scanTrash(adapter);
-  // 회의록 메인 파일만 (sidecar 는 메인과 같은 stamp 로 함께 trash 되어 있지만 보여줄 필요 X)
+  // 메모 메인 파일만 (sidecar 는 메인과 같은 stamp 로 함께 trash 되어 있지만 보여줄 필요 X)
   const meetings: Meeting[] = [];
   for (const { id, deletedAt } of trashed) {
     if (isMeetingSidecar(id)) continue; // sidecar 는 별도로 보여주지 않음

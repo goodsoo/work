@@ -1,4 +1,4 @@
-// Claude 등 외부 AI 에 회의록 요약 요청할 프롬프트 생성.
+// Claude 등 외부 AI 에 메모 요약 요청할 프롬프트 생성.
 
 export interface PromptInput {
   title?: string | null;
@@ -15,7 +15,7 @@ function attendeesToString(v: PromptInput["attendees"]): string {
   return v;
 }
 
-const PROMPT_HEADER = `다음 회의록을 정리해주세요.
+const PROMPT_HEADER = `다음 메모를 정리해주세요.
 
 ## 출력 형식
 \`\`\`
@@ -30,7 +30,7 @@ const PROMPT_HEADER = `다음 회의록을 정리해주세요.
 - [담당자] 할 일 — 기한
 \`\`\`
 
-규칙: 본문에 있는 정보를 우선하고, 회의 내용(transcript)은 디테일 보조. 충돌 시 본문 우선. 빈 섹션은 생략.`;
+규칙: 메모에 있는 정보를 우선하고, 음성 기록(transcript)은 디테일 보조. 충돌 시 메모 우선. 빈 섹션은 생략.`;
 
 export function buildClaudePrompt(input: PromptInput): string {
   const parts: string[] = [PROMPT_HEADER];
@@ -47,13 +47,13 @@ export function buildClaudePrompt(input: PromptInput): string {
 
   const content = (input.content ?? "").trim();
   if (content) {
-    parts.push("## 본문");
+    parts.push("## 메모");
     parts.push(content);
   }
 
   const transcript = (input.transcript ?? "").trim();
   if (transcript) {
-    parts.push("## 회의 내용");
+    parts.push("## 음성 기록");
     parts.push(transcript);
   }
 

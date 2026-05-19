@@ -32,7 +32,7 @@ function nonEmptyList(items: string[] | null | undefined): string[] {
 export function meetingToMarkdown(meeting: MeetingMarkdownInput): string {
   const parts: string[] = [];
 
-  const title = isNonEmpty(meeting.title) ? meeting.title.trim() : "회의록";
+  const title = isNonEmpty(meeting.title) ? meeting.title.trim() : "메모";
   parts.push(`## ${title}`);
 
   const meta: string[] = [];

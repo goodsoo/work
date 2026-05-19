@@ -219,7 +219,7 @@ export function MeetingForm({ meetingId, onBack }: Props) {
 
   // 단축키 (Tauri only):
   //   Cmd/Ctrl+Z/Y/Shift+Z = 활성 탭 stack 의 undo/redo
-  //   Cmd+[ / Cmd+] = sub-tab 좌/우 cycling (본문 ↔ 회의 내용 ↔ 요약)
+  //   Cmd+[ / Cmd+] = sub-tab 좌/우 cycling (메모 ↔ 음성 기록 ↔ 요약)
   //   Cmd+E = 본문 탭일 때 편집/보기 토글 (옵시디안 패턴)
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -240,7 +240,7 @@ export function MeetingForm({ meetingId, onBack }: Props) {
         return;
       }
       if (!isTauri) return;
-      // Cmd+E — 본문 탭일 때만 편집/보기 토글. 다른 탭이면 무시 (textarea 통과).
+      // Cmd+E — 메모 탭일 때만 편집/보기 토글. 다른 탭이면 무시 (textarea 통과).
       if (cmd && !e.shiftKey && !e.altKey && k === "e") {
         if (activeTab !== "body") return;
         e.preventDefault();
@@ -375,7 +375,7 @@ export function MeetingForm({ meetingId, onBack }: Props) {
               type="button"
               onClick={activeHistory.undo}
               disabled={!activeHistory.canUndo}
-              title={`실행 취소 (${activeTab === "body" ? "본문" : activeTab === "transcript" ? "회의 내용" : "요약"})`}
+              title={`실행 취소 (${activeTab === "body" ? "메모" : activeTab === "transcript" ? "음성 기록" : "요약"})`}
               className="px-1.5 py-1 transition disabled:opacity-20"
               style={{ color: "var(--text-secondary)", minHeight: 0 }}
             >
@@ -385,7 +385,7 @@ export function MeetingForm({ meetingId, onBack }: Props) {
               type="button"
               onClick={activeHistory.redo}
               disabled={!activeHistory.canRedo}
-              title={`다시 실행 (${activeTab === "body" ? "본문" : activeTab === "transcript" ? "회의 내용" : "요약"})`}
+              title={`다시 실행 (${activeTab === "body" ? "메모" : activeTab === "transcript" ? "음성 기록" : "요약"})`}
               className="px-1.5 py-1 transition disabled:opacity-20"
               style={{ color: "var(--text-secondary)", borderLeft: "1px solid var(--border-subtle)", minHeight: 0 }}
             >
@@ -535,7 +535,7 @@ export function MeetingForm({ meetingId, onBack }: Props) {
         >
           <div className="flex gap-1">
             <TabBtn
-              label="본문"
+              label="메모"
               badge={viewMode === "edit" ? "편집" : "보기"}
               badgeTitle={
                 isTauri
@@ -551,7 +551,7 @@ export function MeetingForm({ meetingId, onBack }: Props) {
               onClick={() => setActiveTab("body")}
             />
             <TabBtn
-              label="회의 내용"
+              label="음성 기록"
               active={activeTab === "transcript"}
               onClick={() => setActiveTab("transcript")}
             />
@@ -654,7 +654,7 @@ export function MeetingForm({ meetingId, onBack }: Props) {
                 (body ?? "").trim().length === 0 &&
                 (transcript ?? "").trim().length === 0
               }
-              title="본문과 회의 내용을 묶어 Claude 프롬프트로 복사"
+              title="메모와 음성 기록을 묶어 Claude 프롬프트로 복사"
               onError={setActionError}
             />
             {hasAnySummary ? (
@@ -721,7 +721,7 @@ export function MeetingForm({ meetingId, onBack }: Props) {
               </div>
             ) : (
               <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-                본문이나 회의 내용을 적은 뒤 위 버튼을 눌러 AI 요약을 만들어요.
+                메모나 음성 기록을 적은 뒤 위 버튼을 눌러 AI 요약을 만들어요.
               </p>
             )}
           </div>
@@ -866,7 +866,7 @@ function TranscriptArea({
       <textarea
         value={transcript}
         onChange={(e) => onChange(e.target.value)}
-        placeholder="회의 녹음의 텍스트 변환 결과를 여기에..."
+        placeholder="음성 녹음의 텍스트 변환 결과를 여기에..."
         className="w-full resize-none bg-transparent text-base leading-relaxed outline-none"
         style={{
           color: "var(--text-primary)",
