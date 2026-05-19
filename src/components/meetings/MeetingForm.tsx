@@ -366,12 +366,6 @@ export function MeetingForm({ meetingId, onBack }: Props) {
   const hasAnySummary =
     summary.discussion_items.length + summary.decisions.length + summary.action_items.length > 0;
 
-  const anyPendingEdit =
-    bodyHistory.canUndo ||
-    transcriptHistory.canUndo ||
-    summaryHistory.canUndo ||
-    metaHistory.canUndo;
-
   const meetingForCopy = {
     title: meta.title || null,
     date: meta.date || null,
@@ -435,7 +429,6 @@ export function MeetingForm({ meetingId, onBack }: Props) {
           <SaveIndicator
             isPending={updateMutation.isPending}
             isError={updateMutation.isError}
-            hasPendingEdit={anyPendingEdit && !updateMutation.isPending && !updateMutation.isError}
             onRetry={retrySave}
           />
         </div>
@@ -1003,40 +996,32 @@ function useDebouncedPending(isPending: boolean, delayMs = 200): boolean {
 function SaveIndicator({
   isPending,
   isError,
-  hasPendingEdit,
   onRetry,
 }: {
   isPending: boolean;
   isError: boolean;
-  hasPendingEdit: boolean;
   onRetry: () => void;
 }) {
   const showSpinner = useDebouncedPending(isPending);
 
-  // 상태 결정: error > spinner > wait (hasPendingEdit) > success (idle)
-  const state: "error" | "spinner" | "wait" | "success" = isError
+  // 상태 결정: error > spinner > success (idle 및 typing 직후 모두)
+  const state: "error" | "spinner" | "success" = isError
     ? "error"
     : showSpinner
       ? "spinner"
-      : hasPendingEdit
-        ? "wait"
-        : "success";
+      : "success";
 
   const dotColor =
     state === "error"
       ? "var(--accent-red)"
-      : state === "success"
-        ? "var(--accent-green)"
-        : "var(--text-muted)";
+      : "var(--accent-green)";
 
   const title =
     state === "error"
       ? "저장 실패 — 재시도"
       : state === "spinner"
         ? "저장 중"
-        : state === "wait"
-          ? "저장 대기 중"
-          : "저장됨";
+        : "저장됨";
 
   const inner = (
     <span
