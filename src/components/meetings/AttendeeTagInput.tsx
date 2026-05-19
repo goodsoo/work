@@ -126,8 +126,8 @@ export function AttendeeTagInput({
           }}
           onKeyDown={onKeyDown}
           placeholder={tags.length === 0 ? placeholder ?? "이름 입력 후 Enter" : ""}
-          className="min-w-[6em] flex-1 bg-transparent px-1 py-0.5 text-sm outline-none"
-          style={{ color: "var(--text-primary)", minHeight: 0 }}
+          className="min-w-[6em] flex-1 bg-transparent text-sm outline-none"
+          style={{ color: "var(--text-primary)", minHeight: 0, padding: 0 }}
         />
       </div>
       {open && filtered.length > 0 ? (
