@@ -27,6 +27,16 @@ const meetingsKey = ["meetings"] as const;
 const deletedMeetingsKey = ["meetings", "deleted"] as const;
 const meetingKey = (id: string) => ["meetings", id] as const;
 
+// 새 메모 직후 자동 focus 용 1회성 flag. useCreateMeeting 가 set, MeetingForm 가 consume.
+let _justCreatedMeetingId: string | null = null;
+export function consumeJustCreatedMeetingId(id: string): boolean {
+  if (_justCreatedMeetingId === id) {
+    _justCreatedMeetingId = null;
+    return true;
+  }
+  return false;
+}
+
 // patch 형식 (string | null | array) 을 Meeting 의 정규 type 으로 변환.
 // onMutate 가 `{...prev, ...patch}` 그대로 spread 하면 attendees 가 "alice, bob"
 // 같은 string 으로 덮여서 data.attendees.join() 호출 시 TypeError. title/date 등
@@ -99,6 +109,7 @@ export function useCreateMeeting() {
     mutationFn: async (input: MeetingInsert) => {
       const created = await createMeeting(adapter, input);
       markMeetingSelfWrite(watcher, created.id);
+      _justCreatedMeetingId = created.id;
       return created;
     },
     onSuccess: (created) => {

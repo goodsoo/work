@@ -26,8 +26,16 @@ const GUTTER_WIDTH = "1.75rem";
 
 export function SourceBodyEditor({ content, onChange }: Props) {
   const [draft, setDraft] = useState(content);
+  const [caretLine, setCaretLine] = useState<number | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const skipNextValueSyncRef = useRef(true);
+
+  function updateCaretLine() {
+    const el = textareaRef.current;
+    if (!el) return;
+    const pos = el.selectionStart ?? 0;
+    setCaretLine(el.value.slice(0, pos).split("\n").length - 1);
+  }
 
   useEffect(() => {
     if (skipNextValueSyncRef.current) {
@@ -122,7 +130,7 @@ export function SourceBodyEditor({ content, onChange }: Props) {
         aria-hidden
       >
         {lineKinds.map((kind, i) => (
-          <GutterMarker key={i} kind={kind} />
+          <GutterMarker key={i} kind={kind} active={i === caretLine} />
         ))}
       </div>
       <textarea
@@ -132,8 +140,14 @@ export function SourceBodyEditor({ content, onChange }: Props) {
           skipNextValueSyncRef.current = true;
           setDraft(e.target.value);
           onChange(e.target.value);
+          updateCaretLine();
         }}
-        placeholder="내용을 입력하세요..."
+        onSelect={updateCaretLine}
+        onKeyUp={updateCaretLine}
+        onClick={updateCaretLine}
+        onFocus={updateCaretLine}
+        onBlur={() => setCaretLine(null)}
+        placeholder="메모 내용을 적어주세요..."
         className="flex-1 resize-none bg-transparent text-base outline-none"
         style={{
           color: "var(--text-primary)",
@@ -148,7 +162,13 @@ export function SourceBodyEditor({ content, onChange }: Props) {
   );
 }
 
-function GutterMarker({ kind }: { kind: LineKind }) {
+function GutterMarker({
+  kind,
+  active,
+}: {
+  kind: LineKind;
+  active: boolean;
+}) {
   const label = labelForKind(kind);
   const depth =
     "depth" in kind && typeof kind.depth === "number" ? kind.depth : 0;
@@ -163,6 +183,8 @@ function GutterMarker({ kind }: { kind: LineKind }) {
         height: LINE_HEIGHT,
         lineHeight: LINE_HEIGHT,
         opacity: isContinuation ? 0.4 : 1,
+        backgroundColor: active ? "var(--bg-surface-hover)" : undefined,
+        color: active ? "var(--text-primary)" : undefined,
       }}
     >
       <span

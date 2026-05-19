@@ -181,4 +181,10 @@
   .animate-page-in {
     animation: fade-in 0.15s ease-out;
   }
+
+  /* 메모 편집↔보기 토글 fade — 짧고 가벼움 */
+  @keyframes meetingViewFade {
+    from { opacity: 0.35; }
+    to { opacity: 1; }
+  }
 }

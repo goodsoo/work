@@ -11,6 +11,7 @@ import {
   X,
 } from "lucide-react";
 import {
+  consumeJustCreatedMeetingId,
   useMeeting,
   useMeetings,
   useUpdateMeeting,
@@ -82,8 +83,10 @@ function summaryToPatch(s: SummaryDoc): MeetingUpdate {
 }
 
 function metaToPatch(m: MetaDoc): MeetingUpdate {
+  const trimmedTitle = m.title.trim();
   return {
-    title: m.title.trim() || null,
+    // 빈 title 은 patch 제외 — 빈 제목 commit 회피. onBlur 가 input value 도 reset.
+    title: trimmedTitle === "" ? undefined : trimmedTitle,
     date: m.date || null,
     time: m.time.trim() || null,
     attendees: m.attendees.trim() || null,
@@ -173,6 +176,7 @@ export function MeetingForm({ meetingId, onBack }: Props) {
   const meta = metaHistory.value;
 
   const [actionError, setActionError] = useState<string | null>(null);
+  const titleInputRef = useRef<HTMLInputElement>(null);
   const [activeTab, setActiveTabState] = useState<ActiveTab>(
     () => ACTIVE_TAB_CACHE.get(meetingId) ?? "body",
   );
@@ -206,6 +210,18 @@ export function MeetingForm({ meetingId, onBack }: Props) {
   // 메모 전환 시 그 메모의 마지막 탭으로 (cache miss 면 본문).
   useEffect(() => {
     setActiveTabState(ACTIVE_TAB_CACHE.get(meetingId) ?? "body");
+  }, [meetingId]);
+
+  // 방금 만든 메모면 title input 자동 focus + select all — 사용자가 default
+  // 'memo' 위에 바로 타이핑하면 새 제목으로 교체.
+  useEffect(() => {
+    if (consumeJustCreatedMeetingId(meetingId)) {
+      // mount 직후 ref attach 되도록 microtask 한 tick 미룸
+      requestAnimationFrame(() => {
+        titleInputRef.current?.focus();
+        titleInputRef.current?.select();
+      });
+    }
   }, [meetingId]);
 
   // 활성 탭의 history (단축키 + 상단 undo/redo 버튼 대상).
@@ -478,9 +494,15 @@ export function MeetingForm({ meetingId, onBack }: Props) {
       <div className="mx-auto max-w-3xl px-6 pb-24 pt-8">
         {/* Title — large, Notion-style */}
         <input
+          ref={titleInputRef}
           type="text"
           value={meta.title}
           onChange={(e) => setMetaField("title", e.target.value)}
+          onBlur={() => {
+            if (meta.title.trim() === "" && data?.title) {
+              setMetaField("title", data.title);
+            }
+          }}
           placeholder="제목 없음"
           autoFocus={!data.title}
           className="w-full bg-transparent text-3xl font-bold outline-none"
@@ -503,11 +525,10 @@ export function MeetingForm({ meetingId, onBack }: Props) {
           <label className="inline-flex items-center gap-1.5">
             <span className="text-xs" style={{ color: "var(--text-muted)" }}>시간</span>
             <input
-              type="text"
+              type="time"
               value={meta.time}
               onChange={(e) => setMetaField("time", e.target.value)}
-              placeholder="14:00"
-              className="w-20 border-0 bg-transparent text-sm outline-none"
+              className="border-0 bg-transparent text-sm outline-none"
               style={{ color: "var(--text-secondary)" }}
             />
           </label>
@@ -544,8 +565,10 @@ export function MeetingForm({ meetingId, onBack }: Props) {
                     ? "보기 모드"
                     : "편집 모드"
               }
-              onBadgeClick={() =>
-                setViewMode(viewMode === "edit" ? "view" : "edit")
+              onBadgeClick={
+                activeTab === "body"
+                  ? () => setViewMode(viewMode === "edit" ? "view" : "edit")
+                  : undefined
               }
               active={activeTab === "body"}
               onClick={() => setActiveTab("body")}
@@ -562,6 +585,19 @@ export function MeetingForm({ meetingId, onBack }: Props) {
             />
           </div>
           <div className="flex items-center gap-1.5 pb-1">
+            {activeTab === "body" && body.length > 0 ? (
+              <span
+                className="text-xs"
+                style={{ color: "var(--text-muted)" }}
+              >
+                {body.length}자
+              </span>
+            ) : null}
+            <AutoSaveIndicator
+              isPending={updateMutation.isPending}
+              isSuccess={updateMutation.isSuccess}
+              isError={updateMutation.isError}
+            />
             {activeTab === "body" ? (
               <button
                 type="button"
@@ -611,7 +647,10 @@ export function MeetingForm({ meetingId, onBack }: Props) {
         {/* Tab content wrapper — 탭이 상단 도달할 때까지 페이지 스크롤 가능하도록 minHeight 보장 */}
         <div className="mt-4" style={{ minHeight: "calc(100svh - 8rem)" }}>
         {activeTab === "body" ? (
-          <div>
+          <div
+            key={viewMode}
+            style={{ animation: "meetingViewFade 140ms ease" }}
+          >
             {viewMode === "edit" ? (
               <SourceBodyEditor
                 key={`${meetingId}:body`}
@@ -805,6 +844,30 @@ function TabBtn({
         </span>
       ) : null}
     </button>
+  );
+}
+
+function AutoSaveIndicator({
+  isPending,
+  isSuccess,
+  isError,
+}: {
+  isPending: boolean;
+  isSuccess: boolean;
+  isError: boolean;
+}) {
+  let label: string | null = null;
+  let color = "var(--text-muted)";
+  if (isPending) label = "저장 중…";
+  else if (isError) {
+    label = "저장 실패";
+    color = "var(--accent-red-text)";
+  } else if (isSuccess) label = "저장됨";
+  if (!label) return null;
+  return (
+    <span className="text-xs" style={{ color }} aria-live="polite">
+      {label}
+    </span>
   );
 }
 

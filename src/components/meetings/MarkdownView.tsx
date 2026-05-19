@@ -9,7 +9,7 @@ export function MarkdownView({ content }: Props) {
   if (!content.trim()) {
     return (
       <p style={{ color: "var(--text-muted)" }} className="text-sm">
-        본문이 비어있어요. 편집으로 전환해서 적어보세요.
+        메모가 비어있어요. 편집으로 전환해서 적어보세요.
       </p>
     );
   }
