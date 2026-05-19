@@ -14,18 +14,6 @@ import {
   Users,
 } from "lucide-react";
 
-function pad2(n: number): string {
-  return n.toString().padStart(2, "0");
-}
-function formatNowDate(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
-}
-function formatNowTime(): string {
-  const d = new Date();
-  return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
-}
-
 // 숫자 + 지정 separator 만 허용 (cmd/ctrl 단축키 + 화살표/backspace/delete/Enter 통과).
 function makeNumericOnly(separators: string) {
   return (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -205,9 +193,6 @@ export function MeetingForm({ meetingId, onBack }: Props) {
 
   const [actionError, setActionError] = useState<string | null>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
-  // placeholder 는 mount 시 1회 — 매 분 갱신은 over-engineering.
-  const datePlaceholder = useMemo(() => formatNowDate(), []);
-  const timePlaceholder = useMemo(() => formatNowTime(), []);
   const [activeTab, setActiveTabState] = useState<ActiveTab>(
     () => ACTIVE_TAB_CACHE.get(meetingId) ?? "body",
   );
@@ -464,7 +449,7 @@ export function MeetingForm({ meetingId, onBack }: Props) {
               setMetaField("title", "untitled");
             }
           }}
-          placeholder="제목을 입력해주세요"
+          placeholder="untitled"
           autoFocus={!data.title}
           className="min-w-0 flex-1 bg-transparent text-center text-base font-semibold outline-none"
           style={{ color: "var(--text-primary)" }}
@@ -655,7 +640,7 @@ export function MeetingForm({ meetingId, onBack }: Props) {
               value={meta.date}
               onChange={(e) => setMetaField("date", e.target.value)}
               onKeyDown={dateKeyFilter}
-              placeholder={datePlaceholder}
+              placeholder="YYYY-MM-DD"
               className="meta-input flex-1"
               maxLength={10}
             />
@@ -667,7 +652,7 @@ export function MeetingForm({ meetingId, onBack }: Props) {
               value={meta.time}
               onChange={(e) => setMetaField("time", e.target.value)}
               onKeyDown={timeKeyFilter}
-              placeholder={timePlaceholder}
+              placeholder="HH:MM"
               className="meta-input flex-1"
               maxLength={5}
             />
