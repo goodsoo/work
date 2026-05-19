@@ -91,6 +91,7 @@
 
 ## 🟡 UX 후보
 
+- [ ] **휴지통 자동 선택 + 미리보기 + 복원**. 휴지통 진입 시 첫 항목 자동 선택 + 메모 미리보기 (read-only). 비어있으면 placeholder ("휴지통이 비어있어요"). 휴지통 빠져나오면 기존에 선택돼 있던 메모로 복원. DeletedMeetingsList + 미리보기 컴포넌트 + App.tsx selection 복원 로직.
 - [ ] **단축키 cheatsheet 모달** (옵시디안 패턴). `?` 같은 단축키로 모달 띄움 — 페이지 탭 (Cmd+1/2/3/4) / 메모 sub-tab (Cmd+[/]) / 편집-보기 토글 (Cmd+E) / undo (Cmd+Z) 등 모든 단축키 한 곳에. sub-tab tooltip 에서 단축키 표시는 이미 제거된 상태 (`MeetingForm.tsx` TabBtn). 모달 진입점 (`?` 키 또는 우상단 keyboard 아이콘) + 모달 본체 (디자인 토큰 기반).
 
 ## 🟡 디자인 / UI 폴리싱 (남은 작업)
