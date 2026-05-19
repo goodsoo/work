@@ -287,7 +287,10 @@ function TopTabsRow({
   return (
     <nav
       className="flex shrink-0 items-stretch"
-      style={{ borderBottom: "1px solid var(--border-default)" }}
+      style={{
+        height: "3.5rem", // 본문 sticky 헤더와 통일
+        borderBottom: "1px solid var(--border-default)",
+      }}
       aria-label="primary"
     >
       {TABS.map(({ id, label, icon: Icon }, i) => {
@@ -301,7 +304,7 @@ function TopTabsRow({
             aria-current={active ? "page" : undefined}
             title={title}
             aria-label={label}
-            className="flex flex-1 items-center justify-center py-2.5 transition"
+            className="flex flex-1 items-center justify-center transition"
             style={{
               borderBottom: active
                 ? "2px solid var(--btn-primary)"
