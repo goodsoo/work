@@ -1010,52 +1010,83 @@ function SaveIndicator({
   hasPendingEdit: boolean;
   onRetry: () => void;
 }) {
-  const showPending = useDebouncedPending(isPending);
+  const showSpinner = useDebouncedPending(isPending);
 
-  if (isError) {
+  // 상태 결정: error > spinner > wait (hasPendingEdit) > success (idle)
+  const state: "error" | "spinner" | "wait" | "success" = isError
+    ? "error"
+    : showSpinner
+      ? "spinner"
+      : hasPendingEdit
+        ? "wait"
+        : "success";
+
+  const dotColor =
+    state === "error"
+      ? "var(--accent-red)"
+      : state === "success"
+        ? "var(--accent-green)"
+        : "var(--text-muted)";
+
+  const title =
+    state === "error"
+      ? "저장 실패 — 재시도"
+      : state === "spinner"
+        ? "저장 중"
+        : state === "wait"
+          ? "저장 대기 중"
+          : "저장됨";
+
+  const inner = (
+    <span
+      className="relative inline-flex items-center justify-center"
+      style={{ width: "0.875rem", height: "0.875rem" }}
+    >
+      {/* spinner — pending 일 때만 fade-in */}
+      <Loader2
+        className="absolute inset-0 h-3.5 w-3.5 animate-spin"
+        style={{
+          color: "var(--text-muted)",
+          opacity: state === "spinner" ? 1 : 0,
+          transition: "opacity 180ms ease",
+        }}
+      />
+      {/* dot — error / success / wait */}
+      <span
+        className="absolute rounded-full"
+        style={{
+          width: "0.5rem",
+          height: "0.5rem",
+          backgroundColor: dotColor,
+          opacity: state === "spinner" ? 0 : 1,
+          transform: state === "spinner" ? "scale(0.6)" : "scale(1)",
+          transition: "opacity 180ms ease, background-color 180ms ease, transform 180ms ease",
+        }}
+      />
+    </span>
+  );
+
+  if (state === "error") {
     return (
       <button
         type="button"
         onClick={onRetry}
-        title="저장 실패 — 재시도"
-        aria-label="저장 실패 — 재시도"
-        className="rounded p-1 transition"
-        style={{ color: "var(--accent-red)", minHeight: 0 }}
+        title={title}
+        aria-label={title}
+        className="rounded p-1"
+        style={{ minHeight: 0 }}
       >
-        <AlertCircle className="h-3.5 w-3.5" />
+        {inner}
       </button>
     );
   }
-  if (showPending) {
-    return (
-      <span
-        title="저장 중"
-        aria-label="저장 중"
-        className="inline-flex items-center p-1"
-        style={{ color: "var(--text-muted)" }}
-      >
-        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-      </span>
-    );
-  }
-  if (hasPendingEdit) {
-    // 저장 대기 (debounce 안) — 작은 dot 만으로 미세 신호
-    return (
-      <span
-        title="저장 대기 중"
-        aria-label="저장 대기 중"
-        className="inline-flex items-center justify-center p-1"
-      >
-        <span
-          className="block rounded-full"
-          style={{
-            width: "0.375rem",
-            height: "0.375rem",
-            backgroundColor: "var(--text-muted)",
-          }}
-        />
-      </span>
-    );
-  }
-  return null;
+  return (
+    <span
+      title={title}
+      aria-label={title}
+      className="inline-flex items-center p-1"
+    >
+      {inner}
+    </span>
+  );
 }
