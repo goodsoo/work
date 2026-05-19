@@ -100,6 +100,9 @@
   html {
     -webkit-text-size-adjust: 100%;
     -webkit-tap-highlight-color: transparent;
+    /* macOS WebKit elastic scroll (rubber band) 제거 — page 전체 bounce 차단.
+       본문 영역 자체 scroll container 는 영향 X. */
+    overscroll-behavior: none;
   }
 
   body {
@@ -109,6 +112,7 @@
     font-feature-settings: "ss10";
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    overscroll-behavior: none;
   }
 
   .font-serif {
