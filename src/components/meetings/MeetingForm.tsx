@@ -621,16 +621,20 @@ export function MeetingForm({ meetingId, onBack }: Props) {
         <div className="mt-4">
           <MetaRow icon={<CalendarIcon className="h-3.5 w-3.5" />} label="날짜">
             <input
-              type="date"
+              type="text"
               value={meta.date}
               onChange={(e) => setMetaField("date", e.target.value)}
+              placeholder="2026-05-19"
               className="meta-input"
+              style={{ width: "7rem" }}
             />
             <input
-              type="time"
+              type="text"
               value={meta.time}
               onChange={(e) => setMetaField("time", e.target.value)}
+              placeholder="14:00"
               className="meta-input"
+              style={{ width: "4rem" }}
             />
           </MetaRow>
           <MetaRow icon={<Users className="h-3.5 w-3.5" />} label="참석자">

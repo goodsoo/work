@@ -192,8 +192,8 @@
     to { opacity: 1; }
   }
 
-  /* 메모 meta 영역 input — 옵시디안 properties 스타일.
-     WebKit date/time 의 inner padding/spinner/inset 박스 다 제거. */
+  /* 메모 meta 영역 input — 옵시디안 properties 스타일 plain text.
+     WebKit type=date/time 의 강제 native UI 박스 회피 위해 type=text 사용. */
   .meta-input {
     appearance: none;
     -webkit-appearance: none;
@@ -207,30 +207,8 @@
     color: var(--text-primary);
     font-family: inherit;
     min-width: 0;
-    position: relative;
   }
-  .meta-input::-webkit-datetime-edit { padding: 0; }
-  .meta-input::-webkit-datetime-edit-fields-wrapper { padding: 0; }
-  .meta-input::-webkit-datetime-edit-text { padding: 0 0.15em; }
-  .meta-input::-webkit-datetime-edit-month-field,
-  .meta-input::-webkit-datetime-edit-day-field,
-  .meta-input::-webkit-datetime-edit-year-field,
-  .meta-input::-webkit-datetime-edit-hour-field,
-  .meta-input::-webkit-datetime-edit-minute-field {
-    padding: 0;
-    color: inherit;
-  }
-  .meta-input::-webkit-inner-spin-button,
-  .meta-input::-webkit-clear-button { display: none; }
-  /* date / time native picker indicator (작은 ▼ 화살표) 숨김 — input 전체 click 시 열림 */
-  .meta-input::-webkit-calendar-picker-indicator {
-    opacity: 0;
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    cursor: pointer;
-  }
+  .meta-input::placeholder { color: var(--text-muted); }
 
   /* meta row focus-within 강조 — 옵시디안 properties 의 row hover 패턴 */
   .meta-row {
