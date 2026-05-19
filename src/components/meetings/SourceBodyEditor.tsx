@@ -155,10 +155,8 @@ export function SourceBodyEditor({ content, onChange }: Props) {
           padding: 0,
           paddingLeft: "0.5rem",
           overflowY: "hidden",
-          // wrap="off" 제거 → 긴 줄 자연 줄넘김. gutter marker 는 source line
-          // 첫 visual line 옆에만 위치 (옵시디안 line number 패턴).
-          wordBreak: "break-word",
         }}
+        wrap="off"
       />
     </div>
   );
