@@ -366,6 +366,14 @@ export function MeetingForm({ meetingId, onBack }: Props) {
   const hasAnySummary =
     summary.discussion_items.length + summary.decisions.length + summary.action_items.length > 0;
 
+  // 미저장 변경 여부 — memory state vs query data (optimistic update 후엔 sync).
+  // typing 직후 ~ commit timer (1초) 까진 true, optimistic update 시점에 false.
+  const hasUnsavedChange =
+    body !== initialBody ||
+    transcript !== initialTranscript ||
+    !summariesEqual(summary, initialSummary) ||
+    !metasEqual(meta, initialMeta);
+
   const meetingForCopy = {
     title: meta.title || null,
     date: meta.date || null,
@@ -427,7 +435,7 @@ export function MeetingForm({ meetingId, onBack }: Props) {
             </button>
           </div>
           <SaveIndicator
-            isPending={updateMutation.isPending}
+            isPending={updateMutation.isPending || hasUnsavedChange}
             isError={updateMutation.isError}
             onRetry={retrySave}
           />
@@ -979,20 +987,6 @@ function TranscriptArea({
   );
 }
 
-// pending 이 200ms 이상 지속될 때만 visible — 빠른 mutation 의 깜빡임 회피.
-function useDebouncedPending(isPending: boolean, delayMs = 200): boolean {
-  const [visible, setVisible] = useState(false);
-  useEffect(() => {
-    if (!isPending) {
-      setVisible(false);
-      return;
-    }
-    const t = setTimeout(() => setVisible(true), delayMs);
-    return () => clearTimeout(t);
-  }, [isPending, delayMs]);
-  return visible;
-}
-
 function SaveIndicator({
   isPending,
   isError,
@@ -1002,12 +996,11 @@ function SaveIndicator({
   isError: boolean;
   onRetry: () => void;
 }) {
-  const showSpinner = useDebouncedPending(isPending);
-
-  // 상태 결정: error > spinner > success (idle 및 typing 직후 모두)
+  // isPending 은 호출자에서 (mutation isPending OR hasUnsavedChange) 로 옴.
+  // typing 시점부터 spinner — 깜빡임 회피 위해 debounce 없음.
   const state: "error" | "spinner" | "success" = isError
     ? "error"
-    : showSpinner
+    : isPending
       ? "spinner"
       : "success";
 
