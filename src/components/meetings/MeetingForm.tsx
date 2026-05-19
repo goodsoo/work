@@ -41,6 +41,7 @@ import { useCreateTodo } from "../../hooks/useTodos";
 import type { MeetingUpdate } from "../../api/meetings";
 import { ClipPromptButton } from "../common/ClipPromptButton";
 import { buildClaudePrompt } from "../../lib/clipboardPrompt";
+import { parseAttendees } from "../../lib/attendees";
 import { CopyButton } from "./CopyButton";
 import { EditableList } from "./EditableList";
 import { AttendeeTagInput } from "./AttendeeTagInput";
@@ -90,6 +91,20 @@ function metasEqual(a: MetaDoc, b: MetaDoc): boolean {
     a.time === b.time &&
     a.attendees === b.attendees
   );
+}
+
+// hasUnsavedChange 용 — disk roundtrip 후 형식 차이 (예: 'alice,bob' vs 'alice, bob') 무시.
+function metasEqualNormalized(a: MetaDoc, b: MetaDoc): boolean {
+  return (
+    a.title === b.title &&
+    a.date === b.date &&
+    a.time === b.time &&
+    arraysEqual(parseAttendees(a.attendees), parseAttendees(b.attendees))
+  );
+}
+
+function trimNewlines(s: string): string {
+  return s.replace(/^\n+/, "").replace(/\n+$/, "");
 }
 
 function summaryToPatch(s: SummaryDoc): MeetingUpdate {
@@ -368,11 +383,13 @@ export function MeetingForm({ meetingId, onBack }: Props) {
 
   // 미저장 변경 여부 — memory state vs query data (optimistic update 후엔 sync).
   // typing 직후 ~ commit timer (1초) 까진 true, optimistic update 시점에 false.
+  // body/transcript 는 disk write 시 앞뒤 newline trim 되므로 비교도 normalize.
+  // attendees 는 textarea string vs disk-roundtrip 의 ", " join 차이 회피 위해 parseAttendees 로 array 비교.
   const hasUnsavedChange =
-    body !== initialBody ||
-    transcript !== initialTranscript ||
+    trimNewlines(body) !== trimNewlines(initialBody) ||
+    trimNewlines(transcript) !== trimNewlines(initialTranscript) ||
     !summariesEqual(summary, initialSummary) ||
-    !metasEqual(meta, initialMeta);
+    !metasEqualNormalized(meta, initialMeta);
 
   const meetingForCopy = {
     title: meta.title || null,
