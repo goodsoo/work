@@ -175,7 +175,7 @@ export function AppShell({ activeTab, onTabChange, sidePanel, children }: Props)
             ["--gs-main-pl" as string]: mainPaddingLeft,
           } as React.CSSProperties
         }
-        className="animate-page-in lg:!pb-0 lg:h-screen lg:overflow-y-auto lg:[padding-left:var(--gs-main-pl)]"
+        className="animate-page-in lg:!pb-0 lg:h-screen lg:overflow-y-auto lg:overscroll-none lg:[padding-left:var(--gs-main-pl)]"
       >
         {children}
       </main>

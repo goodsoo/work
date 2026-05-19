@@ -641,7 +641,7 @@ export function MeetingForm({ meetingId, onBack }: Props) {
 
       {/* Full-page editor — desktop 에선 자체 scroll container (header 옆 scrollbar 회피).
           outer = full-width scroll, inner = max-w content. */}
-      <div className="lg:flex-1 lg:overflow-y-auto">
+      <div className="lg:flex-1 lg:overflow-y-auto lg:overscroll-none">
         <div className="mx-auto max-w-3xl px-6 pb-24">
         {/* Tab nav — 헤더 바로 아래에 sticky. 헤더 (3.5rem) 와 시각적으로 연결. */}
         <div
