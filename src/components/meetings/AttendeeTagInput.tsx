@@ -86,11 +86,7 @@ export function AttendeeTagInput({
   return (
     <div className="relative">
       <div
-        className="flex flex-wrap items-center gap-1 rounded-lg px-2 py-1.5 transition"
-        style={{
-          border: "1px solid var(--border-default)",
-          backgroundColor: "var(--bg-base)",
-        }}
+        className="flex flex-wrap items-center gap-1"
         onClick={() => inputRef.current?.focus()}
       >
         {tags.map((tag, i) => (

@@ -192,22 +192,15 @@
     to { opacity: 1; }
   }
 
-  /* 메모 meta 영역 input — native UI 정리, focus 시 미세 강조 */
+  /* 메모 meta 영역 input — 본문 textarea 와 같은 plain 톤.
+     native border/bg 제거, caret 만 (background 강조 X). */
   .meta-input {
     border: 0;
     background-color: transparent;
     outline: none;
-    padding: 0.25rem 0.5rem;
-    border-radius: 0.375rem;
-    font-size: 0.875rem;
-    line-height: 1.25rem;
-    transition: background-color 120ms ease;
-  }
-  .meta-input:hover {
-    background-color: var(--bg-surface-hover);
-  }
-  .meta-input:focus {
-    background-color: var(--bg-surface-hover);
-    box-shadow: 0 0 0 1px var(--border-default);
+    padding: 0;
+    font-size: 1rem;
+    line-height: 1.625rem;
+    color: var(--text-primary);
   }
 }
