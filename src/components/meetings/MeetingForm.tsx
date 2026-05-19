@@ -930,7 +930,7 @@ function MetaReadOnly({ meta }: { meta: MetaDoc }) {
         <div
           key={r.label}
           className="flex items-center gap-3"
-          style={{ minHeight: "1.625rem", paddingLeft: "2.25rem" }}
+          style={{ minHeight: "1.625rem" }}
         >
           <span
             className="shrink-0"
