@@ -619,7 +619,7 @@ export function MeetingForm({ meetingId, onBack }: Props) {
 
         {/* Metadata — 본문 textarea 의 gutter 패턴과 동일. icon col + divider + 라벨 + 값. */}
         <div className="mt-4">
-          <MetaRow icon={<CalendarIcon className="h-3.5 w-3.5" />} label="일시">
+          <MetaRow icon={<CalendarIcon className="h-3.5 w-3.5" />} label="날짜">
             <input
               type="date"
               value={meta.date}

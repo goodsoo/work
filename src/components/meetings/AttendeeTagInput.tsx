@@ -92,11 +92,8 @@ export function AttendeeTagInput({
         {tags.map((tag, i) => (
           <span
             key={`${tag}-${i}`}
-            className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-sm"
-            style={{
-              backgroundColor: "var(--bg-surface)",
-              color: "var(--text-primary)",
-            }}
+            className="inline-flex items-center gap-0.5 pr-2"
+            style={{ color: "var(--text-primary)" }}
           >
             {tag}
             <button
@@ -107,7 +104,7 @@ export function AttendeeTagInput({
               }}
               aria-label={`${tag} 제거`}
               className="rounded transition"
-              style={{ color: "var(--text-muted)", minHeight: 16, minWidth: 16 }}
+              style={{ color: "var(--text-muted)", minHeight: 14, minWidth: 14 }}
             >
               <X className="h-3 w-3" />
             </button>

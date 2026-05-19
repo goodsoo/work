@@ -193,8 +193,10 @@
   }
 
   /* 메모 meta 영역 input — 본문 textarea 와 같은 plain 톤.
-     native border/bg 제거, caret 만 (background 강조 X). */
+     옵시디안 properties 스타일: native UI (border/bg/spin) 제거, plain inline text. */
   .meta-input {
+    appearance: none;
+    -webkit-appearance: none;
     border: 0;
     background-color: transparent;
     outline: none;
@@ -202,5 +204,15 @@
     font-size: 1rem;
     line-height: 1.625rem;
     color: var(--text-primary);
+    font-family: inherit;
+  }
+  /* date / time native picker indicator (작은 ▼ 화살표) 숨김 — 클릭 영역은 유지 */
+  .meta-input::-webkit-calendar-picker-indicator {
+    opacity: 0;
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    cursor: pointer;
   }
 }
