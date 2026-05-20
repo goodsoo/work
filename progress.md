@@ -2,57 +2,66 @@
 
 다음 세션이 빠르게 파악할 수 있도록 짧게 유지.
 
-## 현재 상태 (2026-05-20, PR #14 land 직후)
+## 현재 상태 (2026-05-20, PR #14 land + dogfood 후 todo.md 재구조화)
 
-**휴지통 overlay 도입** 완료 (PR #14, main `e62ad30`). 메모장 사이드패널 footer 🗑️ → 중앙 overlay 모달 + 좌측 list (stamp prefix 잘려 원본 제목만) + 우측 본문 미리보기. 영구삭제 + 휴지통 비우기 ConfirmDialog 일관. 삭제 시각 `yyyy.mm.dd(요일) hh:mm`. 카테고리 `ui_ux`.
+**휴지통 overlay 도입** 완료 (PR #14, main `e62ad30`). 그 후 dogfood 1 세션 진행 → 13 항목 발견 → todo.md 를 PR 단위 21개로 재구조화 + done.md 신설 (`accbc8a`).
 
-**다음 세션 진입점**: `.auto-select-fix.md` (untracked) — trash-cleanup 작업 중 발견한 메모장 자동선택 버그. 별 PR 로 분리. 새 branch `fix/meetings-auto-select` 셋업해서 진행.
+**다음 세션 진입점**: `.auto-select-fix.md` (untracked) — trash-cleanup 작업 중 발견한 메모장 자동선택 버그. fix 코드는 작성됨 + revert 됨 + 별 PR 대기. 새 worktree (`fix/meetings-auto-select`) 셋업해서 가장 먼저 land.
+
+그 다음 잡고 갈 PR 후보 (사용자가 선호하는 순서):
+1. 빠른 polish — toast overflow / radial wipe / undo 변경 탭 전환
+2. 마크다운 typing UX — Tab/Enter 자동연장/URL paste/smart dashes/빈영역 클릭
+3. 큰 신규 — 루틴 또는 Tauri 헤더 통합 (둘 다 단독 PR 크기)
 
 ## 이번 세션에 한 일 (2026-05-20)
 
-### PR #14 land — 휴지통 overlay + 본문 미리보기 + 비우기
+### dogfood 13개 항목 검토 + todo.md PR 단위 재구조화
 
-브랜치 `feat/trash-cleanup`, 카테고리 `ui_ux`. 머지 후 worktree + 로컬/원격 branch 정리 필요.
+사용자 dogfood 발견 항목 (제목 그대로):
+- 투두 매일 하는 할일 / 에러 박스 overflow / undo·redo 통합 / 체크박스+코드블록 / 자동 선택 / line gutter 이어짐 / 텍스트 색상 / `---` 한 줄 / Opt+QWE / 테마 전환 애니 / 헤더 디자인 / 시간 키워드 / textarea 빈영역 클릭
 
-핵심 변경:
+각 항목 깊게 분석 + 옵션 비교 + 사용자 결정 받음. 핵심 결정 사항:
 
-- **휴지통 overlay (`TrashModal.tsx`)** — 사이드패널 footer 🗑️ → 중앙 z-50 모달. SettingsModal 과 같은 패턴 (좌측 aside + 우측 section + ESC/백드롭 닫기). max-w-5xl × min(640px, 85vh). 사이드패널 view 모드 (list ↔ trash) 폐기 → App.tsx 의 state stash·restore 흐름 통째 제거.
-- **stamp prefix 표시 계층에서 strip** — 디스크 표현 (`.trash/{stamp}-{base}.md`) 유지. 사이드바 row 렌더 시점에 정규식 `^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-` 잘라 표시명만 사용. scanTrash 가 이미 deletedAt 분리 반환.
-- **본문 미리보기 (`TrashPreview.tsx`)** — read-only. 제목 + meta (date/time/attendees) + 본문 + 회의 내용 + 요약 callouts. 모달 우측 panel 로 mount.
-- **ConfirmDialog 컴포넌트** — `src/components/ConfirmDialog.tsx`. 영구삭제 + 휴지통 비우기 둘 다. ESC = 취소, Enter = 확인, 바깥 클릭 = 취소. cancel 에 default focus (실수 방지). 디자인 토큰 + danger 모드 (accent-red). 기존 native `window.confirm` 대체.
-- **휴지통 비우기 (`emptyTrash` + `useEmptyTrash`)** — `.trash/` 의 메인 메모 + sidecar 모두 영구 삭제. sequential `purgeMeeting` 호출 + 잔여 cleanup. aside header 의 메모 count 옆 빨간 `비우기` 버튼.
-- **삭제 시각 포맷 (`formatDateTimeKo`)** — `2026.05.17(일) 14:09`. 같은 분 안 여러 삭제 구별 가능. sidebar row + TrashPreview 헤더 (앞에 우상단 "휴지통 미리보기" 배지 있어서 본문 meta 에서는 빼고 sidebar 만).
-- **자동선택 fix 분리** — trash-cleanup 작업 중 메모장 첫 메모 자동선택 안 되는 버그 발견 (hash marker 가 selectedMeetingId 로 set 되어 effect 가 fallback skip). 진단 + fix 완료했지만 trash 와 무관해서 `.auto-select-fix.md` 에 작업 내용 저장 + App.tsx 부분 revert. 다음 세션에서 별 PR.
+- **루틴 (매일 할일)** — `routines/` 폴더 + 1 routine = 1 md 파일 + Obsidian Tasks 호환 라인 이력 누적 + ActivityBar 새 탭 + 12주 heatmap. todos / journals 와 분리.
+- **line gutter "이어짐" 표시** — opacity 폐기 → SVG **dotted vertical (┊) + dotted corner**. inferLineKind 에 다음 줄 look-ahead 추가. 사용자가 점선 corner 선호 명시 (solid ╰ 거부).
+- **테마 전환 애니** — (c) cascade stagger 가 아니라 **(d) radial wipe from toggle**. View Transitions API + clip-path. macOS 시스템 다크모드 토글과 동일 패턴. ~15줄.
+- **Tauri 윈도우 헤더** — α (ActivityBar 헤더 흡수) + β (배경 통일) 결합 = **γ**. 본문 +48px + 무경계.
+- **단축키 cheatsheet 모달** — `?` 키 진입점 별도 추가 X (PR #13 의 설정 모달 단축키 섹션으로 가치 달성). todo 에서 제거.
+- **메타 undo/redo** — 메타 3 field (date/time/attendees) 는 PR #12 `b8ec87d` 에서 docHistory 통합 완료. 제목만 남음 → todo 좁힘.
+- **smart dashes** — macOS 가 `--` → `—` 변환해서 `---` (hr) / 마크다운 표 입력 불가. textarea autoCorrect/spellCheck off + input event intercept fallback.
+- **마크다운 입력 자동화** — Tab/Shift+Tab indent (리스트 안 list level) + Enter 자동 list marker 연장 + 빈 marker Enter 종료 + IME composition 안전. 옵시디안 표준 동작.
+- **마크다운 단축키** — ⌘B/⌘I wrap (toggle) + Alt+↑/↓ 줄 이동 + ⌘Shift+D 복제 + URL paste over selection 자동 링크.
+- **Opt+Q/W/E** — input/textarea 포커스에서도 동작. macOS default 글자 preventDefault. Tauri + 브라우저 둘 다.
+
+### todo.md 재구조화 (16 신규 + 기존 V0.6.1/V0.7.x 통합)
+
+PR 단위로 21개. 각 PR 에 한 줄 임팩트 후보 + 카테고리 (`ui_ux | backend | infra | fix`) 라벨 — 카드 frontmatter `impact_summary` 로 직접 옮길 수 있게. dogfood 항목 추가:
+- 날짜/시간 표시 포맷 통일 (메모 사이드바 카드 + 휴지통 카드 + 앱 전체 검토 + `lib/dates.ts` 단일 함수)
+
+### done.md 신설
+
+`PR #12 / #13 / #14 + dogfood 확인 2건` 아카이브. todo.md → done.md 로 이동 패턴 정착.
 
 ## 알아야 할 컨텍스트
 
-- **vault 모델 V0.7.1** — main meeting 의 frontmatter = `id: <uuid>` + `date` (optional) + `time` + `attendees` + `tags`. **frontmatter 에 title 없음**. 파일명 = `meetings/{title}.md`. 옛 V0.6 메모 (date prefix + frontmatter title) 는 lazy migration — 첫 read 시 uid 발급 + frontmatter rewrite.
-- **client cache key 통일** — React Query queryKey / `HISTORY_CACHE` / URL hash / hook signature 모두 uid 기반. `useUpdateMeeting(uid)` 가 mutationFn 시점에 list cache 의 path lookup.
-- **vault 위치**: `/Users/ham/Library/Mobile Documents/iCloud~md~obsidian/Documents/goodsoob/` (사용자 dogfood vault).
-- **백업 위치**: vault 내 `.backups/goodsoob-vault-YYYYMMDD-HHmmss.zip`. dot prefix 폴더라 vault scanner/watcher 무시. vault 폴더 옮길 때 백업도 자동 따라감.
-- **휴지통 필터 invert** (V0.7.1 후속): `listDeletedMeetings` (`src/api/meetings.ts:134`) + `restoreFromTrash` (`src/lib/vault/scan.ts:488`) 가 V0.6 date-prefix 강제 → 순수 일기 패턴만 제외하는 negative filter 로. 새 메모 카테고리 (예: portfolio trash) 추가하면 이 자리도 같이 봐야 함.
-- **ESC race 패턴** — input 컴포넌트의 ESC 핸들러에서 `setDraft(value)` 후 `blur()` 호출 시 onBlur 가 stale draft commit 하는 race. ref flag (`skipCommitRef`) 로 다음 commit skip. 새 input 컴포넌트 만들 때 같은 패턴 의식.
-- **자동 백업 confirm vs silent** — 자동은 사용자가 토글 켠 시점에 rotation 사전 동의 → silent. 수동은 명시 액션이라 한도 가득 시 modal confirm. 같은 모달 컴포넌트 재사용 (이번엔 한 mode 만, action prop 제거).
-- **현재 worktree 상태**: `goodsoob-work` (main repo, `feat/meetings-ux-polish` — chip 작업 다른 세션). `goodsoob-work-trash-cleanup` 은 PR #14 머지 직후 — 정리 대기 (자동선택 fix 새 worktree 시작 시점에).
-
-## V0.6.1 후속 (dogfood 와 병행)
-
-- [ ] Conflict resolution 모달 (현재 throw 만)
-- [x] ~~Vault 변경 UI (설정 페이지)~~ — PR #13 처리
-- [x] ~~vault 폴더 사라짐 graceful~~ — PR #13 처리 (3초 polling + focus event)
-- [ ] iCloud `(conflicted copy)` 파일 무시 룰
-- [ ] vault 스캔 성능 실측 + frontmatter-only fast path
-- [ ] frontmatter parse 실패 graceful fallback — YAML 깨졌을 때 빈 frontmatter + body 그대로 → 사이드바 표시 보장.
-- [ ] uid 중복 감지 + 후순위 재발급
-- [ ] 깨진 파일 사용자 alert — 사이드바 banner
+- **vault 모델 V0.7.1** — main meeting frontmatter = `id: <uuid>` + `date` (optional) + `time` + `attendees` + `tags`. frontmatter 에 title 없음. 파일명 = `meetings/{title}.md`. lazy migration.
+- **client cache key 통일** — uid 기반. `useUpdateMeeting(uid)` 가 mutationFn 시점에 path lookup.
+- **vault 위치**: `/Users/ham/Library/Mobile Documents/iCloud~md~obsidian/Documents/goodsoob/`
+- **백업 위치**: vault 내 `.backups/goodsoob-vault-YYYYMMDD-HHmmss.zip` — dot prefix 라 scanner/watcher 무시
+- **휴지통 필터 invert** (V0.7.1 후속): `listDeletedMeetings` + `restoreFromTrash` 가 negative filter. 새 메모 카테고리 추가 시 같이 봐야 함.
+- **ESC race 패턴** — input 컴포넌트 ESC 핸들러 `setDraft(value) → blur()` 가 onBlur stale draft commit race. `skipCommitRef` 로 다음 commit skip.
+- **자동 백업 confirm vs silent** — 자동은 토글 시점에 rotation 사전 동의 → silent. 수동은 한도 가득 시 modal confirm.
+- **DocSnapshot 통합** — `useStateHistory` 1 stack = `{ body, transcript, summary, meta(date+time+attendees) }`. 제목은 별도 (native input undo).
+- **현재 worktree 상태**: `goodsoob-work-trash-cleanup` 은 PR #14 + todo 재구조화 후 정리 대기. `.auto-select-fix.md` 별 worktree 분리 필요.
 
 ## 미해결
 
-- 자동 백업 첫 실행 시 zip 시간 (vault 크기 따라 1-10초) — 본인 vault 가 크면 첫 실행 잠깐 멈춤 인지될 수 있음. dogfood 후 spinner toast 등 검토.
-- vault liveness 3초 polling 의 외장 디스크 sleep spin-up risk — 실측 dogfood 중 발견 시 빈도 조정.
-- 캘린더 스크롤 상태 페이지 전환 시 보존.
-- 에러 상태 패딩 통일 (p-3/p-4 혼재).
-- V0.5.3~V0.5.4 lint 11 errors (기존 코드 react-hooks/refs) — dogfood 단계에서 정리.
-- `syncPortfolio` 안 `[syncPortfolio]` 진단 console.log — dogfood 안정화 후 제거.
-- `backup-pre-pr-split` branch 안전망 — dogfood 며칠 후 삭제 결정.
+- **자동선택 fix 별 PR** — `.auto-select-fix.md` 의 fix 를 새 worktree (`fix/meetings-auto-select`) 로 land. 가장 먼저.
+- 자동 백업 첫 실행 zip 시간 — 큰 vault 면 1-10초 멈춤. spinner toast 등 검토.
+- vault liveness 3초 polling 외장 디스크 sleep spin-up risk — dogfood 빈도 봐서 조정.
+- 캘린더 스크롤 상태 페이지 전환 보존.
+- 에러 상태 패딩 p-3/p-4 혼재.
+- V0.5.3~V0.5.4 lint 11 errors (기존 코드 react-hooks/refs).
+- `syncPortfolio` 진단 console.log 제거 (dogfood 안정화 후).
+- `backup-pre-pr-split` branch 안전망 — 며칠 후 삭제 결정.
 - Vercel 대시보드 disconnect (선택).
