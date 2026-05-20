@@ -22,6 +22,7 @@ import { useGhSync } from "./hooks/usePortfolio";
 import { readSyncState } from "./api/portfolio";
 import { useMeetings, useCreateMeeting, useDeleteMeeting } from "./hooks/useMeetings";
 import { useVault } from "./lib/vault/useVault";
+import { maybeAutoBackup } from "./lib/backup";
 import { DrawerProvider, useDrawer } from "./hooks/useDrawer";
 import { todayIso } from "./lib/dates";
 import { isTauri } from "./lib/isTauri";
@@ -75,6 +76,7 @@ function AppContent() {
   const createMeetingMutation = useCreateMeeting();
   const deleteMeetingMutation = useDeleteMeeting();
   const autoSyncDone = useRef(false);
+  const autoBackupDone = useRef(false);
   const autoSelectedRef = useRef(didAutoSelectThisSession);
 
   // V0.7 design step 3 (1B): vault ready 후 5초 background sync 1회 (since=last_sync).
@@ -92,6 +94,21 @@ function AppContent() {
         // useGhSync state.error 에 반영 — sidebar 가 표시
       }
     }, 5000);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isReady]);
+
+  // 자동 백업 — vault ready 후 10초 뒤 1회. interval/keepCount 설정에 따라 실행.
+  useEffect(() => {
+    if (!isTauri || !isReady || autoBackupDone.current) return;
+    autoBackupDone.current = true;
+    const t = setTimeout(async () => {
+      try {
+        await maybeAutoBackup(adapter);
+      } catch (err) {
+        console.error("auto backup failed", err);
+      }
+    }, 10000);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isReady]);

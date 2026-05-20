@@ -29,6 +29,7 @@
 
 ## 🟡 V0.7.x 후속 (dogfood 결과로 결정)
 
+- [ ] **기간별 백업** — vault 파일 많아져 매 백업 zip 이 무거워질 때 대비. 일/주/월 등 기간 bucket 별로 보관 (예: 최근 일 단위 7개 + 주 단위 4개 + 월 단위 6개). 또는 incremental/differential 패턴. 현재는 단순 full zip × 보관개수 10개.
 - [ ] **전체 재동기화 버튼** — since 무시하고 full fetch. rename 발생 시 옛 PR 도 매칭 가능. 사이드바 SyncButton 옆 별도 트리거.
 - [ ] **gh search concurrency 5 병렬 enrich**. 4A 직렬. 매일 사용에서 첫 sync 3분 통증 크면 도입.
 - [ ] **`gh search prs` 페이지네이션**. 1000 개 넘는 케이스. 본인 1-2년치 cover 검증 후 결정.
