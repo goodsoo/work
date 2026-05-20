@@ -1,0 +1,120 @@
+import { isTauri } from "../../lib/isTauri";
+
+type Shortcut = {
+  keys: string[];
+  label: string;
+  note?: string;
+};
+
+type Group = {
+  title: string;
+  items: Shortcut[];
+};
+
+const GROUPS: Group[] = [
+  {
+    title: "페이지 이동",
+    items: [
+      { keys: ["⌘", "1"], label: "메모장" },
+      { keys: ["⌘", "2"], label: "캘린더" },
+      { keys: ["⌘", "3"], label: "할 일" },
+      { keys: ["⌘", "4"], label: "내 작업" },
+    ],
+  },
+  {
+    title: "메모 관리 (메모장 탭)",
+    items: [
+      { keys: ["⌘", "N"], label: "새 메모", note: "입력 중에도 동작" },
+      { keys: ["⌘", "⌫"], label: "휴지통으로", note: "입력 밖에서만" },
+      { keys: ["⌘", "↑"], label: "이전 메모", note: "입력 밖에서만" },
+      { keys: ["⌘", "↓"], label: "다음 메모", note: "입력 밖에서만" },
+    ],
+  },
+  {
+    title: "메모 sub-tab (입력 밖에서만)",
+    items: [
+      { keys: ["Q"], label: "본문 탭", note: "본문일 땐 편집/보기 토글" },
+      { keys: ["W"], label: "음성 기록 탭" },
+      { keys: ["E"], label: "요약 탭" },
+    ],
+  },
+  {
+    title: "편집",
+    items: [
+      { keys: ["⌘", "Z"], label: "되돌리기", note: "본문·메타 통합 timeline" },
+      { keys: ["⌘", "⇧", "Z"], label: "다시 실행" },
+      { keys: ["Esc"], label: "input 빠져나가기 / 변경 취소" },
+    ],
+  },
+];
+
+export function ShortcutsSection() {
+  return (
+    <div className="space-y-5">
+      {!isTauri && (
+        <p
+          className="text-xs px-3 py-2 rounded"
+          style={{
+            color: "var(--text-secondary)",
+            background: "var(--bg-base)",
+            border: "1px solid var(--border-subtle)",
+          }}
+        >
+          단축키는 데스크탑 앱 (Tauri) 전용. 브라우저에선 시스템 단축키와 충돌해 동작하지 않아요.
+        </p>
+      )}
+      {GROUPS.map((group) => (
+        <section key={group.title}>
+          <h3
+            className="mb-2 text-xs font-semibold uppercase tracking-wide"
+            style={{ color: "var(--text-muted)" }}
+          >
+            {group.title}
+          </h3>
+          <ul className="grid grid-cols-[repeat(auto-fit,minmax(240px,1fr))] gap-x-6">
+            {group.items.map((s) => (
+              <li
+                key={s.label}
+                className="flex items-center gap-3 py-2"
+                style={{ borderBottom: "1px solid var(--border-default)" }}
+              >
+                <div className="min-w-0 flex-1">
+                  <span
+                    className="text-sm"
+                    style={{ color: "var(--text-primary)" }}
+                  >
+                    {s.label}
+                  </span>
+                  {s.note && (
+                    <span
+                      className="ml-2 text-xs"
+                      style={{ color: "var(--text-muted)" }}
+                    >
+                      {s.note}
+                    </span>
+                  )}
+                </div>
+                <div className="flex shrink-0 items-center gap-1">
+                  {s.keys.map((k, i) => (
+                    <kbd
+                      key={i}
+                      className="inline-flex h-6 min-w-[1.5rem] items-center justify-center rounded px-1.5 text-xs font-medium"
+                      style={{
+                        background: "var(--bg-base)",
+                        border: "1px solid var(--border-default)",
+                        color: "var(--text-secondary)",
+                        fontFamily: "ui-monospace, SFMono-Regular, monospace",
+                      }}
+                    >
+                      {k}
+                    </kbd>
+                  ))}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
+    </div>
+  );
+}

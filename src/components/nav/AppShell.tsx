@@ -1,5 +1,5 @@
-import { useEffect, useRef, type ReactNode } from "react";
-import { Sun, Moon, Menu } from "lucide-react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Sun, Moon, Menu, Settings } from "lucide-react";
 import { useTheme } from "../../hooks/useTheme";
 import {
   useSidePanelWidth,
@@ -8,6 +8,7 @@ import {
 } from "../../hooks/useSidePanelWidth";
 import { useDrawer } from "../../hooks/useDrawer";
 import { isTauri } from "../../lib/isTauri";
+import { SettingsModal } from "../settings/SettingsModal";
 import { BottomTabs, TABS, type Tab } from "./BottomTabs";
 
 const MOBILE_DRAWER_WIDTH = 288;
@@ -33,6 +34,7 @@ export function AppShell({
   const { theme, toggle } = useTheme();
   const { width, setWidth } = useSidePanelWidth();
   const drawer = useDrawer();
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const hasSidePanel = sidePanel != null;
   const ThemeIcon = theme === "light" ? Sun : Moon;
 
@@ -105,15 +107,27 @@ export function AppShell({
                 style={{ borderTop: "1px solid var(--border-subtle)" }}
               >
                 <div className="flex min-w-0 items-center">{sidePanelFooter}</div>
-                <button
-                  type="button"
-                  onClick={toggle}
-                  title={theme === "light" ? "다크 모드로" : "라이트 모드로"}
-                  className="flex h-7 w-7 items-center justify-center rounded-md transition"
-                  style={{ color: "var(--text-muted)", minHeight: 0 }}
-                >
-                  <ThemeIcon className="h-3.5 w-3.5" />
-                </button>
+                <div className="flex items-center gap-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setSettingsOpen(true)}
+                    title="설정"
+                    aria-label="설정"
+                    className="flex h-7 w-7 items-center justify-center rounded-md transition"
+                    style={{ color: "var(--text-muted)", minHeight: 0 }}
+                  >
+                    <Settings className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={toggle}
+                    title={theme === "light" ? "다크 모드로" : "라이트 모드로"}
+                    className="flex h-7 w-7 items-center justify-center rounded-md transition"
+                    style={{ color: "var(--text-muted)", minHeight: 0 }}
+                  >
+                    <ThemeIcon className="h-3.5 w-3.5" />
+                  </button>
+                </div>
               </div>
             </div>
             <SidePanelResizer width={width} onChange={setWidth} />
@@ -144,7 +158,16 @@ export function AppShell({
               goodsoob
             </h1>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-0.5">
+            <button
+              type="button"
+              onClick={() => setSettingsOpen(true)}
+              aria-label="설정"
+              className="flex h-8 w-8 items-center justify-center rounded-md transition"
+              style={{ color: "var(--text-muted)", minHeight: 0 }}
+            >
+              <Settings className="h-4 w-4" />
+            </button>
             <button
               type="button"
               onClick={toggle}
@@ -205,6 +228,11 @@ export function AppShell({
 
       {/* Mobile bottom tabs */}
       <BottomTabs activeTab={activeTab} onTabChange={handleTabChange} />
+
+      <SettingsModal
+        isOpen={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+      />
     </div>
   );
 }

@@ -17,6 +17,7 @@ interface VaultContextValue {
   watcher: VaultWatcher;
   vaultRoot: string | null;
   setVaultRoot: (path: string) => Promise<void>;
+  disconnect: () => void;
   isReady: boolean;
 }
 
@@ -47,6 +48,13 @@ export function VaultProvider({ children }: { children: ReactNode }) {
     setIsReady(true);
   };
 
+  const disconnect = () => {
+    localStorage.removeItem(VAULT_ROOT_KEY);
+    queryClient.clear();
+    setVaultRootState(null);
+    // watcher / interval / focus listener 정리는 useEffect cleanup 에서 처리됨.
+  };
+
   useEffect(() => {
     if (!vaultRoot) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -54,6 +62,29 @@ export function VaultProvider({ children }: { children: ReactNode }) {
       return;
     }
     let cancelled = false;
+    let aliveTimer: ReturnType<typeof setInterval> | null = null;
+
+    function handleVaultGone() {
+      if (cancelled) return;
+      cancelled = true;
+      watcher.stop();
+      if (aliveTimer) clearInterval(aliveTimer);
+      window.removeEventListener("focus", checkAlive);
+      localStorage.removeItem(VAULT_ROOT_KEY);
+      queryClient.clear();
+      setVaultRootState(null);
+    }
+
+    async function checkAlive() {
+      if (cancelled) return;
+      try {
+        const ok = await adapter.exists("");
+        if (!ok) handleVaultGone();
+      } catch {
+        handleVaultGone();
+      }
+    }
+
     (async () => {
       adapter.setRoot(vaultRoot);
       try {
@@ -61,6 +92,9 @@ export function VaultProvider({ children }: { children: ReactNode }) {
         if (cancelled) return;
         await watcher.start();
         setIsReady(true);
+        // 폴더 사라짐 감지 — 3초 주기 + window focus 즉시.
+        aliveTimer = setInterval(checkAlive, 3000);
+        window.addEventListener("focus", checkAlive);
       } catch (err) {
         // vault 폴더 사라짐 / 권한 없음 → 다시 picker 필요
         console.error("vault init failed", err);
@@ -72,11 +106,13 @@ export function VaultProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
       watcher.stop();
+      if (aliveTimer) clearInterval(aliveTimer);
+      window.removeEventListener("focus", checkAlive);
     };
-  }, [vaultRoot, adapter, watcher]);
+  }, [vaultRoot, adapter, watcher, queryClient]);
 
   const value = useMemo<VaultContextValue>(
-    () => ({ adapter, watcher, vaultRoot, setVaultRoot, isReady }),
+    () => ({ adapter, watcher, vaultRoot, setVaultRoot, disconnect, isReady }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [adapter, watcher, vaultRoot, isReady],
   );
