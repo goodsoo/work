@@ -88,11 +88,11 @@ export function PortfolioSidePanel({
 function SyncError({ message }: { message: string }) {
   return (
     <div
-      className="flex items-start gap-2 rounded-md px-3 py-2 text-xs"
+      className="flex items-start gap-2 rounded px-2 py-1 text-xs"
       style={{
         backgroundColor: "var(--accent-red-bg)",
         color: "var(--accent-red-text)",
-        borderLeft: "4px solid var(--accent-red)",
+        borderLeft: "2px solid var(--accent-red)",
       }}
     >
       <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />

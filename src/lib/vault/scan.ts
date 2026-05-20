@@ -66,6 +66,21 @@ export function meetingMainPath(path: string): string {
   return path.replace(SIDECAR_RE, ".md");
 }
 
+// iCloud / Dropbox / OneDrive 등 sync 도구가 동기화 중 생성하는 부산물 파일.
+// scan 대상에서 제외 — 사이드바에 노이즈로 뜨거나 read 가 실패해 메모 행세하지
+// 않도록.
+//   - "(conflicted copy ...)" / "(Mac's conflicted copy ...)" — iCloud/Dropbox
+//   - ".foo.md.icloud" — iCloud evicted placeholder (dot prefix)
+//   - dot prefix 일반 — OS 메타 파일 (.DS_Store 등)
+const SYNC_NOISE_RE = /\(conflicted copy|\(conflict[^/]*\d{4}-\d{2}-\d{2}/i;
+export function isSyncNoiseFile(path: string): boolean {
+  // 파일명만 검사 — 폴더 경로에 dot 있어도 상관 X.
+  const name = path.split("/").pop() ?? path;
+  if (name.startsWith(".")) return true;
+  if (name.endsWith(".icloud")) return true;
+  return SYNC_NOISE_RE.test(name);
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Frontmatter helpers
 
@@ -360,6 +375,7 @@ export async function scanMeetings(adapter: VaultAdapter): Promise<MeetingMeta[]
   for (const path of files) {
     if (!path.endsWith(".md")) continue;
     if (isMeetingSidecar(path)) continue; // sidecar 는 scan 대상 X
+    if (isSyncNoiseFile(path)) continue; // iCloud/Dropbox 충돌·placeholder skip
     try {
       let raw = await adapter.read(path);
       let meta = await adapter.readMeta(path);
@@ -394,8 +410,12 @@ export async function scanMeetings(adapter: VaultAdapter): Promise<MeetingMeta[]
         updated_at: m.updated_at,
         deleted_at: m.deleted_at,
       });
-    } catch {
-      // 손상된 파일 skip
+    } catch (err) {
+      // read / readMeta 실패 — yaml 깨짐이 아니라 디스크 access 실패 (iCloud
+      // evict, 권한 등). parseVaultFile 자체는 graceful 이므로 frontmatter 손상
+      // 만으론 안 떨어짐. 디버깅용 path 로깅 — 사용자가 메모가 비어 보이는 이유
+      // 추적 가능.
+      console.warn(`[scanMeetings] skip ${path}:`, err);
     }
   }
   results.sort((a, b) => {
@@ -412,6 +432,7 @@ export async function scanJournals(adapter: VaultAdapter): Promise<JournalMeta[]
   const results: JournalMeta[] = [];
   for (const path of files) {
     if (!path.endsWith(".md")) continue;
+    if (isSyncNoiseFile(path)) continue;
     try {
       const meta = await adapter.readMeta(path);
       const date = filePathToDate(path);
@@ -435,6 +456,7 @@ export async function scanAllTodos(adapter: VaultAdapter): Promise<TodoItem[]> {
   for (const path of todoFiles) {
     if (!path.endsWith(".md")) continue;
     if (path.startsWith(".") || path.startsWith(".trash/")) continue;
+    if (isSyncNoiseFile(path)) continue;
     try {
       const raw = await adapter.read(path);
       // sidecar 면 메인 path 로 source 보고 → todo extractor 가 같은 meeting 의 항목으로 group.
@@ -509,7 +531,7 @@ export async function scanTrash(
 ): Promise<{ id: string; deletedAt: number }[]> {
   const files = await adapter.list(".trash");
   return files
-    .filter((p) => p.endsWith(".md"))
+    .filter((p) => p.endsWith(".md") && !isSyncNoiseFile(p))
     .map((p) => {
       const base = p.replace(/^\.trash\//, "");
       const stampMatch = base.match(

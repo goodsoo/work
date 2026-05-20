@@ -73,11 +73,20 @@ function buildMeeting(input: MeetingInsert, id: string, uid: string): Meeting {
 
 // 한 회의 sidecar 까지 read 해서 합쳐 반환. sidecar 없으면 그 필드는 빈 값.
 // uid 없는 옛 메모는 lazy 발급 + frontmatter rewrite (scanMeetings 가 못 잡은 경로 보완).
+//
+// iCloud sync footgun: `adapter.exists` 가 false 라도 throw 하지 null 반환 X.
+// 이유: iCloud 가 파일을 잠시 evict / 새 버전 download 중이면 exists 가 일시
+// false 가 됨. null 반환 시 useQuery detail cache 에 박혀 영구 stuck (list 가
+// 다시 refetch 되어도 detail 은 자동 재시도 trigger 없음). throw 하면 React
+// Query 가 retry (1·2·4초 backoff) → sync 끝나면 자동 복구. 실제 삭제된 메모는
+// retry 3번 다 실패 후 error UI 의 재시도 버튼으로 사용자가 처리.
 async function readFullMeeting(
   adapter: VaultAdapter,
   id: string,
-): Promise<Meeting | null> {
-  if (!(await adapter.exists(id))) return null;
+): Promise<Meeting> {
+  if (!(await adapter.exists(id))) {
+    throw new Error(`meeting file unavailable: ${id}`);
+  }
   let mainRaw = await adapter.read(id);
   let meta = await adapter.readMeta(id);
   const tPath = transcriptPath(id);
@@ -162,7 +171,7 @@ export async function listDeletedMeetings(
 export async function getMeeting(
   adapter: VaultAdapter,
   id: string,
-): Promise<Meeting | null> {
+): Promise<Meeting> {
   return readFullMeeting(adapter, id);
 }
 
@@ -260,7 +269,7 @@ export async function updateMeeting(
   ) {
     const sPath = summaryPath(currentId);
     // 현재 상태 read (sidecar 가 있으면 그 H2 list 보존)
-    const current = (await readFullMeeting(adapter, currentId)) ?? buildMeeting({}, currentId, "");
+    const current = await readFullMeeting(adapter, currentId);
     const merged = {
       discussion_items: patch.discussion_items ?? current.discussion_items,
       decisions: patch.decisions ?? current.decisions,
@@ -282,9 +291,7 @@ export async function updateMeeting(
     }
   }
 
-  const updated = await readFullMeeting(adapter, currentId);
-  if (!updated) throw new Error(`meeting disappeared after update: ${currentId}`);
-  return updated;
+  return readFullMeeting(adapter, currentId);
 }
 
 // Soft delete: 메인 + sidecar 다 같은 stamp 로 .trash/ 이동
@@ -323,9 +330,7 @@ export async function restoreMeeting(
       }
     }
   }
-  const m = await readFullMeeting(adapter, restoredPath);
-  if (!m) throw new Error(`restore failed: ${trashId}`);
-  return m;
+  return readFullMeeting(adapter, restoredPath);
 }
 
 // 영구 삭제 (휴지통에서만) — 메인 + 같은 stamp sidecar 도 함께 삭제
