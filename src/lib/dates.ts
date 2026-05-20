@@ -56,6 +56,13 @@ export function formatDateShortWithDay(iso: string): string {
   return format(parseIsoDate(iso), "M/d EEE", { locale: ko });
 }
 
+/** "2026.05.17(일) 14:09" — 휴지통 삭제 시각 표시용. ISO datetime 입력. */
+export function formatDateTimeKo(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return format(d, "yyyy.MM.dd(EEE) HH:mm", { locale: ko });
+}
+
 /** Relative human label: 오늘 / 어제 / 내일 / N일 후 / N일 전 / "5/6" */
 export function relativeDateLabel(
   iso: string,

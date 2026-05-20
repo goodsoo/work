@@ -4,12 +4,12 @@ import { AppShell } from "./components/nav/AppShell";
 import { GlobalTooltip } from "./components/Tooltip";
 import type { Tab } from "./components/nav/BottomTabs";
 import { MeetingForm } from "./components/meetings/MeetingForm";
+import { TrashModal } from "./components/meetings/TrashModal";
 import {
   MeetingsSidePanel,
   MeetingsSidePanelFooter,
   CalendarDayPanel,
   TodosSidePanel,
-  type MeetingsView,
 } from "./components/nav/SidePanel";
 import type { TodoCategory } from "./api/todos";
 type TodosFilter = TodoCategory | "all" | "uncategorized";
@@ -69,7 +69,8 @@ function AppContent() {
   const [portfolioFilter, setPortfolioFilter] = useState<ProjectFilter>({
     kind: "all",
   });
-  const [meetingsView, setMeetingsView] = useState<MeetingsView>("list");
+  // 휴지통은 overlay — utility 액션이라 SettingsModal 과 같은 패턴.
+  const [trashOpen, setTrashOpen] = useState(false);
   const portfolioSync = useGhSync();
   const { adapter, isReady } = useVault();
   const meetings = useMeetings();
@@ -338,9 +339,6 @@ function AppContent() {
       <MeetingsSidePanel
         selectedId={selectedMeetingId}
         onSelect={openMeeting}
-        onMeetingPurged={handleMeetingPurged}
-        view={meetingsView}
-        onViewChange={setMeetingsView}
       />
     ) : tab === "calendar" ? (
       <CalendarDayPanel
@@ -365,10 +363,10 @@ function AppContent() {
       />
     ) : undefined;
 
-  // 메모장 list 모드일 때만 도움말 + 휴지통 footer. trash 모드는 footer 비움 (TrashView 의 back 버튼 사용).
+  // 메모장 탭에서만 도움말 + 휴지통 footer. 휴지통은 overlay 모달로 열림.
   const sidePanelFooter =
-    tab === "meetings" && meetingsView === "list" ? (
-      <MeetingsSidePanelFooter onTrashOpen={() => setMeetingsView("trash")} />
+    tab === "meetings" ? (
+      <MeetingsSidePanelFooter onTrashOpen={() => setTrashOpen(true)} />
     ) : undefined;
 
   return (
@@ -400,6 +398,11 @@ function AppContent() {
       ) : (
         <TodosPage categoryFilter={todoCategory} />
       )}
+      <TrashModal
+        isOpen={trashOpen}
+        onClose={() => setTrashOpen(false)}
+        onMeetingPurged={handleMeetingPurged}
+      />
     </AppShell>
   );
 }
