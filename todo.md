@@ -39,6 +39,7 @@
 - [x] ~~portfolio 진단 console.log 제거~~ — V0.7.2 제거 완료.
 - [ ] **commit cluster 카드 모델** (Plan B) — owner repo PR 워크플로 전환 부담 크면 → branch 단위 cluster + AI 입력 commit messages.
 - [ ] **PR body 이미지 자동 import → screenshots frontmatter**. sync 가 PR body 의 `<img src>` / `![](url)` 패턴 추출 → URL fetch → `_attachments/{slug}/before-N.png` 다운로드 → screenshots 자동 채움. 본인이 dropzone 으로 박은 거 있으면 보존. dogfood 가치: 매 PR 마다 카드 dropzone 으로 두 번 더 박는 수고 제거. private repo URL 은 gh auth token 활용. PR #9 (`feat(nav): SidePanel 상단 탭`) 부터 적용되면 첫 효과 확인.
+- [ ] **내 작업 수동 추가** — portfolio 탭에서 GitHub 무관 카드 (오프라인 업무 / 회의 발표 / 방금 한 작업 등) 직접 만들기. UI: "새 카드" 버튼 → title/date/category/impact_summary 입력 + screenshots dropzone → 저장. frontmatter `github_pr_id` 없거나 0 → sync 가 건드리지 않음 (legacy 카드 schema 그대로 활용). 평가 자료에 PR 외 활동도 포함 가능.
 
 ---
 
