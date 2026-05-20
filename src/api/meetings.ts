@@ -348,5 +348,32 @@ export async function purgeMeeting(
   }
 }
 
+// 휴지통 비우기 — .trash/ 의 메인 메모 + sidecar 모두 영구 삭제.
+// sidecar 가 메인보다 먼저 삭제돼도 purgeMeeting 의 exists 검사가 흡수.
+export async function emptyTrash(adapter: VaultAdapter): Promise<void> {
+  const files = await adapter.list(".trash");
+  const mainFiles = files.filter(
+    (p) => p.endsWith(".md") && !isMeetingSidecar(p),
+  );
+  for (const main of mainFiles) {
+    try {
+      await purgeMeeting(adapter, main);
+    } catch {
+      // 한 파일 실패해도 나머지 진행 — UI 가 다시 list 받아 잔여 표시
+    }
+  }
+  // sidecar 만 단독으로 남아있는 경우 (이상 케이스) 청소
+  const remaining = await adapter.list(".trash");
+  for (const p of remaining) {
+    if (p.endsWith(".md")) {
+      try {
+        await adapter.delete(p);
+      } catch {
+        // skip
+      }
+    }
+  }
+}
+
 // re-export — watcher / 외부 호환
 export { meetingMainPath, isMeetingSidecar };

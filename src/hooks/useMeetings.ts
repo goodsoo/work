@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tansta
 import {
   createMeeting,
   deleteMeeting,
+  emptyTrash,
   getMeeting,
   listDeletedMeetings,
   listMeetings,
@@ -226,6 +227,17 @@ export function usePurgeMeeting() {
       qc.setQueryData<Meeting[]>(deletedMeetingsKey, (prev) =>
         prev?.filter((m) => m.id !== trashId),
       );
+    },
+  });
+}
+
+export function useEmptyTrash() {
+  const { adapter } = useVault();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => emptyTrash(adapter),
+    onSuccess: () => {
+      qc.setQueryData<Meeting[]>(deletedMeetingsKey, []);
     },
   });
 }
