@@ -56,7 +56,7 @@
 
 - [ ] **본문 textarea word-wrap + gutter dynamic alignment**. 현재 `wrap="off"` 라 긴 줄 가로 scroll. 사용자 의도: 자연 줄넘김 + 좌측 gutter marker 가 wrap 된 visual line 과 정확히 align. 방법: hidden mirror div 가 textarea 와 같은 width/font/line-height/word-break 으로 source line 별 actual visual height 측정 → gutter marker height 동기. ResizeObserver 로 textarea width 변경 감지 + debounce. 작업 ~40-50줄. 한국어 글자 width 일치 + textarea native scroll bar 영향 등 측면 주의. 본인이 한국어 메모 길게 자주 → 가치 ↑.
 - [ ] **메모 제목/날짜/시간/참석자 undo·redo** (`⌘+Z`). 본문 textarea 의 undo 와 일관성. 4 field 각각 `useStateHistory<string>` 도입 + `onCommit` noop (자동 mutation X) + 명시 commit (blur/Enter) 시 mutation. undo/redo 자체는 mutation 트리거 안 함 — undo 후 blur 안 하면 frontmatter 변경 X (또는 undo/redo callback 안에서 자동 commit 처리). 본인이 dogfood 에서 meta typo 후 `⌘+Z` 원한 빈도로 가치 결정.
-- [ ] **휴지통 자동 선택 + 미리보기 + 복원**. 휴지통 진입 시 첫 항목 자동 선택 + 메모 미리보기 (read-only). 비어있으면 placeholder ("휴지통이 비어있어요"). 휴지통 빠져나오면 기존에 선택돼 있던 메모로 복원. DeletedMeetingsList + 미리보기 컴포넌트 + App.tsx selection 복원 로직.
+- [x] ~~휴지통 자동 선택 + 미리보기 + 복원 (overlay 모달)~~ — PR #14 처리
 - [ ] **단축키 cheatsheet 모달** (옵시디안 패턴). `?` 같은 단축키로 모달 띄움 — 페이지 탭 (Cmd+1/2/3/4) / 메모 sub-tab (Cmd+[/]) / 편집-보기 토글 (Cmd+E) / undo (Cmd+Z) 등 모든 단축키 한 곳에. sub-tab tooltip 에서 단축키 표시는 이미 제거된 상태 (`MeetingForm.tsx` TabBtn). 모달 진입점 (`?` 키 또는 우상단 keyboard 아이콘) + 모달 본체 (디자인 토큰 기반).
 
 ---
