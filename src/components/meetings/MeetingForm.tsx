@@ -152,7 +152,10 @@ export function MeetingForm({ meetingId, onBack }: Props) {
   // 데이터 도착 전엔 cacheKey undefined → cache 참여 X. 데이터 도착 시
   // undefined → defined transition 으로 initial 적용. 메모 전환 시
   // cacheKey 가 바뀌면서 이전 메모의 stack state 가 모듈 캐시에 보존됨.
-  const id = data?.id;
+  //
+  // V0.7.1 title-as-filename 모델: title 변경 = file path rename. 그래서 cacheKey
+  // 는 path (`data.id`) 가 아니라 영구 식별자 uid 기반 — 제목 바뀌어도 history 유지.
+  const uid = data?.uid;
   const initialBody = data?.content ?? "";
   const initialTranscript = data?.transcript ?? "";
   const initialSummary = useMemo<SummaryDoc>(
@@ -187,7 +190,7 @@ export function MeetingForm({ meetingId, onBack }: Props) {
   // 변경 undo (옵시디안/notion 패턴). 제목은 history 미참여 — commitTitle 직접 mutation.
   const docHistory = useStateHistory<DocSnapshot>({
     initial: initialDoc,
-    cacheKey: id ? `${id}:doc` : undefined,
+    cacheKey: uid ? `${uid}:doc` : undefined,
     commitMs: 1000,
     isEqual: docsEqual,
     onCommit: (d) => updateMutation.mutate(docToPatch(d)),
@@ -761,7 +764,6 @@ export function MeetingForm({ meetingId, onBack }: Props) {
               <div className="mb-4">
                 <MetaRow
                   icon={<CalendarIcon className="h-3.5 w-3.5" />}
-                  iconTitle="허용 형식: YYYY-MM-DD · 5/19 · 5.19 · 5월 19일 · 2026/5/19 · 오늘 · 내일 · 어제 · 모레 · 그제 · 월/화/수… (가장 최근 그 요일)"
                   label="날짜"
                 >
                   <LooseDateInput
@@ -771,7 +773,6 @@ export function MeetingForm({ meetingId, onBack }: Props) {
                 </MetaRow>
                 <MetaRow
                   icon={<Clock className="h-3.5 w-3.5" />}
-                  iconTitle="허용 형식: HH:MM · 14:30 · 14시 30분 · 오후 2시 · 오전 9:30 · 2pm · 2:30 PM · 1430"
                   label="시간"
                 >
                   <LooseTimeInput
@@ -938,12 +939,10 @@ function CharCountBadge({ count }: { count: number }) {
 // 본문 textarea 의 line gutter 패턴과 동일: icon col (1.75rem) + 우측 divider + 라벨 + 값.
 function MetaRow({
   icon,
-  iconTitle,
   label,
   children,
 }: {
   icon: React.ReactNode;
-  iconTitle?: string;
   label: string;
   children: React.ReactNode;
 }) {
@@ -956,8 +955,6 @@ function MetaRow({
           color: "var(--text-muted)",
           borderRight: "1px solid var(--border-subtle)",
         }}
-        title={iconTitle}
-        aria-label={iconTitle}
       >
         {icon}
       </div>
@@ -1249,7 +1246,7 @@ function LooseDateInput({
       maxLength={10}
       className="border-0 bg-transparent text-sm leading-none outline-none"
       style={{
-        color: "var(--text-secondary)",
+        color: "var(--text-primary)",
         width: `${widthCh}ch`,
       }}
     />
@@ -1313,7 +1310,7 @@ function LooseTimeInput({
       maxLength={11}
       className="border-0 bg-transparent text-sm leading-none outline-none"
       style={{
-        color: "var(--text-secondary)",
+        color: "var(--text-primary)",
         width: `${Math.max(draft.length, 5)}ch`,
       }}
     />

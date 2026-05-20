@@ -164,6 +164,9 @@ export function useStateHistory<T>(
   const set = useCallback(
     (next: T) => {
       setValue(next);
+      // valueRef 를 동기로 갱신 — 같은 turn 의 flush() 가 latest value 를 보도록.
+      // setValue 는 비동기라 useCallback closure 의 value 만 봤다간 stale.
+      valueRef.current = next;
       onChangeRef.current?.(next);
       if (commitTimerRef.current != null) {
         window.clearTimeout(commitTimerRef.current);
@@ -233,24 +236,27 @@ export function useStateHistory<T>(
   const flush = useCallback(() => {
     if (commitTimerRef.current == null) return;
     const eq = isEqualRef.current;
+    // 같은 turn 에 set(next) → flush() 호출 시 useCallback closure 의 value 는
+    // setValue 비동기라 stale. valueRef 가 set 안에서 동기로 갱신되니 그걸 사용.
+    const v = valueRef.current;
     window.clearTimeout(commitTimerRef.current);
     commitTimerRef.current = null;
     setHistory((prev) => {
       const truncated = prev.slice(0, pointer + 1);
       if (
         truncated.length > 0 &&
-        eq(truncated[truncated.length - 1], value)
+        eq(truncated[truncated.length - 1], v)
       ) {
         return prev;
       }
-      const appended = [...truncated, value];
+      const appended = [...truncated, v];
       const overflow = Math.max(0, appended.length - maxDepth);
       const trimmed = overflow > 0 ? appended.slice(overflow) : appended;
       setPointer(trimmed.length - 1);
       return trimmed;
     });
-    onCommitRef.current?.(value);
-  }, [pointer, value, maxDepth]);
+    onCommitRef.current?.(v);
+  }, [pointer, maxDepth]);
 
   const hasPendingEdit = !isEqual(history[pointer], value);
 

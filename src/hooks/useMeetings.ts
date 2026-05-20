@@ -101,15 +101,22 @@ export function useDeletedMeetings() {
 export function useMeeting(uid: string | undefined) {
   const { adapter, isReady } = useVault();
   const qc = useQueryClient();
+  // list cache 가 채워진 뒤에만 detail query 실행. 그렇지 않으면 새로고침 시
+  // hash 에서 selectedMeetingId 가 즉시 set 되어 detail queryFn 이 list 보다 먼저
+  // 돌고, uidToPath 가 undefined 를 돌려주는 바람에 detail 캐시가 null 로 굳어
+  // 본문이 영구히 안 뜸. queryKey 동일이라 useQuery 가 dedupe.
+  const list = useMeetings();
   return useQuery({
     queryKey: uid ? meetingKey(uid) : ["meetings", "none"],
     queryFn: async () => {
       if (!uid) return null;
       const path = uidToPath(qc, uid);
-      if (!path) return null; // list cache miss — 다음 list refetch 후 사용자가 재시도.
+      // list cache 에 uid 없으면 throw → retry. list refetch 가 끝나는 사이
+      // 일시 누락이면 자동 복구. (정말 사라진 meeting 은 retry 다 실패 후 error UI)
+      if (!path) throw new Error(`meeting uid not in list: ${uid}`);
       return getMeeting(adapter, path);
     },
-    enabled: !!uid && isReady,
+    enabled: !!uid && isReady && list.isSuccess,
   });
 }
 

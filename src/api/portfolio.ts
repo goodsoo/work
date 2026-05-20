@@ -687,13 +687,6 @@ export async function syncPortfolio(
     const s = (pr.state || "").toUpperCase();
     return s === "CLOSED" || s === "MERGED";
   });
-  // 진단용 — dogfood 끝나면 제거.
-  // eslint-disable-next-line no-console
-  console.log("[syncPortfolio]", {
-    raw: results.length,
-    filtered: closed.length,
-    firstState: results[0]?.state,
-  });
 
   // 부트스트랩: projects.md 가 비었고 가져온 PR 이 있으면 unique repo 별로
   // default project 1개씩 자동 생성 (1 repo = 1 project, slug = kebab nameWithOwner).

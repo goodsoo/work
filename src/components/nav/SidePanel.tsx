@@ -6,12 +6,15 @@ import {
   HelpCircle,
   X,
   Trash2,
+  ArrowUpDown,
+  Check,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   useMeetings,
   useCreateMeeting,
 } from "../../hooks/useMeetings";
+import { useMeetingSort, type MeetingSortKey } from "../../hooks/useMeetingSort";
 import { useJournals } from "../../hooks/useJournals";
 import { useTodos, useUpdateTodo } from "../../hooks/useTodos";
 import { useSchedules, useDeleteSchedule } from "../../hooks/useSchedules";
@@ -48,6 +51,45 @@ export function MeetingsSidePanel({
   const { data, isLoading } = useMeetings();
   const createMutation = useCreateMeeting();
   const [createError, setCreateError] = useState<string | null>(null);
+  const [sortKey, setSortKey] = useMeetingSort();
+
+  // 키 우선순위: date → time → mtime. date_desc / date_asc 가 방향 결정,
+  // 그 안에서 time 도 같은 방향. date 없는 메모는 맨 아래, 같은 date 안에서
+  // time 없는 메모도 맨 아래 — 정보 없는 쪽을 끝으로 몰아 정렬 어긋남 회피.
+  const sortedData = useMemo(() => {
+    if (!data) return data;
+    const arr = data.slice();
+    if (sortKey === "name") {
+      arr.sort((a, b) => {
+        const ta = (a.title ?? "").trim();
+        const tb = (b.title ?? "").trim();
+        if (!ta && !tb) return b.mtime - a.mtime;
+        if (!ta) return 1;
+        if (!tb) return -1;
+        return ta.localeCompare(tb, "ko");
+      });
+    } else {
+      const asc = sortKey === "date_asc";
+      arr.sort((a, b) => {
+        const da = a.date ?? "";
+        const db = b.date ?? "";
+        if (da !== db) {
+          if (!da) return 1;
+          if (!db) return -1;
+          return asc ? da.localeCompare(db) : db.localeCompare(da);
+        }
+        const ta = a.time ?? "";
+        const tb = b.time ?? "";
+        if (ta !== tb) {
+          if (!ta) return 1;
+          if (!tb) return -1;
+          return asc ? ta.localeCompare(tb) : tb.localeCompare(ta);
+        }
+        return asc ? a.mtime - b.mtime : b.mtime - a.mtime;
+      });
+    }
+    return arr;
+  }, [data, sortKey]);
 
   async function handleCreate() {
     setCreateError(null);
@@ -84,16 +126,19 @@ export function MeetingsSidePanel({
         >
           메모장
         </h2>
-        <button
-          type="button"
-          onClick={handleCreate}
-          disabled={createMutation.isPending}
-          title="새 메모장"
-          className="flex h-7 w-7 items-center justify-center rounded-md transition disabled:opacity-50"
-          style={{ color: "var(--text-secondary)", minHeight: 0 }}
-        >
-          <Plus className="h-4 w-4" />
-        </button>
+        <div className="flex items-center gap-0.5">
+          <SortMenu value={sortKey} onChange={setSortKey} />
+          <button
+            type="button"
+            onClick={handleCreate}
+            disabled={createMutation.isPending}
+            title="새 메모장"
+            className="flex h-7 w-7 items-center justify-center rounded-md transition disabled:opacity-50"
+            style={{ color: "var(--text-secondary)", minHeight: 0 }}
+          >
+            <Plus className="h-4 w-4" />
+          </button>
+        </div>
       </div>
 
       {createError ? (
@@ -120,7 +165,7 @@ export function MeetingsSidePanel({
               />
             ))}
           </div>
-        ) : !data || data.length === 0 ? (
+        ) : !sortedData || sortedData.length === 0 ? (
           <div
             className="px-4 py-8 text-center text-sm"
             style={{ color: "var(--text-muted)" }}
@@ -129,7 +174,7 @@ export function MeetingsSidePanel({
           </div>
         ) : (
           <ul className="p-2">
-            {data.map((m) => (
+            {sortedData.map((m) => (
               <MeetingItem
                 key={m.uid}
                 meeting={m}
@@ -222,6 +267,99 @@ function MarkdownHelp() {
         </div>
       ) : null}
     </>
+  );
+}
+
+const SORT_OPTIONS: Array<{ id: MeetingSortKey; label: string }> = [
+  { id: "date_desc", label: "최신순" },
+  { id: "date_asc", label: "오래된순" },
+  { id: "name", label: "이름순" },
+];
+
+function SortMenu({
+  value,
+  onChange,
+}: {
+  value: MeetingSortKey;
+  onChange: (next: MeetingSortKey) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  // 바깥 클릭 / ESC 로 닫기.
+  useEffect(() => {
+    if (!open) return;
+    function onDown(e: MouseEvent) {
+      if (!wrapRef.current) return;
+      if (!wrapRef.current.contains(e.target as Node)) setOpen(false);
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    window.addEventListener("mousedown", onDown);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("mousedown", onDown);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  return (
+    <div ref={wrapRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        title="정렬"
+        aria-label="정렬"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        className="flex h-7 w-7 items-center justify-center rounded-md transition"
+        style={{
+          color: "var(--text-secondary)",
+          backgroundColor: open ? "var(--bg-surface-active)" : undefined,
+          minHeight: 0,
+        }}
+      >
+        <ArrowUpDown className="h-3.5 w-3.5" />
+      </button>
+      {open ? (
+        <div
+          role="menu"
+          className="absolute right-0 top-full z-30 mt-1 min-w-[120px] overflow-hidden rounded-md shadow-md"
+          style={{
+            backgroundColor: "var(--bg-surface)",
+            border: "1px solid var(--border-default)",
+          }}
+        >
+          {SORT_OPTIONS.map((opt) => {
+            const active = opt.id === value;
+            return (
+              <button
+                key={opt.id}
+                type="button"
+                role="menuitemradio"
+                aria-checked={active}
+                onClick={() => {
+                  onChange(opt.id);
+                  setOpen(false);
+                }}
+                className="flex w-full items-center justify-between px-3 py-1.5 text-left text-xs transition"
+                style={{
+                  color: active ? "var(--text-primary)" : "var(--text-secondary)",
+                  backgroundColor: active ? "var(--bg-surface-active)" : undefined,
+                  minHeight: 0,
+                }}
+              >
+                <span>{opt.label}</span>
+                {active ? (
+                  <Check className="h-3 w-3" style={{ color: "var(--text-secondary)" }} />
+                ) : null}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+    </div>
   );
 }
 
