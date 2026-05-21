@@ -110,6 +110,7 @@ PR 단위로 묶음. 각 PR 의 **한 줄 임팩트** 는 카드 frontmatter `im
 한 줄 임팩트: 잔여 디자인 inconsistency 정리
 
 - [ ] 캘린더 스크롤만으로 다른 월 본 상태도 페이지 전환 시 복원 (selectedDate 안 바뀌어도)
+- [ ] **UI chrome `user-select: none`** — 마우스 실수 드래그로 사이드바 헤더 / 캘린더 셀 / 버튼 라벨 등이 파랗게 selection 되는 거 차단. 텍스트 복사 의도 있는 영역 (메모 본문, 메모 제목, 일정 제목, transcript) 은 그대로 유지. 어디까지 막을지 = chrome vs content 경계 정의 필요
 
 ### PR — 캘린더 헤더 네비게이션 `ui_ux`
 한 줄 임팩트: 캘린더에서 이전/다음 달 / 오늘로 한 번에 점프

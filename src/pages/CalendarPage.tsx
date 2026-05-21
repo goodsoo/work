@@ -7,6 +7,7 @@ import {
   useState,
 } from "react";
 import { addDays, startOfWeek } from "date-fns";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useMeetings } from "../hooks/useMeetings";
 import { useJournals } from "../hooks/useJournals";
 import { useTodos } from "../hooks/useTodos";
@@ -226,14 +227,12 @@ export function CalendarPage({ targetDate, onSelectedDateChange }: Props) {
     return { year: w.getFullYear(), month: w.getMonth() + 1 };
   }, [anchorWeekStart, visibleWeekOffset]);
 
-  // "오늘" 버튼 가시성 — 오늘 주가 viewport 근처에 있는지
   const todayWeekOffset = useMemo(() => {
     const todayWS = startOfWeek(new Date(), { weekStartsOn: 0 });
     return Math.round(
       (todayWS.getTime() - anchorWeekStart.getTime()) / WEEK_MS,
     );
   }, [anchorWeekStart]);
-  const todayVisible = Math.abs(visibleWeekOffset - todayWeekOffset) <= 2;
 
   function handleDayClick(date: string) {
     setSelectedDate(date);
@@ -243,14 +242,43 @@ export function CalendarPage({ targetDate, onSelectedDateChange }: Props) {
     onSelectedDateChange?.(date);
   }
 
+  // off = target 주가 anchor 로부터 몇 주. 화살표/오늘 버튼은 instant jump.
+  // visibleWeekOffset 을 즉시 set 해서 month label 동기화 — onScroll 마지막 frame 누락
+  // 또는 stale closure 로 라벨이 안 바뀌던 race 차단.
+  function jumpToWeekOffset(off: number) {
+    const el = containerRef.current;
+    const rh = rowHeightRef.current;
+    if (!el || !rh) return;
+    const targetCenter = Math.max(minCenterOffset, off);
+    const idx = off - targetCenter + WEEK_CENTER;
+    const targetTop = idx * rh;
+    setVisibleWeekOffset(off);
+    if (targetCenter === centerWeekOffset) {
+      el.scrollTop = targetTop;
+    } else {
+      rebalanceTargetRef.current = targetTop;
+      setCenterWeekOffset(targetCenter);
+    }
+  }
+
   function jumpToToday() {
     setSelectedDate(today);
     setLastTarget(today);
     onSelectedDateChange?.(today);
-    const targetCenter = Math.max(minCenterOffset, todayWeekOffset);
-    const idxToday = todayWeekOffset - targetCenter + WEEK_CENTER;
-    rebalanceTargetRef.current = idxToday * rowHeightRef.current;
-    setCenterWeekOffset(targetCenter);
+    jumpToWeekOffset(todayWeekOffset);
+  }
+
+  function jumpToMonth(delta: number) {
+    const target = new Date(
+      currentMonthYM.year,
+      currentMonthYM.month - 1 + delta,
+      1,
+    );
+    const targetWS = startOfWeek(target, { weekStartsOn: 0 });
+    const targetOffset = Math.round(
+      (targetWS.getTime() - anchorWeekStart.getTime()) / WEEK_MS,
+    );
+    jumpToWeekOffset(targetOffset);
   }
 
   if (isLoading) {
@@ -274,13 +302,69 @@ export function CalendarPage({ targetDate, onSelectedDateChange }: Props) {
         className="shrink-0"
         style={{ borderBottom: "1px solid var(--border-subtle)" }}
       >
-        <div className="flex items-baseline gap-2 px-3 py-2 lg:px-5">
+        {/* 년월 헤더 — 메모장 헤더와 동일 spec (3.5rem, text-base, bg-overlay, backdrop-blur).
+            grid 3-col 로 nav 가 늘어나도 제목은 viewport-center 유지. */}
+        <div
+          className="grid items-center gap-2 px-3 backdrop-blur lg:px-5"
+          style={{
+            height: "3.5rem",
+            gridTemplateColumns:
+              "minmax(0, 1fr) minmax(0, auto) minmax(0, 1fr)",
+            backgroundColor: "var(--bg-overlay)",
+            borderBottom: "1px solid var(--border-subtle)",
+          }}
+        >
+          <div />
           <h3
-            className="text-sm font-semibold"
+            className="justify-self-center text-base font-semibold"
             style={{ color: "var(--text-primary)" }}
           >
             {currentMonthYM.year}년 {currentMonthYM.month}월
           </h3>
+          <div className="justify-self-end flex items-center gap-2">
+            <div
+              className="inline-flex overflow-hidden rounded-md"
+              style={{ border: "1px solid var(--border-subtle)" }}
+            >
+            <button
+              type="button"
+              onClick={() => jumpToMonth(-1)}
+              title="이전 달"
+              aria-label="이전 달"
+              className="px-1.5 py-1 transition"
+              style={{ color: "var(--text-secondary)", minHeight: 0 }}
+            >
+              <ChevronLeft className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={jumpToToday}
+              title="오늘"
+              className="px-2 py-1 text-xs font-medium transition"
+              style={{
+                color: "var(--text-secondary)",
+                borderLeft: "1px solid var(--border-subtle)",
+                minHeight: 0,
+              }}
+            >
+              오늘
+            </button>
+            <button
+              type="button"
+              onClick={() => jumpToMonth(1)}
+              title="다음 달"
+              aria-label="다음 달"
+              className="px-1.5 py-1 transition"
+              style={{
+                color: "var(--text-secondary)",
+                borderLeft: "1px solid var(--border-subtle)",
+                minHeight: 0,
+              }}
+            >
+              <ChevronRight className="h-3.5 w-3.5" />
+            </button>
+            </div>
+          </div>
         </div>
         <div className="grid grid-cols-7 px-3 lg:px-5">
           {WEEKDAYS.map((w, i) => (
@@ -312,20 +396,6 @@ export function CalendarPage({ targetDate, onSelectedDateChange }: Props) {
           currentMonth={currentMonthYM.month}
         />
       </div>
-
-      {!todayVisible ? (
-        <button
-          type="button"
-          onClick={jumpToToday}
-          className="absolute bottom-4 right-4 rounded-full px-4 py-2 text-sm font-medium shadow-lg transition lg:bottom-6 lg:right-6"
-          style={{
-            backgroundColor: "var(--btn-primary)",
-            color: "var(--btn-primary-text)",
-          }}
-        >
-          오늘
-        </button>
-      ) : null}
     </div>
   );
 }
