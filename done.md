@@ -6,6 +6,17 @@
 
 ## 2026-05-21
 
+### PR #18 — 메모 본문 typing 옵시디안 수준으로
+
+- **마크다운 typing UX** — Tab/Shift+Tab indent (single + multi-line) / Enter 자동 list marker 연장 (bullet/ordered/checkbox/quote, empty marker 종료, IME-safe) / URL paste over selection → markdown link / smart dashes 비활성화 (autoCorrect="off" + beforeinput intercept fallback, 본문+transcript 둘 다) / textarea 빈 영역 클릭 → 끝 포커스. helper = `src/lib/markdownTyping.ts` 의 pure function 묶음 + 33 unit test.
+- **마크다운 단축키 묶음** — ⌘B/⌘I wrap toggle (caret 만 있을 땐 빈 wrap + 가운데) / Alt+↑/↓ 줄 이동 / ⌘Shift+D 복제 / Opt+Q/W/E sub-tab (input/textarea 안에서도 동작, macOS dead-key œ/∑/´ preventDefault).
+- **편집 모드 시각 위계 정비** — gutter 의 lucide 아이콘 + heading H1/H2/H3 + ordered 번호 모두 accent-blue 통일 (편집 모드 신호) / alignSelf flex-start 로 작성된 부분에만 border+아이콘 / `LineKind.lastContinuation` look-ahead + SVG dotted vertical (이어짐 중간) + dotted corner (이어짐 마지막), opacity 차이 폐기 / active marker = 정사각형 둥근 accent-blue-bg chip (회색 직사각형 폐기, gutter borderRight 와 4px 여백).
+- **undo/redo 자동 탭 전환** — `useStateHistory` 의 undo/redo 가 `{from, to}` return 으로 라우팅 결정 노출. `DocSnapshot.__source` 추적 + undo → `from.__source` / redo → `to.__source` 의 탭으로 자동 전환 (변경이 일어나는 탭으로 일관 규칙). 다른 탭 보다가 ⌘Z 눌러도 즉시 변경 위치로 점프.
+- **탭별 scroll 위치 유지** — `SCROLL_CACHE` 모듈 Map (`${meetingId}:${tab}`). onScroll 매 step cache + 탭/메모 전환 직후 useLayoutEffect + RAF 두 번 set (content height mount 직후 미정 케이스). 메모/음성/요약 탭 왕복해도 보던 위치 그대로.
+- **wrapper padding 클릭 → 활성 textarea focus** — `mx-auto max-w-3xl px-6 pb-24` wrapper 에 onMouseDown 부착 + 좌우 px-6 영역은 좌표로 제외. 본문/transcript/summary 활성 탭의 textarea 자동 인식.
+- **시간 input 자연어 키워드** — `parseLooseTime` 가장 앞에 `(지금|현재|now)` 매칭 → `new Date()` HH:mm. vault md 에는 실제 시각만 저장.
+- commit `946f340..49ec51e` (5개 — helpers/typing+gutter/history+scroll+Opt+QWE/dates/screenshots), merge `07969bf`
+
 ### PR #17 — 노트 삭제 stale 선택 복원 race + 단축키 uid 정합
 
 - **stale 선택 복원 race fix** — `list.isSuccess` 후 `selectedMeetingId` 가 list 에 없으면 null fallback + hash replaceState. 노트 삭제 후 `history.back` 이 이미 purge 된 메모로 popstate 가거나 / 초기 진입 hash 가 다른 세션 (옵시디안 모바일 sync 등) 에서 삭제된 메모 uid 인 두 경로에서 `useMeeting` throw → React Query retry → 영구 error UI 차단.

@@ -10,34 +10,11 @@ PR 단위로 묶음. 각 PR 의 **한 줄 임팩트** 는 카드 frontmatter `im
 
 ## 🚀 메모 에디터 (마크다운) 강화
 
-### PR — 마크다운 typing UX 강화 `ui_ux`
-한 줄 임팩트: 메모 본문 typing 이 옵시디안 수준으로
-
-- [ ] Tab/Shift+Tab indent — 단일 + 다중 줄, 리스트 안에선 list level 증가, 일반 라인은 2-space
-- [ ] Enter 자동 list marker 연장 — `-` / `1.` / `- [ ]` / `>` 다음 줄 자동. 빈 marker 줄 Enter = 종료. IME composition 안전 (`e.isComposing`)
-- [ ] URL paste over selection → `[선택텍스트](URL)` 자동 변환
-- [ ] **textarea smart dashes 비활성화** — macOS 시스템의 "스마트 인용 부호와 줄표" 가 `--` → `—`, `---` → 더 짧은 em dash 로 자동 변환 (사용자 체감: `---` 입력 시 짧은 한 줄로 줄어듦). textarea props (`autoCorrect="off"` + `spellCheck="off"` + `autoCapitalize="off"`) + 안 막히면 `beforeinput` event intercept fallback. 본문/transcript 둘 다.
-- [ ] textarea 아래 빈 영역 클릭 → 커서 끝으로 포커스. 본문/transcript 둘 다
-
-### PR — 마크다운 단축키 묶음 `ui_ux`
-한 줄 임팩트: 본문 단축키로 마우스 동선 제거
-
-- [ ] ⌘B / ⌘I bold/italic wrap — 선택 있으면 감싸기, 없으면 빈 wrap + 커서 가운데. toggle (이미 wrap 됐으면 unwrap)
-- [ ] Alt+↑/↓ 줄 이동 — 다중 줄 선택 시 블록 전체
-- [ ] ⌘Shift+D 줄 복제
-- [ ] **Opt+Q / Opt+W / Opt+E sub-tab 단축키** — input/textarea 포커스에서도 동작 (현재 Q/W/E 는 textarea 밖에서만). macOS default 글자 (`œ`/`∑`/´) preventDefault. Tauri + 브라우저 둘 다.
-
-### PR — 마크다운 보기 모드 + 시각 위계 정비 `ui_ux`
-한 줄 임팩트: 보기 모드가 옵시디안만큼 정확히 렌더 + 편집 모드 위계 명확
+### PR — 마크다운 보기 모드 정비 `ui_ux`
+한 줄 임팩트: 보기 모드가 옵시디안만큼 정확히 렌더
 
 - [ ] **MarkdownView 체크박스 (`- [ ]`) 렌더링** + 보기 모드 클릭 토글로 body 마크다운 직접 수정. 현재 구현 약함.
 - [ ] **MarkdownView 4-space indented code block 렌더링** — pre/code 컴포넌트 매핑 점검. 현재 코드블록 인식 안 됨.
-- [ ] **편집 모드 line gutter — opacity 폐기** + SVG dotted vertical (┊) + dotted corner 두 글리프. `inferLineKind` 에 다음 줄 look-ahead 추가 → 새 항목 = solid 아이콘 / 이어짐 중간 = dotted vertical / 이어짐 마지막 = dotted corner / plain = 빈 자리. **focus 시에도 이어짐 구분 명확** (현재는 opacity 차이로 focus 시 구분 약함).
-
-### PR — undo/redo 변경 탭 자동 전환 `ui_ux`
-한 줄 임팩트: undo 가 다른 탭에서 일어났을 때 자동 전환되어 즉시 보임
-
-- [ ] `useStateHistory` source ("body"/"transcript"/"summary"/"meta") 추적 → undo/redo 시 해당 탭으로 `setActiveTab` 자동 호출. meta 는 본문 탭 내부라 본문 탭 유지
 
 ### PR — Slash command (마크다운 type 즉시 변환) `ui_ux`
 한 줄 임팩트: `/` 한 글자로 현재 줄 type 변환
@@ -81,11 +58,6 @@ PR 단위로 묶음. 각 PR 의 **한 줄 임팩트** 는 카드 frontmatter `im
 - [ ] 헤더 배경 = sidepanel 배경 통일 (전체 한 덩어리)
 - [ ] ActivityBar 빈 공간에 `data-tauri-drag-region` 명시
 - [ ] macOS 전용 — Windows/Linux fallback (native title bar 유지)
-
-### PR — 시간 input 자연어 키워드 `ui_ux`
-한 줄 임팩트: 시간 칸에 "지금" / "now" / "현재" 입력하면 현재 시각 자동
-
-- [ ] `lib/dates.ts` 키워드 매핑 (지금 / now / 현재 → 현재 HH:mm). blur/Enter 시점에 변환. vault md 에는 실제 시각 저장 (키워드 X).
 
 ---
 
