@@ -37,7 +37,9 @@ import { useViewMode } from "../../hooks/useViewMode";
 import { isTauri } from "../../lib/isTauri";
 import { formatError } from "../../lib/errors";
 import { TitleConflictError } from "../../lib/vault/scan";
-import { parseLooseDate, parseLooseTime, weekdayShort } from "../../lib/dates";
+import { weekdayShort } from "../../lib/dates";
+import { LooseDateInput } from "../common/LooseDateInput";
+import { LooseTimeInput } from "../common/LooseTimeInput";
 
 // 파일시스템 + 옵시디안 link syntax 금지 문자. title input commit 시 검사.
 const TITLE_UNSAFE_RE = /[/\\:*?"<>|#\^\[\]]/;
@@ -1301,146 +1303,6 @@ function TranscriptArea({
         />
       </div>
     </div>
-  );
-}
-
-/**
- * 너그러운 날짜 input. blur/Enter 시 parseLooseDate → ISO 정규화. 파싱 실패 시
- * 이전 값으로 revert. blur 상태 + 유효 ISO + 요일 있으면 input value 자체에
- * " (요일)" 합쳐 표시. focus 가면 ISO 만 (편집 가능).
- */
-function LooseDateInput({
-  value,
-  onCommit,
-}: {
-  value: string;
-  onCommit: (next: string) => void;
-}) {
-  const [draft, setDraft] = useState(value);
-  const [focused, setFocused] = useState(false);
-  // ESC → blur 시 commit skip flag. setDraft 가 async 라 commit 클로저가
-  // stale draft 읽고 수정값을 저장하는 버그 방지.
-  const skipCommitRef = useRef(false);
-  useEffect(() => {
-    setDraft(value);
-  }, [value]);
-
-  function commit() {
-    if (skipCommitRef.current) {
-      skipCommitRef.current = false;
-      return;
-    }
-    const trimmed = draft.trim();
-    if (trimmed === "") {
-      if (value !== "") onCommit("");
-      return;
-    }
-    if (trimmed === value) return;
-    const iso = parseLooseDate(trimmed);
-    if (iso) {
-      setDraft(iso);
-      if (iso !== value) onCommit(iso);
-    } else {
-      setDraft(value);
-    }
-  }
-
-  const wd = weekdayShort(value);
-  const display = !focused && draft && wd ? `${draft} (${wd})` : draft;
-  const widthCh = Math.max(display.length, 10);
-
-  return (
-    <input
-      type="text"
-      value={display}
-      onChange={(e) => setDraft(e.target.value)}
-      onFocus={() => setFocused(true)}
-      onBlur={() => {
-        setFocused(false);
-        commit();
-      }}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") {
-          e.preventDefault();
-          e.currentTarget.blur();
-        } else if (e.key === "Escape") {
-          skipCommitRef.current = true;
-          setDraft(value);
-          e.currentTarget.blur();
-        }
-      }}
-      placeholder="yyyy-mm-dd"
-      maxLength={10}
-      className="border-0 bg-transparent text-sm leading-none outline-none"
-      style={{
-        color: "var(--text-primary)",
-        width: `${widthCh}ch`,
-      }}
-    />
-  );
-}
-
-/**
- * 너그러운 시간 input. blur/Enter 시 parseLooseTime → HH:mm 정규화.
- * 파싱 실패 시 이전 값으로 revert.
- */
-function LooseTimeInput({
-  value,
-  onCommit,
-}: {
-  value: string;
-  onCommit: (next: string) => void;
-}) {
-  const [draft, setDraft] = useState(value);
-  const skipCommitRef = useRef(false);
-  useEffect(() => {
-    setDraft(value);
-  }, [value]);
-
-  function commit() {
-    if (skipCommitRef.current) {
-      skipCommitRef.current = false;
-      return;
-    }
-    const trimmed = draft.trim();
-    if (trimmed === "") {
-      if (value !== "") onCommit("");
-      return;
-    }
-    if (trimmed === value) return;
-    const hhmm = parseLooseTime(trimmed);
-    if (hhmm) {
-      setDraft(hhmm);
-      if (hhmm !== value) onCommit(hhmm);
-    } else {
-      setDraft(value);
-    }
-  }
-
-  return (
-    <input
-      type="text"
-      value={draft}
-      onChange={(e) => setDraft(e.target.value)}
-      onBlur={commit}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") {
-          e.preventDefault();
-          e.currentTarget.blur();
-        } else if (e.key === "Escape") {
-          skipCommitRef.current = true;
-          setDraft(value);
-          e.currentTarget.blur();
-        }
-      }}
-      placeholder="hh:mm"
-      maxLength={11}
-      className="border-0 bg-transparent text-sm leading-none outline-none"
-      style={{
-        color: "var(--text-primary)",
-        width: `${Math.max(draft.length, 5)}ch`,
-      }}
-    />
   );
 }
 
