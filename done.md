@@ -6,6 +6,24 @@
 
 ## 2026-05-21
 
+### PR #21 — 메모/할일 데이터 도메인 정리 + 메모→할일 ⌘⏎
+
+- **두 도메인으로 환원** — Note (`meetings/` + `journals/`, 폴더로 분리한 같은 schema md 파일) / Task (`inbox.md` 안 `- [ ]` 라인, 일정/할일 통합). 사용자 mental model 의 메모/일기/일정/할일 4 개념을 2 entity 로.
+- **journals schema meetings 와 통일** — frontmatter `id: <uuid>` lazy migration 추가 (`scanJournals` / `upsertJournal`). 옛 일기 첫 read 시 uuid 발급 + rewrite.
+- **Task scan 범위 축소** — `scanAllTodos` 가 vault 전체 → `inbox.md` only. 메모/일기 안 `- [ ]` 는 단순 체크박스 (의도 보존). 회의록 의안 체크리스트, 타인 할일, 옵션 list 가 todo 페이지에 false positive 로 침범하던 통증 해소.
+- **Schedule entity 폐기** — `_is_event` / `Schedule` 타입 / `schedules.ts` / `useSchedules` / `ScheduleBlock.tsx` 제거. 캘린더 / SidePanel / MonthGrid 가 `Task` 직접 사용. **캘린더 셀에 같은 task 가 schedule 줄 + todo 줄 두 번 등장하던 중복 push 버그** (`CalendarPage.tsx:107-125`) 자동 해소.
+- **`TaskAddModal` 통합** — `ScheduleAddModal` → `components/tasks/TaskAddModal.tsx` 신설. 필드: 제목 / 날짜 (optional) / 시간 (optional) / 카테고리 / 우선순위 / 완료됨 토글. `prefill?: Partial<TodoInsert>` props. 호출처 통일 (할일 페이지, 캘린더 셀 클릭, 사이드 패널 `+` 모두 같은 모달).
+- **메모 → 할일 ⌘⏎ 액션** — 메모 본문 cursor 가 `- [ ]` 라인 위 → 단축키 `⌘⏎`. `SourceBodyEditor` 가 `onSendLineToInbox` prop 호출, MeetingForm 의 `lineToTaskPrefill` 이 `extractTodos` parser 재사용해서 라인 분석 → TaskAddModal prefill (체크 상태 / 날짜 / 시간 / 카테고리 / 우선순위 모두 자동). **메모 라인은 그대로 (일방향 복제, 두 라인 완전 독립 — sync X)**. Apple Notes → Reminders 패턴.
+- **inline 문법** — `- [x] 본문 --- YYYY-MM-DD HH:MM #category #priority`. em dash `—` 대신 triple hyphen `---` 도 매칭 (한국어 키보드에서 em dash 직접 입력 불가능). `lib/dates` 의 `parseLooseDate` / `parseLooseTime` 자연어 fallback — `오늘 / 내일 / 모레 / 월 / 오후 2시 / 2026.05.04 / 1830` 등 흡수.
+- **footgun fix — `buildTodoLine` 항상 ISO 박음**. 이전엔 올해 case 에 한해 `M/D` 박았는데 연도 바뀌면 `getFullYear()` 가 새 해로 보충해 모든 M/D todo 가 1년 미래로 점프하던 버그. 이제 라인 자체에 연도 보존.
+- **parser graceful split** — `---` 뒤 date/time 매칭 둘 다 실패하면 split 무효, 본문 보존. 외부 편집 / 사용자 실수로 망가져도 텍스트 손실 X.
+- **`sanitizeTaskTitle`** — title 안 `—` / `---` 박혀있으면 저장 시 `--` 로 강등. 다음 read 의 잘못된 split 차단.
+- **date-like 토큰 time false positive 차단** — `parseLooseTime("6/07")` 가 `parseInt` 로 `06:00` 잘못 매칭하던 거 fix. 자연어 fallback 의 토큰별 시도에서 slash/dash 포함 토큰은 time 매칭 skip. 인접 2-token sliding window 는 `오전/오후/AM/PM` prefix 일 때만 — "오후 2시" 같은 multi-word 보존.
+- **assignee 추출 폐기** — UI 에 기능 없는데 parser 가 `[X] 본문` bracket 을 assignee 로 흡수해 본문에서 분리. `[ ] 안녕`, `[홍길동] 보고서` 같은 케이스에서 본문 일부 사라지던 문제. `ASSIGNEE_RE` / `TodoItem.assignee` / 관련 테스트 제거. bracket 도 본문 일부로 보존.
+- **"일정" 라벨 정리** — 사이드 패널 `+` 의 "일정 추가" → "할 일 추가". 카피 통일.
+- 19 modified, 4 deleted, 2 new. 168 tests passing (+19 신규 자연어/sanitize/graceful split/`---` 매칭/assignee 폐기 등).
+- commit `c5555b4` (squash)
+
 ### PR #20 — 본문 슬래시 커맨드
 
 - **`/` 한 글자로 줄 type 즉시 변환** — 메모 본문 빈 줄 또는 marker 뒤에서 `/` → popover (H1-3 / bullet / ordered / checkbox / quote / code-fence / hr / table 10개). ↑/↓ nav, Enter/Tab 선택, Esc 닫기. 타이핑으로 filter (`/h1`, `/체크`, 한글 키워드 매칭). 옵시디안 community "Slash Command Suggester" 호환 — vault md source 변화 X (표준 markdown). paragraph 면 marker prepend, 이미 marker 있으면 교체 (bullet → checkbox 등), indent 보존.
