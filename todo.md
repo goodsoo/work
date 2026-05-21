@@ -134,14 +134,6 @@ PR 단위로 묶음. 각 PR 의 **한 줄 임팩트** 는 카드 frontmatter `im
 
 ## 🛡️ Vault 안정성 (V0.6.1 후속)
 
-### PR — vault 파일 read 안정성 `backend`
-한 줄 임팩트: 깨진 frontmatter / 중복 uid / 외부 sync 충돌 파일도 데이터 표시 유지
-
-- [ ] 🔥 **깨진 파일 사용자 alert banner** — "N 개 메모를 읽지 못했어요" 사이드바 banner, 클릭 시 디스크 path 표시. UX 약점 (메모 사라진 듯 보임) 해소.
-- [x] ~~uid 중복 감지 + 후순위 재발급~~ — PR #16 완료. scanMeetings 끝 `Set<uid>` 검사 + mtime 작은 entry 재발급 + 디스크 rewrite. 외부 도구 (옵시디안 merge / 백업 복원) 가 중복 uuid 만들어도 silent 자동 복구.
-- [x] ~~frontmatter parse 실패 graceful fallback~~ — `parseVaultFile` 이미 graceful (yaml 깨져도 빈 fm fallback). V0.7.2 scanMeetings catch 에 console.warn 추가로 디버깅 보강.
-- [x] ~~iCloud `(conflicted copy)` 같은 sync 충돌 파일 vault 스캔에서 무시~~ — V0.7.2 `isSyncNoiseFile` 헬퍼 (conflicted copy / .icloud / dotfile).
-
 ### PR — vault 폴더 사라짐 모달 `ui_ux`
 한 줄 임팩트: 외장 디스크 disconnect / iCloud 이동 시 사용자가 명확히 인식
 
