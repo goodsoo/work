@@ -120,7 +120,7 @@ export function AppShell({
                   </button>
                   <button
                     type="button"
-                    onClick={toggle}
+                    onClick={(e) => toggle({ origin: { x: e.clientX, y: e.clientY } })}
                     title={theme === "light" ? "다크 모드로" : "라이트 모드로"}
                     className="flex h-7 w-7 items-center justify-center rounded-md transition"
                     style={{ color: "var(--text-muted)", minHeight: 0 }}
@@ -170,7 +170,7 @@ export function AppShell({
             </button>
             <button
               type="button"
-              onClick={toggle}
+              onClick={(e) => toggle({ origin: { x: e.clientX, y: e.clientY } })}
               className="flex h-8 w-8 items-center justify-center rounded-md transition"
               style={{ color: "var(--text-muted)", minHeight: 0 }}
             >
