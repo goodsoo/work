@@ -320,8 +320,7 @@ export function buildPRGuidePrompt(): string {
 const IMPACT_HEADER = /^###\s+한\s*줄\s*임팩트\s*$/m;
 const CATEGORY_HEADER = /^###\s+카테고리\s*$/m;
 const CATEGORY_ENUM = /^(ui_ux|backend|infra|fix|other)$/i;
-const PR_CATEGORIES = ["ui_ux", "backend", "infra", "fix", "other"] as const;
-type PRCategory = (typeof PR_CATEGORIES)[number];
+type PRCategory = "ui_ux" | "backend" | "infra" | "fix" | "other";
 
 export function parsePRResponse(
   text: string,

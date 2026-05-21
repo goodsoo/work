@@ -6,6 +6,15 @@
 
 ## 2026-05-21
 
+### PR #24 — portfolio sync 강화 + 날짜 min + lint 정리 (backend 묶음)
+
+- **gh enrich concurrency 5 병렬** — `processWithConcurrency` worker pool 도입. enrich + 이미지 다운로드를 같은 worker 안에서 5 동시 처리, vault write 는 직렬 (충돌 회피). 100 PR 기준 wall clock 3분 → 30초 예상.
+- **PR body 이미지 자동 import** — sync 가 PR body 의 markdown `![](url)` + GitHub drag&drop `<img src>` 추출 → Tauri shell+curl 위임으로 vault `_attachments/{slug}/{before|after}-N.{ext}` 다운로드 → `screenshots` frontmatter 자동 채움. `## Before` / `## After` 헤더 또는 alt text 로 라벨 추론. existing.screenshots 가 비어있을 때만 import (본인 dropzone 박은 거 보존). path 가 vault 에 이미 있으면 redundant 다운로드 skip. 실패해도 best-effort (다음 sync 가 재시도).
+- **날짜 input 2026-01-01 min** — `src/lib/dates.ts` 에 `MIN_DATE_ISO` + `isBeforeMinDate()` export. `composeIso` 가 2026 미만 ISO 를 null 반환 (parseLooseDate 의 모든 분기 통합 차단). 앱 전체 `<input type="date">` 에 `min` 속성 + onChange silent reject. LooseDateInput 은 parseLooseDate 통해 자동 적용.
+- **lint 34 errors + 3 warnings → 0** — `_err`/`_url`/`PR_CATEGORIES` 미사용 제거, `no-useless-escape` 8건, `\x00-\x1f` 정상화 (binary control char regex → escape form), 의도된 패턴은 inline disable (useStateHistory race-fix refs, react-refresh, set-state-in-effect 외부 value sync).
+- **Vercel disconnect 는 drop** — 모바일 PWA 다시 살릴 가능성 보고 안전망 유지.
+- commit `1609ca4`
+
 ### PR #23 — 테마 전환 radial wipe
 
 - **View Transitions API 폐기 + 직접 구현** — macOS Ventura WKWebView (Safari 16) 가 미지원이라 fallback 으로 즉시 toggle 됐었음. fixed overlay + clip-path circle 로 직접 구현.

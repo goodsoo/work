@@ -114,6 +114,9 @@ function filterOptions(filter: string): SlashOption[] {
   );
 }
 
+// 부모 컴포넌트 (MeetingForm) 가 같은 매칭 함수로 popover 닫기 결정 — 같은 파일에서
+// export 해야 룰 일관. Fast refresh 회피를 위해 함수 export 허용 disable.
+// eslint-disable-next-line react-refresh/only-export-components
 export function getSlashOptionsForFilter(filter: string): SlashOption[] {
   return filterOptions(filter);
 }

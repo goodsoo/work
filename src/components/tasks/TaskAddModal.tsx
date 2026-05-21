@@ -33,6 +33,9 @@ export function TaskAddModal({ open, onClose, prefill }: Props) {
   const [done, setDone] = useState(false);
   const titleRef = useRef<HTMLInputElement>(null);
 
+  // 모달 열림 + prefill 이 바뀌면 draft 동기화 (보기 모드 → 편집 모드 전환 등).
+  // 의도된 sync.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (!open) return;
     setTitle(prefill?.title ?? "");
@@ -43,6 +46,7 @@ export function TaskAddModal({ open, onClose, prefill }: Props) {
     setDone(prefill?.done ?? false);
     requestAnimationFrame(() => titleRef.current?.focus());
   }, [open, prefill]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   useEffect(() => {
     if (!open) return;

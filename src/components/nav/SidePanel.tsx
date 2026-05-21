@@ -690,18 +690,18 @@ export function TodosSidePanel({
   onCategoryChange,
 }: TodosPanelProps) {
   const { data } = useTodos();
-  const todos = data ?? [];
 
   const counts = useMemo(() => {
+    const list = data ?? [];
     const map: Record<string, number> = { all: 0, work: 0, meeting: 0, uncategorized: 0 };
-    for (const t of todos) {
+    for (const t of list) {
       if (t.done) continue;
       map.all++;
       if (t.category) map[t.category]++;
       else map.uncategorized++;
     }
     return map;
-  }, [todos]);
+  }, [data]);
 
   const items: Array<{ id: TodoCategory | "all" | "uncategorized"; label: string; count: number }> = [
     { id: "all", label: "전체", count: counts.all },

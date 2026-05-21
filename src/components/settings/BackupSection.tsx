@@ -33,10 +33,12 @@ export function BackupSection() {
     }
   }
 
+  // 첫 mount 시 1회 비동기 fetch — refresh 가 내부에서 set* 호출.
+  /* eslint-disable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
   useEffect(() => {
     void refresh();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  /* eslint-enable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
 
   async function handleManualBackup() {
     setError(null);
