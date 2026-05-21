@@ -1,67 +1,217 @@
 # todo
 
-진행 중 / 후보만. 완료 기록은 [done.md](done.md) 참조.
+PR 단위로 묶음. 각 PR 의 **한 줄 임팩트** 는 카드 frontmatter `impact_summary` 후보. 카테고리는 `ui_ux | backend | infra | fix | other`.
 
 🔥 = 우선순위 높음 (dogfood 통증). 🟡 = 일반 후보. 🟢 = 진행 중.
 
----
-
-## 🟡 V0.6.1 후속 (dogfood 단계)
-
-- [ ] 🔥 **깨진 파일 사용자 alert** — 사이드바 banner: "N 개 메모를 읽지 못했어요" → 디스크 path. UX 약점 (메모 사라진 듯) 해소.
-- [ ] 🔥 **vault 폴더 사라짐 모달** — 외장 디스크 disconnect 시 사용자 모달 (감지는 PR #13 완료, UI 만 남음).
-- [ ] **Conflict resolution 모달** — 현재는 ConflictError throw 만. UI 에서 "내 변경 보존 / 외부 변경 가져오기" 선택지 + `.conflict-*.md` 파일 생성.
+완료 기록은 [done.md](done.md) 참조.
 
 ---
 
-## 🟡 V0.7 dogfood 진행 중
+## 🚀 메모 에디터 (마크다운) 강화
 
-- [ ] **다른 owner repo legacy 카드 backfill** — "내 작업" 탭의 "Legacy 카드 프롬프트" 버튼 복사 → 각 repo Claude Code 에 붙여넣어 카드 생성.
-- [ ] **회사 owner repo 도 PR 워크플로 전환 시도** — branch + 셀프 PR + auto-merge (셸 alias 로 5초). 매 commit 마다 PR description 작성이 평가 자료 품질 ↑. goodsoo/work 양식 (`buildPRGuidePrompt()`) paste 로 적용.
-- [ ] **backup-pre-pr-split branch 삭제 결정** — PR 분할 안전망. dogfood 며칠 후 안전 확인되면 `git branch -D`.
+### PR — 마크다운 typing UX 강화 `ui_ux`
+한 줄 임팩트: 메모 본문 typing 이 옵시디안 수준으로
+
+- [ ] Tab/Shift+Tab indent — 단일 + 다중 줄, 리스트 안에선 list level 증가, 일반 라인은 2-space
+- [ ] Enter 자동 list marker 연장 — `-` / `1.` / `- [ ]` / `>` 다음 줄 자동. 빈 marker 줄 Enter = 종료. IME composition 안전 (`e.isComposing`)
+- [ ] URL paste over selection → `[선택텍스트](URL)` 자동 변환
+- [ ] **textarea smart dashes 비활성화** — macOS 시스템의 "스마트 인용 부호와 줄표" 가 `--` → `—`, `---` → 더 짧은 em dash 로 자동 변환 (사용자 체감: `---` 입력 시 짧은 한 줄로 줄어듦). textarea props (`autoCorrect="off"` + `spellCheck="off"` + `autoCapitalize="off"`) + 안 막히면 `beforeinput` event intercept fallback. 본문/transcript 둘 다.
+- [ ] textarea 아래 빈 영역 클릭 → 커서 끝으로 포커스. 본문/transcript 둘 다
+
+### PR — 마크다운 단축키 묶음 `ui_ux`
+한 줄 임팩트: 본문 단축키로 마우스 동선 제거
+
+- [ ] ⌘B / ⌘I bold/italic wrap — 선택 있으면 감싸기, 없으면 빈 wrap + 커서 가운데. toggle (이미 wrap 됐으면 unwrap)
+- [ ] Alt+↑/↓ 줄 이동 — 다중 줄 선택 시 블록 전체
+- [ ] ⌘Shift+D 줄 복제
+- [ ] **Opt+Q / Opt+W / Opt+E sub-tab 단축키** — input/textarea 포커스에서도 동작 (현재 Q/W/E 는 textarea 밖에서만). macOS default 글자 (`œ`/`∑`/´) preventDefault. Tauri + 브라우저 둘 다.
+
+### PR — 마크다운 보기 모드 + 시각 위계 정비 `ui_ux`
+한 줄 임팩트: 보기 모드가 옵시디안만큼 정확히 렌더 + 편집 모드 위계 명확
+
+- [ ] **MarkdownView 체크박스 (`- [ ]`) 렌더링** + 보기 모드 클릭 토글로 body 마크다운 직접 수정. 현재 구현 약함.
+- [ ] **MarkdownView 4-space indented code block 렌더링** — pre/code 컴포넌트 매핑 점검. 현재 코드블록 인식 안 됨.
+- [ ] **편집 모드 line gutter — opacity 폐기** + SVG dotted vertical (┊) + dotted corner 두 글리프. `inferLineKind` 에 다음 줄 look-ahead 추가 → 새 항목 = solid 아이콘 / 이어짐 중간 = dotted vertical / 이어짐 마지막 = dotted corner / plain = 빈 자리. **focus 시에도 이어짐 구분 명확** (현재는 opacity 차이로 focus 시 구분 약함).
+
+### PR — undo/redo 변경 탭 자동 전환 `ui_ux`
+한 줄 임팩트: undo 가 다른 탭에서 일어났을 때 자동 전환되어 즉시 보임
+
+- [ ] `useStateHistory` source ("body"/"transcript"/"summary"/"meta") 추적 → undo/redo 시 해당 탭으로 `setActiveTab` 자동 호출. meta 는 본문 탭 내부라 본문 탭 유지
+
+### PR — 본문 word-wrap + gutter dynamic alignment `ui_ux`
+한 줄 임팩트: 한국어 메모 자연 줄넘김 + gutter 정확 정렬
+
+- [ ] textarea `wrap="on"` + gutter marker 가 wrap 된 visual line 과 align. hidden mirror div 가 같은 width/font/line-height 으로 source line 별 actual visual height 측정 → gutter marker height 동기. ResizeObserver 로 textarea width 변경 감지 + debounce. ~40-50줄
+
+### PR — 메모 검색 (사이드바 검색창) `ui_ux`
+한 줄 임팩트: 메모 많아져도 이름으로 즉시 찾기
+
+- [ ] 옵시디안 quick switcher 패턴 — title + body 즉시 매칭, scope toggle (현재 탭 / 전체). 단축키 `Cmd+P`. 사이드바 검색창 + 결과 highlight.
+
+### PR — 메모 태그 필터 `ui_ux`
+한 줄 임팩트: frontmatter `tags` 기반 사이드바 필터
+
+- [ ] 사이드바 위에 태그 chip 행 — frontmatter `tags: [foo, bar]` 의 union. 클릭하면 그 태그 메모만. 태그 입력 UI 는 별 작업 (frontmatter 직접 편집 의존).
 
 ---
 
-## 🟡 V0.7.x 후속 (dogfood 결과로 결정)
+## ✨ 신규 기능
 
-- [ ] **gh search concurrency 5 병렬 enrich**. 4A 직렬. 매일 사용에서 첫 sync 3분 통증 크면 도입.
-- [ ] **회사 HTTPS outbound 차단 시 자동 sync 끄기 설정**. dogfood 시 매일 토스트 떠야 발견.
-- [ ] **gh 미설치 / 미로그인 별도 모달** — 현재는 sync error 가 sidebar inline 메시지. 첫 dogfood 시 본인 경험 안 좋으면 추가.
-- [ ] **commit cluster 카드 모델** (Plan B) — owner repo PR 워크플로 전환 부담 크면 → branch 단위 cluster + AI 입력 commit messages.
-- [ ] **PR body 이미지 자동 import → screenshots frontmatter**. sync 가 PR body 의 `<img src>` / `![](url)` 패턴 추출 → URL fetch → `_attachments/{slug}/before-N.png` 다운로드 → screenshots 자동 채움. 본인이 dropzone 으로 박은 거 있으면 보존. dogfood 가치: 매 PR 마다 카드 dropzone 으로 두 번 더 박는 수고 제거. private repo URL 은 gh auth token 활용.
-- [ ] **내 작업 수동 추가** — portfolio 탭에서 GitHub 무관 카드 (오프라인 업무 / 회의 발표 / 방금 한 작업 등) 직접 만들기. UI: "새 카드" 버튼 → title/date/category/impact_summary 입력 + screenshots dropzone → 저장. frontmatter `github_pr_id` 없거나 0 → sync 가 건드리지 않음 (legacy 카드 schema 그대로 활용). 평가 자료에 PR 외 활동도 포함 가능.
+### PR — 루틴 (매일 하는 할일) `ui_ux`
+한 줄 임팩트: 출퇴근 / 운동 / 일기 같은 매일 streak 시각화
 
----
+- [ ] vault `routines/` 폴더 신설. 1 routine = 1 md 파일 (frontmatter `type: routine`, `schedule: every day` 등)
+- [ ] 본문은 Obsidian Tasks 호환 라인 (`- [x] ✅ YYYY-MM-DD`) 이력 누적
+- [ ] ActivityBar 새 탭 "루틴" (⌘5). 좌측 routine 리스트 (오늘 체크박스 + 현재 streak `🔥7`), 우측 12주 GitHub-style heatmap + 통계 (현재/최장 streak, 30일 완료율)
+- [ ] 놓친 날 자동 fail (streak break). 수동 휴무일 토글 (`- [-] 휴무 YYYY-MM-DD`) 로 streak 보호
 
-## 🟡 V0.7 다른 후보 (V0.7 dogfood 후 진입)
+### PR — Tauri 윈도우 헤더 통합 `ui_ux`
+한 줄 임팩트: ActivityBar 가 헤더로 흡수돼 본문 +48px 확보 + 무경계 (traffic light 옆 같은 줄로)
 
-- [ ] **Tauri 2 Mobile**. 모바일에서 본인 디자인 UI 사용.
-- [ ] **"Claude 응답 paste → 자동 callout"** (회의록 영역).
-- [ ] **녹음 파일 직접 업로드 → 자동 STT**.
-- [ ] **Tauri 데스크탑 앱 빌드 마무리**. `bun run tauri:build` 로 .dmg 생성 + 코드 사인.
+- [ ] `tauri.conf.json` `titleBarStyle: "Overlay"` + `hiddenTitle: true`. ActivityBar 를 traffic light 옆 같은 줄로
+- [ ] 헤더 배경 = sidepanel 배경 통일 (전체 한 덩어리)
+- [ ] ActivityBar 빈 공간에 `data-tauri-drag-region` 명시
+- [ ] macOS 전용 — Windows/Linux fallback (native title bar 유지)
 
----
+### PR — 시간 input 자연어 키워드 `ui_ux`
+한 줄 임팩트: 시간 칸에 "지금" / "now" / "현재" 입력하면 현재 시각 자동
 
-## 🟡 UX 후보
-
-- [ ] **메모 검색 (사이드바 검색창)**. 옵시디안 quick switcher 패턴 — title + body 즉시 매칭, scope toggle (현재 탭 / 전체). 단축키 `Cmd+P`. 메모 많아지면 사이드바 스크롤 한계.
-- [ ] **메모 태그 필터 (frontmatter `tags`)**. 사이드바 위에 태그 chip 행. 클릭하면 그 태그 메모만. frontmatter `tags: [foo, bar]` 입력 UI 는 별 작업.
-- [ ] **본문 textarea word-wrap + gutter dynamic alignment**. 현재 `wrap="off"` 라 긴 줄 가로 scroll. 사용자 의도: 자연 줄넘김 + 좌측 gutter marker 가 wrap 된 visual line 과 정확히 align. 방법: hidden mirror div 가 textarea 와 같은 width/font/line-height/word-break 으로 source line 별 actual visual height 측정 → gutter marker height 동기. ResizeObserver 로 textarea width 변경 감지 + debounce. 작업 ~40-50줄. 한국어 글자 width 일치 + textarea native scroll bar 영향 등 측면 주의. 본인이 한국어 메모 길게 자주 → 가치 ↑.
-- [ ] **메모 제목/날짜/시간/참석자 undo·redo** (`⌘+Z`). 본문 textarea 의 undo 와 일관성. 4 field 각각 `useStateHistory<string>` 도입 + `onCommit` noop (자동 mutation X) + 명시 commit (blur/Enter) 시 mutation. undo/redo 자체는 mutation 트리거 안 함 — undo 후 blur 안 하면 frontmatter 변경 X (또는 undo/redo callback 안에서 자동 commit 처리). 본인이 dogfood 에서 meta typo 후 `⌘+Z` 원한 빈도로 가치 결정.
-- [ ] **휴지통 자동 선택 + 미리보기 + 복원**. 휴지통 진입 시 첫 항목 자동 선택 + 메모 미리보기 (read-only). 비어있으면 placeholder ("휴지통이 비어있어요"). 휴지통 빠져나오면 기존에 선택돼 있던 메모로 복원. DeletedMeetingsList + 미리보기 컴포넌트 + App.tsx selection 복원 로직.
-- [ ] **단축키 cheatsheet 모달** (옵시디안 패턴). `?` 같은 단축키로 모달 띄움 — 페이지 탭 (Cmd+1/2/3/4) / 메모 sub-tab (Cmd+[/]) / 편집-보기 토글 (Cmd+E) / undo (Cmd+Z) 등 모든 단축키 한 곳에. 모달 진입점 (`?` 키 또는 우상단 keyboard 아이콘) + 모달 본체 (디자인 토큰 기반).
+- [ ] `lib/dates.ts` 키워드 매핑 (지금 / now / 현재 → 현재 HH:mm). blur/Enter 시점에 변환. vault md 에는 실제 시각 저장 (키워드 X).
 
 ---
 
-## 🟡 안정성 / 위생
+## 🎨 폴리시
 
-- [ ] **useDebouncedSave race 검토** — V0.7.2 useStateHistory 의 stale closure race 가 일기 본문 자동 저장 / 캘린더 자동 저장 패턴에도 있는지 점검. `set + immediate flush` 같은 turn 호출 케이스 있으면 `valueRef` 동기 갱신 적용.
-- [ ] **자동 백업 spinner toast** — vault 크기 따라 첫 zip 1-10초 침묵 = 사용자 불안. 1초+ 면 toast 띄움.
-- [ ] **lint 11 errors 정리** — V0.5.3~V0.5.4 부터 잔존 (react-hooks/refs). dogfood 단계 한 번에 정리.
+### PR — 테마 전환 radial wipe `ui_ux`
+한 줄 임팩트: 테마 토글 시 누른 곳에서 원형으로 퍼지는 wipe (갑자기 밝아져 눈 아픈 문제)
+
+- [ ] View Transitions API + clip-path circle. 토글 버튼 클릭 좌표 origin. 0.8s ease-out.
+
+### PR — toast/에러 박스 overflow 수정 `fix`
+한 줄 임팩트: 긴 에러 메세지도 박스 안에 잘 fit + 재시도 버튼 보임
+
+- [ ] toast 컨테이너 max-width + 텍스트 영역 min-w-0 + break-words + 액션 버튼 flex-shrink-0. 한 컴포넌트 수정으로 모든 toast 적용. 현재는 긴 에러 시 텍스트가 박스 밖으로 나가고 재시도 버튼이 밀려서 안 보임.
+
+### PR — UI 패딩 / 캘린더 폴리싱 `ui_ux`
+한 줄 임팩트: 잔여 디자인 inconsistency 정리
+
+- [ ] 캘린더 스크롤만으로 다른 월 본 상태도 페이지 전환 시 복원 (selectedDate 안 바뀌어도)
+
+### PR — 캘린더 헤더 네비게이션 `ui_ux`
+한 줄 임팩트: 캘린더에서 이전/다음 달 / 오늘로 한 번에 점프
+
+- [ ] 캘린더 sticky 헤더 우측에 `[<] [오늘] [>]` 버튼 추가 (월 라벨과 같은 row).
+- [ ] 이동 시 **해당 달의 1일이 포함된 주 row 가 최상단**으로 (scrollIntoView smooth). prev = 현재 sticky month 의 1달 이전, next = 1달 이후, 오늘 = `new Date()` 의 달.
+- [ ] 49주 버퍼 edge 근접 시 기존 rebalance 로직과 호환 — 점프 anchor 가 버퍼 밖이면 rebalance 먼저 → 그 후 scroll. minCenterOffset (2026-01 이전 차단) 도 그대로 적용.
+
+### PR — 할일 페이지 UI/UX 개편 `ui_ux`
+한 줄 임팩트: 할일 리스트 + 입력 흐름 dogfood 통증 한 번에 정리
+
+- [ ] **리스트 UI 정리** — 구분선 톤 다운 (현재 너무 진함). 정보 레이아웃 재배치 (제목/메타/액션 위계 명확).
+- [ ] **체크 실수 복원** — 단일 클릭 = 실수 잦음. 더블클릭으로 체크 토글 또는 ⌘Z undo 도입 (둘 다 양립 가능).
+- [ ] **날짜/시간 입력 통일** — 메모장 메타 row 와 같은 패턴 (date input + time input). 현재는 날짜만 + 입력 불편 + 시간 없음. 메모장과 컴포넌트 공유 후보.
+- [ ] **추가 헤더 sticky** — 할일 추가 입력란을 상단 sticky 로 고정, 또는 위로 스크롤 시 등장. 현재는 매번 최상단으로 가야 함.
+
+### PR — 내 작업 (portfolio) UI/UX 개편 `ui_ux`
+한 줄 임팩트: 카드 view + 편집 흐름 + 업로드 dogfood 통증 한 번에 정리
+
+- [ ] **카드 크기/레이아웃 재설계** — 현재 카드 너무 크고 한눈에 중요 정보 (impact_summary / 날짜 / 카테고리) 안 들어옴. 정보 우선순위 정리 + 작은 카드 그리드.
+- [ ] **카드 inline 편집** — 현재 lightbox 모달 진입 후 편집. 카드 클릭 = inline 펼침 + 편집 모드 전환 검토. 메모장 패턴 (제목 → 본문 inline) 과 비교.
+- [ ] **`ResponsePasteArea` 발견성** — `PortfolioWorkCard.tsx:147` 의 "Claude 응답 paste" 입력란. impact_summary 비었을 때만 등장 + placeholder 만 있어 사용자가 "무슨 기능인지 모름" 체감. 라벨/도움말 보강 또는 가치 재평가 후 제거 결정. (단일 카드 메뉴의 "Claude 프롬프트 복사" 는 별개 — 그건 명확.)
+- [ ] **이미지 업로드 드래그&드롭** — CLAUDE.md 엔 dropzone 명시지만 사용자 체감 안 됨. 실제 동작 점검 + 카드 그리드 어디서든 드래그 받도록 영역 확장. lightbox 안 dropzone 도 동작 검증.
+- [ ] **참고**: "내 작업 수동 추가" 는 별도 PR 로 📊 Portfolio 섹션에 이미 있음 (`#portfolio` 탭에 "새 카드" 버튼).
+
+### PR — 날짜/시간 표시 포맷 통일 `ui_ux`
+한 줄 임팩트: 앱 전체 날짜/시간 표시가 한 컨벤션으로
+
+- [ ] **메모장 사이드바 카드** — `MM.DD(ddd) HH:mm · 참석자 N명`. 올해면 연도 생략, 올해 아니면 `YYYY.MM.DD(ddd) HH:mm`
+- [ ] **휴지통 카드** — 메모장 카드와 동일 포맷 통일. 삭제 시각은 카드 secondary 영역 (하단 또는 작은 글씨로 별도 위치)
+- [ ] **앱 전체 검토 + 통일** — 메모 본문 메타 row / 캘린더 라벨 / todos 마감일 / portfolio 카드 등 표시 위치 찾아 한 컨벤션으로
+- [ ] **`lib/dates.ts` 단일 포맷 함수 도입** — `formatMeetingDate()` / `formatTrashDate()` 등 → 모든 호출처 통일. 새 표시 위치 추가 시 함수만 호출
+
+---
+
+## 🛡️ Vault 안정성 (V0.6.1 후속)
+
+### PR — vault 파일 read 안정성 `backend`
+한 줄 임팩트: 깨진 frontmatter / 중복 uid / 외부 sync 충돌 파일도 데이터 표시 유지
+
+- [ ] 🔥 **깨진 파일 사용자 alert banner** — "N 개 메모를 읽지 못했어요" 사이드바 banner, 클릭 시 디스크 path 표시. UX 약점 (메모 사라진 듯 보임) 해소.
+- [x] ~~uid 중복 감지 + 후순위 재발급~~ — PR #16 완료. scanMeetings 끝 `Set<uid>` 검사 + mtime 작은 entry 재발급 + 디스크 rewrite. 외부 도구 (옵시디안 merge / 백업 복원) 가 중복 uuid 만들어도 silent 자동 복구.
+- [x] ~~frontmatter parse 실패 graceful fallback~~ — `parseVaultFile` 이미 graceful (yaml 깨져도 빈 fm fallback). V0.7.2 scanMeetings catch 에 console.warn 추가로 디버깅 보강.
+- [x] ~~iCloud `(conflicted copy)` 같은 sync 충돌 파일 vault 스캔에서 무시~~ — V0.7.2 `isSyncNoiseFile` 헬퍼 (conflicted copy / .icloud / dotfile).
+
+### PR — vault 폴더 사라짐 모달 `ui_ux`
+한 줄 임팩트: 외장 디스크 disconnect / iCloud 이동 시 사용자가 명확히 인식
+
+- [ ] 🔥 감지는 PR #13 완료 (즉시 VaultPicker 복귀). UI 모달만 남음 — "vault 폴더에 접근할 수 없어요. {경로} 확인 후 다시 연결하거나 다른 폴더 선택" + 재연결/다른 폴더 선택 버튼.
+
+### PR — Conflict resolution 모달 `backend`
+한 줄 임팩트: 옵시디안 모바일과 동시 편집 충돌 시 보존/덮어쓰기 선택
+
+- [ ] ConflictError throw → UI 모달 (내 변경 보존 / 외부 변경 가져오기 / `.conflict-*.md` 파일 생성)
+
+---
+
+## 📊 Portfolio (V0.7.x 후속)
+
+### PR — 내 작업 수동 추가 `ui_ux`
+한 줄 임팩트: GitHub PR 무관 카드 (오프라인 업무 / 회의 발표) 도 portfolio 에 직접 추가
+
+- [ ] portfolio 탭에서 "새 카드" 버튼 → title/date/category/impact_summary 입력 + screenshots dropzone → 저장. frontmatter `github_pr_id` 없거나 0 → sync 가 건드리지 않음 (legacy 카드 schema 그대로 활용). 평가 자료에 PR 외 활동도 포함.
+
+### PR — gh 호출 인프라 강화 `backend`
+한 줄 임팩트: gh 인증/네트워크 실패도 매끄럽게
+
+- [ ] gh 미설치 / 미로그인 별도 모달 (현재는 sidebar inline)
+- [ ] 회사 HTTPS outbound 차단 감지 + 자동 sync off 설정 (매일 토스트 떠야 발견)
+- [ ] gh enrich concurrency 5 병렬 (현재 직렬, 첫 sync 3분 통증 시 도입)
+
+### PR — PR body 이미지 자동 import `backend`
+한 줄 임팩트: PR 의 before/after 이미지 자동 vault 다운로드
+
+- [ ] sync 가 PR body 의 `<img src>` / `![](url)` 추출 → URL fetch → `_attachments/{slug}/before-N.png` 다운로드 → screenshots frontmatter 자동 채움. 본인 dropzone 박은 거 보존. private repo URL 은 gh auth token.
+
+### PR — commit cluster 카드 (Plan B) `backend`
+한 줄 임팩트: 회사 PR 워크플로 전환 부담 크면 branch cluster 로 대체
+
+- [ ] branch 단위 commit cluster → AI 입력 commit messages 로 카드 생성
+
+---
+
+## 🧹 안정성 / 위생
+
+### PR — useDebouncedSave race 검토 `backend`
+한 줄 임팩트: V0.7.2 useStateHistory race fix 와 같은 패턴이 다른 자동 저장에도 있는지
+
+- [ ] 일기 본문 자동 저장 / 캘린더 자동 저장 패턴에 `set + immediate flush` 같은 turn 호출 케이스 있는지 점검. 있으면 `valueRef` 동기 갱신 적용.
+
+### PR — 자동 백업 spinner toast `ui_ux`
+한 줄 임팩트: 첫 zip 1-10초 침묵 = 사용자 불안 → spinner
+
+- [ ] vault 크기 따라 첫 zip 1-10초 침묵. 1초+ 면 toast 띄움.
+
+### PR — lint 정리 + Vercel disconnect `infra`
+한 줄 임팩트: 잔여 위생
+
+- [ ] **lint 정리** — 현재 28 errors + 3 warnings (V0.5.3~V0.5.4 부터 누적, react-hooks/refs 위주). dogfood 단계 한 번에 정리.
 - [ ] **Vercel 대시보드 disconnect** — deploy 는 `vercel.json` 으로 막혔지만 대시보드 연동은 잔존. 선택.
 
 ---
 
-## 🟡 디자인 / UI 폴리싱
+## 📅 매일 사용 / dogfood (작업 X, routine)
 
-- [ ] **캘린더 스크롤만으로 다른 월 본 상태 보존**. selectedDate 안 바뀐 채 스크롤만 이동한 경우는 페이지 전환 시 복원 안 됨. 명시적 날짜 클릭은 OK.
+- [ ] V0.7 dogfood 매일 사용 — 다음 분기 평가 시 portfolio 탭만 띄워서 5분 내 펼쳐보일 수 있는지 검증
+- [ ] 다른 owner repo legacy 카드 backfill — "Legacy 카드 프롬프트" 복사 → 각 repo Claude Code 에 paste
+- [ ] 회사 owner repo PR 워크플로 전환 시도 — branch + 셀프 PR + auto-merge alias (5초)
+- [ ] backup-pre-pr-split branch 삭제 결정 (dogfood 며칠 후 안전 확인)
+
+---
+
+## 🔮 V0.7+ 후보 (dogfood 결과로 진입 결정)
+
+- [ ] Tauri 2 Mobile — 모바일에서 본인 UI 사용
+- [ ] "Claude 응답 paste → 자동 callout" 회의록 영역
+- [ ] 녹음 파일 직접 업로드 → 자동 STT
+- [ ] Tauri 데스크탑 `.dmg` 빌드 + 코드 사인
