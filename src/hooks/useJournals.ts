@@ -34,7 +34,6 @@ export function useUpsertJournal() {
         next.sort((a, b) => (a.date < b.date ? 1 : -1));
         return next;
       });
-      qc.invalidateQueries({ queryKey: ["todos"] });
     },
   });
 }
@@ -51,7 +50,6 @@ export function useDeleteJournal() {
       qc.setQueryData<Journal[]>(journalsKey, (prev) =>
         prev?.filter((j) => j.id !== id),
       );
-      qc.invalidateQueries({ queryKey: ["todos"] });
     },
   });
 }

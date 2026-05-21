@@ -21,21 +21,39 @@ import {
   applyWrap,
   applyLineMove,
   applyLineDuplicate,
+  applyLineKindTransform,
+  detectSlashTrigger,
   type EditResult,
 } from "../../lib/markdownTyping";
+import {
+  SlashCommandPopover,
+  getSlashOptionsForFilter,
+  type SlashOption,
+} from "./SlashCommandPopover";
 
 type Props = {
   content: string;
   onChange: (next: string) => void;
+  // cursor 가 - [ ] 라인 위에서 ⌘⏎ 누르면 그 라인 텍스트를 부모에게 전달.
+  // 부모 (MeetingForm) 가 TaskAddModal prefill 로 띄움. 일방향 복제 — 메모 라인은 그대로.
+  onSendLineToInbox?: (lineText: string) => void;
 };
 
 // textarea의 한 줄 높이 (line-height = 1.625rem, text-base 기준).
 const LINE_HEIGHT = "1.625rem";
 const GUTTER_WIDTH = "1.75rem";
 
-export function SourceBodyEditor({ content, onChange }: Props) {
+type SlashState = {
+  slashStart: number; // value 안 `/` 의 offset
+  filter: string;
+  selectedIndex: number;
+  slashLine: number; // popover top 계산용 (slash 가 있는 줄 index)
+};
+
+export function SourceBodyEditor({ content, onChange, onSendLineToInbox }: Props) {
   const [draft, setDraft] = useState(content);
   const [caretLine, setCaretLine] = useState<number | null>(null);
+  const [slashState, setSlashState] = useState<SlashState | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const skipNextValueSyncRef = useRef(true);
   // 다음 render 직후 textarea selection 을 강제로 set 할 위치. Tab/Enter/Paste 같은
@@ -47,6 +65,47 @@ export function SourceBodyEditor({ content, onChange }: Props) {
     if (!el) return;
     const pos = el.selectionStart ?? 0;
     setCaretLine(el.value.slice(0, pos).split("\n").length - 1);
+    updateSlashTrigger(el.value, pos);
+  }
+
+  // value + caret 위치 기준으로 slash trigger 재평가. 활성 trigger 면 state set,
+  // 아니면 close.
+  function updateSlashTrigger(value: string, caret: number) {
+    const t = detectSlashTrigger(value, caret);
+    if (!t) {
+      if (slashState) setSlashState(null);
+      return;
+    }
+    const slashLine = value.slice(0, t.slashStart).split("\n").length - 1;
+    setSlashState((prev) => {
+      // filter 가 바뀌면 selectedIndex 는 0 으로 reset.
+      if (!prev || prev.slashStart !== t.slashStart) {
+        return {
+          slashStart: t.slashStart,
+          filter: t.filter,
+          selectedIndex: 0,
+          slashLine,
+        };
+      }
+      if (prev.filter === t.filter) return prev;
+      return { ...prev, filter: t.filter, selectedIndex: 0, slashLine };
+    });
+  }
+
+  // SlashCommandPopover 옵션 선택 시: `/{filter}` literal 을 제거하고 target kind 로
+  // 줄 변환. 변환 후 caret 은 transform 결과의 caret 위치로.
+  function commitSlashOption(option: SlashOption) {
+    const el = textareaRef.current;
+    if (!el || !slashState) return;
+    const value = el.value;
+    const { slashStart, filter } = slashState;
+    const slashEnd = slashStart + 1 + filter.length;
+    // 1) `/{filter}` 제거
+    const stripped = value.slice(0, slashStart) + value.slice(slashEnd);
+    // 2) 그 자리 (slashStart) 의 줄을 target kind 로 변환
+    const r = applyLineKindTransform(stripped, slashStart, option.target);
+    commitEdit(r);
+    setSlashState(null);
   }
 
   function commitEdit(r: EditResult) {
@@ -196,6 +255,45 @@ export function SourceBodyEditor({ content, onChange }: Props) {
     // IME composition (한글 등) 중에는 절대 가로채지 않음.
     if (e.nativeEvent.isComposing || e.keyCode === 229) return;
     const ta = e.currentTarget;
+    // 슬래시 커맨드 popover 열려있을 때 — 위/아래/Enter/Tab/Esc 가로채기.
+    if (slashState) {
+      const opts = getSlashOptionsForFilter(slashState.filter);
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        if (opts.length === 0) return;
+        setSlashState({
+          ...slashState,
+          selectedIndex: (slashState.selectedIndex + 1) % opts.length,
+        });
+        return;
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        if (opts.length === 0) return;
+        setSlashState({
+          ...slashState,
+          selectedIndex:
+            (slashState.selectedIndex - 1 + opts.length) % opts.length,
+        });
+        return;
+      }
+      if (e.key === "Enter" || e.key === "Tab") {
+        if (opts.length === 0) {
+          setSlashState(null);
+          return; // native 동작 진행 (Enter list continue 등)
+        }
+        e.preventDefault();
+        const chosen = opts[Math.min(slashState.selectedIndex, opts.length - 1)];
+        commitSlashOption(chosen);
+        return;
+      }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setSlashState(null);
+        return;
+      }
+      // 다른 키 (typing 등) 는 통과 — onChange 가 다시 trigger 평가.
+    }
     if (e.key === "Tab") {
       // 항상 preventDefault — applyIndent 가 null 이어도 native Tab 이 prev focusable
       // (참석자 input 등) 로 빠져나가는 것 차단. textarea 안 머무름.
@@ -218,6 +316,20 @@ export function SourceBodyEditor({ content, onChange }: Props) {
       return;
     }
     const mod = e.metaKey || e.ctrlKey;
+    // ⌘⏎ — cursor 라인이 - [ ] 면 그 라인 텍스트 inbox 로 보내기 (일방향 복제)
+    if (mod && e.key === "Enter" && !e.shiftKey && !e.altKey && onSendLineToInbox) {
+      const value = ta.value;
+      const pos = ta.selectionStart ?? 0;
+      const lineStart = value.lastIndexOf("\n", pos - 1) + 1;
+      const lineEndIdx = value.indexOf("\n", pos);
+      const lineEnd = lineEndIdx === -1 ? value.length : lineEndIdx;
+      const lineText = value.slice(lineStart, lineEnd);
+      if (/^\s*-\s\[[ x]\]\s/.test(lineText)) {
+        e.preventDefault();
+        onSendLineToInbox(lineText);
+        return;
+      }
+    }
     // ⌘B / ⌘I / ⌘E — bold / italic / inline-code wrap toggle
     if (
       mod && !e.shiftKey && !e.altKey &&
@@ -275,7 +387,7 @@ export function SourceBodyEditor({ content, onChange }: Props) {
     <div
       className="flex"
       onMouseDown={onContainerMouseDown}
-      style={{ minHeight: "60vh", alignItems: "stretch" }}
+      style={{ minHeight: "60vh", alignItems: "stretch", position: "relative" }}
     >
       <div
         className="select-none"
@@ -304,6 +416,7 @@ export function SourceBodyEditor({ content, onChange }: Props) {
           setDraft(e.target.value);
           onChange(e.target.value);
           updateCaretLine();
+          updateSlashTrigger(e.target.value, e.target.selectionStart ?? 0);
         }}
         onKeyDown={onKeyDown}
         onPaste={onPaste}
@@ -328,6 +441,18 @@ export function SourceBodyEditor({ content, onChange }: Props) {
         }}
         wrap="off"
       />
+      {slashState ? (
+        <SlashCommandPopover
+          filter={slashState.filter}
+          selectedIndex={slashState.selectedIndex}
+          onSelect={commitSlashOption}
+          onClose={() => setSlashState(null)}
+          // gutter (1.75rem) + textarea paddingLeft (0.5rem) = 2.25rem 안쪽.
+          anchorLeft="2.25rem"
+          // slash 줄 바로 아래 — (slashLine + 1) * LINE_HEIGHT.
+          anchorTop={`calc(${slashState.slashLine + 1} * ${LINE_HEIGHT})`}
+        />
+      ) : null}
     </div>
   );
 }

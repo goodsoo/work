@@ -15,11 +15,24 @@ const TIME_EXAMPLES: Example[] = [
   { inputs: ["1830", "0930"], output: "압축 HHmm" },
 ];
 
+const TASK_EXAMPLES: Example[] = [
+  { inputs: ["- [ ] 보고서 --- 내일 14:00 #work #high"], output: "전체 형식" },
+  { inputs: ["- [x] 이미 완료"], output: "체크 상태도 그대로" },
+  { inputs: ["--- 내일", "--- 월", "--- 2026-05-22"], output: "날짜 (자연어 / 요일 / ISO 등 위 '날짜 입력' 표 전부 사용 가능)" },
+  { inputs: ["HH:MM", "오후 2시", "1830"], output: "시간 (위 '시간 입력' 표 전부 사용 가능)" },
+  { inputs: ["#work", "#meeting"], output: "카테고리" },
+  { inputs: ["#high", "#medium", "#low"], output: "우선순위" },
+];
+
 export function HelpSection() {
   return (
     <div className="space-y-5">
       <Block title="날짜 입력" examples={DATE_EXAMPLES} />
       <Block title="시간 입력" examples={TIME_EXAMPLES} />
+      <Block
+        title="메모 → 할 일 (cursor 줄 위 ⌘⏎)"
+        examples={TASK_EXAMPLES}
+      />
     </div>
   );
 }

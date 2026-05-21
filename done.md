@@ -6,6 +6,34 @@
 
 ## 2026-05-21
 
+### PR #21 — 메모/할일 데이터 도메인 정리 + 메모→할일 ⌘⏎
+
+- **두 도메인으로 환원** — Note (`meetings/` + `journals/`, 폴더로 분리한 같은 schema md 파일) / Task (`inbox.md` 안 `- [ ]` 라인, 일정/할일 통합). 사용자 mental model 의 메모/일기/일정/할일 4 개념을 2 entity 로.
+- **journals schema meetings 와 통일** — frontmatter `id: <uuid>` lazy migration 추가 (`scanJournals` / `upsertJournal`). 옛 일기 첫 read 시 uuid 발급 + rewrite.
+- **Task scan 범위 축소** — `scanAllTodos` 가 vault 전체 → `inbox.md` only. 메모/일기 안 `- [ ]` 는 단순 체크박스 (의도 보존). 회의록 의안 체크리스트, 타인 할일, 옵션 list 가 todo 페이지에 false positive 로 침범하던 통증 해소.
+- **Schedule entity 폐기** — `_is_event` / `Schedule` 타입 / `schedules.ts` / `useSchedules` / `ScheduleBlock.tsx` 제거. 캘린더 / SidePanel / MonthGrid 가 `Task` 직접 사용. **캘린더 셀에 같은 task 가 schedule 줄 + todo 줄 두 번 등장하던 중복 push 버그** (`CalendarPage.tsx:107-125`) 자동 해소.
+- **`TaskAddModal` 통합** — `ScheduleAddModal` → `components/tasks/TaskAddModal.tsx` 신설. 필드: 제목 / 날짜 (optional) / 시간 (optional) / 카테고리 / 우선순위 / 완료됨 토글. `prefill?: Partial<TodoInsert>` props. 호출처 통일 (할일 페이지, 캘린더 셀 클릭, 사이드 패널 `+` 모두 같은 모달).
+- **메모 → 할일 ⌘⏎ 액션** — 메모 본문 cursor 가 `- [ ]` 라인 위 → 단축키 `⌘⏎`. `SourceBodyEditor` 가 `onSendLineToInbox` prop 호출, MeetingForm 의 `lineToTaskPrefill` 이 `extractTodos` parser 재사용해서 라인 분석 → TaskAddModal prefill (체크 상태 / 날짜 / 시간 / 카테고리 / 우선순위 모두 자동). **메모 라인은 그대로 (일방향 복제, 두 라인 완전 독립 — sync X)**. Apple Notes → Reminders 패턴.
+- **inline 문법** — `- [x] 본문 --- YYYY-MM-DD HH:MM #category #priority`. em dash `—` 대신 triple hyphen `---` 도 매칭 (한국어 키보드에서 em dash 직접 입력 불가능). `lib/dates` 의 `parseLooseDate` / `parseLooseTime` 자연어 fallback — `오늘 / 내일 / 모레 / 월 / 오후 2시 / 2026.05.04 / 1830` 등 흡수.
+- **footgun fix — `buildTodoLine` 항상 ISO 박음**. 이전엔 올해 case 에 한해 `M/D` 박았는데 연도 바뀌면 `getFullYear()` 가 새 해로 보충해 모든 M/D todo 가 1년 미래로 점프하던 버그. 이제 라인 자체에 연도 보존.
+- **parser graceful split** — `---` 뒤 date/time 매칭 둘 다 실패하면 split 무효, 본문 보존. 외부 편집 / 사용자 실수로 망가져도 텍스트 손실 X.
+- **`sanitizeTaskTitle`** — title 안 `—` / `---` 박혀있으면 저장 시 `--` 로 강등. 다음 read 의 잘못된 split 차단.
+- **date-like 토큰 time false positive 차단** — `parseLooseTime("6/07")` 가 `parseInt` 로 `06:00` 잘못 매칭하던 거 fix. 자연어 fallback 의 토큰별 시도에서 slash/dash 포함 토큰은 time 매칭 skip. 인접 2-token sliding window 는 `오전/오후/AM/PM` prefix 일 때만 — "오후 2시" 같은 multi-word 보존.
+- **assignee 추출 폐기** — UI 에 기능 없는데 parser 가 `[X] 본문` bracket 을 assignee 로 흡수해 본문에서 분리. `[ ] 안녕`, `[홍길동] 보고서` 같은 케이스에서 본문 일부 사라지던 문제. `ASSIGNEE_RE` / `TodoItem.assignee` / 관련 테스트 제거. bracket 도 본문 일부로 보존.
+- **"일정" 라벨 정리** — 사이드 패널 `+` 의 "일정 추가" → "할 일 추가". 카피 통일.
+- 19 modified, 4 deleted, 2 new. 168 tests passing (+19 신규 자연어/sanitize/graceful split/`---` 매칭/assignee 폐기 등).
+- commit `c5555b4` (squash)
+
+### PR #20 — 본문 슬래시 커맨드
+
+- **`/` 한 글자로 줄 type 즉시 변환** — 메모 본문 빈 줄 또는 marker 뒤에서 `/` → popover (H1-3 / bullet / ordered / checkbox / quote / code-fence / hr / table 10개). ↑/↓ nav, Enter/Tab 선택, Esc 닫기. 타이핑으로 filter (`/h1`, `/체크`, 한글 키워드 매칭). 옵시디안 community "Slash Command Suggester" 호환 — vault md source 변화 X (표준 markdown). paragraph 면 marker prepend, 이미 marker 있으면 교체 (bullet → checkbox 등), indent 보존.
+- **trigger 룰** — 줄에서 caret 직전이 indent · marker (`- `, `1. `, `- [ ] `, `> `, `# `) 뒤 빈 곳일 때만. URL / 날짜 / 일반 문장 중 `/` 는 false positive 차단. `markdownTyping.ts` 의 `detectSlashTrigger` 가 single regex 로 판정.
+- **`applyLineKindTransform` helper** — pure function. paragraph/bullet/ordered/checkbox/quote/heading 1-3/code-fence/hr/table 10개 target. `stripLineMarker` 가 기존 marker (ATX heading + parseLineMarker 통합) 제거 후 새 marker prepend. indent 정규화 + caret 재계산.
+- **`SlashCommandPopover` 컴포넌트** — 키워드 startsWith filter + 라벨 contains. `mousedown` 으로 옵션 선택 (textarea blur race 차단). 옵션마다 lucide 아이콘 + 라벨 + hint (`# `, `- `, `1. `). 일치 0 이면 안내만 (자동 닫기 X, backspace 로 복구).
+- **SourceBodyEditor 통합** — slashState (slashStart/filter/selectedIndex/slashLine). onKeyDown 에서 popover 활성 시 Up/Down/Enter/Tab/Esc 가로채기, 다른 키는 통과 → onChange 가 다시 trigger 평가. popover 위치 = gutter (1.75rem) + textarea paddingLeft (0.5rem) 안쪽, `calc(slashLine+1 * 1.625rem)` top (현재 줄 바로 아래).
+- 17개 unit test 추가 (applyLineKindTransform 9 + detectSlashTrigger 8). 163 통과.
+- commit `57fa603`, merge `dc169ab`
+
 ### 직커밋 — vault 폴더 사라짐 명시 안내 + 재연결 시 빈 vault 신생 방지
 
 - **`VaultDisconnected` 화면 신설** — `VaultProvider` 에 `disconnectedFrom` state 추가 + 끊김 감지 (`handleVaultGone` / init failed) 가 직전 path 보존. `VaultGate` 가 `vaultRoot` null && `disconnectedFrom` 있으면 새 화면 ("vault 폴더에 접근할 수 없어요" + 이전 path mono + [재연결] / [다른 폴더 선택]) 렌더, 그 외 기존 `VaultPicker`. 끊긴 이유/경로 모른 채 picker 가 *조용히* 뜨던 문제 해소.

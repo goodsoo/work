@@ -6,6 +6,8 @@ import {
   applyWrap,
   applyLineMove,
   applyLineDuplicate,
+  applyLineKindTransform,
+  detectSlashTrigger,
   parseLineMarker,
 } from "./markdownTyping";
 
@@ -216,5 +218,80 @@ describe("applyUrlPaste", () => {
     expect(
       applyUrlPaste("see https://a.com here", 4, 17, "https://b.com"),
     ).toBeNull();
+  });
+});
+
+describe("applyLineKindTransform", () => {
+  it("paragraph → heading prepend", () => {
+    const r = applyLineKindTransform("hello", 5, { type: "heading", level: 1 });
+    expect(r.value).toBe("# hello");
+    expect(r.start).toBe(7);
+  });
+  it("paragraph → bullet prepend", () => {
+    const r = applyLineKindTransform("hello", 0, { type: "bullet" });
+    expect(r.value).toBe("- hello");
+  });
+  it("bullet → checkbox 교체 (marker 만 바뀜)", () => {
+    const r = applyLineKindTransform("- foo bar", 5, { type: "checkbox" });
+    expect(r.value).toBe("- [ ] foo bar");
+  });
+  it("ordered → bullet 교체", () => {
+    const r = applyLineKindTransform("1. foo", 3, { type: "bullet" });
+    expect(r.value).toBe("- foo");
+  });
+  it("heading → paragraph (marker 제거)", () => {
+    const r = applyLineKindTransform("## hi", 5, { type: "paragraph" });
+    expect(r.value).toBe("hi");
+  });
+  it("indent 보존 — 들여쓴 bullet → checkbox", () => {
+    const r = applyLineKindTransform("  - foo", 5, { type: "checkbox" });
+    expect(r.value).toBe("  - [ ] foo");
+  });
+  it("여러 줄 중 caret 줄만 변환", () => {
+    const value = "first\nhello\nthird";
+    const caret = value.indexOf("hello") + 2; // "he|llo"
+    const r = applyLineKindTransform(value, caret, { type: "heading", level: 2 });
+    expect(r.value).toBe("first\n## hello\nthird");
+  });
+  it("hr → 줄 통째로 ---", () => {
+    const r = applyLineKindTransform("anything", 4, { type: "hr" });
+    expect(r.value).toBe("---");
+  });
+  it("code-fence → fence pair (multi-line)", () => {
+    const r = applyLineKindTransform("", 0, { type: "code-fence" });
+    expect(r.value).toBe("```\n\n```");
+  });
+});
+
+describe("detectSlashTrigger", () => {
+  it("빈 줄 column 0 의 `/` → trigger", () => {
+    const r = detectSlashTrigger("/", 1);
+    expect(r).toEqual({ slashStart: 0, filter: "" });
+  });
+  it("indent 뒤 `/` → trigger", () => {
+    const r = detectSlashTrigger("  /", 3);
+    expect(r).toEqual({ slashStart: 2, filter: "" });
+  });
+  it("`/h1` filter 매칭", () => {
+    const r = detectSlashTrigger("/h1", 3);
+    expect(r).toEqual({ slashStart: 0, filter: "h1" });
+  });
+  it("bullet marker 뒤 `/` → trigger (marker 교체 시나리오)", () => {
+    const r = detectSlashTrigger("- /", 3);
+    expect(r).toEqual({ slashStart: 2, filter: "" });
+  });
+  it("일반 텍스트 중 `/` → null", () => {
+    expect(detectSlashTrigger("foo /", 5)).toBeNull();
+  });
+  it("URL 안의 `/` → null", () => {
+    expect(detectSlashTrigger("https://", 8)).toBeNull();
+  });
+  it("filter 안에 공백 → null (filter 끊김)", () => {
+    expect(detectSlashTrigger("/h 1", 4)).toBeNull();
+  });
+  it("이전 줄에 텍스트 있어도 현재 줄 빈 곳이면 trigger", () => {
+    const value = "first line\n/";
+    const r = detectSlashTrigger(value, value.length);
+    expect(r).toEqual({ slashStart: 11, filter: "" });
   });
 });

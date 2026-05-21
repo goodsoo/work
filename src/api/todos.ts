@@ -18,13 +18,11 @@ export interface Todo {
   category: TodoCategory | null;
   due_date: string | null;
   due_time: string | null;
-  linked_meeting_id: string | null;
   // V0.5.3 호환 — UI 가 의존. vault 에선 파일 mtime / "now" 로 대체.
   created_at: string;
   updated_at: string;
   // V0.6 internal — mutation 헬퍼용
   _source: { file: string; line: number };
-  _is_event: boolean;
 }
 
 export interface TodoInsert {
@@ -34,7 +32,6 @@ export interface TodoInsert {
   due_date?: string | null;
   due_time?: string | null;
   priority?: TodoPriority;
-  linked_meeting_id?: string | null;
 }
 
 export interface TodoUpdate {
@@ -82,26 +79,18 @@ function todoFromItem(item: TodoItem, mtimeIso?: string): Todo {
     category: categoryTag ?? null,
     due_date: item.due ?? null,
     due_time: item.time ?? null,
-    linked_meeting_id: item.source.file.startsWith("meetings/")
-      ? item.source.file
-      : null,
     created_at: iso,
     updated_at: iso,
     _source: item.source,
-    _is_event: item.isEvent,
   };
 }
 
 // ─── inline syntax 라인 build ───────────────────────────────────────────────
 
-function formatDateForLine(iso: string): string {
-  // YYYY-MM-DD → M/D (올해면) 또는 YYYY-MM-DD
-  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (!m) return iso;
-  const year = Number(m[1]);
-  const cur = new Date().getFullYear();
-  if (year === cur) return `${Number(m[2])}/${Number(m[3])}`;
-  return iso;
+// title 안에 split 구분자 (`—` 또는 `---`) 박히면 다음 read 시 parser 가 잘못 split.
+// title 차원에서 `--` 로 강등 — parser 의 DUE_SPLIT_RE 와 매칭 안 됨 → 본문 보존.
+function sanitizeTaskTitle(title: string): string {
+  return title.replace(/—|---/g, "--");
 }
 
 export function buildTodoLine(input: {
@@ -114,10 +103,13 @@ export function buildTodoLine(input: {
   extra_tags?: string[];
 }): string {
   const check = input.done ? "x" : " ";
-  let line = `- [${check}] ${input.title}`;
+  // 시스템 생성 라인은 항상 ` --- ` + ISO 날짜. 옛 vault 의 ` — ` + M/D 도
+  // parser 가 호환 매칭. ISO 박는 이유: M/D 만 박으면 연도가 read 시점 따라 점프
+  // (2026 에 박은 5/22 가 2027 에 read 시 2027-05-22 로 해석되는 footgun).
+  let line = `- [${check}] ${sanitizeTaskTitle(input.title)}`;
   if (input.due_date || input.due_time) {
-    line += " —";
-    if (input.due_date) line += ` ${formatDateForLine(input.due_date)}`;
+    line += " ---";
+    if (input.due_date) line += ` ${input.due_date}`;
     if (input.due_time) line += ` ${input.due_time}`;
   }
   if (input.category) line += ` #${input.category}`;
@@ -173,11 +165,9 @@ export async function createTodo(
     category: input.category ?? null,
     due_date: input.due_date ?? null,
     due_time: input.due_time ?? null,
-    linked_meeting_id: input.linked_meeting_id ?? null,
     created_at: iso,
     updated_at: iso,
     _source: { file: INBOX_PATH, line: lineNum },
-    _is_event: !!input.due_time,
   };
 }
 

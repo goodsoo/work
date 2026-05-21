@@ -119,14 +119,6 @@ export function TodoRow({ todo, onToggle, onUpdate, onDelete }: Props) {
             value={todo.category}
             onChange={(c) => onUpdate(todo, { category: c })}
           />
-          {todo.linked_meeting_id ? (
-            <span
-              className="font-mono text-[10px] uppercase tracking-wide"
-              style={{ color: "var(--text-muted)" }}
-            >
-              from meeting
-            </span>
-          ) : null}
         </div>
       </div>
 

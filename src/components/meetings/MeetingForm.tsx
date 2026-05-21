@@ -33,6 +33,9 @@ import { EditableList } from "./EditableList";
 import { AttendeeTagInput } from "./AttendeeTagInput";
 import { SourceBodyEditor } from "./SourceBodyEditor";
 import { MarkdownView } from "./MarkdownView";
+import { TaskAddModal } from "../tasks/TaskAddModal";
+import type { TodoCategory, TodoInsert, TodoPriority } from "../../api/todos";
+import { extractTodos } from "../../lib/vault/tasks";
 import { useViewMode } from "../../hooks/useViewMode";
 import { isTauri } from "../../lib/isTauri";
 import { formatError } from "../../lib/errors";
@@ -300,6 +303,10 @@ export function MeetingForm({ meetingId, onBack }: Props) {
     ACTIVE_TAB_CACHE.set(meetingId, t);
     setActiveTabState(t);
   }
+  const [taskModalOpen, setTaskModalOpen] = useState(false);
+  const [taskModalPrefill, setTaskModalPrefill] = useState<
+    Partial<TodoInsert>
+  >({});
   const [addedTodoIndices, setAddedTodoIndices] = useState<Set<number>>(
     () => new Set(),
   );
@@ -481,7 +488,6 @@ export function MeetingForm({ meetingId, onBack }: Props) {
         title: text,
         priority: "medium",
         due_date: null,
-        linked_meeting_id: meetingId,
       });
       setAddedTodoIndices((prev) => {
         const next = new Set(prev);
@@ -901,6 +907,10 @@ export function MeetingForm({ meetingId, onBack }: Props) {
                   if (newLines > prevLines) docHistory.flush();
                   setDoc("body", { ...doc, body: v });
                 }}
+                onSendLineToInbox={(lineText) => {
+                  setTaskModalPrefill(lineToTaskPrefill(lineText));
+                  setTaskModalOpen(true);
+                }}
               />
             ) : (
               <MarkdownView
@@ -1027,8 +1037,40 @@ export function MeetingForm({ meetingId, onBack }: Props) {
 
         </div>
       </div>
+      <TaskAddModal
+        open={taskModalOpen}
+        onClose={() => setTaskModalOpen(false)}
+        prefill={taskModalPrefill}
+      />
     </div>
   );
+}
+
+// 메모 안 한 줄 → TaskAddModal prefill. extractTodos parser 가 자연어까지 처리
+// (오늘, 내일, 월/화/일요일, 한글/압축 날짜, "오후 2시" 등).
+// 문법: `- [x] 본문 --- (날짜) (시간) #category #priority`
+//   - [x] / [ ]    = done
+//   --- 또는 —     = date/time split (앞 본문, 뒤 매칭 토큰들)
+//   #work / #meeting       = category
+//   #high / #medium / #low = priority
+// 매칭 안 되는 토큰은 모두 본문으로 (예 `[안건 1]` 같은 bracket).
+function lineToTaskPrefill(lineText: string): Partial<TodoInsert> {
+  const items = extractTodos("inbox.md", `${lineText}\n`);
+  const item = items[0];
+  if (!item) return {};
+  const prefill: Partial<TodoInsert> = {
+    title: item.text,
+    done: item.done,
+  };
+  if (item.due) prefill.due_date = item.due;
+  if (item.time) prefill.due_time = item.time;
+  const cat = item.tags.find((t): t is TodoCategory => t === "work" || t === "meeting");
+  if (cat) prefill.category = cat;
+  const pri = item.tags.find((t): t is TodoPriority =>
+    t === "high" || t === "medium" || t === "low",
+  );
+  if (pri) prefill.priority = pri;
+  return prefill;
 }
 
 function CharCountBadge({ count }: { count: number }) {

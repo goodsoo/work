@@ -2,7 +2,6 @@ import {
   Plus,
   ClipboardList,
   BookOpen,
-  Calendar,
   HelpCircle,
   X,
   Trash2,
@@ -17,13 +16,12 @@ import {
 import { useMeetingSort, type MeetingSortKey } from "../../hooks/useMeetingSort";
 import { useJournals } from "../../hooks/useJournals";
 import { useTodos, useUpdateTodo } from "../../hooks/useTodos";
-import { useSchedules, useDeleteSchedule } from "../../hooks/useSchedules";
 import type { Meeting } from "../../api/meetings";
 import type { Todo, TodoCategory } from "../../api/todos";
 import { TODO_CATEGORIES } from "../../api/todos";
 import { formatDateLong, isToday, todayIso } from "../../lib/dates";
 import { formatError } from "../../lib/errors";
-import { ScheduleAddModal } from "../schedules/ScheduleAddModal";
+import { TaskAddModal } from "../tasks/TaskAddModal";
 
 /* ── Meetings Side Panel ── */
 
@@ -458,22 +456,17 @@ export function CalendarDayPanel({
   const meetingsQ = useMeetings();
   const journalsQ = useJournals();
   const todosQ = useTodos();
-  const schedulesQ = useSchedules();
   const updateTodo = useUpdateTodo();
-  const deleteSchedule = useDeleteSchedule();
   const [showAddModal, setShowAddModal] = useState(false);
 
   const today = isToday(selectedDate);
 
-  const { meetings, schedules, todos, journal } = useMemo(() => {
+  const { meetings, todos, journal } = useMemo(() => {
     const meetings = (meetingsQ.data ?? []).filter(
       (m) => m.date === selectedDate,
     );
     const journals = (journalsQ.data ?? []).filter(
       (j) => j.date === selectedDate,
-    );
-    const schedules = (schedulesQ.data ?? []).filter(
-      (s) => timestampToLocalIso(s.start_time) === selectedDate,
     );
     const todos = (todosQ.data ?? []).filter((t) => {
       if (t.done) {
@@ -491,19 +484,25 @@ export function CalendarDayPanel({
       if (ta !== tb) return ta < tb ? -1 : 1;
       return a.created_at < b.created_at ? -1 : 1;
     });
-    schedules.sort((a, b) => (a.start_time < b.start_time ? -1 : 1));
+    // 시간 있는 todo 가 앞 (시간순), 없는 거 뒤 (created_at 순)
     todos.sort((a, b) => {
       if (a.done !== b.done) return a.done ? 1 : -1;
+      const ta = a.due_time ?? "";
+      const tb = b.due_time ?? "";
+      if (ta !== tb) {
+        if (!ta) return 1;
+        if (!tb) return -1;
+        return ta < tb ? -1 : 1;
+      }
       return a.created_at < b.created_at ? -1 : 1;
     });
 
     return {
       meetings,
-      schedules,
       todos,
       journal: journals[0] ?? null,
     };
-  }, [meetingsQ.data, journalsQ.data, todosQ.data, schedulesQ.data, selectedDate]);
+  }, [meetingsQ.data, journalsQ.data, todosQ.data, selectedDate]);
 
   function handleToggle(t: Todo) {
     const nextDone = !t.done;
@@ -518,7 +517,6 @@ export function CalendarDayPanel({
 
   const hasItems =
     meetings.length > 0 ||
-    schedules.length > 0 ||
     todos.length > 0 ||
     journal !== null;
 
@@ -546,8 +544,8 @@ export function CalendarDayPanel({
         <button
           type="button"
           onClick={() => setShowAddModal(true)}
-          title="일정 추가"
-          aria-label="일정 추가"
+          title="할 일 추가"
+          aria-label="할 일 추가"
           className="flex h-7 w-7 items-center justify-center rounded-md transition"
           style={{ color: "var(--text-secondary)", minHeight: 0 }}
         >
@@ -566,42 +564,6 @@ export function CalendarDayPanel({
           </div>
         ) : (
           <div className="space-y-1 p-3">
-            {/* Schedules (merged with todos visually) */}
-            {schedules.map((s) => {
-              const time = new Date(s.start_time).toLocaleTimeString("ko-KR", {
-                hour: "2-digit",
-                minute: "2-digit",
-                hour12: false,
-              });
-              return (
-                <div
-                  key={s.id}
-                  className="group flex items-start gap-2 rounded-md px-3 py-2 transition"
-                >
-                  <Calendar
-                    className="mt-0.5 h-3.5 w-3.5 shrink-0"
-                    style={{ color: "var(--text-secondary)" }}
-                  />
-                  <div className="min-w-0 flex-1">
-                    <div className="text-sm" style={{ color: "var(--text-primary)" }}>
-                      <span style={{ color: "var(--text-muted)" }}>
-                        {time}
-                      </span>{" "}
-                      {s.title}
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => deleteSchedule.mutate(s.id)}
-                    className="text-xs opacity-0 transition group-hover:opacity-100"
-                    style={{ color: "var(--text-muted)", minHeight: 0 }}
-                  >
-                    삭제
-                  </button>
-                </div>
-              );
-            })}
-
             {/* Meetings */}
             {meetings.map((m) => (
               <button
@@ -633,7 +595,7 @@ export function CalendarDayPanel({
               </button>
             ))}
 
-            {/* Todos */}
+            {/* Todos — due_time 있으면 시각 prefix */}
             {todos.map((t) => (
               <div
                 key={t.id}
@@ -668,6 +630,11 @@ export function CalendarDayPanel({
                     color: t.done ? "var(--text-muted)" : "var(--text-primary)",
                   }}
                 >
+                  {t.due_time ? (
+                    <span style={{ color: "var(--text-muted)" }}>
+                      {t.due_time}{" "}
+                    </span>
+                  ) : null}
                   {t.title}
                 </span>
               </div>
@@ -700,10 +667,10 @@ export function CalendarDayPanel({
         )}
       </div>
 
-      <ScheduleAddModal
+      <TaskAddModal
         open={showAddModal}
-        defaultDate={selectedDate}
         onClose={() => setShowAddModal(false)}
+        prefill={{ due_date: selectedDate }}
       />
     </div>
   );

@@ -34,8 +34,6 @@ export function useCreateTodo() {
       qc.setQueryData<Todo[]>(todosKey, (prev) =>
         prev ? [created, ...prev] : [created],
       );
-      qc.invalidateQueries({ queryKey: ["meetings"] });
-      qc.invalidateQueries({ queryKey: ["journals"] });
     },
   });
 }
@@ -79,8 +77,6 @@ export function useDeleteTodo() {
       qc.setQueryData<Todo[]>(todosKey, (prev) =>
         prev?.filter((t) => t.id !== id),
       );
-      qc.invalidateQueries({ queryKey: ["meetings"] });
-      qc.invalidateQueries({ queryKey: ["journals"] });
     },
   });
 }
