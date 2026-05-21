@@ -23,6 +23,7 @@ import type { Todo, TodoCategory } from "../../api/todos";
 import { TODO_CATEGORIES } from "../../api/todos";
 import { formatDateLong, isToday, todayIso } from "../../lib/dates";
 import { formatError } from "../../lib/errors";
+import { ScheduleAddModal } from "../schedules/ScheduleAddModal";
 
 /* ── Meetings Side Panel ── */
 
@@ -460,6 +461,7 @@ export function CalendarDayPanel({
   const schedulesQ = useSchedules();
   const updateTodo = useUpdateTodo();
   const deleteSchedule = useDeleteSchedule();
+  const [showAddModal, setShowAddModal] = useState(false);
 
   const today = isToday(selectedDate);
 
@@ -524,7 +526,7 @@ export function CalendarDayPanel({
     <div className="flex h-full flex-col">
       {/* Date header */}
       <div
-        className="shrink-0 px-4 py-3"
+        className="flex shrink-0 items-center justify-between px-4 py-3"
         style={{ borderBottom: "1px solid var(--border-default)" }}
       >
         <div className="flex items-center gap-2">
@@ -539,9 +541,18 @@ export function CalendarDayPanel({
             style={{ color: "var(--text-primary)" }}
           >
             {formatDateLong(selectedDate)}
-            {today ? " · 오늘" : ""}
           </h2>
         </div>
+        <button
+          type="button"
+          onClick={() => setShowAddModal(true)}
+          title="일정 추가"
+          aria-label="일정 추가"
+          className="flex h-7 w-7 items-center justify-center rounded-md transition"
+          style={{ color: "var(--text-secondary)", minHeight: 0 }}
+        >
+          <Plus className="h-4 w-4" />
+        </button>
       </div>
 
       {/* Items */}
@@ -688,6 +699,12 @@ export function CalendarDayPanel({
           </div>
         )}
       </div>
+
+      <ScheduleAddModal
+        open={showAddModal}
+        defaultDate={selectedDate}
+        onClose={() => setShowAddModal(false)}
+      />
     </div>
   );
 }

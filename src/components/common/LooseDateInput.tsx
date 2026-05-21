@@ -1,0 +1,76 @@
+import { useEffect, useRef, useState } from "react";
+import { parseLooseDate, weekdayShort } from "../../lib/dates";
+
+type Props = {
+  value: string;
+  onCommit: (next: string) => void;
+  fullWidth?: boolean;
+};
+
+// 너그러운 날짜 input. blur/Enter 시 parseLooseDate → ISO 정규화. 파싱 실패 시
+// 이전 값으로 revert. blur 상태 + 유효 ISO + 요일 있으면 input value 자체에
+// " (요일)" 합쳐 표시. focus 가면 ISO 만 (편집 가능).
+export function LooseDateInput({ value, onCommit, fullWidth = false }: Props) {
+  const [draft, setDraft] = useState(value);
+  const [focused, setFocused] = useState(false);
+  // ESC → blur 시 commit skip flag. setDraft 가 async 라 commit 클로저가
+  // stale draft 읽고 수정값을 저장하는 버그 방지.
+  const skipCommitRef = useRef(false);
+  useEffect(() => {
+    setDraft(value);
+  }, [value]);
+
+  function commit() {
+    if (skipCommitRef.current) {
+      skipCommitRef.current = false;
+      return;
+    }
+    const trimmed = draft.trim();
+    if (trimmed === "") {
+      if (value !== "") onCommit("");
+      return;
+    }
+    if (trimmed === value) return;
+    const iso = parseLooseDate(trimmed);
+    if (iso) {
+      setDraft(iso);
+      if (iso !== value) onCommit(iso);
+    } else {
+      setDraft(value);
+    }
+  }
+
+  const wd = weekdayShort(value);
+  const display = !focused && draft && wd ? `${draft} (${wd})` : draft;
+  const widthCh = Math.max(display.length, 10);
+
+  return (
+    <input
+      type="text"
+      value={display}
+      onChange={(e) => setDraft(e.target.value)}
+      onFocus={() => setFocused(true)}
+      onBlur={() => {
+        setFocused(false);
+        commit();
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          e.currentTarget.blur();
+        } else if (e.key === "Escape") {
+          skipCommitRef.current = true;
+          setDraft(value);
+          e.currentTarget.blur();
+        }
+      }}
+      placeholder="yyyy-mm-dd"
+      maxLength={10}
+      className="border-0 bg-transparent text-sm leading-none outline-none"
+      style={{
+        color: "var(--text-primary)",
+        width: fullWidth ? "100%" : `${widthCh}ch`,
+      }}
+    />
+  );
+}
