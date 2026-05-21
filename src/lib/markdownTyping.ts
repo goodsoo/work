@@ -289,6 +289,138 @@ export function applyLineDuplicate(
   return { value: newValue, start: start + delta, end: end + delta };
 }
 
+// Slash command 가 한 줄을 변환할 때의 target marker.
+// SlashCommandPopover 의 선택지와 1:1.
+export type SlashTargetKind =
+  | { type: "paragraph" } // 기존 marker 제거 (plain text 로)
+  | { type: "heading"; level: 1 | 2 | 3 }
+  | { type: "bullet" }
+  | { type: "ordered" }
+  | { type: "checkbox" }
+  | { type: "quote" }
+  | { type: "code-fence" }
+  | { type: "hr" }
+  | { type: "table" };
+
+// 줄에서 marker (bullet/ordered/checkbox/quote/heading) 제거 → { indent, content }.
+// indent 는 공백/탭 normalize 후 leading whitespace, content 는 marker 뒤 본문.
+function stripLineMarker(line: string): { indent: string; content: string } {
+  const indentMatch = line.match(/^([ \t]*)/);
+  const indent = (indentMatch?.[1] ?? "").replace(/\t/g, INDENT);
+  const rest = line.slice(indentMatch?.[1].length ?? 0);
+
+  // ATX heading
+  const heading = rest.match(/^#{1,6}\s+(.*)$/);
+  if (heading) return { indent, content: heading[1] };
+
+  const marker = parseLineMarker(rest);
+  if (marker) return { indent, content: marker.rest };
+
+  return { indent, content: rest };
+}
+
+// 한 줄을 target kind 로 변환. 기존 marker 가 있으면 교체, paragraph 면 prepend.
+// indent 보존. 줄 안의 caret 위치 (lineCaretOffset) 도 함께 받아, 변환 후 caret 을
+// 원래 본문 위치 + 새 marker 길이 만큼 옮긴다 (대략 — code-fence/hr/table 같은
+// multi-line 변환은 첫 줄 끝으로).
+export function applyLineKindTransform(
+  value: string,
+  caret: number,
+  target: SlashTargetKind,
+): EditResult {
+  const lineStart = value.lastIndexOf("\n", caret - 1) + 1;
+  const nl = value.indexOf("\n", caret);
+  const lineEnd = nl === -1 ? value.length : nl;
+  const line = value.slice(lineStart, lineEnd);
+  const { indent, content } = stripLineMarker(line);
+
+  let newLine = "";
+  let caretInLine = 0;
+
+  switch (target.type) {
+    case "paragraph":
+      newLine = indent + content;
+      caretInLine = indent.length + content.length;
+      break;
+    case "heading": {
+      const prefix = "#".repeat(target.level) + " ";
+      newLine = indent + prefix + content;
+      caretInLine = indent.length + prefix.length + content.length;
+      break;
+    }
+    case "bullet":
+      newLine = indent + "- " + content;
+      caretInLine = indent.length + 2 + content.length;
+      break;
+    case "ordered":
+      newLine = indent + "1. " + content;
+      caretInLine = indent.length + 3 + content.length;
+      break;
+    case "checkbox":
+      newLine = indent + "- [ ] " + content;
+      caretInLine = indent.length + 6 + content.length;
+      break;
+    case "quote":
+      newLine = indent + "> " + content;
+      caretInLine = indent.length + 2 + content.length;
+      break;
+    case "code-fence": {
+      // 빈 fence pair — content 가 있으면 fence 안에 둠.
+      const inner = content;
+      newLine = indent + "```\n" + indent + inner + "\n" + indent + "```";
+      caretInLine = indent.length + 4 + indent.length + inner.length; // fence 안쪽 끝
+      break;
+    }
+    case "hr":
+      newLine = "---";
+      caretInLine = 3;
+      break;
+    case "table": {
+      const rows = [
+        indent + "| 헤더1 | 헤더2 |",
+        indent + "| --- | --- |",
+        indent + "| 값1 | 값2 |",
+      ];
+      newLine = rows.join("\n");
+      // caret 을 첫 번째 헤더 셀 안 ("헤더1" 첫 글자 자리) 으로 두는 게 자연스럽지만,
+      // textarea selection API 단순화 위해 첫 줄 끝.
+      caretInLine = rows[0].length;
+      break;
+    }
+  }
+
+  const newValue = value.slice(0, lineStart) + newLine + value.slice(lineEnd);
+  const newCaret = lineStart + caretInLine;
+  return { value: newValue, start: newCaret, end: newCaret };
+}
+
+// `/{filter}` 슬래시 커맨드 trigger 가 살아있는지 판정.
+// 현재 줄에서 caret 위치까지의 text 가 `^{indent or marker}\/{filter}$` 패턴이면 true.
+// filter 는 한 단어 (공백/줄바꿈 없음). marker 뒤에 친 `/` 도 허용 — 그 줄을 다른
+// kind 로 바꾸는 시나리오 (bullet → checkbox 등).
+const SLASH_TRIGGER_RE =
+  /^[ \t]*(?:[-*+] \[[ xX]\] |[-*+] |\d+\. |> |#{1,6} )?\/([^\s/]*)$/;
+
+export type SlashTriggerState = {
+  slashStart: number; // value 안 `/` literal 의 시작 offset
+  filter: string;
+};
+
+// caret 위치 기준으로 slash trigger 가 활성 상태인지 확인. 활성이면 slashStart + filter,
+// 아니면 null. value 변경 / 키 입력마다 호출해서 popover 상태 갱신.
+export function detectSlashTrigger(
+  value: string,
+  caret: number,
+): SlashTriggerState | null {
+  const lineStart = value.lastIndexOf("\n", caret - 1) + 1;
+  const beforeCaret = value.slice(lineStart, caret);
+  const m = beforeCaret.match(SLASH_TRIGGER_RE);
+  if (!m) return null;
+  const filter = m[1];
+  const slashStart = caret - filter.length - 1; // -1 = `/` 자체
+  return { slashStart, filter };
+}
+
 // URL paste over selection → `[selected](URL)` 자동 변환.
 // - selection 비어있으면 null (native paste).
 // - pasted text 가 단일 URL (http/https, 공백 없음) 아니면 null.
