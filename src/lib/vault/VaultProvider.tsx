@@ -19,6 +19,10 @@ interface VaultContextValue {
   setVaultRoot: (path: string) => Promise<void>;
   disconnect: () => void;
   isReady: boolean;
+  /** 접근 불가로 끊긴 vault 의 마지막 path. 명시 disconnect 일 땐 null. */
+  disconnectedFrom: string | null;
+  /** disconnectedFrom 의 경로로 재연결 시도. setVaultRoot 와 동일하게 throw. */
+  reconnect: () => Promise<void>;
 }
 
 // eslint-disable-next-line react-refresh/only-export-components
@@ -36,12 +40,20 @@ export function VaultProvider({ children }: { children: ReactNode }) {
     return localStorage.getItem(VAULT_ROOT_KEY);
   });
   const [isReady, setIsReady] = useState(false);
+  const [disconnectedFrom, setDisconnectedFrom] = useState<string | null>(null);
 
   const setVaultRoot = async (path: string) => {
     watcher.stop();
     adapter.setRoot(path);
+    // ensureVaultStructure 의 mkdir(recursive: true) 가 root 자체도 만들어버림 —
+    // 재연결 시 폴더가 없는 상태면 빈 vault 가 신생되어 사용자 데이터 손실처럼 보임.
+    // 폴더가 디스크에 실재할 때만 통과시킴.
+    if (!(await adapter.exists(""))) {
+      throw new Error("폴더에 접근할 수 없어요. 외장 디스크 / iCloud 연결을 확인하세요.");
+    }
     await ensureVaultStructure(adapter);
     localStorage.setItem(VAULT_ROOT_KEY, path);
+    setDisconnectedFrom(null);
     setVaultRootState(path);
     queryClient.clear();
     await watcher.start();
@@ -51,8 +63,14 @@ export function VaultProvider({ children }: { children: ReactNode }) {
   const disconnect = () => {
     localStorage.removeItem(VAULT_ROOT_KEY);
     queryClient.clear();
+    setDisconnectedFrom(null);
     setVaultRootState(null);
     // watcher / interval / focus listener 정리는 useEffect cleanup 에서 처리됨.
+  };
+
+  const reconnect = async () => {
+    if (!disconnectedFrom) return;
+    await setVaultRoot(disconnectedFrom);
   };
 
   useEffect(() => {
@@ -72,6 +90,7 @@ export function VaultProvider({ children }: { children: ReactNode }) {
       window.removeEventListener("focus", checkAlive);
       localStorage.removeItem(VAULT_ROOT_KEY);
       queryClient.clear();
+      setDisconnectedFrom(vaultRoot);
       setVaultRootState(null);
     }
 
@@ -96,9 +115,11 @@ export function VaultProvider({ children }: { children: ReactNode }) {
         aliveTimer = setInterval(checkAlive, 3000);
         window.addEventListener("focus", checkAlive);
       } catch (err) {
-        // vault 폴더 사라짐 / 권한 없음 → 다시 picker 필요
+        // vault 폴더 사라짐 / 권한 없음 → 끊김 안내 화면으로 보냄
         console.error("vault init failed", err);
+        if (cancelled) return;
         localStorage.removeItem(VAULT_ROOT_KEY);
+        setDisconnectedFrom(vaultRoot);
         setVaultRootState(null);
         setIsReady(false);
       }
@@ -112,9 +133,18 @@ export function VaultProvider({ children }: { children: ReactNode }) {
   }, [vaultRoot, adapter, watcher, queryClient]);
 
   const value = useMemo<VaultContextValue>(
-    () => ({ adapter, watcher, vaultRoot, setVaultRoot, disconnect, isReady }),
+    () => ({
+      adapter,
+      watcher,
+      vaultRoot,
+      setVaultRoot,
+      disconnect,
+      isReady,
+      disconnectedFrom,
+      reconnect,
+    }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [adapter, watcher, vaultRoot, isReady],
+    [adapter, watcher, vaultRoot, isReady, disconnectedFrom],
   );
 
   return <VaultContext.Provider value={value}>{children}</VaultContext.Provider>;

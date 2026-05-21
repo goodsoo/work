@@ -6,6 +6,13 @@
 
 ## 2026-05-21
 
+### 직커밋 — vault 폴더 사라짐 명시 안내 + 재연결 시 빈 vault 신생 방지
+
+- **`VaultDisconnected` 화면 신설** — `VaultProvider` 에 `disconnectedFrom` state 추가 + 끊김 감지 (`handleVaultGone` / init failed) 가 직전 path 보존. `VaultGate` 가 `vaultRoot` null && `disconnectedFrom` 있으면 새 화면 ("vault 폴더에 접근할 수 없어요" + 이전 path mono + [재연결] / [다른 폴더 선택]) 렌더, 그 외 기존 `VaultPicker`. 끊긴 이유/경로 모른 채 picker 가 *조용히* 뜨던 문제 해소.
+- **재연결 시 빈 vault 신생 방지** — `setVaultRoot` 첫 줄에 `adapter.exists("")` 검사 추가 + 실패 시 throw. 기존엔 폴더가 사라진 상태로 setVaultRoot 가 호출되면 `ensureVaultStructure` 의 `mkdir(recursive: true)` 가 root 까지 통째로 만들어버려 "재연결" 한 클릭이 빈 vault 를 신생시키던 footgun 차단. inline 에러로 "외장 디스크 / iCloud 연결 확인" 안내.
+- **"다른 폴더 선택" 즉시 다이얼로그** — 화면에서 한 번 더 클릭하지 않고 바로 Tauri `open({ directory: true })` 띄움 (defaultPath = 이전 vault). 취소 시 disconnected 화면 유지.
+- 직커밋 (포트폴리오 카드 가치 적다고 판단 — UI 새 화면이지만 disconnect 트리거 자체가 dogfood 일상에서 거의 안 발생).
+
 ### PR #19 — 캘린더 헤더 nav + 일정 추가 modal
 
 - **헤더 nav** — `[<][오늘][>]` 1개월 instant jump, buffer 49주 rebalance 호환. `minCenterOffset` 클램프 (2026-01 이전 차단) 유지. `visibleWeekOffset` 즉시 set 으로 month label race 차단 (smooth scroll 마지막 frame onScroll 누락 또는 stale closure 로 라벨 안 바뀌던 증상).

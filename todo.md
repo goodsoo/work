@@ -113,11 +113,6 @@ PR 단위로 묶음. 각 PR 의 **한 줄 임팩트** 는 카드 frontmatter `im
 
 ## 🛡️ Vault 안정성 (V0.6.1 후속)
 
-### PR — vault 폴더 사라짐 모달 `ui_ux`
-한 줄 임팩트: 외장 디스크 disconnect / iCloud 이동 시 사용자가 명확히 인식
-
-- [ ] 🔥 감지는 PR #13 완료 (즉시 VaultPicker 복귀). UI 모달만 남음 — "vault 폴더에 접근할 수 없어요. {경로} 확인 후 다시 연결하거나 다른 폴더 선택" + 재연결/다른 폴더 선택 버튼.
-
 ### PR — Conflict resolution 모달 `backend`
 한 줄 임팩트: 옵시디안 모바일과 동시 편집 충돌 시 보존/덮어쓰기 선택
 

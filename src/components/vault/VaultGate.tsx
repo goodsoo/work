@@ -1,11 +1,15 @@
 import type { ReactNode } from "react";
 import { useVault } from "../../lib/vault/useVault";
+import { VaultDisconnected } from "./VaultDisconnected";
 import { VaultPicker } from "./VaultPicker";
 
 export function VaultGate({ children }: { children: ReactNode }) {
-  const { vaultRoot, isReady } = useVault();
+  const { vaultRoot, isReady, disconnectedFrom } = useVault();
 
   if (!vaultRoot) {
+    if (disconnectedFrom) {
+      return <VaultDisconnected from={disconnectedFrom} />;
+    }
     return <VaultPicker />;
   }
   if (!isReady) {
