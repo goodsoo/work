@@ -32,11 +32,42 @@ describe("extractTodos", () => {
     expect(items[0].due).toBe("2026-05-22");
   });
 
-  it("— HH:MM 시간 → time, isEvent=true", () => {
+  it("— HH:MM 시간 → time", () => {
     const raw = "- [ ] 발표 — 14:00\n";
     const items = extractTodos("inbox.md", raw);
     expect(items[0].time).toBe("14:00");
-    expect(items[0].isEvent).toBe(true);
+  });
+
+  it("--- (triple hyphen) 도 em dash 와 동일 매칭 (키보드 친화)", () => {
+    const raw = "- [ ] 보고서 --- 5/22 14:00\n";
+    const items = extractTodos("inbox.md", raw);
+    expect(items[0].text).toBe("보고서");
+    expect(items[0].due).toMatch(/-05-22$/);
+    expect(items[0].time).toBe("14:00");
+  });
+
+  it("--- 뒤 date/time 매칭 실패 시 split 무효 → 본문 보존", () => {
+    // 외부 편집 / 사용자 실수로 --- 뒤 패턴 망가진 케이스. parser 가
+    // graceful 해야 본문 손실 X.
+    const raw = "- [ ] 보고서 --- 망가진뒤\n";
+    const items = extractTodos("inbox.md", raw);
+    expect(items[0].text).toBe("보고서 --- 망가진뒤");
+    expect(items[0].due).toBeUndefined();
+    expect(items[0].time).toBeUndefined();
+  });
+
+  it("자연어 날짜 (내일, 월) → due 매칭 + title 에서 제거", () => {
+    const raw = "- [ ] 회의 --- 내일\n";
+    const items = extractTodos("inbox.md", raw);
+    expect(items[0].text).toBe("회의");
+    expect(items[0].due).toBeDefined();
+  });
+
+  it("자연어 시간 (오후 2시) → time 매칭", () => {
+    const raw = "- [ ] 발표 --- 오후 2시\n";
+    const items = extractTodos("inbox.md", raw);
+    expect(items[0].text).toBe("발표");
+    expect(items[0].time).toBe("14:00");
   });
 
   it("#tag 다수 추출", () => {
@@ -63,7 +94,6 @@ describe("extractTodos", () => {
     expect(t.time).toBe("14:00");
     expect(t.tags).toContain("meeting");
     expect(t.tags).toContain("event");
-    expect(t.isEvent).toBe(true);
   });
 
   it("코드블록 안의 체크박스는 무시", () => {

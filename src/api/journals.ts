@@ -2,6 +2,7 @@ import type { VaultAdapter } from "../lib/vault/adapter";
 import {
   fileToJournal,
   journalPath,
+  journalToRaw,
   scanJournals,
   trashFile,
   type Journal,
@@ -40,11 +41,28 @@ export async function upsertJournal(
   content: string,
 ): Promise<Journal> {
   const path = journalPath(date);
-  // 일기는 단순 형식: frontmatter (date) + 본문
-  const raw = `---\ndate: ${date}\n---\n\n${content}\n`;
-  const meta = await adapter.write(path, raw);
+  let uid: string;
+  let prevMtime: number | undefined;
+  if (await adapter.exists(path)) {
+    const prevRaw = await adapter.read(path);
+    const prevMeta = await adapter.readMeta(path);
+    const prev = fileToJournal(path, prevRaw, prevMeta.mtime);
+    uid = prev.uid || crypto.randomUUID();
+    prevMtime = prevMeta.mtime;
+  } else {
+    uid = crypto.randomUUID();
+  }
+  const raw = journalToRaw({
+    id: path,
+    uid,
+    date,
+    mtime: 0,
+    content,
+  });
+  const meta = await adapter.write(path, raw, prevMtime);
   return {
     id: path,
+    uid,
     date,
     mtime: meta.mtime,
     content,

@@ -4,10 +4,8 @@ import { todayIso, isToday } from "../../lib/dates";
 import type { Meeting } from "../../api/meetings";
 import type { Journal } from "../../api/journals";
 import type { Todo } from "../../api/todos";
-import type { Schedule } from "../../api/schedules";
 
 export type DayItems = {
-  schedules: Schedule[];
   meetings: Meeting[];
   todos: Todo[];
   journal: Journal | null;
@@ -18,7 +16,7 @@ export const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
 type CellEvent = {
   key: string;
   label: string;
-  type: "meeting" | "schedule" | "todo";
+  type: "meeting" | "todo";
   time?: string;
   done?: boolean;
 };
@@ -186,23 +184,10 @@ export function MonthGrid({
   );
 }
 
-function formatCellTime(ts: string): string {
-  const d = new Date(ts);
-  return `${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}`;
-}
-
 function buildCellEvents(items: DayItems | undefined): CellEvent[] {
   if (!items) return [];
   const events: CellEvent[] = [];
 
-  for (const s of items.schedules) {
-    events.push({
-      key: `s-${s.id}`,
-      label: s.title,
-      type: "schedule",
-      time: formatCellTime(s.start_time),
-    });
-  }
   for (const m of items.meetings) {
     events.push({
       key: `m-${m.id}`,
@@ -211,11 +196,13 @@ function buildCellEvents(items: DayItems | undefined): CellEvent[] {
       time: m.time ?? undefined,
     });
   }
+  // due_time 있는 todo 는 같은 todo 줄에서 시각 prefix 만 추가.
   for (const t of items.todos) {
     events.push({
       key: `t-${t.id}`,
       label: t.title,
       type: "todo",
+      time: t.due_time ?? undefined,
       done: t.done,
     });
   }

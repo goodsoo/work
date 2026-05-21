@@ -16,14 +16,6 @@ PR 단위로 묶음. 각 PR 의 **한 줄 임팩트** 는 카드 frontmatter `im
 - [ ] **MarkdownView 체크박스 (`- [ ]`) 렌더링** + 보기 모드 클릭 토글로 body 마크다운 직접 수정. 현재 구현 약함.
 - [ ] **MarkdownView 4-space indented code block 렌더링** — pre/code 컴포넌트 매핑 점검. 현재 코드블록 인식 안 됨.
 
-### PR — Slash command (마크다운 type 즉시 변환) `ui_ux`
-한 줄 임팩트: `/` 한 글자로 현재 줄 type 변환
-
-- [ ] 본문 textarea 안에서 줄 시작 또는 빈 곳에 `/` 입력 → popover (heading 1-3 / bullet / ordered / checkbox / quote / code fence / hr / table). 화살표 키 nav + Enter 선택 + Esc 닫기
-- [ ] 선택 시 현재 줄 type 변환 — 일반 paragraph 면 marker prepend, 이미 marker 있으면 교체 (예 bullet → checkbox). 기존 들여쓰기 보존
-- [ ] 옵시디안 community plugin "Slash Command Suggester" 호환 패턴 — vault md 변화 X (마크다운 source 그대로). 키보드 우선 흐름 유지 (마우스 의존성 X)
-- [ ] gutter 아이콘 클릭 시 type 변환 대안 검토했으나 보류 — 현재 gutter 클릭 = focusLine 동작 충돌 + dogfood 사용 빈도 검증 안 됨 (slash command 가 키보드 흐름 더 자연)
-
 ### PR — 본문 word-wrap + gutter dynamic alignment `ui_ux`
 한 줄 임팩트: 한국어 메모 자연 줄넘김 + gutter 정확 정렬
 
@@ -38,6 +30,28 @@ PR 단위로 묶음. 각 PR 의 **한 줄 임팩트** 는 카드 frontmatter `im
 한 줄 임팩트: frontmatter `tags` 기반 사이드바 필터
 
 - [ ] 사이드바 위에 태그 chip 행 — frontmatter `tags: [foo, bar]` 의 union. 클릭하면 그 태그 메모만. 태그 입력 UI 는 별 작업 (frontmatter 직접 편집 의존).
+
+---
+
+## 🗂️ 데이터 도메인 정리
+
+### PR — 메모/일기/일정/할일 두 도메인 환원 + 메모→inbox 일방향 `backend`
+한 줄 임팩트: 노트 / 작업 두 모델로 단순화, 메모 안 체크박스 통증 해결
+
+**문제 (dogfood 통증)**:
+1. 메모 안 `- [ ]` 가 자동 todo 페이지 등장 → 회의록 의안 체크리스트, 타인 할일, 옵션 list 까지 false positive
+2. 메모 라인 본문 수정 시 todo 페이지에서 박은 메타 (date / category) 가 같이 사라짐 — 라인 안 inline 토큰이라 라인 통째 replace
+3. 일정 = "due_time 있는 todo" view 라 entity 같으나 UI / 라벨 / 입력 모달 분리. 사용자 mental model 분열
+4. 캘린더 셀에 같은 task 가 schedule 줄 + todo 줄 두 번 등장 (`CalendarPage.tsx:107-125`)
+
+**해결 방향**: Note / Task 두 도메인으로 환원. Note = 메모장 형식 md 파일 (메모/일기, 폴더로 분리). Task = inbox.md 안 `- [ ]` 라인 (일정/할일, due_date 있으면 캘린더에도 등장). 메모 → Task 는 명시적 일방향 복사 (Apple Notes → Reminders 패턴).
+
+- [ ] **journals schema meetings 와 통일** — frontmatter `id: <uuid>` lazy migration + attendees/tags 빈 배열 default. list 분리는 `scanJournals` / `scanMeetings` 폴더 기반 유지
+- [ ] **Task 모델 단순화** — scan 범위 축소 (`scanAllTodos` → inbox.md only). `linked_meeting_id` 자동 추론 폐기. Schedule entity / `_is_event` / `schedules.ts` / `useSchedules` 제거. `CalendarPage.tsx` 의 schedule + todo 중복 push 버그 fix (한 task = 한 줄)
+- [ ] **TaskAddModal 통합** — `ScheduleAddModal` 리네임/확장. 필드: 제목 / 날짜 (optional) / 시간 (optional) / 카테고리 / 우선순위. `prefill?: Partial<TaskInsert>` props. 호출처 통일 (할일 페이지 "새 할 일", 캘린더 셀 클릭, 캘린더 페이지 "+")
+- [ ] **메모 "할일로 보내기" 액션** — 메모 에디터 cursor 가 `- [ ]` 라인 위 → 단축키 `⌘⏎` + 라인 옆 hover ⬆️ 아이콘. `extractTodos` parser 재사용해서 라인 텍스트 분석 → TaskAddModal prefill 채움. 사용자 확인/수정 후 저장 = inbox.md append. **메모 라인은 그대로 (일방향, 두 라인 완전 독립 — sync X)**
+- [ ] **"일정" 라벨 UI 카피 정리** — 캘린더 페이지 / 입력 UI 의 "일정" 단어 → "할 일" 또는 "작업" 통일. ActivityBar 의 캘린더 + 할일 탭 분리 자체는 유지 (시간축 view vs 리스트 view)
+- [ ] **migration 결정** — 메모 안 기존 `- [ ]` 들이 갑자기 todo 페이지에서 사라짐. 자동 migration 안 함 (1인 본인 vault). 본인이 inbox 로 옮길지 메모 안에 그대로 둘지 dogfood 로 판단
 
 ---
 

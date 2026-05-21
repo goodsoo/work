@@ -11,7 +11,6 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useMeetings } from "../hooks/useMeetings";
 import { useJournals } from "../hooks/useJournals";
 import { useTodos } from "../hooks/useTodos";
-import { useSchedules } from "../hooks/useSchedules";
 import { todayIso } from "../lib/dates";
 import {
   MonthGrid,
@@ -50,7 +49,6 @@ export function CalendarPage({ targetDate, onSelectedDateChange }: Props) {
   const meetingsQ = useMeetings();
   const journalsQ = useJournals();
   const todosQ = useTodos();
-  const schedulesQ = useSchedules();
 
   const today = todayIso();
   // anchor: 오늘 주의 일요일. 마운트 이후 변경 X.
@@ -81,8 +79,7 @@ export function CalendarPage({ targetDate, onSelectedDateChange }: Props) {
   const isLoading =
     meetingsQ.isLoading ||
     journalsQ.isLoading ||
-    todosQ.isLoading ||
-    schedulesQ.isLoading;
+    todosQ.isLoading;
 
   // 버퍼 주 목록 (각 주의 일요일)
   const weeks = useMemo(() => {
@@ -99,7 +96,7 @@ export function CalendarPage({ targetDate, onSelectedDateChange }: Props) {
     function ensure(d: string): DayItems {
       let items = map.get(d);
       if (!items) {
-        items = { schedules: [], meetings: [], todos: [], journal: null };
+        items = { meetings: [], todos: [], journal: null };
         map.set(d, items);
       }
       return items;
@@ -109,9 +106,6 @@ export function CalendarPage({ targetDate, onSelectedDateChange }: Props) {
     }
     for (const j of journalsQ.data ?? []) {
       ensure(j.date).journal = j;
-    }
-    for (const s of schedulesQ.data ?? []) {
-      ensure(timestampToLocalIsoDate(s.start_time)).schedules.push(s);
     }
     for (const t of todosQ.data ?? []) {
       let d: string | null = null;
@@ -124,20 +118,27 @@ export function CalendarPage({ targetDate, onSelectedDateChange }: Props) {
       if (d) ensure(d).todos.push(t);
     }
     for (const items of map.values()) {
-      items.schedules.sort((a, b) => (a.start_time < b.start_time ? -1 : 1));
       items.meetings.sort((a, b) => {
         const ta = a.time ?? "";
         const tb = b.time ?? "";
         if (ta !== tb) return ta < tb ? -1 : 1;
         return a.created_at < b.created_at ? -1 : 1;
       });
+      // 시간 있는 todo 가 앞 (시간순), 없는 거 뒤 (created_at 순)
       items.todos.sort((a, b) => {
         if (a.done !== b.done) return a.done ? 1 : -1;
+        const ta = a.due_time ?? "";
+        const tb = b.due_time ?? "";
+        if (ta !== tb) {
+          if (!ta) return 1;
+          if (!tb) return -1;
+          return ta < tb ? -1 : 1;
+        }
         return a.created_at < b.created_at ? -1 : 1;
       });
     }
     return map;
-  }, [meetingsQ.data, journalsQ.data, todosQ.data, schedulesQ.data]);
+  }, [meetingsQ.data, journalsQ.data, todosQ.data]);
 
   // External target date (from side panel)
   const [lastTarget, setLastTarget] = useState<string | null>(null);

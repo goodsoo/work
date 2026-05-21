@@ -1,3 +1,5 @@
+import { parseLooseDate, parseLooseTime } from "../dates";
+
 export interface TodoItem {
   id: string;
   text: string;
@@ -7,13 +9,15 @@ export interface TodoItem {
   assignee?: string;
   tags: string[];
   source: { file: string; line: number }; // line은 0-based
-  isEvent: boolean;
 }
 
 const CHECKBOX_RE = /^(\s*)- \[([ x])\] (.+)$/;
 const ASSIGNEE_RE = /^\[([^\]]+)\]\s+/;
 const TAG_RE = /(?:^|\s)#([\p{L}\p{N}_-]+)/gu;
-const DUE_SPLIT_RE = / — (.+)$/;
+// em dash (— U+2014) 또는 triple hyphen (---). 한국어 키보드는 em dash 직접 입력
+// 어려워서 --- 도 같이 매칭. -- (2개) 는 CLI 옵션 / 영어 본문 false positive 우려로
+// 채택 X. macOS 스마트 dash 자동 치환은 SourceBodyEditor 가 차단.
+const DUE_SPLIT_RE = / (?:—|---) (.+)$/;
 const ISO_DATE_RE = /(\d{4})-(\d{2})-(\d{2})/;
 const MD_DATE_RE = /(?:^|\s)(\d{1,2})\/(\d{1,2})(?=\s|$)/;
 const TIME_RE = /(?:^|\s)(\d{1,2}):(\d{2})(?=\s|$)/;
@@ -53,7 +57,6 @@ export function extractTodos(filePath: string, raw: string): TodoItem[] {
       assignee: parsed.assignee,
       tags: parsed.tags,
       source: { file: filePath, line: i },
-      isEvent: parsed.tags.includes("event") || !!parsed.time,
     });
   }
 
@@ -88,7 +91,7 @@ function parseTodoContent(content: string): ParsedContent {
     return " ";
   });
 
-  // 3. ` — ` 이후 date/time 추출
+  // 3. ` — ` 또는 ` --- ` 이후 date/time 추출
   const dueSplit = remaining.match(DUE_SPLIT_RE);
   if (dueSplit) {
     const duePart = dueSplit[1];
@@ -107,7 +110,38 @@ function parseTodoContent(content: string): ParsedContent {
     if (tm) {
       time = `${tm[1].padStart(2, "0")}:${tm[2]}`;
     }
-    remaining = remaining.slice(0, dueSplit.index!);
+    // 자연어 fallback — lib/dates 의 parser 로 "내일", "월", "오후 2시", "1830"
+    // 같은 토큰 흡수. ISO/M/D/HH:MM 이 못 잡은 부분만 시도.
+    // 1) duePart 전체 시도 — "오후 2시" 같은 multi-word 표현
+    // 2) 토큰별 시도 — "내일 14:00" 같은 date+time 복합
+    if (!due || !time) {
+      if (!due) {
+        const d = parseLooseDate(duePart);
+        if (d) due = d;
+      }
+      if (!time) {
+        const t = parseLooseTime(duePart);
+        if (t) time = t;
+      }
+    }
+    if (!due || !time) {
+      const tokens = duePart.split(/\s+/);
+      for (const tok of tokens) {
+        if (!due) {
+          const d = parseLooseDate(tok);
+          if (d) due = d;
+        }
+        if (!time) {
+          const t = parseLooseTime(tok);
+          if (t) time = t;
+        }
+      }
+    }
+    // date / time 적어도 하나 매칭 시만 split 유효. 둘 다 실패면 --- 자체를
+    // 본문 일부로 보존 — 외부 편집 / 사용자 실수로 매칭 깨졌을 때 텍스트 손실 방지.
+    if (due || time) {
+      remaining = remaining.slice(0, dueSplit.index!);
+    }
   }
 
   return {
