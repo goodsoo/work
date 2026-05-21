@@ -2,7 +2,13 @@ import { useEffect, useRef, useState } from "react";
 import { Trash2 } from "lucide-react";
 import type { Todo, TodoPriority, TodoCategory } from "../../api/todos";
 import { TODO_CATEGORIES } from "../../api/todos";
-import { isPast, isToday, relativeDateLabel } from "../../lib/dates";
+import {
+  MIN_DATE_ISO,
+  isBeforeMinDate,
+  isPast,
+  isToday,
+  relativeDateLabel,
+} from "../../lib/dates";
 
 type Props = {
   todo: Todo;
@@ -234,7 +240,12 @@ function DueDateInput({
       <input
         type="date"
         value={value ?? ""}
-        onChange={(e) => onChange(e.target.value || null)}
+        min={MIN_DATE_ISO}
+        onChange={(e) => {
+          const v = e.target.value;
+          if (isBeforeMinDate(v)) return;
+          onChange(v || null);
+        }}
         aria-label="기한"
       />
       {value ? (

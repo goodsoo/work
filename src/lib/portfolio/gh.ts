@@ -82,7 +82,7 @@ export async function ghAuthCheck(host: string = "github.com"): Promise<boolean>
   try {
     const result = await runGh(["auth", "token", "--hostname", host]);
     return result.code === 0 && result.stdout.trim().length > 0;
-  } catch (_err) {
+  } catch {
     // shell 실행 자체 실패 = gh 미설치 가능성 (또는 sh 자체 부재)
     return false;
   }

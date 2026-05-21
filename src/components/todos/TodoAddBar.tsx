@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Plus } from "lucide-react";
 import type { TodoPriority } from "../../api/todos";
+import { MIN_DATE_ISO, isBeforeMinDate } from "../../lib/dates";
 
 type Props = {
   onAdd: (input: {
@@ -57,7 +58,12 @@ export function TodoAddBar({ onAdd, disabled }: Props) {
       <input
         type="date"
         value={dueDate}
-        onChange={(e) => setDueDate(e.target.value)}
+        min={MIN_DATE_ISO}
+        onChange={(e) => {
+          const v = e.target.value;
+          if (isBeforeMinDate(v)) return;
+          setDueDate(v);
+        }}
         aria-label="기한"
       />
       <button

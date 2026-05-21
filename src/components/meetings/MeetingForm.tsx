@@ -45,7 +45,7 @@ import { LooseDateInput } from "../common/LooseDateInput";
 import { LooseTimeInput } from "../common/LooseTimeInput";
 
 // 파일시스템 + 옵시디안 link syntax 금지 문자. title input commit 시 검사.
-const TITLE_UNSAFE_RE = /[/\\:*?"<>|#\^\[\]]/;
+const TITLE_UNSAFE_RE = /[/\\:*?"<>|#^[\]]/;
 
 type Props = {
   meetingId: string;
@@ -183,7 +183,7 @@ export function MeetingForm({ meetingId, onBack }: Props) {
       time: data?.time ?? "",
       attendees: data?.attendees ? data.attendees.join(", ") : "",
     }),
-    [data?.date, data?.time, data?.attendees],
+    [data],
   );
 
   const initialDoc = useMemo<DocSnapshot>(
@@ -247,6 +247,8 @@ export function MeetingForm({ meetingId, onBack }: Props) {
     setTitleDraft(initialTitle);
   }, [initialTitle]);
   useEffect(() => {
+    // 외부 meta.attendees 가 바뀌면 draft 동기화 (다른 mutation/sync). 의도된 sync.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setAttendeesDraft(meta.attendees);
   }, [meta.attendees]);
 
@@ -329,6 +331,7 @@ export function MeetingForm({ meetingId, onBack }: Props) {
 
   // 메모 전환 시 그 메모의 마지막 탭으로 (cache miss 면 본문).
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setActiveTabState(ACTIVE_TAB_CACHE.get(meetingId) ?? "body");
   }, [meetingId]);
 
@@ -468,6 +471,9 @@ export function MeetingForm({ meetingId, onBack }: Props) {
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
+    // routeToSource / setActiveTab 은 의도적으로 dep 제외 — listener 매 typing 마다
+    // re-register 폭주 회피 (안의 클로저는 ref 통해 최신 값 사용).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [docHistory, activeTab, viewMode, setViewMode]);
 
   async function handleDelete() {

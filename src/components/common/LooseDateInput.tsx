@@ -17,6 +17,8 @@ export function LooseDateInput({ value, onCommit, fullWidth = false }: Props) {
   // stale draft 읽고 수정값을 저장하는 버그 방지.
   const skipCommitRef = useRef(false);
   useEffect(() => {
+    // 외부에서 value 바뀌면 draft 동기화 (server 갱신 등). 의도된 sync 패턴.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setDraft(value);
   }, [value]);
 

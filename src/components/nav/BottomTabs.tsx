@@ -8,6 +8,8 @@ type Props = {
   onTabChange: (tab: Tab) => void;
 };
 
+// SidePanel / ActivityBar / 단축키 분기에서 공유. 함수/상수도 같은 파일에서 export.
+// eslint-disable-next-line react-refresh/only-export-components
 export const TABS: Array<{ id: Tab; label: string; icon: LucideIcon }> = [
   { id: "meetings", label: "메모장", icon: ClipboardList },
   { id: "calendar", label: "캘린더", icon: CalendarDays },
