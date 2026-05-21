@@ -28,11 +28,14 @@ export type UseStateHistoryOptions<T> = {
   isEqual?: (a: T, b: T) => boolean;
 };
 
+export type HistoryTransition<T> = { from: T; to: T };
+
 export type UseStateHistoryResult<T> = {
   value: T;
   set: (next: T) => void;
-  undo: () => void;
-  redo: () => void;
+  /** Returns from/to for routing decisions (e.g. tab switch). null when at boundary. */
+  undo: () => HistoryTransition<T> | null;
+  redo: () => HistoryTransition<T> | null;
   /** Force commit any pending edit immediately. */
   flush: () => void;
   canUndo: boolean;
@@ -194,7 +197,7 @@ export function useStateHistory<T>(
     [commitMs, pointer, maxDepth],
   );
 
-  const undo = useCallback(() => {
+  const undo = useCallback((): HistoryTransition<T> | null => {
     let workingHistory = history;
     let workingPointer = pointer;
     const eq = isEqualRef.current;
@@ -212,7 +215,7 @@ export function useStateHistory<T>(
         setHistory(workingHistory);
         setPointer(workingHistory.length - 1);
       }
-      return;
+      return null;
     }
     const newPointer = workingPointer - 1;
     const newValue = workingHistory[newPointer];
@@ -221,17 +224,19 @@ export function useStateHistory<T>(
     setValue(newValue);
     onChangeRef.current?.(newValue);
     onCommitRef.current?.(newValue);
+    return { from: value, to: newValue };
   }, [history, pointer, value, maxDepth]);
 
-  const redo = useCallback(() => {
-    if (pointer >= history.length - 1) return;
+  const redo = useCallback((): HistoryTransition<T> | null => {
+    if (pointer >= history.length - 1) return null;
     const newPointer = pointer + 1;
     const newValue = history[newPointer];
     setPointer(newPointer);
     setValue(newValue);
     onChangeRef.current?.(newValue);
     onCommitRef.current?.(newValue);
-  }, [history, pointer]);
+    return { from: value, to: newValue };
+  }, [history, pointer, value]);
 
   const flush = useCallback(() => {
     if (commitTimerRef.current == null) return;
