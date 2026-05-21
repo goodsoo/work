@@ -11,8 +11,6 @@
 - [ ] 🔥 **깨진 파일 사용자 alert** — 사이드바 banner: "N 개 메모를 읽지 못했어요" → 디스크 path. UX 약점 (메모 사라진 듯) 해소.
 - [ ] 🔥 **vault 폴더 사라짐 모달** — 외장 디스크 disconnect 시 사용자 모달 (감지는 PR #13 완료, UI 만 남음).
 - [ ] **Conflict resolution 모달** — 현재는 ConflictError throw 만. UI 에서 "내 변경 보존 / 외부 변경 가져오기" 선택지 + `.conflict-*.md` 파일 생성.
-- [x] ~~iCloud sync 충돌 파일 무시 룰~~ — V0.7.2 `isSyncNoiseFile` 헬퍼 (conflicted copy / .icloud / dotfile).
-- [x] ~~frontmatter parse 실패 시 graceful fallback~~ — `parseVaultFile` 이미 graceful (yaml 깨져도 빈 fm fallback). V0.7.2 scanMeetings catch 에 console.warn 추가로 디버깅 보강.
 
 ---
 
@@ -26,8 +24,6 @@
 
 ## 🟡 V0.7.x 후속 (dogfood 결과로 결정)
 
-- [x] ~~전체 재동기화 버튼~~ — 이미 사이드바 `SyncButton` + `PortfolioPage` onSync 가 since 없이 호출 (V0.7.2 확인). 백그라운드 auto sync 만 incremental (`{since}`) 사용.
-- [x] ~~portfolio 진단 console.log 제거~~ — V0.7.2 제거 완료.
 - [ ] **gh search concurrency 5 병렬 enrich**. 4A 직렬. 매일 사용에서 첫 sync 3분 통증 크면 도입.
 - [ ] **회사 HTTPS outbound 차단 시 자동 sync 끄기 설정**. dogfood 시 매일 토스트 떠야 발견.
 - [ ] **gh 미설치 / 미로그인 별도 모달** — 현재는 sync error 가 sidebar inline 메시지. 첫 dogfood 시 본인 경험 안 좋으면 추가.
@@ -68,5 +64,4 @@
 
 ## 🟡 디자인 / UI 폴리싱
 
-- [x] ~~에러 상태 패딩 통일~~ — V0.7.2 PortfolioSidePanel SyncError 박스를 다른 사이드바 알림 톤(rounded px-2 py-1, 2px border)에 맞춤. toast(p-3) ↔ page-level(p-4) 차이는 의도된 분기로 유지.
 - [ ] **캘린더 스크롤만으로 다른 월 본 상태 보존**. selectedDate 안 바뀐 채 스크롤만 이동한 경우는 페이지 전환 시 복원 안 됨. 명시적 날짜 클릭은 OK.
