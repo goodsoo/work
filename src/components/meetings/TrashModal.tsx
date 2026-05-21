@@ -46,7 +46,8 @@ export function TrashModal({ isOpen, onClose }: Props) {
     return () => window.removeEventListener("keydown", onKey);
   }, [isOpen, onClose, confirmOpen]);
 
-  // 모달 닫힐 때 state 리셋
+  // 모달 닫힐 때 state 리셋. 의도된 effect → state sync.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (!isOpen) {
       setSelectedId(null);
@@ -66,6 +67,7 @@ export function TrashModal({ isOpen, onClose }: Props) {
     const inList = selectedId && data.some((m) => m.id === selectedId);
     if (!inList) setSelectedId(data[0].id);
   }, [isOpen, data, selectedId]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   async function handleRestore(id: string) {
     setError(null);

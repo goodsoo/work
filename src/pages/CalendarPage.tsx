@@ -154,6 +154,8 @@ export function CalendarPage({ targetDate, onSelectedDateChange }: Props) {
     if (targetCenter !== centerWeekOffset) {
       // diffWeeks 가 minCenter 보다 작아 클램프되었으면 idx 도 조정 (그 주가 버퍼의 어느 인덱스에 있는지).
       const idxTarget = diffWeeks - targetCenter + WEEK_CENTER;
+      // 의도: external target 진입 시 즉시 scroll 위치 기록 후 layout 직후 effect 가 사용.
+      // eslint-disable-next-line react-hooks/refs
       rebalanceTargetRef.current = idxTarget * rowHeightRef.current;
       setCenterWeekOffset(targetCenter);
     }

@@ -82,11 +82,6 @@ PR 단위로 묶음. 각 PR 의 **한 줄 임팩트** 는 카드 frontmatter `im
 - [ ] **이미지 업로드 드래그&드롭** — CLAUDE.md 엔 dropzone 명시지만 사용자 체감 안 됨. 실제 동작 점검 + 카드 그리드 어디서든 드래그 받도록 영역 확장. lightbox 안 dropzone 도 동작 검증.
 - [ ] **참고**: "내 작업 수동 추가" 는 별도 PR 로 📊 Portfolio 섹션에 이미 있음 (`#portfolio` 탭에 "새 카드" 버튼).
 
-### PR — 날짜 input 2026년 이전 차단 `fix`
-한 줄 임팩트: 오타로 2025/0202 같은 과거 날짜 입력 방지
-
-- [ ] 메모장 메타 row 의 date input, 일정 / 투두 마감일 date input 등 앱 전체 `<input type="date">` 에 `min="2026-01-01"`. 캘린더의 `minCenterOffset` (2026-01 이전 차단) 과 컨벤션 통일. 키보드 직접 입력으로 2025 박는 케이스도 onChange 에서 reject + 원복 (브라우저 native min 은 picker 만 막고 typing 은 통과). toast/경고 X — 조용히 못 들어가게.
-
 ### PR — 날짜/시간 표시 포맷 통일 `ui_ux`
 한 줄 임팩트: 앱 전체 날짜/시간 표시가 한 컨벤션으로
 
@@ -118,12 +113,6 @@ PR 단위로 묶음. 각 PR 의 **한 줄 임팩트** 는 카드 frontmatter `im
 
 - [ ] gh 미설치 / 미로그인 별도 모달 (현재는 sidebar inline)
 - [ ] 회사 HTTPS outbound 차단 감지 + 자동 sync off 설정 (매일 토스트 떠야 발견)
-- [ ] gh enrich concurrency 5 병렬 (현재 직렬, 첫 sync 3분 통증 시 도입)
-
-### PR — PR body 이미지 자동 import `backend`
-한 줄 임팩트: PR 의 before/after 이미지 자동 vault 다운로드
-
-- [ ] sync 가 PR body 의 `<img src>` / `![](url)` 추출 → URL fetch → `_attachments/{slug}/before-N.png` 다운로드 → screenshots frontmatter 자동 채움. 본인 dropzone 박은 거 보존. private repo URL 은 gh auth token.
 
 ### PR — commit cluster 카드 (Plan B) `backend`
 한 줄 임팩트: 회사 PR 워크플로 전환 부담 크면 branch cluster 로 대체
@@ -139,11 +128,10 @@ PR 단위로 묶음. 각 PR 의 **한 줄 임팩트** 는 카드 frontmatter `im
 
 - [ ] vault 크기 따라 첫 zip 1-10초 침묵. 1초+ 면 toast 띄움.
 
-### PR — lint 정리 + Vercel disconnect `infra`
+### PR — Vercel 대시보드 disconnect `infra`
 한 줄 임팩트: 잔여 위생
 
-- [ ] **lint 정리** — 현재 28 errors + 3 warnings (V0.5.3~V0.5.4 부터 누적, react-hooks/refs 위주). dogfood 단계 한 번에 정리.
-- [ ] **Vercel 대시보드 disconnect** — deploy 는 `vercel.json` 으로 막혔지만 대시보드 연동은 잔존. 선택.
+- [ ] **Vercel 대시보드 disconnect** — deploy 는 `vercel.json` 으로 막혔지만 대시보드 연동은 잔존. 모바일 PWA 다시 살릴 가능성 보고 결정.
 
 ---
 

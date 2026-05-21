@@ -404,8 +404,7 @@ describe("syncPortfolio — 본인 수정 필드 보존 (v2.2 3A, design test #8
       mkSearchResult({ number: 1, url: "https://github.com/owner/repo/pull/1" }),
       mkSearchResult({ number: 2, url: "https://github.com/owner/repo/pull/2" }),
     ];
-    const enrichFn = async (_url: string) =>
-      mkDetail({ body: "fresh body from sync" });
+    const enrichFn = async () => mkDetail({ body: "fresh body from sync" });
 
     const result = await syncPortfolio(adapter, { searchFn, enrichFn });
     expect(result.total).toBe(2);
@@ -666,18 +665,22 @@ describe("syncPortfolio — 본인 수정 필드 보존 (v2.2 3A, design test #8
     expect(afterProjects[0].repos).toEqual(["new-owner/repo"]);
   });
 
-  it("AbortSignal — 중단 시 AbortError throw", async () => {
+  it("AbortSignal — 중단 시 AbortError throw + 추가 enrich 안 호출", async () => {
     const adapter = createMemoryAdapter();
     adapter.setRoot("/vault");
     const controller = new AbortController();
-    const searchFn = async () => [
-      mkSearchResult({ number: 1 }),
-      mkSearchResult({ number: 2 }),
-    ];
+    const TOTAL = 20; // concurrency 5 보다 훨씬 큼
+    const searchFn = async () =>
+      Array.from({ length: TOTAL }, (_, i) =>
+        mkSearchResult({
+          number: i + 1,
+          url: `https://github.com/owner/repo/pull/${i + 1}`,
+        }),
+      );
     let enrichCalls = 0;
     const enrichFn = async () => {
       enrichCalls++;
-      controller.abort(); // 첫 enrich 후 cancel
+      controller.abort(); // 첫 enrich 시작 즉시 cancel
       return mkDetail();
     };
     await expect(
@@ -687,7 +690,148 @@ describe("syncPortfolio — 본인 수정 필드 보존 (v2.2 3A, design test #8
         signal: controller.signal,
       }),
     ).rejects.toThrow(/cancelled/);
-    // 두 번째 PR 은 enrich 전 abort 체크에 걸려 enrich 호출 안 됨
-    expect(enrichCalls).toBe(1);
+    // 5 worker 동시 시작 → 동시 in-flight 만큼만 enrich 호출되고 (≤ 5),
+    // 그 다음 다음 PR 들은 abort 검출로 enrich 안 들어감.
+    expect(enrichCalls).toBeLessThan(TOTAL);
+    expect(enrichCalls).toBeLessThanOrEqual(5);
+  });
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // V0.7.x — PR body 이미지 자동 import
+
+  it("PR body 이미지 자동 import: existing.screenshots 비어있으면 다운로드 + frontmatter", async () => {
+    const adapter = createMemoryAdapter();
+    adapter.setRoot("/vault");
+    const searchFn = async () => [
+      mkSearchResult({
+        number: 1,
+        url: "https://github.com/owner/repo/pull/1",
+      }),
+    ];
+    const enrichFn = async () =>
+      mkDetail({
+        body: `## Before
+![before](https://example.com/before.png)
+## After
+![after](https://example.com/after.jpg)
+`,
+      });
+    const downloaded: Array<[string, string]> = [];
+    const downloadFn = async (relPath: string, url: string) => {
+      downloaded.push([relPath, url]);
+    };
+    await syncPortfolio(adapter, { searchFn, enrichFn, downloadFn });
+
+    expect(downloaded).toEqual([
+      ["portfolio/_attachments/owner-repo-1/before-1.png", "https://example.com/before.png"],
+      ["portfolio/_attachments/owner-repo-1/after-1.jpg", "https://example.com/after.jpg"],
+    ]);
+    const card = await readPortfolioWork(adapter, "owner-repo-1");
+    expect(card?.frontmatter.screenshots).toEqual([
+      {
+        path: "portfolio/_attachments/owner-repo-1/before-1.png",
+        label: "before",
+        caption: "",
+      },
+      {
+        path: "portfolio/_attachments/owner-repo-1/after-1.jpg",
+        label: "after",
+        caption: "",
+      },
+    ]);
+  });
+
+  it("본인이 dropzone 박은 screenshots 보존 — sync 가 덮어쓰지 않음", async () => {
+    const adapter = createMemoryAdapter();
+    adapter.setRoot("/vault");
+    // 1차 sync 로 카드 생성
+    const searchFn = async () => [mkSearchResult({ number: 1 })];
+    const enrichFn = async () => mkDetail({ body: "" });
+    await syncPortfolio(adapter, { searchFn, enrichFn });
+
+    // 본인이 옵시디안/UI 에서 직접 dropzone 박았다고 가정
+    const card = await readPortfolioWork(adapter, "owner-repo-1");
+    await adapter.write(
+      portfolioWorkPath("owner-repo-1"),
+      portfolioWorkToRaw({
+        ...card!,
+        frontmatter: {
+          ...card!.frontmatter,
+          screenshots: [
+            {
+              path: "portfolio/_attachments/owner-repo-1/manual.png",
+              label: "before",
+              caption: "내가 박은 것",
+            },
+          ],
+        },
+      }),
+    );
+
+    // 2차 sync — PR body 에 이미지가 있어도 import 안 함 (보존)
+    const enrich2 = async () =>
+      mkDetail({
+        body: `## Before\n![before](https://example.com/sync-tries.png)`,
+      });
+    const downloaded: string[] = [];
+    const downloadFn = async (relPath: string) => {
+      downloaded.push(relPath);
+    };
+    await syncPortfolio(adapter, {
+      searchFn,
+      enrichFn: enrich2,
+      downloadFn,
+    });
+    expect(downloaded).toEqual([]); // 다운로드 안 일어남
+    const preserved = await readPortfolioWork(adapter, "owner-repo-1");
+    expect(preserved?.frontmatter.screenshots).toHaveLength(1);
+    expect(preserved?.frontmatter.screenshots[0].caption).toBe("내가 박은 것");
+  });
+
+  it("download 실패해도 sync 는 전체 안 죽음 (best effort)", async () => {
+    const adapter = createMemoryAdapter();
+    adapter.setRoot("/vault");
+    const searchFn = async () => [mkSearchResult({ number: 1 })];
+    const enrichFn = async () =>
+      mkDetail({
+        body: `## Before\n![before](https://broken/url.png)\n![after](https://broken/url2.png)`,
+      });
+    const downloadFn = async () => {
+      throw new Error("network down");
+    };
+    const result = await syncPortfolio(adapter, {
+      searchFn,
+      enrichFn,
+      downloadFn,
+    });
+    expect(result.added).toBe(1);
+    const card = await readPortfolioWork(adapter, "owner-repo-1");
+    expect(card?.frontmatter.screenshots).toEqual([]);
+  });
+
+  it("이미 vault 에 같은 path 이미지 있으면 redundant download skip", async () => {
+    const adapter = createMemoryAdapter();
+    adapter.setRoot("/vault");
+    // 같은 path 가 이미 vault 에 있음 (이전 sync 또는 본인이 직접 박은 binary)
+    await adapter.write(
+      "portfolio/_attachments/owner-repo-1/before-1.png",
+      "stub",
+    );
+    const searchFn = async () => [mkSearchResult({ number: 1 })];
+    const enrichFn = async () =>
+      mkDetail({
+        body: `## Before\n![before](https://example.com/x.png)`,
+      });
+    const downloaded: string[] = [];
+    const downloadFn = async (relPath: string) => {
+      downloaded.push(relPath);
+    };
+    await syncPortfolio(adapter, { searchFn, enrichFn, downloadFn });
+    expect(downloaded).toEqual([]); // skip
+    // frontmatter 엔 path 가 박혀야 함 (이미 파일은 있으니)
+    const card = await readPortfolioWork(adapter, "owner-repo-1");
+    expect(card?.frontmatter.screenshots[0].path).toBe(
+      "portfolio/_attachments/owner-repo-1/before-1.png",
+    );
   });
 });

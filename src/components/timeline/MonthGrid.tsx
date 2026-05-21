@@ -11,6 +11,8 @@ export type DayItems = {
   journal: Journal | null;
 };
 
+// CalendarPage / WeekRow 등에서 공유. 컴포넌트와 같은 파일에서 export.
+// eslint-disable-next-line react-refresh/only-export-components
 export const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
 
 type CellEvent = {

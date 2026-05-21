@@ -1,6 +1,19 @@
 import { addDays, differenceInCalendarDays, format, parseISO } from "date-fns";
 import { ko } from "date-fns/locale";
 
+/**
+ * 앱 전체의 최소 허용 날짜. 2026 본인 사용 시작 시점.
+ * date input 의 `min` 속성 + parseLooseDate / onChange 에서 silent reject 에 사용.
+ * 캘린더 view 의 좌측 클램프도 이 값 기준.
+ */
+export const MIN_DATE_ISO = "2026-01-01";
+
+/** ISO 가 MIN_DATE_ISO 미만이면 true. 빈 문자열은 false (지우기는 통과). */
+export function isBeforeMinDate(iso: string): boolean {
+  if (!iso) return false;
+  return iso < MIN_DATE_ISO;
+}
+
 /** "월"/"화"/... or null if iso is invalid */
 export function weekdayShort(iso: string): string | null {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return null;
@@ -154,7 +167,7 @@ export function parseLooseDate(
   // 한글 단위 또는 일반 구분자 — "년", "월", "일" 또는 공백/슬래시/점/하이픈
   const parts = s
     .replace(/년|월|일/g, " ")
-    .split(/[\s/.\-]+/)
+    .split(/[\s/.-]+/)
     .filter(Boolean);
 
   if (parts.length === 2) {
@@ -190,7 +203,10 @@ function composeIso(year: number, month: number, day: number): string | null {
   ) {
     return null;
   }
-  return `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  const iso = `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  // 2026-01-01 미만은 silent reject (parseLooseDate 의 모든 분기가 이 경로로 흐름).
+  if (iso < MIN_DATE_ISO) return null;
+  return iso;
 }
 
 /**
