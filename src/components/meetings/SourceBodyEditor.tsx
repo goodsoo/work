@@ -14,6 +14,15 @@ import {
   labelForKind,
   type LineKind,
 } from "../../lib/markdownLineKind";
+import {
+  applyIndent,
+  applyEnterContinue,
+  applyUrlPaste,
+  applyWrap,
+  applyLineMove,
+  applyLineDuplicate,
+  type EditResult,
+} from "../../lib/markdownTyping";
 
 type Props = {
   content: string;
@@ -29,12 +38,22 @@ export function SourceBodyEditor({ content, onChange }: Props) {
   const [caretLine, setCaretLine] = useState<number | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const skipNextValueSyncRef = useRef(true);
+  // 다음 render 직후 textarea selection 을 강제로 set 할 위치. Tab/Enter/Paste 같은
+  // 프로그램 edit 에서 caret 을 정확히 이동시키기 위함.
+  const pendingSelectionRef = useRef<{ start: number; end: number } | null>(null);
 
   function updateCaretLine() {
     const el = textareaRef.current;
     if (!el) return;
     const pos = el.selectionStart ?? 0;
     setCaretLine(el.value.slice(0, pos).split("\n").length - 1);
+  }
+
+  function commitEdit(r: EditResult) {
+    pendingSelectionRef.current = { start: r.start, end: r.end };
+    skipNextValueSyncRef.current = true;
+    setDraft(r.value);
+    onChange(r.value);
   }
 
   // gutter 클릭 → 해당 줄 전체 선택 (줄 시작 ~ 끝, 개행 제외) + focus
@@ -65,7 +84,34 @@ export function SourceBodyEditor({ content, onChange }: Props) {
     if (!el) return;
     el.style.height = "auto";
     el.style.height = el.scrollHeight + "px";
+    if (pendingSelectionRef.current) {
+      const { start, end } = pendingSelectionRef.current;
+      el.setSelectionRange(start, end);
+      pendingSelectionRef.current = null;
+      // caret line 도 새 위치로
+      setCaretLine(el.value.slice(0, start).split("\n").length - 1);
+    }
   }, [draft]);
+
+  // macOS 의 "스마트 인용 부호와 줄표" 가 -- → — 자동 치환을 emit 할 때,
+  // beforeinput inputType "insertReplacementText" 로 들어옴 — preventDefault.
+  // textarea props (autoCorrect/spellCheck/autoCapitalize="off") 로 대부분 막히지만
+  // 시스템 설정에 따라 안 막히는 케이스 fallback.
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    function onBeforeInput(e: Event) {
+      const ev = e as InputEvent;
+      if (ev.inputType === "insertReplacementText") {
+        const d = ev.data ?? "";
+        if (d.includes("—") || d.includes("–") || d.includes("“") || d.includes("”") || d.includes("‘") || d.includes("’") || d.includes("…")) {
+          e.preventDefault();
+        }
+      }
+    }
+    el.addEventListener("beforeinput", onBeforeInput);
+    return () => el.removeEventListener("beforeinput", onBeforeInput);
+  }, []);
 
   const lineKinds = useMemo(() => {
     const lines = draft.split("\n");
@@ -130,17 +176,111 @@ export function SourceBodyEditor({ content, onChange }: Props) {
       }
     }
 
+    // Post-pass 3: continuation 마지막 표시 — 다음 줄이 같은 marker 종류 continuation/항목이
+    // 아니면 lastContinuation = true. gutter dotted vertical (중간) vs dotted corner (마지막).
+    for (let i = 0; i < kinds.length; i++) {
+      const k = kinds[i];
+      const isContinuation = "continuation" in k && k.continuation === true;
+      if (!isContinuation) continue;
+      const next = kinds[i + 1];
+      const sameTypeContinues = !!next && next.type === k.type;
+      if (!sameTypeContinues) {
+        kinds[i] = { ...k, lastContinuation: true } as LineKind;
+      }
+    }
+
     return kinds;
   }, [draft]);
 
+  function onKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    // IME composition (한글 등) 중에는 절대 가로채지 않음.
+    if (e.nativeEvent.isComposing || e.keyCode === 229) return;
+    const ta = e.currentTarget;
+    if (e.key === "Tab") {
+      // 항상 preventDefault — applyIndent 가 null 이어도 native Tab 이 prev focusable
+      // (참석자 input 등) 로 빠져나가는 것 차단. textarea 안 머무름.
+      e.preventDefault();
+      const r = applyIndent(
+        ta.value,
+        ta.selectionStart,
+        ta.selectionEnd,
+        e.shiftKey,
+      );
+      if (r) commitEdit(r);
+      return;
+    }
+    if (e.key === "Enter" && !e.shiftKey && !(e.metaKey || e.ctrlKey || e.altKey)) {
+      const r = applyEnterContinue(ta.value, ta.selectionStart, ta.selectionEnd);
+      if (r) {
+        e.preventDefault();
+        commitEdit(r);
+      }
+      return;
+    }
+    const mod = e.metaKey || e.ctrlKey;
+    // ⌘B / ⌘I bold-italic wrap toggle
+    if (mod && !e.shiftKey && !e.altKey && (e.code === "KeyB" || e.code === "KeyI")) {
+      const mark = e.code === "KeyB" ? "**" : "*";
+      e.preventDefault();
+      commitEdit(applyWrap(ta.value, ta.selectionStart, ta.selectionEnd, mark));
+      return;
+    }
+    // ⌘Shift+D 줄 복제
+    if (mod && e.shiftKey && !e.altKey && e.code === "KeyD") {
+      e.preventDefault();
+      commitEdit(applyLineDuplicate(ta.value, ta.selectionStart, ta.selectionEnd));
+      return;
+    }
+    // Alt+↑/↓ 줄 이동
+    if (e.altKey && !mod && !e.shiftKey && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
+      const dir = e.key === "ArrowUp" ? "up" : "down";
+      const r = applyLineMove(ta.value, ta.selectionStart, ta.selectionEnd, dir);
+      if (r) {
+        e.preventDefault();
+        commitEdit(r);
+      }
+      return;
+    }
+  }
+
+  function onPaste(e: React.ClipboardEvent<HTMLTextAreaElement>) {
+    const text = e.clipboardData.getData("text/plain");
+    if (!text) return;
+    const ta = e.currentTarget;
+    const r = applyUrlPaste(ta.value, ta.selectionStart, ta.selectionEnd, text);
+    if (r) {
+      e.preventDefault();
+      commitEdit(r);
+    }
+  }
+
+  // textarea 아래/우측 빈 영역 클릭 → textarea focus + caret 끝.
+  function onContainerMouseDown(e: React.MouseEvent<HTMLDivElement>) {
+    if (e.target === e.currentTarget) {
+      const el = textareaRef.current;
+      if (!el) return;
+      e.preventDefault();
+      el.focus();
+      const end = el.value.length;
+      el.setSelectionRange(end, end);
+      setCaretLine(el.value.slice(0, end).split("\n").length - 1);
+    }
+  }
+
   return (
-    <div className="flex">
+    <div
+      className="flex"
+      onMouseDown={onContainerMouseDown}
+      style={{ minHeight: "60vh", alignItems: "stretch" }}
+    >
       <div
         className="select-none"
         style={{
           width: GUTTER_WIDTH,
-          color: "var(--text-muted)",
+          paddingRight: "4px", // active background 와 borderRight 사이 여백
+          color: "var(--accent-blue-text)", // 편집 모드 signal — 보기 모드엔 gutter 자체 없음
           borderRight: "1px solid var(--border-subtle)",
+          alignSelf: "flex-start", // outer flex stretch 무시 — 실제 줄 수까지만 border/marker 보임
         }}
       >
         {lineKinds.map((kind, i) => (
@@ -161,6 +301,8 @@ export function SourceBodyEditor({ content, onChange }: Props) {
           onChange(e.target.value);
           updateCaretLine();
         }}
+        onKeyDown={onKeyDown}
+        onPaste={onPaste}
         onSelect={updateCaretLine}
         onKeyUp={updateCaretLine}
         onClick={updateCaretLine}
@@ -168,6 +310,9 @@ export function SourceBodyEditor({ content, onChange }: Props) {
         onBlur={() => setCaretLine(null)}
         placeholder="메모 내용을 적어주세요..."
         className="flex-1 resize-none bg-transparent text-base outline-none"
+        autoCorrect="off"
+        autoCapitalize="off"
+        spellCheck={false}
         style={{
           color: "var(--text-primary)",
           lineHeight: LINE_HEIGHT,
@@ -195,25 +340,26 @@ function GutterMarker({
   const label = labelForKind(kind);
   const depth =
     "depth" in kind && typeof kind.depth === "number" ? kind.depth : 0;
-  const isContinuation =
-    "continuation" in kind && kind.continuation === true;
 
   return (
     <div
       title={label || "이 줄로 이동"}
       onClick={onClick}
-      className="flex cursor-pointer items-center justify-center hover:bg-[var(--bg-surface-hover)]"
+      className="flex cursor-pointer items-center justify-center"
       style={{
         height: LINE_HEIGHT,
         lineHeight: LINE_HEIGHT,
-        opacity: isContinuation ? 0.4 : 1,
-        backgroundColor: active ? "var(--bg-surface-hover)" : undefined,
-        color: active ? "var(--text-primary)" : undefined,
+        color: active ? "var(--accent-blue)" : undefined,
       }}
     >
       <span
         className="relative inline-flex items-center justify-center"
-        style={{ width: "1.25rem", height: "1rem" }}
+        style={{
+          width: "1.5rem",
+          height: "1.5rem",
+          backgroundColor: active ? "var(--accent-blue-bg)" : undefined,
+          borderRadius: active ? "0.375rem" : undefined,
+        }}
       >
         <KindGlyph kind={kind} />
         {depth > 0 ? (
@@ -233,17 +379,57 @@ function GutterMarker({
   );
 }
 
+// 이어짐 줄 표시 — 위 항목과 시각적으로 묶이는 dotted line.
+// variant "vertical" = 중간, "corner" = 마지막 (└ 모양).
+function ContinuationGlyph({ variant }: { variant: "vertical" | "corner" }) {
+  return (
+    <svg
+      width={20}
+      height={26}
+      viewBox="0 0 20 26"
+      fill="none"
+      aria-hidden
+      style={{ display: "block" }}
+    >
+      <line
+        x1="10"
+        y1="0"
+        x2="10"
+        y2={variant === "corner" ? 14 : 26}
+        stroke="currentColor"
+        strokeWidth="1.2"
+        strokeLinecap="round"
+        strokeDasharray="1.5 3"
+      />
+      {variant === "corner" ? (
+        <path
+          d="M 10 14 Q 10 18 14 18"
+          stroke="currentColor"
+          strokeWidth="1.2"
+          fill="none"
+          strokeLinecap="round"
+          strokeDasharray="1.5 3"
+        />
+      ) : null}
+    </svg>
+  );
+}
+
 function KindGlyph({ kind }: { kind: LineKind }) {
+  const isContinuation =
+    "continuation" in kind && kind.continuation === true;
+  if (isContinuation) {
+    const isLast =
+      "lastContinuation" in kind && kind.lastContinuation === true;
+    return <ContinuationGlyph variant={isLast ? "corner" : "vertical"} />;
+  }
   switch (kind.type) {
     case "paragraph":
     case "empty":
       return null;
     case "heading":
       return (
-        <span
-          className="font-mono text-[10px] font-semibold"
-          style={{ color: "var(--text-secondary)" }}
-        >
+        <span className="font-mono text-[10px] font-semibold">
           H{kind.level}
         </span>
       );
@@ -252,10 +438,7 @@ function KindGlyph({ kind }: { kind: LineKind }) {
     case "ordered":
       if (typeof kind.renderedNumber === "number") {
         return (
-          <span
-            className="font-mono text-[10px] font-semibold tabular-nums"
-            style={{ color: "var(--text-secondary)" }}
-          >
+          <span className="font-mono text-[10px] font-semibold tabular-nums">
             {kind.renderedNumber}.
           </span>
         );

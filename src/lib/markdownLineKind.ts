@@ -5,15 +5,16 @@ export type LineKind =
   | { type: "paragraph" }
   | { type: "empty" }
   | { type: "heading"; level: 1 | 2 | 3 | 4 | 5 | 6; setext?: boolean }
-  | { type: "bullet"; depth: number; continuation?: boolean }
+  | { type: "bullet"; depth: number; continuation?: boolean; lastContinuation?: boolean }
   | {
       type: "ordered";
       depth: number;
       continuation?: boolean;
       renderedNumber?: number;
+      lastContinuation?: boolean;
     }
-  | { type: "checkbox"; depth: number; continuation?: boolean }
-  | { type: "quote"; continuation?: boolean }
+  | { type: "checkbox"; depth: number; continuation?: boolean; lastContinuation?: boolean }
+  | { type: "quote"; continuation?: boolean; lastContinuation?: boolean }
   | { type: "code-fence" }
   | { type: "code-block" }
   | { type: "code-indent" }
