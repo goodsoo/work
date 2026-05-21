@@ -9,7 +9,6 @@
 ## 🟡 V0.6.1 후속 (dogfood 단계)
 
 - [ ] 🔥 **깨진 파일 사용자 alert** — 사이드바 banner: "N 개 메모를 읽지 못했어요" → 디스크 path. UX 약점 (메모 사라진 듯) 해소.
-- [ ] 🔥 **uid 중복 감지 + 후순위 재발급** — scanMeetings 끝에 `Set<uid>` 검사 + mtime 늦은 메모 재발급. React key 충돌 차단.
 - [ ] 🔥 **vault 폴더 사라짐 모달** — 외장 디스크 disconnect 시 사용자 모달 (감지는 PR #13 완료, UI 만 남음).
 - [ ] **Conflict resolution 모달** — 현재는 ConflictError throw 만. UI 에서 "내 변경 보존 / 외부 변경 가져오기" 선택지 + `.conflict-*.md` 파일 생성.
 - [x] ~~iCloud sync 충돌 파일 무시 룰~~ — V0.7.2 `isSyncNoiseFile` 헬퍼 (conflicted copy / .icloud / dotfile).

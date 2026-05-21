@@ -4,6 +4,14 @@
 
 ---
 
+## 2026-05-21
+
+### PR #16 — uid 중복 자동 복구
+
+- **uid 중복 감지 + 후순위 재발급** — scanMeetings 끝 `Set<uid>` 검사 + mtime 작은 entry 만 새 uuid 재발급 + 디스크 rewrite. 외부 도구 (옵시디안 모바일 merge / 백업 복원) 가 같은 uuid 갖는 파일 두 개 만들어도 사이드바 리로드 때 silent 자동 복구. commit `346fea5`
+
+---
+
 ## 2026-05-20
 
 ### PR #14 — 휴지통 overlay
