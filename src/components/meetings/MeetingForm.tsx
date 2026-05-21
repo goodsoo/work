@@ -61,11 +61,14 @@ type MetaDoc = {
 };
 
 // 전체 메모 도큐먼트 = 1 history stack (옵시디안/notion 패턴).
+// __source = 마지막 set 의 출처 ("body"/"transcript"/"summary:*"/"meta:*"). undo/redo 시
+// 자동으로 그 탭으로 setActiveTab 하는 UX 용 metadata. docsEqual / docToPatch 에서 무시.
 type DocSnapshot = {
   body: string;
   transcript: string;
   summary: SummaryDoc;
   meta: MetaDoc;
+  __source?: string;
 };
 
 function arraysEqual(a: string[], b: string[]): boolean {
@@ -131,6 +134,9 @@ type ActiveTab = "body" | "transcript" | "summary";
 // 메모별 마지막 활성 탭 기억. 페이지 전환으로 컴포넌트가 unmount/mount 되어도
 // 살아남도록 모듈 레벨에. 새로고침 시 초기화.
 const ACTIVE_TAB_CACHE = new Map<string, ActiveTab>();
+// 메모 + 탭 별 scroll 위치 기억 (`${meetingId}:${tab}` → scrollTop). 탭 전환/페이지
+// 전환 시 outgoing 탭의 위치 저장 + incoming 탭의 위치 복원. 새로고침 시 초기화.
+const SCROLL_CACHE = new Map<string, number>();
 
 export function MeetingForm({ meetingId, onBack }: Props) {
   const { data, isLoading, error, refetch } = useMeeting(meetingId);
@@ -210,9 +216,14 @@ export function MeetingForm({ meetingId, onBack }: Props) {
       docHistory.flush();
     }
     lastSourceRef.current = source;
-    docHistory.set(next);
+    docHistory.set({ ...next, __source: source });
     if (immediate) docHistory.flush();
   }
+
+  // undo/redo 시 doc.__source 보고 자동 탭 전환 (옵시디안/notion 처럼 변경 시점 탭으로).
+  // meta:* 는 본문 탭 내부 영역이라 body 로 라우팅. typing 중에도 effect 가 fire 되지만
+  // 이미 그 탭에 있으니 no-op.
+
 
   const [actionError, setActionError] = useState<string | null>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
@@ -282,6 +293,7 @@ export function MeetingForm({ meetingId, onBack }: Props) {
   const [activeTab, setActiveTabState] = useState<ActiveTab>(
     () => ACTIVE_TAB_CACHE.get(meetingId) ?? "body",
   );
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   function setActiveTab(t: ActiveTab) {
     ACTIVE_TAB_CACHE.set(meetingId, t);
     setActiveTabState(t);
@@ -310,6 +322,31 @@ export function MeetingForm({ meetingId, onBack }: Props) {
   useEffect(() => {
     setActiveTabState(ACTIVE_TAB_CACHE.get(meetingId) ?? "body");
   }, [meetingId]);
+
+  // 탭/메모 전환 후 layout 직후 — incoming 탭의 scroll 위치 복원 (없으면 0).
+  // content mount 직후엔 textarea auto-resize 등으로 height 가 정해지지 않아
+  // scrollTop set 이 cap 될 수 있음. immediate + next frame 두 번 set 으로 안전.
+  useLayoutEffect(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    const saved = SCROLL_CACHE.get(`${meetingId}:${activeTab}`) ?? 0;
+    el.scrollTop = saved;
+    const raf = requestAnimationFrame(() => {
+      el.scrollTop = saved;
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [meetingId, activeTab]);
+
+  // undo/redo 시 변경되는 영역의 탭으로 자동 전환.
+  //   undo → from.__source (= 되돌려지는 변경의 출처)
+  //   redo → to.__source   (= 적용되는 변경의 출처)
+  // 둘 다 "변경이 일어나는" 탭으로 가는 일관 규칙.
+  function routeToSource(src: string | undefined) {
+    if (!src) return;
+    if (src === "transcript") setActiveTab("transcript");
+    else if (src.startsWith("summary")) setActiveTab("summary");
+    else setActiveTab("body"); // "body" 또는 "meta:*"
+  }
 
   // 방금 만든 메모면 title input 자동 focus + select all — 사용자가 default
   // 'memo' 위에 바로 타이핑하면 새 제목으로 교체.
@@ -368,13 +405,38 @@ export function MeetingForm({ meetingId, onBack }: Props) {
       if ((isUndo || isRedo) && isInTitleInput()) return;
       if (isUndo) {
         e.preventDefault();
-        docHistory.undo();
+        const t = docHistory.undo();
+        if (t) routeToSource((t.from as DocSnapshot).__source);
         return;
       }
       if (isRedo) {
         e.preventDefault();
-        docHistory.redo();
+        const t = docHistory.redo();
+        if (t) routeToSource((t.to as DocSnapshot).__source);
         return;
+      }
+      // Opt+Q/W/E — input/textarea 안에서도 동작 (브라우저/Tauri 둘 다).
+      // macOS default 글자 (œ/∑/´ dead-key) preventDefault.
+      if (e.altKey && !cmd && !e.shiftKey) {
+        if (e.code === "KeyQ") {
+          e.preventDefault();
+          if (activeTab === "body") {
+            setViewMode(viewMode === "edit" ? "view" : "edit");
+          } else {
+            setActiveTab("body");
+          }
+          return;
+        }
+        if (e.code === "KeyW") {
+          e.preventDefault();
+          setActiveTab("transcript");
+          return;
+        }
+        if (e.code === "KeyE") {
+          e.preventDefault();
+          setActiveTab("summary");
+          return;
+        }
       }
       if (!isTauri) return;
       // single-key sub-tab — modifier 있으면 무시.
@@ -519,7 +581,10 @@ export function MeetingForm({ meetingId, onBack }: Props) {
           >
             <button
               type="button"
-              onClick={docHistory.undo}
+              onClick={() => {
+                const t = docHistory.undo();
+                if (t) routeToSource((t.from as DocSnapshot).__source);
+              }}
               disabled={!docHistory.canUndo}
               title={`실행 취소 (${activeTab === "body" ? "메모" : activeTab === "transcript" ? "음성 기록" : "요약"})`}
               className="px-1.5 py-1 transition disabled:opacity-20"
@@ -529,7 +594,10 @@ export function MeetingForm({ meetingId, onBack }: Props) {
             </button>
             <button
               type="button"
-              onClick={docHistory.redo}
+              onClick={() => {
+                const t = docHistory.redo();
+                if (t) routeToSource((t.to as DocSnapshot).__source);
+              }}
               disabled={!docHistory.canRedo}
               title={`다시 실행 (${activeTab === "body" ? "메모" : activeTab === "transcript" ? "음성 기록" : "요약"})`}
               className="px-1.5 py-1 transition disabled:opacity-20"
@@ -705,9 +773,35 @@ export function MeetingForm({ meetingId, onBack }: Props) {
       ) : null}
 
       {/* Full-page editor — desktop 에선 자체 scroll container (header 옆 scrollbar 회피).
-          outer = full-width scroll, inner = max-w content. */}
-      <div className="lg:flex-1 lg:overflow-y-auto lg:overscroll-none">
-        <div className="mx-auto max-w-3xl px-6 pb-24">
+          outer = full-width scroll, inner = max-w content.
+          onScroll = 탭별 scroll 위치 매번 cache (탭/메모 전환 시 복원). */}
+      <div
+        ref={scrollContainerRef}
+        className="lg:flex-1 lg:overflow-y-auto lg:overscroll-none"
+        onScroll={(e) => {
+          SCROLL_CACHE.set(
+            `${meetingId}:${activeTab}`,
+            (e.currentTarget as HTMLDivElement).scrollTop,
+          );
+        }}
+      >
+        <div
+          className="mx-auto max-w-3xl px-6 pb-24"
+          onMouseDown={(e) => {
+            // wrapper 의 padding 영역 (특히 pb-24 하단) 클릭 → 활성 textarea 끝으로 focus.
+            // 좌우 px-6 (24px) 영역은 제외 — 사용자가 좌우 padding 은 클릭으로 잡지 말라고 했음.
+            if (e.target !== e.currentTarget) return;
+            const rect = e.currentTarget.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            if (x < 24 || x > rect.width - 24) return;
+            const ta = e.currentTarget.querySelector("textarea");
+            if (!(ta instanceof HTMLTextAreaElement)) return;
+            e.preventDefault();
+            ta.focus();
+            const end = ta.value.length;
+            ta.setSelectionRange(end, end);
+          }}
+        >
         {/* Tab nav — 헤더 바로 아래에 sticky. 헤더 (3.5rem) 와 시각적으로 연결. */}
         <div
           className="sticky top-14 z-10 flex items-center justify-between backdrop-blur lg:top-0"
@@ -1118,6 +1212,34 @@ function TranscriptArea({
     el.style.height = el.scrollHeight + "px";
   }, [transcript]);
 
+  // macOS smart substitution fallback (autoCorrect="off" 안 막힐 때)
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    function onBeforeInput(e: Event) {
+      const ev = e as InputEvent;
+      if (ev.inputType === "insertReplacementText") {
+        const d = ev.data ?? "";
+        if (d.includes("—") || d.includes("–") || d.includes("“") || d.includes("”") || d.includes("‘") || d.includes("’") || d.includes("…")) {
+          e.preventDefault();
+        }
+      }
+    }
+    el.addEventListener("beforeinput", onBeforeInput);
+    return () => el.removeEventListener("beforeinput", onBeforeInput);
+  }, []);
+
+  function onContainerMouseDown(e: React.MouseEvent<HTMLDivElement>) {
+    if (e.target === e.currentTarget) {
+      const el = textareaRef.current;
+      if (!el) return;
+      e.preventDefault();
+      el.focus();
+      const end = el.value.length;
+      el.setSelectionRange(end, end);
+    }
+  }
+
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = "";
@@ -1162,17 +1284,22 @@ function TranscriptArea({
           className="hidden"
         />
       </div>
-      <textarea
-        ref={textareaRef}
-        value={transcript}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder="음성 녹음의 텍스트 변환 결과를 여기에..."
-        className="w-full resize-none bg-transparent text-base leading-relaxed outline-none"
-        style={{
-          color: "var(--text-primary)",
-          overflowY: "hidden",
-        }}
-      />
+      <div onMouseDown={onContainerMouseDown} style={{ minHeight: "60vh" }}>
+        <textarea
+          ref={textareaRef}
+          value={transcript}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="음성 녹음의 텍스트 변환 결과를 여기에..."
+          className="w-full resize-none bg-transparent text-base leading-relaxed outline-none"
+          autoCorrect="off"
+          autoCapitalize="off"
+          spellCheck={false}
+          style={{
+            color: "var(--text-primary)",
+            overflowY: "hidden",
+          }}
+        />
+      </div>
     </div>
   );
 }

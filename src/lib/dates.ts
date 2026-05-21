@@ -209,6 +209,12 @@ export function parseLooseTime(raw: string): string | null {
   const s = raw.trim();
   if (!s) return null;
 
+  // 자연어 키워드 — 현재 시각으로 변환. vault md 에는 실제 HH:mm 저장.
+  if (/^(지금|현재|now)$/i.test(s)) {
+    const d = new Date();
+    return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  }
+
   // AM/PM / 오전/오후 추출
   let amPm: "am" | "pm" | null = null;
   let body = s;

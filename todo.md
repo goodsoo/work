@@ -39,6 +39,14 @@ PR 단위로 묶음. 각 PR 의 **한 줄 임팩트** 는 카드 frontmatter `im
 
 - [ ] `useStateHistory` source ("body"/"transcript"/"summary"/"meta") 추적 → undo/redo 시 해당 탭으로 `setActiveTab` 자동 호출. meta 는 본문 탭 내부라 본문 탭 유지
 
+### PR — Slash command (마크다운 type 즉시 변환) `ui_ux`
+한 줄 임팩트: `/` 한 글자로 현재 줄 type 변환
+
+- [ ] 본문 textarea 안에서 줄 시작 또는 빈 곳에 `/` 입력 → popover (heading 1-3 / bullet / ordered / checkbox / quote / code fence / hr / table). 화살표 키 nav + Enter 선택 + Esc 닫기
+- [ ] 선택 시 현재 줄 type 변환 — 일반 paragraph 면 marker prepend, 이미 marker 있으면 교체 (예 bullet → checkbox). 기존 들여쓰기 보존
+- [ ] 옵시디안 community plugin "Slash Command Suggester" 호환 패턴 — vault md 변화 X (마크다운 source 그대로). 키보드 우선 흐름 유지 (마우스 의존성 X)
+- [ ] gutter 아이콘 클릭 시 type 변환 대안 검토했으나 보류 — 현재 gutter 클릭 = focusLine 동작 충돌 + dogfood 사용 빈도 검증 안 됨 (slash command 가 키보드 흐름 더 자연)
+
 ### PR — 본문 word-wrap + gutter dynamic alignment `ui_ux`
 한 줄 임팩트: 한국어 메모 자연 줄넘김 + gutter 정확 정렬
 
