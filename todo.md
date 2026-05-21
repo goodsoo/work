@@ -79,13 +79,6 @@ PR 단위로 묶음. 각 PR 의 **한 줄 임팩트** 는 카드 frontmatter `im
 - [ ] 캘린더 스크롤만으로 다른 월 본 상태도 페이지 전환 시 복원 (selectedDate 안 바뀌어도)
 - [ ] **UI chrome `user-select: none`** — 마우스 실수 드래그로 사이드바 헤더 / 캘린더 셀 / 버튼 라벨 등이 파랗게 selection 되는 거 차단. 텍스트 복사 의도 있는 영역 (메모 본문, 메모 제목, 일정 제목, transcript) 은 그대로 유지. 어디까지 막을지 = chrome vs content 경계 정의 필요
 
-### PR — 캘린더 헤더 네비게이션 `ui_ux`
-한 줄 임팩트: 캘린더에서 이전/다음 달 / 오늘로 한 번에 점프
-
-- [ ] 캘린더 sticky 헤더 우측에 `[<] [오늘] [>]` 버튼 추가 (월 라벨과 같은 row).
-- [ ] 이동 시 **해당 달의 1일이 포함된 주 row 가 최상단**으로 (scrollIntoView smooth). prev = 현재 sticky month 의 1달 이전, next = 1달 이후, 오늘 = `new Date()` 의 달.
-- [ ] 49주 버퍼 edge 근접 시 기존 rebalance 로직과 호환 — 점프 anchor 가 버퍼 밖이면 rebalance 먼저 → 그 후 scroll. minCenterOffset (2026-01 이전 차단) 도 그대로 적용.
-
 ### PR — 할일 페이지 UI/UX 개편 `ui_ux`
 한 줄 임팩트: 할일 리스트 + 입력 흐름 dogfood 통증 한 번에 정리
 
@@ -102,6 +95,11 @@ PR 단위로 묶음. 각 PR 의 **한 줄 임팩트** 는 카드 frontmatter `im
 - [ ] **`ResponsePasteArea` 발견성** — `PortfolioWorkCard.tsx:147` 의 "Claude 응답 paste" 입력란. impact_summary 비었을 때만 등장 + placeholder 만 있어 사용자가 "무슨 기능인지 모름" 체감. 라벨/도움말 보강 또는 가치 재평가 후 제거 결정. (단일 카드 메뉴의 "Claude 프롬프트 복사" 는 별개 — 그건 명확.)
 - [ ] **이미지 업로드 드래그&드롭** — CLAUDE.md 엔 dropzone 명시지만 사용자 체감 안 됨. 실제 동작 점검 + 카드 그리드 어디서든 드래그 받도록 영역 확장. lightbox 안 dropzone 도 동작 검증.
 - [ ] **참고**: "내 작업 수동 추가" 는 별도 PR 로 📊 Portfolio 섹션에 이미 있음 (`#portfolio` 탭에 "새 카드" 버튼).
+
+### PR — 날짜 input 2026년 이전 차단 `fix`
+한 줄 임팩트: 오타로 2025/0202 같은 과거 날짜 입력 방지
+
+- [ ] 메모장 메타 row 의 date input, 일정 / 투두 마감일 date input 등 앱 전체 `<input type="date">` 에 `min="2026-01-01"`. 캘린더의 `minCenterOffset` (2026-01 이전 차단) 과 컨벤션 통일. 키보드 직접 입력으로 2025 박는 케이스도 onChange 에서 reject + 원복 (브라우저 native min 은 picker 만 막고 typing 은 통과). toast/경고 X — 조용히 못 들어가게.
 
 ### PR — 날짜/시간 표시 포맷 통일 `ui_ux`
 한 줄 임팩트: 앱 전체 날짜/시간 표시가 한 컨벤션으로

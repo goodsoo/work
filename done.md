@@ -6,6 +6,15 @@
 
 ## 2026-05-21
 
+### PR #19 — 캘린더 헤더 nav + 일정 추가 modal
+
+- **헤더 nav** — `[<][오늘][>]` 1개월 instant jump, buffer 49주 rebalance 호환. `minCenterOffset` 클램프 (2026-01 이전 차단) 유지. `visibleWeekOffset` 즉시 set 으로 month label race 차단 (smooth scroll 마지막 frame onScroll 누락 또는 stale closure 로 라벨 안 바뀌던 증상).
+- **헤더 사이즈 통일** — 메모장 본문 헤더 spec (56px height, `text-base font-semibold`, `bg-overlay` + `backdrop-blur`). 요일 row 는 헤더 안 별도 row + divider.
+- **사이드패널 `+` 버튼 → `ScheduleAddModal`** — 제목 / 날짜 / 시작·종료 시간, default 시작 = 현재 시각 30분 round. 메모장 사이드바 패턴 (라벨 left, 액션 right) 따라 사이드패널 헤더에 배치 — 캘린더 sticky 헤더에 modal trigger 까지 박으면 chrome 비대.
+- **`LooseDateInput`/`LooseTimeInput` 추출** — `MeetingForm` 의 inline 함수 → `components/common/` 으로. `fullWidth` prop 추가로 modal form 스타일 호환. `parseLooseTime` 호출만 하므로 main 의 새 시간 키워드 (`지금|now|현재`) 자동 호환.
+- **사이드패널 "· 오늘" 텍스트 제거** — 빨간 점과 중복.
+- commit `551ef56..ee61bb2` (refactor + feat), merge `7e1456c`
+
 ### PR #18 — 메모 본문 typing 옵시디안 수준으로
 
 - **마크다운 typing UX** — Tab/Shift+Tab indent (single + multi-line) / Enter 자동 list marker 연장 (bullet/ordered/checkbox/quote, empty marker 종료, IME-safe) / URL paste over selection → markdown link / smart dashes 비활성화 (autoCorrect="off" + beforeinput intercept fallback, 본문+transcript 둘 다) / textarea 빈 영역 클릭 → 끝 포커스. helper = `src/lib/markdownTyping.ts` 의 pure function 묶음 + 33 unit test.
