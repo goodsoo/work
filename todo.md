@@ -46,11 +46,12 @@ PR 단위로 묶음. 각 PR 의 **한 줄 임팩트** 는 카드 frontmatter `im
 
 **해결 방향**: Note / Task 두 도메인으로 환원. Note = 메모장 형식 md 파일 (메모/일기, 폴더로 분리). Task = inbox.md 안 `- [ ]` 라인 (일정/할일, due_date 있으면 캘린더에도 등장). 메모 → Task 는 명시적 일방향 복사 (Apple Notes → Reminders 패턴).
 
-- [ ] **journals schema meetings 와 통일** — frontmatter `id: <uuid>` lazy migration + attendees/tags 빈 배열 default. list 분리는 `scanJournals` / `scanMeetings` 폴더 기반 유지
-- [ ] **Task 모델 단순화** — scan 범위 축소 (`scanAllTodos` → inbox.md only). `linked_meeting_id` 자동 추론 폐기. Schedule entity / `_is_event` / `schedules.ts` / `useSchedules` 제거. `CalendarPage.tsx` 의 schedule + todo 중복 push 버그 fix (한 task = 한 줄)
-- [ ] **TaskAddModal 통합** — `ScheduleAddModal` 리네임/확장. 필드: 제목 / 날짜 (optional) / 시간 (optional) / 카테고리 / 우선순위. `prefill?: Partial<TaskInsert>` props. 호출처 통일 (할일 페이지 "새 할 일", 캘린더 셀 클릭, 캘린더 페이지 "+")
-- [ ] **메모 "할일로 보내기" 액션** — 메모 에디터 cursor 가 `- [ ]` 라인 위 → 단축키 `⌘⏎` + 라인 옆 hover ⬆️ 아이콘. `extractTodos` parser 재사용해서 라인 텍스트 분석 → TaskAddModal prefill 채움. 사용자 확인/수정 후 저장 = inbox.md append. **메모 라인은 그대로 (일방향, 두 라인 완전 독립 — sync X)**
-- [ ] **"일정" 라벨 UI 카피 정리** — 캘린더 페이지 / 입력 UI 의 "일정" 단어 → "할 일" 또는 "작업" 통일. ActivityBar 의 캘린더 + 할일 탭 분리 자체는 유지 (시간축 view vs 리스트 view)
+- [x] **journals schema meetings 와 통일** — frontmatter `id: <uuid>` lazy migration. list 분리는 `scanJournals` / `scanMeetings` 폴더 기반 유지
+- [x] **Task 모델 단순화** — scan 범위 축소 (`scanAllTodos` → inbox.md only). `linked_meeting_id` / `_is_event` 자동 추론 폐기. Schedule entity / `schedules.ts` / `useSchedules` / `ScheduleBlock` 제거. `CalendarPage.tsx` 의 schedule + todo 중복 push 버그 fix (한 task = 한 줄)
+- [x] **TaskAddModal 통합** — `ScheduleAddModal` → `TaskAddModal`. 필드: 제목 / 날짜 (optional) / 시간 (optional) / 카테고리 / 우선순위 / 완료됨 토글. `prefill?: Partial<TodoInsert>` props. 호출처 통일 (할일 페이지, 캘린더 셀 클릭, 사이드 패널 "+")
+- [x] **메모 "할일로 보내기" 액션** — 메모 에디터 cursor 가 `- [ ]` 라인 위 → 단축키 `⌘⏎`. `extractTodos` parser 재사용해서 라인 텍스트 분석 → TaskAddModal prefill (체크 상태 / 날짜 / 시간 / 카테고리 / 우선순위 모두 자동). 메모 라인은 그대로 (일방향, 독립)
+- [x] **"일정" 라벨 UI 카피 정리** — "일정 추가" → "할 일 추가". ActivityBar 의 캘린더 + 할일 탭 분리 자체는 유지 (시간축 view vs 리스트 view)
+- [x] **추가 footgun fix** — `buildTodoLine` 의 M/D 자동 변환 폐기 (연도 점프 footgun 차단), 구분자 ` — ` → ` --- ` 통일 + 옛 vault 호환 매칭, parser graceful split (date 매칭 실패 시 본문 보존), `sanitizeTaskTitle` (title 안 ` --- ` 강등), date-like 토큰 time false positive 차단, 자연어 fallback (오늘/내일/월/오후 2시), assignee 추출 폐기 (UI 기능 없음)
 - [ ] **migration 결정** — 메모 안 기존 `- [ ]` 들이 갑자기 todo 페이지에서 사라짐. 자동 migration 안 함 (1인 본인 vault). 본인이 inbox 로 옮길지 메모 안에 그대로 둘지 dogfood 로 판단
 
 ---

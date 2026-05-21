@@ -11,11 +11,10 @@ describe("extractTodos", () => {
     expect(items[0].source).toEqual({ file: "inbox.md", line: 0 });
   });
 
-  it("[담당자] 접두 → assignee", () => {
+  it("[담당자] 같은 bracket 도 본문 일부 — assignee 추출 폐기 (UI 기능 없음)", () => {
     const raw = "- [ ] [홍길동] 보고서 작성\n";
     const items = extractTodos("inbox.md", raw);
-    expect(items[0].assignee).toBe("홍길동");
-    expect(items[0].text).toBe("보고서 작성");
+    expect(items[0].text).toBe("[홍길동] 보고서 작성");
   });
 
   it("— M/D → due (현재 연도)", () => {
@@ -70,6 +69,14 @@ describe("extractTodos", () => {
     expect(items[0].time).toBe("14:00");
   });
 
+  it("M/D + 한글 시간 (6/07 18시) → due + time 분리 매칭 (date-like time false positive 차단)", () => {
+    const raw = "- [ ] 보고서 --- 6/07 18시\n";
+    const items = extractTodos("inbox.md", raw);
+    expect(items[0].text).toBe("보고서");
+    expect(items[0].due).toMatch(/-06-07$/);
+    expect(items[0].time).toBe("18:00");
+  });
+
   it("#tag 다수 추출", () => {
     const raw = "- [ ] 보고서 #work #urgent\n";
     const items = extractTodos("inbox.md", raw);
@@ -84,12 +91,11 @@ describe("extractTodos", () => {
     expect(items[0].done).toBe(true);
   });
 
-  it("복합: assignee + due + time + tags", () => {
+  it("복합: bracket + due + time + tags (bracket 는 본문 일부)", () => {
     const raw = "- [ ] [홍길동] 보고서 작성 — 5/22 14:00 #meeting #event\n";
     const items = extractTodos("meetings/foo.md", raw);
     const t = items[0];
-    expect(t.assignee).toBe("홍길동");
-    expect(t.text).toBe("보고서 작성");
+    expect(t.text).toBe("[홍길동] 보고서 작성");
     expect(t.due).toMatch(/-05-22$/);
     expect(t.time).toBe("14:00");
     expect(t.tags).toContain("meeting");

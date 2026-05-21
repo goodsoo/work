@@ -6,13 +6,11 @@ export interface TodoItem {
   done: boolean;
   due?: string; // ISO YYYY-MM-DD
   time?: string; // HH:MM
-  assignee?: string;
   tags: string[];
   source: { file: string; line: number }; // line은 0-based
 }
 
 const CHECKBOX_RE = /^(\s*)- \[([ x])\] (.+)$/;
-const ASSIGNEE_RE = /^\[([^\]]+)\]\s+/;
 const TAG_RE = /(?:^|\s)#([\p{L}\p{N}_-]+)/gu;
 // em dash (— U+2014) 또는 triple hyphen (---). 한국어 키보드는 em dash 직접 입력
 // 어려워서 --- 도 같이 매칭. -- (2개) 는 CLI 옵션 / 영어 본문 false positive 우려로
@@ -54,7 +52,6 @@ export function extractTodos(filePath: string, raw: string): TodoItem[] {
       done,
       due: parsed.due,
       time: parsed.time,
-      assignee: parsed.assignee,
       tags: parsed.tags,
       source: { file: filePath, line: i },
     });
@@ -65,7 +62,6 @@ export function extractTodos(filePath: string, raw: string): TodoItem[] {
 
 interface ParsedContent {
   text: string;
-  assignee?: string;
   due?: string;
   time?: string;
   tags: string[];
@@ -73,25 +69,17 @@ interface ParsedContent {
 
 function parseTodoContent(content: string): ParsedContent {
   let remaining = content;
-  let assignee: string | undefined;
   let due: string | undefined;
   let time: string | undefined;
 
-  // 1. assignee (`[이름] `)
-  const am = remaining.match(ASSIGNEE_RE);
-  if (am) {
-    assignee = am[1];
-    remaining = remaining.slice(am[0].length);
-  }
-
-  // 2. tags 추출
+  // 1. tags 추출
   const tags: string[] = [];
   remaining = remaining.replace(TAG_RE, (_, tag: string) => {
     tags.push(tag);
     return " ";
   });
 
-  // 3. ` — ` 또는 ` --- ` 이후 date/time 추출
+  // 2. ` — ` 또는 ` --- ` 이후 date/time 추출
   const dueSplit = remaining.match(DUE_SPLIT_RE);
   if (dueSplit) {
     const duePart = dueSplit[1];
@@ -112,28 +100,39 @@ function parseTodoContent(content: string): ParsedContent {
     }
     // 자연어 fallback — lib/dates 의 parser 로 "내일", "월", "오후 2시", "1830"
     // 같은 토큰 흡수. ISO/M/D/HH:MM 이 못 잡은 부분만 시도.
-    // 1) duePart 전체 시도 — "오후 2시" 같은 multi-word 표현
-    // 2) 토큰별 시도 — "내일 14:00" 같은 date+time 복합
-    if (!due || !time) {
-      if (!due) {
-        const d = parseLooseDate(duePart);
-        if (d) due = d;
-      }
-      if (!time) {
-        const t = parseLooseTime(duePart);
-        if (t) time = t;
-      }
+    // parseLooseTime 이 너무 관대해서 date-like 토큰을 시간으로 잘못 흡수하는 걸 차단:
+    //   - duePart 전체 시도는 date 만 (시간은 false positive 잦음)
+    //   - 토큰별 시간 시도는 slash/dash 포함 토큰 skip
+    //   - 인접 2-token window 는 시간 prefix (오전/오후/AM/PM) 일 때만 — "오후 2시"
+    if (!due) {
+      const d = parseLooseDate(duePart);
+      if (d) due = d;
     }
     if (!due || !time) {
-      const tokens = duePart.split(/\s+/);
+      const tokens = duePart.split(/\s+/).filter(Boolean);
+      // 1. 시간 prefix sliding window — "오후 2시" 같은 multi-word
+      if (!time && tokens.length >= 2) {
+        for (let i = 0; i < tokens.length - 1; i++) {
+          if (!/^(오전|오후|am|pm)$/i.test(tokens[i])) continue;
+          const t = parseLooseTime(`${tokens[i]} ${tokens[i + 1]}`);
+          if (t) {
+            time = t;
+            break;
+          }
+        }
+      }
+      // 2. 단일 토큰
       for (const tok of tokens) {
         if (!due) {
           const d = parseLooseDate(tok);
           if (d) due = d;
         }
         if (!time) {
-          const t = parseLooseTime(tok);
-          if (t) time = t;
+          const isDateLike = /[/\-]/.test(tok) && /\d/.test(tok);
+          if (!isDateLike) {
+            const t = parseLooseTime(tok);
+            if (t) time = t;
+          }
         }
       }
     }
@@ -146,7 +145,6 @@ function parseTodoContent(content: string): ParsedContent {
 
   return {
     text: remaining.trim(),
-    assignee,
     due,
     time,
     tags,
