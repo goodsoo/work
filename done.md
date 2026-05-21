@@ -6,6 +6,14 @@
 
 ## 2026-05-21
 
+### PR #17 — 노트 삭제 stale 선택 복원 race + 단축키 uid 정합
+
+- **stale 선택 복원 race fix** — `list.isSuccess` 후 `selectedMeetingId` 가 list 에 없으면 null fallback + hash replaceState. 노트 삭제 후 `history.back` 이 이미 purge 된 메모로 popstate 가거나 / 초기 진입 hash 가 다른 세션 (옵시디안 모바일 sync 등) 에서 삭제된 메모 uid 인 두 경로에서 `useMeeting` throw → React Query retry → 영구 error UI 차단.
+- **Cmd+N / Cmd+↑↓ uid 정합** — selectedMeetingId 에 `.id` (path) 대신 `.uid` 박도록. V0.7.1 uid 통일 누락분 — 사이드바 클릭/자동선택은 정상이고 이 두 단축키만 깨져있던 것 복원.
+- **useDebouncedSave race 점검** — JournalBlock 은 `schedule` 가 `pendingRef` 에 sync write → `flush` 가 같은 ref read 구조라 V0.7.2 useStateHistory 의 closure-stale 패턴 없음. 캘린더는 자동 저장 자체 없음. fix 0.
+- **dead callback chain 제거** — TrashModal `onMeetingPurged` + App.tsx `handleMeetingPurged` — uid vs trash path 비교라 절대 match 안 되던 dead code. 새 validation effect 가 같은 의도 cover 하므로 제거.
+- commit `03b294d` + `51720b4`, merge `5df5e0e`
+
 ### 결정 — "깨진 파일 alert banner" 작업 X
 
 todo "vault 파일 read 안정성" PR 그룹 마무리. 다른 sub-task (uid 중복 dedupe / parseVaultFile graceful / sync noise 무시) 3개는 이미 ✅. 마지막 🔥 항목 "깨진 파일 사용자 alert banner" 는 dogfood 검증 결과 가치 0 — PR #16 dedupe 가 중복 uid 자동 재발급 + parseVaultFile 이 yaml 깨져도 빈 fm fallback 이라 사이드바에서 메모 안 사라짐. 진짜 silent fail 은 `adapter.read/readMeta` 자체 실패 (iCloud evict / 권한) 한정인데 dogfood 에서 거의 발생 안 함. banner 가 보여줄 깨진 파일 수가 사실상 0 → dead UI 가 되므로 작업 X. 코드 변경 없음, todo.md PR 그룹 제거 + done.md 기록만.
