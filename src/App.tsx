@@ -132,6 +132,23 @@ function AppContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, selectedMeetingId, meetings.data]);
 
+  // list 로드 후 selectedMeetingId 가 이미 사라진 uid 면 정리. 케이스:
+  //   1. 노트 삭제 직후 closeMeeting→history.back 이 stale entry (그 사이 purge 된 메모) 의
+  //      uid 로 popstate 를 발사 → setSelectedMeetingId 가 dead uid 로 set
+  //   2. 초기 진입 시 URL hash 가 다른 세션에서 삭제된 메모 uid (옵시디안 모바일 sync 등)
+  // 어느 쪽이든 selectedMeetingId 를 그대로 두면 useMeeting 이 throw → React Query retry 3회 →
+  // 영구 error UI. list cache 에 없으면 null 로 fallback + hash 정리 (다음 back 이 재발 X).
+  useEffect(() => {
+    if (!meetings.isSuccess) return;
+    if (!selectedMeetingId) return;
+    const exists = meetings.data?.some((m) => m.uid === selectedMeetingId);
+    if (exists) return;
+    setSelectedMeetingId(null);
+    if (window.location.hash.startsWith("#meeting-")) {
+      window.history.replaceState(null, "", window.location.pathname);
+    }
+  }, [meetings.isSuccess, meetings.data, selectedMeetingId]);
+
   useEffect(() => {
     function syncFromHash() {
       setTab(readTabFromHash());
@@ -213,7 +230,7 @@ function AppContent() {
           decisions: null,
           action_items: null,
         });
-        openMeeting(created.id);
+        openMeeting(created.uid);
       } catch {
         // 사이드 패널의 createError 와 별도 — 단축키 실패는 silent (drawer 안에서도 동작)
       }
@@ -235,7 +252,7 @@ function AppContent() {
       const list = meetings.data;
       if (!list || list.length === 0) return;
       const currIdx = selectedMeetingId
-        ? list.findIndex((m) => m.id === selectedMeetingId)
+        ? list.findIndex((m) => m.uid === selectedMeetingId)
         : -1;
       let nextIdx: number;
       if (currIdx === -1) {
@@ -247,7 +264,7 @@ function AppContent() {
             : Math.max(currIdx - 1, 0);
       }
       if (nextIdx === currIdx) return;
-      openMeeting(list[nextIdx].id);
+      openMeeting(list[nextIdx].uid);
     }
 
     function onKeyDown(e: KeyboardEvent) {
@@ -329,10 +346,6 @@ function AppContent() {
     }
   }
 
-  function handleMeetingPurged(id: string) {
-    if (selectedMeetingId === id) closeMeeting();
-  }
-
   // Side panel per tab (모바일에선 drawer, 데스크탑에선 3-pane 왼쪽 컬럼).
   const sidePanel =
     tab === "meetings" ? (
@@ -401,7 +414,6 @@ function AppContent() {
       <TrashModal
         isOpen={trashOpen}
         onClose={() => setTrashOpen(false)}
-        onMeetingPurged={handleMeetingPurged}
       />
     </AppShell>
   );
