@@ -346,10 +346,6 @@ function AppContent() {
     }
   }
 
-  function handleMeetingPurged(id: string) {
-    if (selectedMeetingId === id) closeMeeting();
-  }
-
   // Side panel per tab (모바일에선 drawer, 데스크탑에선 3-pane 왼쪽 컬럼).
   const sidePanel =
     tab === "meetings" ? (
@@ -418,7 +414,6 @@ function AppContent() {
       <TrashModal
         isOpen={trashOpen}
         onClose={() => setTrashOpen(false)}
-        onMeetingPurged={handleMeetingPurged}
       />
     </AppShell>
   );

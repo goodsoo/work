@@ -22,10 +22,9 @@ function stripTrashStamp(title: string | null | undefined): string {
 type Props = {
   isOpen: boolean;
   onClose: () => void;
-  onMeetingPurged?: (id: string) => void;
 };
 
-export function TrashModal({ isOpen, onClose, onMeetingPurged }: Props) {
+export function TrashModal({ isOpen, onClose }: Props) {
   const { data, isLoading } = useDeletedMeetings();
   const restore = useRestoreMeeting();
   const purge = usePurgeMeeting();
@@ -87,7 +86,6 @@ export function TrashModal({ isOpen, onClose, onMeetingPurged }: Props) {
     const id = purgeTarget.id;
     try {
       await purge.mutateAsync(id);
-      onMeetingPurged?.(id);
       setPurgeTarget(null);
     } catch (e) {
       setError(formatError(e));
