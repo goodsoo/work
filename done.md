@@ -6,6 +6,16 @@
 
 ## 2026-05-21
 
+### PR #20 — 본문 슬래시 커맨드
+
+- **`/` 한 글자로 줄 type 즉시 변환** — 메모 본문 빈 줄 또는 marker 뒤에서 `/` → popover (H1-3 / bullet / ordered / checkbox / quote / code-fence / hr / table 10개). ↑/↓ nav, Enter/Tab 선택, Esc 닫기. 타이핑으로 filter (`/h1`, `/체크`, 한글 키워드 매칭). 옵시디안 community "Slash Command Suggester" 호환 — vault md source 변화 X (표준 markdown). paragraph 면 marker prepend, 이미 marker 있으면 교체 (bullet → checkbox 등), indent 보존.
+- **trigger 룰** — 줄에서 caret 직전이 indent · marker (`- `, `1. `, `- [ ] `, `> `, `# `) 뒤 빈 곳일 때만. URL / 날짜 / 일반 문장 중 `/` 는 false positive 차단. `markdownTyping.ts` 의 `detectSlashTrigger` 가 single regex 로 판정.
+- **`applyLineKindTransform` helper** — pure function. paragraph/bullet/ordered/checkbox/quote/heading 1-3/code-fence/hr/table 10개 target. `stripLineMarker` 가 기존 marker (ATX heading + parseLineMarker 통합) 제거 후 새 marker prepend. indent 정규화 + caret 재계산.
+- **`SlashCommandPopover` 컴포넌트** — 키워드 startsWith filter + 라벨 contains. `mousedown` 으로 옵션 선택 (textarea blur race 차단). 옵션마다 lucide 아이콘 + 라벨 + hint (`# `, `- `, `1. `). 일치 0 이면 안내만 (자동 닫기 X, backspace 로 복구).
+- **SourceBodyEditor 통합** — slashState (slashStart/filter/selectedIndex/slashLine). onKeyDown 에서 popover 활성 시 Up/Down/Enter/Tab/Esc 가로채기, 다른 키는 통과 → onChange 가 다시 trigger 평가. popover 위치 = gutter (1.75rem) + textarea paddingLeft (0.5rem) 안쪽, `calc(slashLine+1 * 1.625rem)` top (현재 줄 바로 아래).
+- 17개 unit test 추가 (applyLineKindTransform 9 + detectSlashTrigger 8). 163 통과.
+- commit `57fa603`, merge `dc169ab`
+
 ### 직커밋 — vault 폴더 사라짐 명시 안내 + 재연결 시 빈 vault 신생 방지
 
 - **`VaultDisconnected` 화면 신설** — `VaultProvider` 에 `disconnectedFrom` state 추가 + 끊김 감지 (`handleVaultGone` / init failed) 가 직전 path 보존. `VaultGate` 가 `vaultRoot` null && `disconnectedFrom` 있으면 새 화면 ("vault 폴더에 접근할 수 없어요" + 이전 path mono + [재연결] / [다른 폴더 선택]) 렌더, 그 외 기존 `VaultPicker`. 끊긴 이유/경로 모른 채 picker 가 *조용히* 뜨던 문제 해소.
