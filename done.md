@@ -6,6 +6,14 @@
 
 ## 2026-05-21
 
+### PR #25 — 빈 본문 편집 진입 CTA + 메모 모드 chip
+
+- **빈 메모 + 보기 모드 CTA 박스** — 본문 비어있고 viewMode=`view` 일 때 점선 박스 (60vh) 렌더 — 클릭하면 viewMode `edit` 전환 + 다음 frame 에 textarea focus. 자동 전환은 사용자가 명시적으로 view 로 둔 의도를 덮을 수 있어 회피.
+- **MarkdownView 의 빈 상태 fallback 제거** — "메모가 비어있어요. 편집으로 전환해서 적어보세요." 단순 텍스트 fallback 은 MeetingForm 분기가 가로채서 dead code. TrashPreview 는 이미 `content?.trim()` 분기라 영향 없음.
+- **ModeChip 도입** — 사용자 요청. 헤더 우측 토글 버튼은 아이콘이 "다음 액션" 을 가리켜 직관적이지 않음 → 서브 헤더 글자수 옆에 현재 상태 chip (편집=accent-blue / 보기=회색). 클릭 토글 + Q 키 그대로.
+- **헤더 우측 Eye/Pencil 토글 버튼 제거** — ModeChip 이 대체. 복사 + 삭제 두 개만 남김.
+- commit `1384a64`
+
 ### PR #24 — portfolio sync 강화 + 날짜 min + lint 정리 (backend 묶음)
 
 - **gh enrich concurrency 5 병렬** — `processWithConcurrency` worker pool 도입. enrich + 이미지 다운로드를 같은 worker 안에서 5 동시 처리, vault write 는 직렬 (충돌 회피). 100 PR 기준 wall clock 3분 → 30초 예상.

@@ -574,6 +574,18 @@ export function MeetingForm({ meetingId, onBack }: Props) {
     setDoc(`summary:${key}`, { ...doc, summary: { ...summary, [key]: value } }, true);
   }
 
+  // 빈 메모 CTA 클릭 — 편집 모드 전환 + 다음 frame 에 본문 textarea focus.
+  // 본문 탭 active 일 때 transcript textarea 는 unmount → 활성 textarea 는 SourceBodyEditor 의 것 1개.
+  function startEditing() {
+    setViewMode("edit");
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const ta = scrollContainerRef.current?.querySelector("textarea");
+        if (ta instanceof HTMLTextAreaElement) ta.focus();
+      });
+    });
+  }
+
   return (
     <div className="min-h-svh lg:flex lg:h-screen lg:min-h-0 lg:flex-col">
       {/* Header — 사이드바 헤더와 같은 높이 (3.5rem). desktop 에선 flex item (top fixed),
@@ -663,37 +675,8 @@ export function MeetingForm({ meetingId, onBack }: Props) {
           } as React.CSSProperties}
         />
 
-        {/* Right: edit toggle / copy / delete */}
+        {/* Right: copy / delete (편집/보기 토글은 서브 헤더 ModeChip 으로 이전) */}
         <div className="flex shrink-0 items-center gap-1 justify-self-end">
-          <button
-            type="button"
-            onClick={() =>
-              activeTab === "body"
-                ? setViewMode(viewMode === "edit" ? "view" : "edit")
-                : setActiveTab("body")
-            }
-            title={
-              activeTab === "body"
-                ? isTauri
-                  ? `${viewMode === "edit" ? "보기 모드" : "편집 모드"}  Q`
-                  : viewMode === "edit"
-                    ? "보기 모드"
-                    : "편집 모드"
-                : "메모 탭으로 이동"
-            }
-            className="rounded-md px-1.5 py-1 transition"
-            style={{
-              border: "1px solid var(--border-subtle)",
-              color: activeTab === "body" ? "var(--text-secondary)" : "var(--text-muted)",
-              minHeight: 0,
-            }}
-          >
-            {viewMode === "edit" ? (
-              <Eye className="h-3.5 w-3.5" />
-            ) : (
-              <Pencil className="h-3.5 w-3.5" />
-            )}
-          </button>
           <CopyButton meeting={meetingForCopy} onError={setActionError} compact />
           <button
             type="button"
@@ -856,6 +839,14 @@ export function MeetingForm({ meetingId, onBack }: Props) {
                       summary.action_items.reduce((s, i) => s + i.length, 0)
               }
             />
+            {activeTab === "body" ? (
+              <ModeChip
+                viewMode={viewMode}
+                onToggle={() =>
+                  setViewMode(viewMode === "edit" ? "view" : "edit")
+                }
+              />
+            ) : null}
           </div>
         </div>
 
@@ -918,6 +909,8 @@ export function MeetingForm({ meetingId, onBack }: Props) {
                   setTaskModalOpen(true);
                 }}
               />
+            ) : body.trim() === "" ? (
+              <EmptyBodyCTA onStartEdit={startEditing} />
             ) : (
               <MarkdownView
                 content={body}
@@ -1079,6 +1072,42 @@ function lineToTaskPrefill(lineText: string): Partial<TodoInsert> {
   return prefill;
 }
 
+// 본문 탭 활성 시 글자수 옆 chip — 현재 viewMode 표시 + 클릭 토글.
+// 헤더 우측 Eye/Pencil 토글 버튼을 대체.
+function ModeChip({
+  viewMode,
+  onToggle,
+}: {
+  viewMode: "edit" | "view";
+  onToggle: () => void;
+}) {
+  const isEdit = viewMode === "edit";
+  const title = isTauri
+    ? `${isEdit ? "보기" : "편집"} 모드로  Q`
+    : `${isEdit ? "보기" : "편집"} 모드로`;
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      title={title}
+      className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs transition"
+      style={{
+        border: "1px solid var(--border-subtle)",
+        color: isEdit ? "var(--accent-blue-text)" : "var(--text-secondary)",
+        backgroundColor: isEdit ? "var(--accent-blue-bg)" : "var(--bg-surface)",
+        minHeight: 0,
+      }}
+    >
+      {isEdit ? (
+        <Pencil className="h-3 w-3" />
+      ) : (
+        <Eye className="h-3 w-3" />
+      )}
+      <span>{isEdit ? "편집" : "보기"}</span>
+    </button>
+  );
+}
+
 function CharCountBadge({ count }: { count: number }) {
   if (count <= 0) return null;
   return (
@@ -1153,6 +1182,52 @@ function MetaReadOnly({ meta }: { meta: MetaDoc }) {
         </div>
       ))}
     </div>
+  );
+}
+
+function EmptyBodyCTA({ onStartEdit }: { onStartEdit: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onStartEdit}
+      className="group flex w-full flex-col items-center justify-center gap-3 rounded-lg text-center transition"
+      style={{
+        minHeight: "60vh",
+        border: "1px dashed var(--border-subtle)",
+        color: "var(--text-muted)",
+        backgroundColor: "transparent",
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.backgroundColor = "var(--bg-surface)";
+        e.currentTarget.style.color = "var(--text-secondary)";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.backgroundColor = "transparent";
+        e.currentTarget.style.color = "var(--text-muted)";
+      }}
+    >
+      <Pencil className="h-6 w-6" />
+      <div className="text-sm">
+        편집을 시작하려면 클릭하세요
+      </div>
+      {isTauri ? (
+        <div className="flex items-center gap-1.5 text-xs">
+          <span>또는</span>
+          <kbd
+            className="rounded font-mono leading-none"
+            style={{
+              padding: "2px 6px",
+              fontSize: "11px",
+              border: "1px solid var(--border-subtle)",
+              color: "var(--text-muted)",
+              backgroundColor: "var(--bg-surface)",
+            }}
+          >
+            Q
+          </kbd>
+        </div>
+      ) : null}
+    </button>
   );
 }
 

@@ -10,13 +10,6 @@ PR 단위로 묶음. 각 PR 의 **한 줄 임팩트** 는 카드 frontmatter `im
 
 ## 🚀 메모 에디터 (마크다운) 강화
 
-### PR — 빈 본문 + 보기 모드 일 때 편집 유도 UI `ui_ux` 🟢
-한 줄 임팩트: 빈 메모 들어가면 편집모드 진입 안내 (현재는 빈 화면)
-
-진행 중 — `feat/empty-edit-cta` worktree
-
-- [ ] 본문 비어있고 viewMode=`view` 일 때 본문 영역에 CTA — "편집을 시작하려면 클릭" 안내 + 클릭 시 viewMode `edit` 전환 + textarea focus. 자동 전환 vs CTA 박스 vs placeholder text — 사용자 의도 파악 후 결정. 음성/요약 탭은 별개 (요약 탭 빈 상태는 SummarizeButton 으로 이미 안내됨).
-
 ### PR — 본문 word-wrap + gutter dynamic alignment `ui_ux`
 한 줄 임팩트: 한국어 메모 자연 줄넘김 + gutter 정확 정렬
 
