@@ -1,0 +1,216 @@
+import { useEffect, useMemo, useRef } from "react";
+import {
+  Heading1,
+  Heading2,
+  Heading3,
+  List,
+  ListOrdered,
+  CheckSquare,
+  Quote,
+  Code,
+  Minus,
+  Table,
+} from "lucide-react";
+import type { SlashTargetKind } from "../../lib/markdownTyping";
+
+export type SlashOption = {
+  id: string;
+  label: string;
+  hint: string;
+  keywords: string[]; // filter 매칭용 — 한글 + 영문
+  target: SlashTargetKind;
+  Icon: React.ComponentType<{ className?: string }>;
+};
+
+const OPTIONS: SlashOption[] = [
+  {
+    id: "h1",
+    label: "제목 1",
+    hint: "# ",
+    keywords: ["h1", "heading1", "제목1", "title", "header1", "큰제목"],
+    target: { type: "heading", level: 1 },
+    Icon: Heading1,
+  },
+  {
+    id: "h2",
+    label: "제목 2",
+    hint: "## ",
+    keywords: ["h2", "heading2", "제목2", "header2"],
+    target: { type: "heading", level: 2 },
+    Icon: Heading2,
+  },
+  {
+    id: "h3",
+    label: "제목 3",
+    hint: "### ",
+    keywords: ["h3", "heading3", "제목3", "header3"],
+    target: { type: "heading", level: 3 },
+    Icon: Heading3,
+  },
+  {
+    id: "bullet",
+    label: "점 목록",
+    hint: "- ",
+    keywords: ["bullet", "list", "ul", "점", "목록", "list", "리스트"],
+    target: { type: "bullet" },
+    Icon: List,
+  },
+  {
+    id: "ordered",
+    label: "번호 목록",
+    hint: "1. ",
+    keywords: ["ordered", "ol", "번호", "숫자", "number", "ol"],
+    target: { type: "ordered" },
+    Icon: ListOrdered,
+  },
+  {
+    id: "checkbox",
+    label: "체크박스",
+    hint: "- [ ] ",
+    keywords: ["check", "checkbox", "todo", "task", "체크", "할일", "투두"],
+    target: { type: "checkbox" },
+    Icon: CheckSquare,
+  },
+  {
+    id: "quote",
+    label: "인용",
+    hint: "> ",
+    keywords: ["quote", "blockquote", "인용", "quote"],
+    target: { type: "quote" },
+    Icon: Quote,
+  },
+  {
+    id: "code",
+    label: "코드 블록",
+    hint: "```",
+    keywords: ["code", "fence", "코드", "code-block"],
+    target: { type: "code-fence" },
+    Icon: Code,
+  },
+  {
+    id: "hr",
+    label: "구분선",
+    hint: "---",
+    keywords: ["hr", "divider", "rule", "구분선", "선"],
+    target: { type: "hr" },
+    Icon: Minus,
+  },
+  {
+    id: "table",
+    label: "표",
+    hint: "table",
+    keywords: ["table", "표", "테이블"],
+    target: { type: "table" },
+    Icon: Table,
+  },
+];
+
+function filterOptions(filter: string): SlashOption[] {
+  const q = filter.trim().toLowerCase();
+  if (!q) return OPTIONS;
+  return OPTIONS.filter((o) =>
+    o.keywords.some((k) => k.toLowerCase().startsWith(q)) ||
+    o.label.toLowerCase().includes(q),
+  );
+}
+
+export function getSlashOptionsForFilter(filter: string): SlashOption[] {
+  return filterOptions(filter);
+}
+
+type Props = {
+  filter: string;
+  selectedIndex: number;
+  onSelect: (option: SlashOption) => void;
+  onClose: () => void;
+  // 부모 (position:relative) 기준 popover 좌상단 — CSS 값 (px 또는 calc).
+  anchorTop: string;
+  anchorLeft: string;
+};
+
+export function SlashCommandPopover({
+  filter,
+  selectedIndex,
+  onSelect,
+  anchorTop,
+  anchorLeft,
+}: Props) {
+  const listRef = useRef<HTMLDivElement>(null);
+  const options = useMemo(() => filterOptions(filter), [filter]);
+
+  // selected item 을 viewport 안으로 스크롤.
+  useEffect(() => {
+    const list = listRef.current;
+    if (!list) return;
+    const item = list.querySelector<HTMLElement>(`[data-index="${selectedIndex}"]`);
+    item?.scrollIntoView({ block: "nearest" });
+  }, [selectedIndex]);
+
+  if (options.length === 0) {
+    // 필터가 아무것도 안 맞으면 안내만 — 닫지는 않음 (사용자가 backspace 하면 다시 보일 수 있게).
+    return (
+      <div
+        role="listbox"
+        className="absolute z-40 min-w-[200px] rounded-md p-2 text-xs shadow-md"
+        style={{
+          top: anchorTop,
+          left: anchorLeft,
+          backgroundColor: "var(--bg-surface)",
+          border: "1px solid var(--border-default)",
+          color: "var(--text-secondary)",
+        }}
+      >
+        일치하는 명령이 없음
+      </div>
+    );
+  }
+
+  return (
+    <div
+      ref={listRef}
+      role="listbox"
+      aria-label="슬래시 커맨드"
+      className="absolute z-40 max-h-[260px] min-w-[220px] overflow-y-auto rounded-md py-1 shadow-md"
+      style={{
+        top: anchorTop,
+        left: anchorLeft,
+        backgroundColor: "var(--bg-surface)",
+        border: "1px solid var(--border-default)",
+      }}
+    >
+      {options.map((o, i) => {
+        const active = i === selectedIndex;
+        return (
+          <button
+            key={o.id}
+            type="button"
+            role="option"
+            aria-selected={active}
+            data-index={i}
+            // mousedown 으로 처리 — textarea blur 가 click 보다 먼저 발생해서 click 까지
+            // 갈 때 이미 popover 가 닫혀버림.
+            onMouseDown={(e) => {
+              e.preventDefault();
+              onSelect(o);
+            }}
+            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs transition"
+            style={{
+              color: active ? "var(--text-primary)" : "var(--text-secondary)",
+              backgroundColor: active ? "var(--bg-surface-active)" : undefined,
+              minHeight: 0,
+            }}
+          >
+            <o.Icon className="h-3.5 w-3.5 flex-shrink-0" />
+            <span className="flex-1">{o.label}</span>
+            <span
+              className="font-mono text-[10px] tabular-nums"
+              style={{ color: "var(--text-muted)" }}
+            >
+              {o.hint}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
