@@ -10,8 +10,10 @@ PR 단위로 묶음. 각 PR 의 **한 줄 임팩트** 는 카드 frontmatter `im
 
 ## 🚀 메모 에디터 (마크다운) 강화
 
-### PR — 빈 본문 + 보기 모드 일 때 편집 유도 UI `ui_ux`
+### PR — 빈 본문 + 보기 모드 일 때 편집 유도 UI `ui_ux` 🟢
 한 줄 임팩트: 빈 메모 들어가면 편집모드 진입 안내 (현재는 빈 화면)
+
+진행 중 — `feat/empty-edit-cta` worktree
 
 - [ ] 본문 비어있고 viewMode=`view` 일 때 본문 영역에 CTA — "편집을 시작하려면 클릭" 안내 + 클릭 시 viewMode `edit` 전환 + textarea focus. 자동 전환 vs CTA 박스 vs placeholder text — 사용자 의도 파악 후 결정. 음성/요약 탭은 별개 (요약 탭 빈 상태는 SummarizeButton 으로 이미 안내됨).
 
@@ -20,15 +22,35 @@ PR 단위로 묶음. 각 PR 의 **한 줄 임팩트** 는 카드 frontmatter `im
 
 - [ ] textarea `wrap="on"` + gutter marker 가 wrap 된 visual line 과 align. hidden mirror div 가 같은 width/font/line-height 으로 source line 별 actual visual height 측정 → gutter marker height 동기. ResizeObserver 로 textarea width 변경 감지 + debounce. ~40-50줄
 
-### PR — 메모 검색 (사이드바 검색창) `ui_ux`
-한 줄 임팩트: 메모 많아져도 이름으로 즉시 찾기
+### PR — 사이드바 메모 탐색 (검색 + 태그 + 즐겨찾기) `ui_ux`
+한 줄 임팩트: 메모 많아져도 사이드바에서 즉시 좁히기 — 이름·태그·즐겨찾기
 
-- [ ] 옵시디안 quick switcher 패턴 — title + body 즉시 매칭, scope toggle (현재 탭 / 전체). 단축키 `Cmd+P`. 사이드바 검색창 + 결과 highlight.
+- [ ] **검색** — 옵시디안 quick switcher 패턴. title + body 즉시 매칭, 결과 highlight. 단축키 `Cmd+P`. 사이드바 검색창 + 결과 highlight.
+- [ ] **태그 필터** — 사이드바 위 태그 chip 행. frontmatter `tags: [foo, bar]` union. 클릭 = 그 태그 메모만, 다중 선택 = AND. 태그 입력 UI 는 별 작업 (frontmatter 직접 편집 의존).
+- [ ] **즐겨찾기 / pin** — 메모 카드에 별/핀 토글. frontmatter `pinned: true` (옵시디안 호환). 사이드바 상단 고정 + 정렬 그룹 분리.
 
-### PR — 메모 태그 필터 `ui_ux`
-한 줄 임팩트: frontmatter `tags` 기반 사이드바 필터
+### PR — 사이드바 폴더 (서브 그룹) `ui_ux`
+한 줄 임팩트: `meetings/{folder}/...` 트리 사이드바, 옵시디안 호환
 
-- [ ] 사이드바 위에 태그 chip 행 — frontmatter `tags: [foo, bar]` 의 union. 클릭하면 그 태그 메모만. 태그 입력 UI 는 별 작업 (frontmatter 직접 편집 의존).
+- [ ] vault `meetings/` 안 sub-folder 인식 + 사이드바 트리 렌더 (collapse/expand). 옵시디안과 같은 폴더 구조 = 모바일 옵시디안 호환 유지.
+- [ ] 새 폴더 생성 / 메모 폴더 이동 (사이드바 drag&drop 또는 컨텍스트 메뉴). 정렬은 기존 `useMeetingSort` 폴더 안에서도 적용.
+- [ ] 폴더 없는 메모 (vault root `meetings/`) 는 "기타" 그룹으로 트리 하단.
+
+### PR — 보기모드 todo 라인 → todo 페이지 추가 버튼 `ui_ux`
+한 줄 임팩트: 보기 모드에서도 본문 `- [ ]` 한 줄을 todo 페이지로 한 클릭 등록
+
+- [ ] 본문 markdown `- [ ]` / `- [x]` 라인 옆에 "todo 추가" 버튼. **hover 시에만 등장** (chrome 노이즈 회피).
+- [ ] 클릭 = 편집 모드 Cmd+Enter 동등 액션 (해당 라인을 todos 페이지 카드로 추가). 보기 모드엔 textarea focus 가 없어 단축키 안 먹히는 gap 메움.
+- [ ] **중복 허용** — 이미 todo 로 추가된 라인도 구분 안 함. todos 페이지가 source of truth, 메모 본문은 snapshot. 중복 카드 생기면 todos 페이지에서 정리.
+- [ ] 위치 후보: 줄 우측 끝 / gutter 영역. markdown 시각 정렬 안 깨지는 곳 우선.
+
+### PR — 본문 이미지 paste / drag&drop `ui_ux`
+한 줄 임팩트: 캡쳐 이미지 본문에 paste/drop → vault `_attachments/` 저장 + markdown 자동 insert
+
+- [ ] textarea (편집 모드) 안 이미지 paste / drag&drop 감지. `_attachments/{slug}/{n}.{ext}` 저장 + caret 위치에 `![](상대경로)` insert.
+- [ ] slug = 현재 메모 title kebab-case. 같은 메모 안 이미지 N 증가.
+- [ ] portfolio 카드의 `_attachments/{slug}/before-N.{ext}` 와 같은 패턴 — 자산 위치 일관.
+- [ ] PR #22 의 이미지 렌더링과 정합 — 저장 후 보기 모드 즉시 정상 표시.
 
 ---
 
@@ -50,6 +72,28 @@ PR 단위로 묶음. 각 PR 의 **한 줄 임팩트** 는 카드 frontmatter `im
 - [ ] ActivityBar 빈 공간에 `data-tauri-drag-region` 명시
 - [ ] macOS 전용 — Windows/Linux fallback (native title bar 유지)
 
+### PR — 캘린더 page 정비 (일기 진입 + month 스크롤 복원) `ui_ux`
+한 줄 임팩트: 캘린더에서 일기 빠른 진입 + 스크롤 위치도 페이지 전환 후 복원
+
+- [ ] **일기 빠른 진입** — 캘린더 사이드 패널 헤더 바로 아래 "일기 쓰기" 버튼. 일기 없는 날 = "+" CTA, 있는 날 = 미리보기 카드 + 펜 아이콘.
+- [ ] 버튼/카드 클릭 = **오버레이 편집창** (설정창 스타일). 캘린더 가리지만 한 단계만, 넓은 입력 공간 + 집중. 닫기 = ESC 또는 X.
+- [ ] 작성/저장 후 사이드 패널엔 **미리보기 카드** — 본문 첫 2-3줄 또는 100자 정도. 카드 다시 클릭 = 오버레이 재진입.
+- [ ] 데이터: 기존 `journals/` vault 폴더 (`useDebouncedSave` 자동 저장). 진입 동선만 캘린더 통합.
+- [ ] **month 스크롤 복원** — 캘린더 스크롤만으로 다른 월 본 상태도 페이지 전환 시 복원 (selectedDate 안 바뀌어도). 메모장 `SCROLL_CACHE` 패턴 차용 가능.
+
+### PR — 사이드바 collapse 단축키 `ui_ux`
+한 줄 임팩트: `Cmd+\` 로 SidePanel 토글, 본문 집중 모드
+
+- [ ] 옵시디안 패턴 — `Cmd+\` 로 SidePanel 토글. localStorage persist (`goodsoob:sidebarCollapsed`).
+- [ ] 애니메이션 = 좌측 slide. 본문 width 자동 확장. ActivityBar 는 그대로 노출.
+- [ ] 모바일은 별개 (이미 단일 컬럼).
+
+### PR — 단축키 자료/통계 페이지 `ui_ux` 🟡
+한 줄 임팩트: 분기 평가용 — 회의 N건 / 일기 streak / todos 완료율 한 화면
+
+- [ ] ActivityBar 새 탭 또는 portfolio 탭 안 별 view. 후순위 — dogfood 통증 작음, 평가 시즌 근접에 진입 결정.
+- [ ] vault scan 기반 — meetings 수 (월별), journals streak, todos 완료율 (이번 달 / 분기). 외부 의존 0.
+
 ---
 
 ## 🎨 폴리시
@@ -59,28 +103,34 @@ PR 단위로 묶음. 각 PR 의 **한 줄 임팩트** 는 카드 frontmatter `im
 
 - [ ] toast 컨테이너 max-width + 텍스트 영역 min-w-0 + break-words + 액션 버튼 flex-shrink-0. 한 컴포넌트 수정으로 모든 toast 적용. 현재는 긴 에러 시 텍스트가 박스 밖으로 나가고 재시도 버튼이 밀려서 안 보임.
 
-### PR — UI 패딩 / 캘린더 폴리싱 `ui_ux`
-한 줄 임팩트: 잔여 디자인 inconsistency 정리
+### PR — chrome user-select 차단 `fix`
+한 줄 임팩트: 사이드바 헤더 / 캘린더 셀 / 버튼 라벨 실수 드래그 selection 차단
 
-- [ ] 캘린더 스크롤만으로 다른 월 본 상태도 페이지 전환 시 복원 (selectedDate 안 바뀌어도)
-- [ ] **UI chrome `user-select: none`** — 마우스 실수 드래그로 사이드바 헤더 / 캘린더 셀 / 버튼 라벨 등이 파랗게 selection 되는 거 차단. 텍스트 복사 의도 있는 영역 (메모 본문, 메모 제목, 일정 제목, transcript) 은 그대로 유지. 어디까지 막을지 = chrome vs content 경계 정의 필요
+- [ ] **UI chrome `user-select: none`** — 마우스 실수 드래그로 사이드바 헤더 / 캘린더 셀 / 버튼 라벨 등이 파랗게 selection 되는 거 차단. 텍스트 복사 의도 있는 영역 (메모 본문, 메모 제목, 일정 제목, transcript) 은 그대로 유지.
+- [ ] chrome vs content 경계 정의 — wrapper 단에서 `select-none` 박고 content 컴포넌트는 `select-text` override.
 
-### PR — 할일 페이지 UI/UX 개편 `ui_ux`
+### PR — 할일 페이지 UI/UX 개편 `ui_ux` 🟢
 한 줄 임팩트: 할일 리스트 + 입력 흐름 dogfood 통증 한 번에 정리
+
+진행 중 — `feat/todos-revamp` worktree
 
 - [ ] **리스트 UI 정리** — 구분선 톤 다운 (현재 너무 진함). 정보 레이아웃 재배치 (제목/메타/액션 위계 명확).
 - [ ] **체크 실수 복원** — 단일 클릭 = 실수 잦음. 더블클릭으로 체크 토글 또는 ⌘Z undo 도입 (둘 다 양립 가능).
 - [ ] **날짜/시간 입력 통일** — 메모장 메타 row 와 같은 패턴 (date input + time input). 현재는 날짜만 + 입력 불편 + 시간 없음. 메모장과 컴포넌트 공유 후보.
 - [ ] **추가 헤더 sticky** — 할일 추가 입력란을 상단 sticky 로 고정, 또는 위로 스크롤 시 등장. 현재는 매번 최상단으로 가야 함.
+- [ ] **정렬 옵션** — 사이드바 메모 정렬 (`useMeetingSort`) 패턴 todos 에도. 마감일순/생성순/카테고리순 popover.
 
-### PR — 내 작업 (portfolio) UI/UX 개편 `ui_ux`
-한 줄 임팩트: 카드 view + 편집 흐름 + 업로드 dogfood 통증 한 번에 정리
+### PR — portfolio 카드 시각 재설계 `ui_ux`
+한 줄 임팩트: 카드 크기 축소 + 한눈에 정보 + inline 편집
 
 - [ ] **카드 크기/레이아웃 재설계** — 현재 카드 너무 크고 한눈에 중요 정보 (impact_summary / 날짜 / 카테고리) 안 들어옴. 정보 우선순위 정리 + 작은 카드 그리드.
 - [ ] **카드 inline 편집** — 현재 lightbox 모달 진입 후 편집. 카드 클릭 = inline 펼침 + 편집 모드 전환 검토. 메모장 패턴 (제목 → 본문 inline) 과 비교.
+
+### PR — portfolio 입력 흐름 `ui_ux`
+한 줄 임팩트: ResponsePasteArea 발견성 + 드래그&드롭 동작 검증
+
 - [ ] **`ResponsePasteArea` 발견성** — `PortfolioWorkCard.tsx:147` 의 "Claude 응답 paste" 입력란. impact_summary 비었을 때만 등장 + placeholder 만 있어 사용자가 "무슨 기능인지 모름" 체감. 라벨/도움말 보강 또는 가치 재평가 후 제거 결정. (단일 카드 메뉴의 "Claude 프롬프트 복사" 는 별개 — 그건 명확.)
 - [ ] **이미지 업로드 드래그&드롭** — CLAUDE.md 엔 dropzone 명시지만 사용자 체감 안 됨. 실제 동작 점검 + 카드 그리드 어디서든 드래그 받도록 영역 확장. lightbox 안 dropzone 도 동작 검증.
-- [ ] **참고**: "내 작업 수동 추가" 는 별도 PR 로 📊 Portfolio 섹션에 이미 있음 (`#portfolio` 탭에 "새 카드" 버튼).
 
 ### PR — 날짜/시간 표시 포맷 통일 `ui_ux`
 한 줄 임팩트: 앱 전체 날짜/시간 표시가 한 컨벤션으로
@@ -123,15 +173,12 @@ PR 단위로 묶음. 각 PR 의 **한 줄 임팩트** 는 카드 frontmatter `im
 
 ## 🧹 안정성 / 위생
 
-### PR — 자동 백업 spinner toast `ui_ux`
-한 줄 임팩트: 첫 zip 1-10초 침묵 = 사용자 불안 → spinner
+### PR — 백업 가시성 강화 `ui_ux`
+한 줄 임팩트: spinner + 마지막 백업 시각 + 오래된 zip 정리 = 백업 영역 dogfood 폴리싱
 
-- [ ] vault 크기 따라 첫 zip 1-10초 침묵. 1초+ 면 toast 띄움.
-
-### PR — Vercel 대시보드 disconnect `infra`
-한 줄 임팩트: 잔여 위생
-
-- [ ] **Vercel 대시보드 disconnect** — deploy 는 `vercel.json` 으로 막혔지만 대시보드 연동은 잔존. 모바일 PWA 다시 살릴 가능성 보고 결정.
+- [ ] **첫 zip spinner toast** — vault 크기 따라 첫 zip 1-10초 침묵. 1초+ 면 spinner toast.
+- [ ] **설정 모달에 마지막 백업 시각 + 백업 path 노출** — "마지막 백업: 2026-05-21 14:32 · 경로 ~/Backups/...". 클릭 = path 클립보드 또는 Finder 진입.
+- [ ] **오래된 zip 자동 정리** — 최근 N개 (default 30개) 만 유지, 그 외 삭제. 정책 = 설정 모달에서 조정 가능.
 
 ---
 
@@ -146,7 +193,7 @@ PR 단위로 묶음. 각 PR 의 **한 줄 임팩트** 는 카드 frontmatter `im
 
 ## 🔮 V0.7+ 후보 (dogfood 결과로 진입 결정)
 
-- [ ] Tauri 2 Mobile — 모바일에서 본인 UI 사용
+- [ ] Tauri 2 Mobile (read-only viewer 부터) — Tauri 2 Mobile 학습/탐색이 동기. 1단계 = vault read + 메모 list/detail 만 모바일 UI 로. write 는 conflict/watcher race 영역이라 학습 단계엔 보류. 옵시디안 모바일 대체보다는 프레임워크 학습 + 본인 stack 모바일 가능성 증명 용도.
 - [ ] "Claude 응답 paste → 자동 callout" 회의록 영역
 - [ ] 녹음 파일 직접 업로드 → 자동 STT
 - [ ] Tauri 데스크탑 `.dmg` 빌드 + 코드 사인
