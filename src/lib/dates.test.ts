@@ -117,4 +117,12 @@ describe("dates", () => {
     expect(parseLooseTime("")).toBe(null);
     expect(parseLooseTime("아침")).toBe(null);
   });
+
+  it("parseLooseTime keywords now/지금/현재 → current HH:mm", () => {
+    const r = parseLooseTime("지금");
+    expect(r).toMatch(/^\d{2}:\d{2}$/);
+    expect(parseLooseTime("now")).toMatch(/^\d{2}:\d{2}$/);
+    expect(parseLooseTime("현재")).toMatch(/^\d{2}:\d{2}$/);
+    expect(parseLooseTime("NOW")).toMatch(/^\d{2}:\d{2}$/);
+  });
 });
