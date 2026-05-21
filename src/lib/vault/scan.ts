@@ -35,6 +35,7 @@ export interface Meeting extends MeetingMeta {
 
 export interface JournalMeta {
   id: string; // file path
+  uid: string; // frontmatter `id` 영구 식별자 (uuid). 메모와 동일 모델.
   date: string;
   mtime: number;
 }
@@ -199,6 +200,7 @@ export function fileToJournal(
   const fm = file.frontmatter;
   return {
     id: filePath,
+    uid: fmString(fm.id) ?? "", // 빈 string 면 lazy migration (scanJournals / upsertJournal).
     date: fmString(fm.date) ?? filePathToDate(filePath),
     mtime,
     content: file.body,
@@ -248,9 +250,13 @@ export function meetingToSummaryRaw(meeting: Meeting): string {
 }
 
 export function journalToRaw(journal: Journal): string {
+  const frontmatter: Record<string, unknown> = {
+    id: journal.uid, // 메모와 동일 — 영구 식별자.
+    date: journal.date,
+  };
   return serializeVaultFile({
     raw: "",
-    frontmatter: { date: journal.date },
+    frontmatter,
     body: journal.content,
   });
 }
@@ -486,39 +492,45 @@ export async function scanJournals(adapter: VaultAdapter): Promise<JournalMeta[]
     if (!path.endsWith(".md")) continue;
     if (isSyncNoiseFile(path)) continue;
     try {
-      const meta = await adapter.readMeta(path);
-      const date = filePathToDate(path);
-      results.push({ id: path, date, mtime: meta.mtime });
-    } catch {
-      // skip
+      let raw = await adapter.read(path);
+      let meta = await adapter.readMeta(path);
+      let j = fileToJournal(path, raw, meta.mtime);
+      // Lazy migration — 옛 일기 (frontmatter id 없음) 첫 만나면 uuid 발급 + rewrite.
+      // 메모 (scanMeetings) 패턴 동일. 한 번만 발생.
+      if (j.uid === "") {
+        const uid = crypto.randomUUID();
+        const updated = { ...j, uid };
+        try {
+          const newRaw = journalToRaw(updated);
+          const newMeta = await adapter.write(path, newRaw, meta.mtime);
+          raw = newRaw;
+          meta = newMeta;
+          j = fileToJournal(path, raw, meta.mtime);
+        } catch {
+          // write 실패 — 메모리 uid 만 채워 list 표시. 다음 scan 시 재시도.
+          j = { ...j, uid };
+        }
+      }
+      results.push({ id: j.id, uid: j.uid, date: j.date, mtime: j.mtime });
+    } catch (err) {
+      console.warn(`[scanJournals] skip ${path}:`, err);
     }
   }
   results.sort((a, b) => b.date.localeCompare(a.date));
   return results;
 }
 
-// vault 전체 *.md 스캔 → 모든 todo 추출 (휴지통 제외). sidecar 도 source 가 됨 (summary 의 action_items).
+// inbox.md 안 todo 만 수집. 메모/일기 안 - [ ] 는 todo 페이지 등장 X
+// (단순 체크박스 / 시각 element). 메모 → inbox 는 명시적 "할일로 보내기" 액션.
 export async function scanAllTodos(adapter: VaultAdapter): Promise<TodoItem[]> {
-  const todoFiles: string[] = [];
-  todoFiles.push(...(await adapter.list("")));
-  todoFiles.push(...(await adapter.list("meetings")));
-  todoFiles.push(...(await adapter.list("journals")));
-
-  const items: TodoItem[] = [];
-  for (const path of todoFiles) {
-    if (!path.endsWith(".md")) continue;
-    if (path.startsWith(".") || path.startsWith(".trash/")) continue;
-    if (isSyncNoiseFile(path)) continue;
-    try {
-      const raw = await adapter.read(path);
-      // sidecar 면 메인 path 로 source 보고 → todo extractor 가 같은 meeting 의 항목으로 group.
-      const sourcePath = isMeetingSidecar(path) ? meetingMainPath(path) : path;
-      items.push(...extractTodos(sourcePath, raw));
-    } catch {
-      // skip
-    }
+  const path = "inbox.md";
+  if (!(await adapter.exists(path))) return [];
+  try {
+    const raw = await adapter.read(path);
+    return extractTodos(path, raw);
+  } catch {
+    return [];
   }
-  return items;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

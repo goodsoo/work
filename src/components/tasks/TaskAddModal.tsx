@@ -1,43 +1,48 @@
 import { useEffect, useRef, useState } from "react";
-import { useCreateSchedule } from "../../hooks/useSchedules";
+import { useCreateTodo } from "../../hooks/useTodos";
+import {
+  TODO_CATEGORIES,
+  type TodoCategory,
+  type TodoInsert,
+  type TodoPriority,
+} from "../../api/todos";
 import { LooseDateInput } from "../common/LooseDateInput";
 import { LooseTimeInput } from "../common/LooseTimeInput";
 
 type Props = {
   open: boolean;
-  defaultDate: string;
   onClose: () => void;
+  // 메모 "할일로 보내기" / 캘린더 셀 클릭 등에서 prefill 채워서 띄움.
+  // title/date/time/category/priority 모두 optional. 사용자가 모달 안에서 다듬음.
+  prefill?: Partial<TodoInsert>;
 };
 
-// 현재 시각을 30분 단위로 round → "HH:mm".
-function nowRoundedToHalfHour(): string {
-  const d = new Date();
-  const rounded = Math.round(d.getMinutes() / 30) * 30;
-  let hour = d.getHours();
-  let minute = rounded;
-  if (rounded === 60) {
-    hour = (hour + 1) % 24;
-    minute = 0;
-  }
-  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
-}
+const PRIORITY_LABEL: Record<TodoPriority, string> = {
+  high: "높음",
+  medium: "보통",
+  low: "낮음",
+};
 
-export function ScheduleAddModal({ open, defaultDate, onClose }: Props) {
-  const createMutation = useCreateSchedule();
+export function TaskAddModal({ open, onClose, prefill }: Props) {
+  const createMutation = useCreateTodo();
   const [title, setTitle] = useState("");
-  const [date, setDate] = useState(defaultDate);
-  const [time, setTime] = useState(() => nowRoundedToHalfHour());
-  const [endTime, setEndTime] = useState("");
+  const [date, setDate] = useState("");
+  const [time, setTime] = useState("");
+  const [category, setCategory] = useState<TodoCategory | null>(null);
+  const [priority, setPriority] = useState<TodoPriority>("medium");
+  const [done, setDone] = useState(false);
   const titleRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!open) return;
-    setTitle("");
-    setDate(defaultDate);
-    setTime(nowRoundedToHalfHour());
-    setEndTime("");
+    setTitle(prefill?.title ?? "");
+    setDate(prefill?.due_date ?? "");
+    setTime(prefill?.due_time ?? "");
+    setCategory(prefill?.category ?? null);
+    setPriority(prefill?.priority ?? "medium");
+    setDone(prefill?.done ?? false);
     requestAnimationFrame(() => titleRef.current?.focus());
-  }, [open, defaultDate]);
+  }, [open, prefill]);
 
   useEffect(() => {
     if (!open) return;
@@ -53,7 +58,7 @@ export function ScheduleAddModal({ open, defaultDate, onClose }: Props) {
 
   if (!open) return null;
 
-  const canSubmit = title.trim().length > 0 && !!date && !!time;
+  const canSubmit = title.trim().length > 0;
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -61,8 +66,11 @@ export function ScheduleAddModal({ open, defaultDate, onClose }: Props) {
     createMutation.mutate(
       {
         title: title.trim(),
-        start_time: `${date}T${time}:00`,
-        end_time: endTime ? `${date}T${endTime}:00` : null,
+        done,
+        due_date: date || null,
+        due_time: date && time ? time : null, // 시간만 있고 날짜 없으면 무시
+        category,
+        priority,
       },
       { onSuccess: () => onClose() },
     );
@@ -72,7 +80,7 @@ export function ScheduleAddModal({ open, defaultDate, onClose }: Props) {
     <div
       role="dialog"
       aria-modal="true"
-      aria-labelledby="schedule-add-title"
+      aria-labelledby="task-add-title"
       onClick={onClose}
       className="fixed inset-0 z-50 flex items-center justify-center p-6"
       style={{ backgroundColor: "rgba(0,0,0,0.4)" }}
@@ -87,11 +95,11 @@ export function ScheduleAddModal({ open, defaultDate, onClose }: Props) {
         }}
       >
         <h2
-          id="schedule-add-title"
+          id="task-add-title"
           className="text-base font-semibold"
           style={{ color: "var(--text-primary)" }}
         >
-          일정 추가
+          할 일 추가
         </h2>
 
         <label className="mt-4 block">
@@ -106,7 +114,7 @@ export function ScheduleAddModal({ open, defaultDate, onClose }: Props) {
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="예: 팀 미팅"
+            placeholder="예: 보고서 작성"
             aria-required="true"
             className="mt-1 w-full rounded-md px-2 py-1.5 text-sm outline-none"
             style={{
@@ -119,14 +127,14 @@ export function ScheduleAddModal({ open, defaultDate, onClose }: Props) {
 
         <div
           className="mt-3 grid gap-2"
-          style={{ gridTemplateColumns: "2fr 1fr 1fr" }}
+          style={{ gridTemplateColumns: "2fr 1fr" }}
         >
           <label className="block">
             <span
               className="text-xs font-medium"
               style={{ color: "var(--text-secondary)" }}
             >
-              날짜 <span style={{ color: "var(--accent-red)" }}>*</span>
+              날짜
             </span>
             <div
               className="mt-1 rounded-md px-2 py-1.5"
@@ -143,7 +151,7 @@ export function ScheduleAddModal({ open, defaultDate, onClose }: Props) {
               className="text-xs font-medium"
               style={{ color: "var(--text-secondary)" }}
             >
-              시작 <span style={{ color: "var(--accent-red)" }}>*</span>
+              시간
             </span>
             <div
               className="mt-1 rounded-md px-2 py-1.5"
@@ -155,30 +163,75 @@ export function ScheduleAddModal({ open, defaultDate, onClose }: Props) {
               <LooseTimeInput value={time} onCommit={setTime} fullWidth />
             </div>
           </label>
+        </div>
+
+        <div className="mt-3 grid grid-cols-2 gap-2">
           <label className="block">
             <span
               className="text-xs font-medium"
               style={{ color: "var(--text-secondary)" }}
             >
-              종료 (선택)
+              카테고리
             </span>
-            <div
-              className="mt-1 rounded-md px-2 py-1.5"
+            <select
+              value={category ?? ""}
+              onChange={(e) =>
+                setCategory((e.target.value || null) as TodoCategory | null)
+              }
+              className="mt-1 w-full rounded-md px-2 py-1.5 text-sm"
               style={{
                 backgroundColor: "var(--bg-surface)",
                 border: "1px solid var(--border-default)",
+                color: "var(--text-primary)",
               }}
             >
-              <LooseTimeInput value={endTime} onCommit={setEndTime} fullWidth />
-            </div>
+              <option value="">없음</option>
+              {TODO_CATEGORIES.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block">
+            <span
+              className="text-xs font-medium"
+              style={{ color: "var(--text-secondary)" }}
+            >
+              우선순위
+            </span>
+            <select
+              value={priority}
+              onChange={(e) => setPriority(e.target.value as TodoPriority)}
+              className="mt-1 w-full rounded-md px-2 py-1.5 text-sm"
+              style={{
+                backgroundColor: "var(--bg-surface)",
+                border: "1px solid var(--border-default)",
+                color: "var(--text-primary)",
+              }}
+            >
+              {(Object.keys(PRIORITY_LABEL) as TodoPriority[]).map((p) => (
+                <option key={p} value={p}>
+                  {PRIORITY_LABEL[p]}
+                </option>
+              ))}
+            </select>
           </label>
         </div>
 
+        <label className="mt-3 flex items-center gap-2 text-xs">
+          <input
+            type="checkbox"
+            checked={done}
+            onChange={(e) => setDone(e.target.checked)}
+          />
+          <span style={{ color: "var(--text-secondary)" }}>
+            완료된 항목으로 추가
+          </span>
+        </label>
+
         {createMutation.isError ? (
-          <p
-            className="mt-3 text-xs"
-            style={{ color: "var(--accent-red)" }}
-          >
+          <p className="mt-3 text-xs" style={{ color: "var(--accent-red)" }}>
             저장에 실패했어요. 다시 시도해주세요.
           </p>
         ) : null}

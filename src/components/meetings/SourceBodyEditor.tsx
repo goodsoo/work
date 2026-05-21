@@ -34,6 +34,9 @@ import {
 type Props = {
   content: string;
   onChange: (next: string) => void;
+  // cursor 가 - [ ] 라인 위에서 ⌘⏎ 누르면 그 라인 텍스트를 부모에게 전달.
+  // 부모 (MeetingForm) 가 TaskAddModal prefill 로 띄움. 일방향 복제 — 메모 라인은 그대로.
+  onSendLineToInbox?: (lineText: string) => void;
 };
 
 // textarea의 한 줄 높이 (line-height = 1.625rem, text-base 기준).
@@ -47,7 +50,7 @@ type SlashState = {
   slashLine: number; // popover top 계산용 (slash 가 있는 줄 index)
 };
 
-export function SourceBodyEditor({ content, onChange }: Props) {
+export function SourceBodyEditor({ content, onChange, onSendLineToInbox }: Props) {
   const [draft, setDraft] = useState(content);
   const [caretLine, setCaretLine] = useState<number | null>(null);
   const [slashState, setSlashState] = useState<SlashState | null>(null);
@@ -313,6 +316,20 @@ export function SourceBodyEditor({ content, onChange }: Props) {
       return;
     }
     const mod = e.metaKey || e.ctrlKey;
+    // ⌘⏎ — cursor 라인이 - [ ] 면 그 라인 텍스트 inbox 로 보내기 (일방향 복제)
+    if (mod && e.key === "Enter" && !e.shiftKey && !e.altKey && onSendLineToInbox) {
+      const value = ta.value;
+      const pos = ta.selectionStart ?? 0;
+      const lineStart = value.lastIndexOf("\n", pos - 1) + 1;
+      const lineEndIdx = value.indexOf("\n", pos);
+      const lineEnd = lineEndIdx === -1 ? value.length : lineEndIdx;
+      const lineText = value.slice(lineStart, lineEnd);
+      if (/^\s*-\s\[[ x]\]\s/.test(lineText)) {
+        e.preventDefault();
+        onSendLineToInbox(lineText);
+        return;
+      }
+    }
     // ⌘B / ⌘I bold-italic wrap toggle
     if (mod && !e.shiftKey && !e.altKey && (e.code === "KeyB" || e.code === "KeyI")) {
       const mark = e.code === "KeyB" ? "**" : "*";
