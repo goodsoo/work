@@ -903,7 +903,15 @@ export function MeetingForm({ meetingId, onBack }: Props) {
                 }}
               />
             ) : (
-              <MarkdownView content={body} />
+              <MarkdownView
+                content={body}
+                onChange={(v) => {
+                  // 체크박스 토글은 단일 캐릭터 변경 — 별 history entry 로 두는 게
+                  // 옵시디안 동작에 맞음 (입력처럼 coalesce 하면 직전 textarea 변경에
+                  // 합쳐져 undo 가 어색해짐).
+                  setDoc("body", { ...doc, body: v }, true);
+                }}
+              />
             )}
           </div>
         ) : null}
