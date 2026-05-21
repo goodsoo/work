@@ -54,11 +54,6 @@ PR 단위로 묶음. 각 PR 의 **한 줄 임팩트** 는 카드 frontmatter `im
 
 ## 🎨 폴리시
 
-### PR — 테마 전환 radial wipe `ui_ux`
-한 줄 임팩트: 테마 토글 시 누른 곳에서 원형으로 퍼지는 wipe (갑자기 밝아져 눈 아픈 문제)
-
-- [ ] View Transitions API + clip-path circle. 토글 버튼 클릭 좌표 origin. 0.8s ease-out.
-
 ### PR — toast/에러 박스 overflow 수정 `fix`
 한 줄 임팩트: 긴 에러 메세지도 박스 안에 잘 fit + 재시도 버튼 보임
 

@@ -6,6 +6,16 @@
 
 ## 2026-05-21
 
+### PR #23 — 테마 전환 radial wipe
+
+- **View Transitions API 폐기 + 직접 구현** — macOS Ventura WKWebView (Safari 16) 가 미지원이라 fallback 으로 즉시 toggle 됐었음. fixed overlay + clip-path circle 로 직접 구현.
+- **overlay 색 hardcode (`#ffffff` / `#1a1a1a`)** — `--bg-base` light/dark 값을 JS 상수로. CSS variable 평가하면 overlay 가 새 테마 cascade 못 받아 잘못된 색.
+- **wipe 끝 처리** — `transitionend` → `flushSync(setThemeState)` 동기 commit 강제 + 250ms 더 overlay 유지. rAF 한 번만으론 큰 DOM paint 가 한 프레임 넘겨 "overlay 사라진 뒤 컴포넌트 늦게 따라옴" 보였음.
+- **반지름 = 4 모서리 중 가장 먼 거리** — 어디서 눌러도 화면 끝까지 wipe.
+- **`prefers-reduced-motion` / origin 없는 호출 → 즉시 toggle fallback**.
+- **350ms ease-out + 250ms post-hold** — 처음 800ms 였는데 끝나고 멈춘 느낌이라 단축. post-hold 덕에 컨텐츠 paint 변화 안 보임.
+- commit `638008a` (merge `2acccb7`)
+
 ### PR #22 — 보기 모드 마크다운 옵시디안 수준 정비 + 편집기 nest 정합
 
 - **체크박스 (`- [ ]`) 렌더링 + 클릭 토글** — task-list-item 안 default `<input>` 트리 walk 로 찾아 null + 직후 공백 1칸 strip (remark-gfm loose-list `<p>` 한 번 더 감싸는 케이스 대응). 토글은 mdast `checked` 가 아니라 source 의 `[ ]`/`[x]` 위치 (li `position.start.offset`) 기준 직접 수정 — React Query optimistic update 와 자연스럽게 합쳐짐.
