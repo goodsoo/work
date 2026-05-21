@@ -68,27 +68,7 @@
 
 PR body 가 곧 vault `portfolio/` 카드의 본문이 됨. 양식 (한 줄 임팩트 / 문제 / Before / After / 디자인 결정 / 유저가 얻는 것 / 카테고리 7섹션) 은 `src/lib/clipboardPrompt.ts` 의 `buildPRGuidePrompt()` 가 single source. 카테고리 enum: `ui_ux | backend | infra | fix | other`. "PR 만들어줘" 요청 받으면 의도 / 유저 가치 / before-after 스크린샷 / 디자인 결정 / 카테고리 5가지 먼저 확보. 작은 변경(오타·dep bump 등 포트폴리오 가치 없는 것)은 PR 안 만들고 main 직커밋 허용.
 
-### /ship 추가 단계 — todo/done 동기화 (gstack ship skill 표준엔 없음)
-
-본인 todo.md/done.md 컨벤션 (gstack TODOS-format 아님) 동기화는 `/ship` 이 PR commit 안에 미리 반영해야 머지 시 main 자동 진입. `/ship` 호출 시 step 15 (commit) **전에** 다음 수행:
-
-1. **PR # 예측**: `gh pr list --state all --limit 1 --json number --jq '.[0].number'` + 1. (동시 PR 작업 있으면 빗나갈 수 있고, 그 경우 `/land` step 5 가 보정.)
-
-2. **todo.md 에서 머지될 항목 식별**: PR body 의 "한 줄 임팩트" / 카테고리 / 키워드로 todo.md 안 `### PR — <제목> \`<category>\`` 섹션 매칭. 자신 없으면 사용자 confirm.
-
-3. **done.md 에 entry 추가** (오늘 `## YYYY-MM-DD` 섹션. 없으면 최상단에 새로 만듦):
-   ```
-   ### PR #<예측> — <섹션 제목>
-
-   - <PR body 의 "디자인 결정" / "유저가 얻는 것" 에서 발췌한 핵심 bullet 들>
-   - commit `<short SHA — push 후 채움>`
-   ```
-
-4. **todo.md 에서 그 섹션 제거** — 헤더 + bullet 모두.
-
-5. **변경을 메인 feature commit 에 stage** — 별도 commit 아님. 머지 시 main 의 todo/done 도 동시에 반영.
-
-매칭 확신 없거나 PR body 가 다중 todo 항목 묶음 (드물지만 가능) 이면 사용자 confirm 후 진행.
+todo.md/done.md 동기화는 글로벌 `~/.claude/CLAUDE.md` 의 "/ship 추가 단계" 가 처리.
 
 ## Skill routing
 
