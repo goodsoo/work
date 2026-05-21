@@ -6,6 +6,18 @@
 
 ## 2026-05-21
 
+### PR #22 — 보기 모드 마크다운 옵시디안 수준 정비 + 편집기 nest 정합
+
+- **체크박스 (`- [ ]`) 렌더링 + 클릭 토글** — task-list-item 안 default `<input>` 트리 walk 로 찾아 null + 직후 공백 1칸 strip (remark-gfm loose-list `<p>` 한 번 더 감싸는 케이스 대응). 토글은 mdast `checked` 가 아니라 source 의 `[ ]`/`[x]` 위치 (li `position.start.offset`) 기준 직접 수정 — React Query optimistic update 와 자연스럽게 합쳐짐.
+- **4-space indented code block** — `code` 의 inline vs block 구분에 className 만 보면 language class 없는 indented case 누락. `<pre>` ancestry 를 React Context 로 추적해 inline/block 정확히 분기.
+- **h4~h6 시각 위계** — 본문 글자와 구별 안 되던 거 단계별 정리.
+- **ordered list nest** — Tab 으로 들여쓰기 시 leading 숫자를 무조건 "1" 로 rewrite (CommonMark: 1 이외 숫자 ordered list 는 paragraph interrupt 못 함 → source `2.` 면 nest 실패). 시각 번호는 CommonMark 가 position 으로 다시 매김.
+- **gutter ↔ parse 일치** — 비-1 ordered marker 가 들여쓰여 있어도 직전 sibling 없으면 ContinuationGlyph (점선 vertical) 로 표시.
+- **`<br>` null 처리** — `<p>` 의 `whitespace-pre-wrap` 가 `\n` 시각 줄바꿈 처리하는데 hard break (`  \n`) 가 `<br>` + `\n` 둘 다 박혀 줄 두 번 끊김 → `<br>` 자체 null. Soft/hard 둘 다 한 줄.
+- **이미지 (`![](path)`)** — vault 안 로컬 경로 / URL 둘 다 정상 렌더.
+- **편집 단축키 도움말 정리** — ⌘B/I/E, ⌘⇧D, Alt+↑↓ 설정 → 단축키 cheatsheet 에 한꺼번에.
+- commit `79e1bb7` (merge)
+
 ### PR #21 — 메모/할일 데이터 도메인 정리 + 메모→할일 ⌘⏎
 
 - **두 도메인으로 환원** — Note (`meetings/` + `journals/`, 폴더로 분리한 같은 schema md 파일) / Task (`inbox.md` 안 `- [ ]` 라인, 일정/할일 통합). 사용자 mental model 의 메모/일기/일정/할일 4 개념을 2 entity 로.

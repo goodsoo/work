@@ -10,11 +10,10 @@ PR 단위로 묶음. 각 PR 의 **한 줄 임팩트** 는 카드 frontmatter `im
 
 ## 🚀 메모 에디터 (마크다운) 강화
 
-### PR — 마크다운 보기 모드 정비 `ui_ux`
-한 줄 임팩트: 보기 모드가 옵시디안만큼 정확히 렌더
+### PR — 빈 본문 + 보기 모드 일 때 편집 유도 UI `ui_ux`
+한 줄 임팩트: 빈 메모 들어가면 편집모드 진입 안내 (현재는 빈 화면)
 
-- [ ] **MarkdownView 체크박스 (`- [ ]`) 렌더링** + 보기 모드 클릭 토글로 body 마크다운 직접 수정. 현재 구현 약함.
-- [ ] **MarkdownView 4-space indented code block 렌더링** — pre/code 컴포넌트 매핑 점검. 현재 코드블록 인식 안 됨.
+- [ ] 본문 비어있고 viewMode=`view` 일 때 본문 영역에 CTA — "편집을 시작하려면 클릭" 안내 + 클릭 시 viewMode `edit` 전환 + textarea focus. 자동 전환 vs CTA 박스 vs placeholder text — 사용자 의도 파악 후 결정. 음성/요약 탭은 별개 (요약 탭 빈 상태는 SummarizeButton 으로 이미 안내됨).
 
 ### PR — 본문 word-wrap + gutter dynamic alignment `ui_ux`
 한 줄 임팩트: 한국어 메모 자연 줄넘김 + gutter 정확 정렬
