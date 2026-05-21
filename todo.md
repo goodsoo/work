@@ -93,6 +93,11 @@ PR 단위로 묶음. 각 PR 의 **한 줄 임팩트** 는 카드 frontmatter `im
 
 - [ ] toast 컨테이너 max-width + 텍스트 영역 min-w-0 + break-words + 액션 버튼 flex-shrink-0. 한 컴포넌트 수정으로 모든 toast 적용. 현재는 긴 에러 시 텍스트가 박스 밖으로 나가고 재시도 버튼이 밀려서 안 보임.
 
+### PR — 노트 삭제 후 stale 선택 복원 오류 `fix`
+한 줄 임팩트: 직전 선택 노트가 이미 삭제됐어도 안 깨짐
+
+- [ ] 노트 삭제 시 "직전 선택 노트로 auto-select" fallback 이 동작 중. 그 fallback target uid 가 이미 trash 로 간 상태면 readFullMeeting → exists false → throw → React Query retry → 결국 error UI. fallback 적용 전 list cache 에서 uid 존재 검사 + 없으면 list 의 첫 valid 노트로 fallback 또는 빈 상태 (selectedMeetingId null).
+
 ### PR — UI 패딩 / 캘린더 폴리싱 `ui_ux`
 한 줄 임팩트: 잔여 디자인 inconsistency 정리
 
