@@ -2,7 +2,25 @@
 // 옵시디안 본문 typing 동작과 일치. 모든 helper 는 pure — value + selection 만 받고
 // 새 value + selection 반환. helper 가 null 반환하면 native 동작 유지.
 
-const INDENT = "  "; // 2-space indent unit
+const INDENT = "  "; // 2-space indent unit (default, bullet/checkbox/일반 텍스트)
+
+// ordered list 는 marker 폭만큼 indent 해야 CommonMark 가 nest 로 인식 (1. → 3, 10. → 4).
+// 현재 줄 source 기준. ordered 가 아니면 default INDENT 반환.
+export function indentUnitForLine(line: string): string {
+  const ordered = line.match(/^\s*(\d+)\.\s/);
+  if (ordered) {
+    // "{digits}. " 폭 = digits 길이 + 2 (마침표 + space).
+    return " ".repeat(ordered[1].length + 2);
+  }
+  return INDENT;
+}
+
+// ordered list 줄의 leading 숫자를 "1" 로 재설정. ordered 가 아니면 unchanged.
+// 사용처: Tab 으로 nest 진입할 때 — CommonMark 가 "1 이외" ordered list 의
+// paragraph interrupt 를 금지하므로 nest 첫 줄은 무조건 1 이어야 함.
+export function renumberOrderedToOne(line: string): string {
+  return line.replace(/^(\s*)\d+(\.\s)/, "$11$2");
+}
 
 type LineMarker = {
   indent: string; // leading whitespace (spaces only; tabs normalize to 2-space)
@@ -102,8 +120,12 @@ export function applyIndent(
     let removedFirst = 0;
     let removedTotal = 0;
     const out = lines.map((ln, i) => {
+      // 줄별 indent unit 으로 untab — ordered list 면 marker 폭만큼 떼야 대칭.
+      const unit = indentUnitForLine(ln);
       let removed = 0;
-      if (ln.startsWith(INDENT)) {
+      if (ln.startsWith(unit)) {
+        removed = unit.length;
+      } else if (ln.startsWith(INDENT)) {
         removed = INDENT.length;
       } else if (ln.startsWith("\t")) {
         removed = 1;
@@ -123,20 +145,30 @@ export function applyIndent(
   }
 
   if (!isMultiLine) {
-    // 단일 줄: 줄 시작에 indent prepend. caret/selection offset 도 +2.
-    const newBlock = INDENT + block;
+    // 단일 줄: 줄 시작에 indent prepend — ordered line 이면 marker 폭, 아니면 2-space.
+    // ordered 는 추가로 marker 번호를 "1" 로 재설정 — CommonMark 가 "1 이외 숫자로 시작하는
+    // ordered list 는 paragraph 를 interrupt 못 함" 이라 새 nest level 첫 item 은 1 이어야
+    // 실제로 sublist 로 인식됨 (이미 sublist 면 unchanged, 첫 nest 면 차이가 큼).
+    const unit = indentUnitForLine(block);
+    const renumbered = renumberOrderedToOne(block);
+    const newBlock = unit + renumbered;
     const newValue = before + newBlock + after;
+    const delta = unit.length + (renumbered.length - block.length);
     return {
       value: newValue,
-      start: start + INDENT.length,
-      end: end + INDENT.length,
+      start: start + delta,
+      end: end + delta,
     };
   }
 
-  const newBlock = lines.map((ln) => INDENT + ln).join("\n");
+  const units = lines.map((ln) => indentUnitForLine(ln));
+  const renums = lines.map((ln) => renumberOrderedToOne(ln));
+  const newBlock = renums.map((ln, i) => units[i] + ln).join("\n");
   const newValue = before + newBlock + after;
-  const addedFirst = INDENT.length;
-  const addedTotal = INDENT.length * lines.length;
+  const renumDelta0 = renums[0].length - lines[0].length;
+  const addedFirst = units[0].length + renumDelta0;
+  const addedTotal = units.reduce((a, u) => a + u.length, 0) +
+    renums.reduce((a, r, i) => a + (r.length - lines[i].length), 0);
   return {
     value: newValue,
     start: start + addedFirst,
@@ -184,7 +216,7 @@ export function applyEnterContinue(
   return { value: newValue, start: caret, end: caret };
 }
 
-// Bold(`**`) / Italic(`*`) wrap toggle.
+// Bold(`**`) / Italic(`*`) / Inline-code(`) wrap toggle.
 // - selection 있고 양옆이 이미 mark 면 unwrap.
 // - selection 있고 unwrap 아니면 wrap.
 // - selection 없으면 빈 wrap (`**|**`) + caret 가운데. 이미 caret 양옆이 mark 면 unwrap.
@@ -192,7 +224,7 @@ export function applyWrap(
   value: string,
   start: number,
   end: number,
-  mark: "**" | "*",
+  mark: "**" | "*" | "`",
 ): EditResult {
   const before = value.slice(0, start);
   const sel = value.slice(start, end);

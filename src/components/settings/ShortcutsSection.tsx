@@ -46,6 +46,21 @@ const GROUPS: Group[] = [
       { keys: ["Esc"], label: "input 빠져나가기 / 변경 취소" },
     ],
   },
+  {
+    title: "본문 편집 (편집 모드)",
+    items: [
+      { keys: ["⌘", "B"], label: "굵게", note: "**text**" },
+      { keys: ["⌘", "I"], label: "기울임", note: "*text*" },
+      { keys: ["⌘", "E"], label: "인라인 코드", note: "`text`" },
+      { keys: ["⌘", "⇧", "D"], label: "줄 복제" },
+      { keys: ["⌥", "↑"], label: "줄 위로 이동" },
+      { keys: ["⌥", "↓"], label: "줄 아래로 이동" },
+      { keys: ["Tab"], label: "들여쓰기 (2-space)" },
+      { keys: ["⇧", "Tab"], label: "내어쓰기" },
+      { keys: ["Enter"], label: "리스트/인용 자동 연장", note: "빈 marker 에서 누르면 종료" },
+      { keys: ["⇧", "Enter"], label: "리스트 연장 없이 줄바꿈", note: "빈 줄 여러 개 만들 때" },
+    ],
+  },
 ];
 
 export function ShortcutsSection() {

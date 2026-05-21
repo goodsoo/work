@@ -126,6 +126,46 @@ describe("applyWrap", () => {
     expect(r.start).toBe(2);
     expect(r.end).toBe(2);
   });
+  it("inline-code wrap selection", () => {
+    const r = applyWrap("run npm install now", 4, 15, "`");
+    expect(r).toEqual({ value: "run `npm install` now", start: 5, end: 16 });
+  });
+  it("inline-code unwrap when selection 양옆이 ` 이미 있음", () => {
+    const r = applyWrap("run `code` now", 5, 9, "`");
+    expect(r.value).toBe("run code now");
+    expect(r.start).toBe(4);
+    expect(r.end).toBe(8);
+  });
+});
+
+describe("applyIndent — marker 폭 적응", () => {
+  it("bullet 줄 Tab = 2-space", () => {
+    const r = applyIndent("- foo", 5, 5, false);
+    expect(r?.value).toBe("  - foo");
+    expect(r?.start).toBe(7);
+  });
+  it("ordered 1. 줄 Tab = 3-space (CommonMark nest 요구)", () => {
+    const r = applyIndent("1. foo", 6, 6, false);
+    expect(r?.value).toBe("   1. foo");
+    expect(r?.start).toBe(9);
+  });
+  it("ordered 10. 줄 Tab = 4-space + marker 1 로 재설정", () => {
+    const r = applyIndent("10. foo", 7, 7, false);
+    // marker 폭 4 spaces prepend + 마커 자체는 "10." → "1." 로 줄어듦.
+    expect(r?.value).toBe("    1. foo");
+  });
+  it("nest 진입 시 marker 번호를 1 로 재설정 (paragraph interrupt 규칙)", () => {
+    // Enter 자동 연장이 만든 "2. 둘" 을 Tab 하면 그냥 indent 만 더해선 nest 안 됨.
+    // marker 도 "1." 로 바꿔야 CommonMark 가 sublist 로 인식.
+    const v = "1. 하나\n2. 둘";
+    const caret = v.length;
+    const r = applyIndent(v, caret, caret, false);
+    expect(r?.value).toBe("1. 하나\n   1. 둘");
+  });
+  it("ordered Shift+Tab = marker 폭만큼 떼기", () => {
+    const r = applyIndent("   1. foo", 9, 9, true);
+    expect(r?.value).toBe("1. foo");
+  });
 });
 
 describe("applyLineMove", () => {

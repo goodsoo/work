@@ -330,9 +330,13 @@ export function SourceBodyEditor({ content, onChange, onSendLineToInbox }: Props
         return;
       }
     }
-    // ⌘B / ⌘I bold-italic wrap toggle
-    if (mod && !e.shiftKey && !e.altKey && (e.code === "KeyB" || e.code === "KeyI")) {
-      const mark = e.code === "KeyB" ? "**" : "*";
+    // ⌘B / ⌘I / ⌘E — bold / italic / inline-code wrap toggle
+    if (
+      mod && !e.shiftKey && !e.altKey &&
+      (e.code === "KeyB" || e.code === "KeyI" || e.code === "KeyE")
+    ) {
+      const mark =
+        e.code === "KeyB" ? "**" : e.code === "KeyI" ? "*" : "`";
       e.preventDefault();
       commitEdit(applyWrap(ta.value, ta.selectionStart, ta.selectionEnd, mark));
       return;
