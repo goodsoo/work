@@ -418,6 +418,7 @@ export async function scanMeetings(adapter: VaultAdapter): Promise<MeetingMeta[]
       console.warn(`[scanMeetings] skip ${path}:`, err);
     }
   }
+  await dedupeUids(adapter, results);
   results.sort((a, b) => {
     const da = a.date ?? "";
     const db = b.date ?? "";
@@ -425,6 +426,57 @@ export async function scanMeetings(adapter: VaultAdapter): Promise<MeetingMeta[]
     return b.mtime - a.mtime;
   });
   return results;
+}
+
+// 같은 uid 두 entry 가 vault 에 존재하면 (외부 복사 / 옵시디안 모바일 merge /
+// 백업 복원) React key 충돌 + 같은 uid hash 라우팅 시 어느 파일 잡힐지 race.
+// 후순위 (mtime 작은, 동률이면 path 알파벳 큰) entries 의 uid 를 새 uuid 로
+// 재발급 + frontmatter rewrite. rewrite 가 watcher 다시 trigger 하지만 dedup
+// 은 idempotent (다음 scan 에 이미 unique → no-op) 이라 무한 루프 X.
+// in-place 로 results 의 uid 필드 갱신 — 같은 turn UI 가 새 uid 로 routing 가능.
+// export — 테스트에서 직접 호출.
+export async function dedupeUids(
+  adapter: VaultAdapter,
+  results: MeetingMeta[],
+): Promise<void> {
+  const groups = new Map<string, MeetingMeta[]>();
+  for (const m of results) {
+    if (!m.uid) continue; // lazy migration 실패한 entry — skip
+    const existing = groups.get(m.uid);
+    if (existing) existing.push(m);
+    else groups.set(m.uid, [m]);
+  }
+
+  for (const [uid, entries] of groups) {
+    if (entries.length < 2) continue;
+    // 우선순위: mtime 큰 → 같으면 path 알파벳 작은. entries[0] 이 keeper.
+    entries.sort((a, b) => {
+      if (a.mtime !== b.mtime) return b.mtime - a.mtime;
+      return a.id.localeCompare(b.id);
+    });
+    for (let i = 1; i < entries.length; i++) {
+      const entry = entries[i];
+      const newUid = crypto.randomUUID();
+      try {
+        const raw = await adapter.read(entry.id);
+        const newRaw = patchFrontmatter(raw, { id: newUid });
+        const newMeta = await adapter.write(entry.id, newRaw, entry.mtime);
+        entry.uid = newUid;
+        entry.mtime = newMeta.mtime;
+        console.warn(
+          `[scanMeetings] dedupe uid: ${entry.id} (was ${uid}, now ${newUid})`,
+        );
+      } catch (err) {
+        // read-only vault / sync conflict / 권한 — 메모리 uid 만 분리해서
+        // React key 충돌 0. 다음 scan 또는 사용자 edit 시 다시 시도.
+        entry.uid = newUid;
+        console.warn(
+          `[scanMeetings] dedupe rewrite 실패 ${entry.id}: 메모리 uid 만 분리`,
+          err,
+        );
+      }
+    }
+  }
 }
 
 export async function scanJournals(adapter: VaultAdapter): Promise<JournalMeta[]> {
