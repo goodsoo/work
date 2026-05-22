@@ -20,7 +20,7 @@
 - **글자수 제한 + word-wrap** — title input `maxLength=200`, 보기 모드 `break-words` 로 긴 todo 줄바꿈 자연.
 - **vault parser/writer** — `CHECKBOX_RE` `[ x-D]` 인식, `TodoItem.cancelled/deleted` 필드, buildTodoLine 의 `#from-<uid>` tag (extra_tags 분리 + reconstruct 시 보존).
 - 31 modified, 8 new, 1 deleted. 168 tests passing.
-- commit `<short SHA — push 후 채움>`
+- commit `ab0f4e3`
 
 ## 2026-05-21
 
