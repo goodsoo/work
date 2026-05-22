@@ -22,6 +22,7 @@ import { LooseDateInput } from "../common/LooseDateInput";
 import { LooseTimeInput } from "../common/LooseTimeInput";
 import { MeetingPicker } from "../common/MeetingPicker";
 import { CategoryPicker } from "../common/CategoryPicker";
+import { categoryColor } from "../../lib/todoCategory";
 
 type Props = {
   todo: Todo;
@@ -219,6 +220,7 @@ export function TodoRow({ todo, onToggle, onUpdate, onDelete }: Props) {
               status={
                 draft.cancelled ? "cancelled" : draft.done ? "done" : "pending"
               }
+              category={draft.category}
               onClick={() => {
                 if (draft.cancelled) {
                   updateDraft({ cancelled: false });
@@ -342,27 +344,27 @@ export function TodoRow({ todo, onToggle, onUpdate, onDelete }: Props) {
             status={
               todo.cancelled ? "cancelled" : todo.done ? "done" : "pending"
             }
+            category={todo.category}
             onClick={() => onToggle(todo)}
           />
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <DueChip todo={todo} />
-              <div
-                className={`min-w-0 break-words text-base ${todo.done || todo.cancelled ? "line-through" : ""}`}
-                style={{
-                  color:
-                    todo.done || todo.cancelled
-                      ? "var(--text-muted)"
-                      : "var(--text-primary)",
-                }}
-              >
-                {todo.title || (
-                  <span style={{ color: "var(--text-muted)" }}>(제목 없음)</span>
-                )}
-              </div>
+            <div
+              className={`min-w-0 break-words text-base ${todo.done || todo.cancelled ? "line-through" : ""}`}
+              style={{
+                color:
+                  todo.done || todo.cancelled
+                    ? "var(--text-muted)"
+                    : "var(--text-primary)",
+              }}
+            >
+              {todo.title || (
+                <span style={{ color: "var(--text-muted)" }}>(제목 없음)</span>
+              )}
             </div>
             <ReadOnlyMeta todo={todo} />
           </div>
+          {/* DueChip — 카드 우측 끝. items-center 라 vertical 가운데 align. */}
+          <DueChip todo={todo} />
         </div>
       )}
     </li>
@@ -370,14 +372,26 @@ export function TodoRow({ todo, onToggle, onUpdate, onDelete }: Props) {
 }
 
 // 체크박스 button — pending / done / cancelled 3 state. editing 중엔 draft 기반,
-// 보기 모드는 todo 기반.
+// 보기 모드는 todo 기반. pending 상태일 때 카테고리 색을 border 로 — 미분류는
+// 기존 회색 (text-muted) 유지. done/cancelled 는 카테고리와 무관 (완료/취소가
+// 의미 우선).
 function CheckboxButton({
   status,
+  category,
   onClick,
 }: {
   status: "pending" | "done" | "cancelled";
+  category: TodoCategory | null;
   onClick: () => void;
 }) {
+  const catColor = status === "pending" ? categoryColor(category) : "";
+  const pendingBorder = catColor || "var(--text-muted)";
+  // 내부 배경 — 카테고리 색을 4% alpha 로 매우 연하게 tint. 미분류
+  // (catColor 빈문자) 는 칠 안 함. color-mix 가 다크모드에서도 var(--cat-*) 자동
+  // 따라감.
+  const pendingFill = catColor
+    ? `color-mix(in srgb, ${catColor} 4%, transparent)`
+    : "transparent";
   return (
     <button
       type="button"
@@ -392,14 +406,25 @@ function CheckboxButton({
         e.stopPropagation();
         onClick();
       }}
-      className={`group/check flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 transition ${
+      className={`group/check flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-md border transition ${
         status === "done"
-          ? "border-[var(--border-default)] bg-[var(--border-default)]"
+          ? "bg-[var(--text-secondary)]"
           : status === "cancelled"
-            ? "border-[var(--text-muted)] bg-[var(--bg-surface)]"
-            : "border-[var(--text-muted)] bg-[var(--bg-base)] hover:scale-110 hover:border-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] hover:shadow-sm"
+            ? "border-[var(--border-default)] bg-[var(--bg-surface)]"
+            : "hover:brightness-95"
       }`}
-      style={{ minHeight: 20, minWidth: 20 }}
+      style={{
+        minHeight: 18,
+        minWidth: 18,
+        borderColor:
+          status === "pending"
+            ? pendingBorder
+            : status === "done"
+              ? "var(--text-secondary)"
+              : undefined,
+        borderWidth: status === "pending" ? 1.5 : undefined,
+        backgroundColor: status === "pending" ? pendingFill : undefined,
+      }}
     >
       {status === "done" ? (
         <svg
@@ -455,17 +480,21 @@ function CheckboxButton({
 
 // 제목 앞 chip — 오늘 / 임박 (내일~3일) / 기한 지남 (D+N). 4일 이상 미래는
 // chip 없음 (메타 row 의 날짜로 충분). done / cancelled 도 X.
+// 체크박스 가 카테고리 색 tint 를 들고 있어 chip 까지 bg 색이면 layer 충돌
+// → bg 제거, outline + text 색만. 시그널 (오늘/지남) 은 색 그대로 유지.
 function DueChip({ todo }: { todo: Todo }) {
   if (todo.done || todo.cancelled || !todo.due_date) return null;
   const diff = daysFromToday(todo.due_date);
   const base = "shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium";
   if (diff === 0) {
+    // "오늘 = 마감 D-day" → 지남과 같은 빨강 시그널. 색 가짓수 줄임.
+    // 위계: 오늘 = filled bold (액션 강조), 지남 = outline (정보).
     return (
       <span
-        className={base}
+        className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold"
         style={{
-          backgroundColor: "var(--accent-blue-bg)",
-          color: "var(--accent-blue-text)",
+          backgroundColor: "var(--accent-red)",
+          color: "var(--text-inverse)",
         }}
       >
         오늘
@@ -477,8 +506,8 @@ function DueChip({ todo }: { todo: Todo }) {
       <span
         className={base}
         style={{
-          backgroundColor: "var(--accent-red-bg)",
           color: "var(--accent-red-text)",
+          border: "1px solid var(--accent-red)",
         }}
       >
         D+{-diff}
@@ -490,7 +519,6 @@ function DueChip({ todo }: { todo: Todo }) {
       <span
         className={base}
         style={{
-          backgroundColor: "transparent",
           color: "var(--text-secondary)",
           border: "1px solid var(--border-default)",
         }}

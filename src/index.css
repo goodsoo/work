@@ -57,6 +57,11 @@
     --cat-fix: #dc2626;
     --cat-other: #7c3aed;
 
+    /* Todo category dots — work/schedule 신규, other 는 portfolio 와 공유.
+       work 는 보라 계열인 --cat-other 와 명확히 구분되도록 주황. */
+    --cat-work: #ea580c;
+    --cat-schedule: #0d9488;
+
     /* Interactive */
     --btn-primary: #18181b;
     --btn-primary-text: #ffffff;
@@ -118,6 +123,10 @@
     --cat-infra: #fbbf24;
     --cat-fix: #f87171;
     --cat-other: #a78bfa;
+
+    /* Todo category dots */
+    --cat-work: #fb923c;
+    --cat-schedule: #2dd4bf;
 
     /* Interactive */
     --btn-primary: #e4e4e7;
