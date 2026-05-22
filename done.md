@@ -17,6 +17,31 @@
 - **DueChip 정리** — bg 색 제거 (체크박스 카테고리 tint 와 layer 충돌) → outline + 글자색. 오늘 = 빨강 filled bold (액션 강조), 지남 = 빨강 outline (정보), 임박 = 회색 outline. 빨강 한 색으로 통일해 가짓수 절감. 위치도 제목 앞 → 카드 우측 끝 (Linear/Things/Todoist 패턴).
 - **DESIGN.md** — 카테고리 dot 토큰 표 + 단일 lookup 위치 명시.
 
+### PR #35 — portfolio sync 안정성 (gh search 빈 배열 fix + stuck 회복)
+
+- **한 줄 임팩트**: 내 작업 sync 가 새 PR 안 빠뜨림
+- **진짜 버그 — `gh search prs` positional 두 qualifier**: 옛 코드는 `'is:merged merged:>=DATE'` 한 arg 박았는데 gh CLI 가 빈 배열 반환 (full sync `'is:merged'` 단일은 정상). 결과적으로 last_sync 이후 머지된 PR 들이 incremental 에 누락 → 매번 [전체 다시 훑기] 수동 호출. `--merged --merged-at '>=DATE'` flag 형으로 분리해 정상 동작 (터미널 직접 확인: 0건 vs 21건).
+- **runningRef stuck 회복 경로 보강**: HMR / Tauri full-reload 중 in-flight invoke 응답이 사라져 promise pending 되는 dev 환경 시나리오 방어. `useGhSync` 에 callIdRef 모노토닉 가드 — hang 된 invoke 가 뒤늦게 resolve 돼도 stale setState 무시. `cancel()` 강화 — abort + callId 증가 + runningRef 강제 false. `SyncButton` 진행 중 X 아이콘으로 manual 회복 경로 노출.
+- **`readSyncState` 5s timeout fallback**: hang 시 since 없이 full sync 로 자동 fallback (since 만 손해). 옛 broken sync 가 또 나와도 incremental 가 멈추지 X.
+- **5초 background auto-sync 재활성**: 옛 portfolio-card-redesign PR 의 임시 비활성 해제. CLAUDE.md V0.7 의 "5초 background auto-sync + 사이드바 수동 트리거" 명시 항목 복원.
+- 6 modified. 221 tests passing. typecheck clean. 실제 동작 검증 (신규 7 + 갱신 14).
+
+---
+
+## 2026-05-22
+
+### PR #34 — 메모장 사이드바 폴더 트리 + 탭 순서 swap
+
+- **한 줄 임팩트**: 메모장 폴더 트리 + 메뉴 순서 변경
+- **탭 swap** (`BottomTabs.tsx`, `App.tsx`) — TABS 배열을 캘린더 → 메모장 → 할 일 → 내 작업 순으로 (사용 빈도 우선). Cmd+1/2/3/4 가 TABS index 기반 자동 매핑이라 Cmd+1=캘린더로 의미 변경. 빈 hash default 도 캘린더 + `#meetings` hash 추가.
+- **폴더 트리** (옵시디안 호환). `adapter.listRecursive` / `listFoldersRecursive` 신규 — `meetings/{folder}/` 중첩 구조 + 빈 폴더 모두 scan. `scan.ts` 에 `meetingFolder` / `normalizeFolderPath` / `moveMeetingToFolder` / `renameMeetingFolder` 등 helper. `buildMeetingsTree(meetings, sort, extraFolders)` 가 메모 + disk 빈 폴더 합쳐 트리 빌드.
+- **사이드바 UI** — `MeetingsTreeView` 신규. 옵시디안 스타일 컴팩트 단일 라인 + chevron 만 폴더에 + 메모는 column align (아이콘 X). 트리 vertical guide 라인 (`border-default` 컬러로 진하게). 클릭존 = 아이콘 직전부터 (indent 공간은 wrapper paddingLeft, dead zone). 메모 진하게 (text-primary), 폴더 흐리게 (text-secondary) — leaf > organizational 위계. inline 메타: 올해 `MM/DD`, 작년 이전 `YY/MM/DD`.
+- **폴더 CRUD** — 헤더 `+폴더` 버튼: '새 폴더' 즉시 생성 + 인라인 rename 자동 진입 (옵시디안 패턴). 폴더 우클릭: 이름 변경 (in-place input) / 폴더 삭제 (안 메모 휴지통 이동 + 빈 dir 정리). 메모 우클릭: 폴더로 이동... → `MoveFolderModal`.
+- **DnD** 메모 → 폴더 — Tauri `dragDropEnabled: false` 로 native file-drop 가로채기 해제 + `WebkitUserDrag: element` 명시 (macOS WKWebView 호환). dragover 의 `preventDefault` 무조건 호출 (types 검사가 일부 WebView 에서 빈 배열 반환).
+- **글로벌 Toast 시스템** (`Toast.tsx` 신규) — frost 카드 우측하단. mutation 실패 (메모 생성/폴더 생성/이동/이름변경/삭제) 모두 `useToast().show()` 통합. 사이드바 inline error row 제거.
+- **정렬** — 폴더 alphabetic 고정, 메모만 `useMeetingSort` 적용. 폴더 / 메모 순서는 정렬 옵션과 무관하게 폴더 먼저.
+- 19 files, 266 tests passing. typecheck clean.
+
 ### PR #33 — macOS 윈도우 헤더 통합 + sidebar collapse
 
 - **한 줄 임팩트**: 윈도우 헤더 통합으로 본문 +56px
@@ -32,6 +57,18 @@
 - 시도하다 거부: vibrancy material (`windowEffects: ["sidebar"]` + `transparent` + `macOSPrivateApi`) — sidebar 가 wallpaper 비쳐 디자인 토큰 무력화. tabs | vault 순서 — mental model "vault > tabs" 시각 mismatch.
 - 14 modified + 2 new + 2 screenshots. 221 tests passing. typecheck clean.
 - commit `055532f`
+
+### PR #32 — F-1 카드 + 모달 편집 + 가이드북 + 휴지통 분리
+
+- **한 줄 임팩트**: 카드 한눈에 N장 + 모달로 안전한 편집
+- **F-1 가로형 dense 카드** — 썸네일 96×72 left + impact main + PR title 부제 + 메타 chip 4개 (날짜·프로젝트·카테고리·코드줄). 카테고리 dot 색 5종, 프로젝트 = repo 부분만, 메타 row 좁아지면 자연 truncate. 1280px 폭에서 카드 일람 가능 — 회고/평가 자료 가치 회복.
+- **카드 = 읽기 전용, 편집은 모달 통합** — PortfolioDetailModal: 좌 viewer (큰 스크린샷 + 좌우 nav + thumb strip + dropzone) / 우 편집 패널 (impact, 카테고리/프로젝트 select, Claude 자동 채움). read-only ↔ edit mode 분리. `[편집]` 진입 → draft state → `[수정 완료]` / `[취소]` / 모달 닫기 = 자동 취소. todo "inline 편집" 대신 modal 편집으로 trade — impact 실수 저장 0.
+- **Claude CLI 자동 호출** — `claude -p` shell spawn (gh CLI 패턴 동일). 구독 자격 활용, API key 결제 0. 응답 → draft 박스에 `[적용]` / `[다시 요청]` / `[×]`. 수동 paste 도 details 토글로 보존.
+- **휴지통 도메인 분리** — vault `.trash/` (메모장) 와 `portfolio/.trash/` 분리. 복원 = 항상 `included: false` (미사용 자리). 휴지통/가이드북에 "전체 동기화 시 부활" 안내.
+- **가이드북 모달** — 사이드바의 PR 가이드 / Legacy 프롬프트 + 동기화 설명 + `[전체 다시 훑기]` 모달 안으로 통합. 사이드바 깔끔.
+- **incremental vs 전체 sync 분리** — 사이드바 = incremental, 가이드북 = 전체. `useGhSync.run` race 차단 (`runningRef`) + 5초 background auto-sync 임시 비활성 (todo 에 안정성 PR 등록).
+- 본인 수정 frontmatter (impact / category / project / included / screenshots) 는 sync 가 절대 안 덮어씀.
+- commit `a282157`
 
 ### PR #31 — 메모장/일기 단축키 단순화 (Q/W/E 제거 + Opt+Tab cycle)
 

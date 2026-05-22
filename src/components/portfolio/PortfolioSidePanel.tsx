@@ -14,6 +14,7 @@ type Props = {
   onFilterChange: (next: ProjectFilter) => void;
   syncState: GhSyncProgress;
   onSyncRun: () => void;
+  onSyncCancel: () => void;
   onFullSyncRun: () => void;
 };
 
@@ -22,6 +23,7 @@ export function PortfolioSidePanel({
   onFilterChange,
   syncState,
   onSyncRun,
+  onSyncCancel,
   onFullSyncRun,
 }: Props) {
   const works = usePortfolioWorks();
@@ -60,7 +62,11 @@ export function PortfolioSidePanel({
         className="flex shrink-0 flex-col gap-2 px-3 pt-3 pb-3"
         style={{ borderBottom: "1px solid var(--border-default)" }}
       >
-        <SyncButton state={syncState} onRun={onSyncRun} />
+        <SyncButton
+          state={syncState}
+          onRun={onSyncRun}
+          onCancel={onSyncCancel}
+        />
         {syncState.error ? (
           <SyncError message={syncState.error.message} />
         ) : null}

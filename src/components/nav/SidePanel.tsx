@@ -10,12 +10,20 @@ import {
   Pencil,
   Circle,
   XCircle,
+  FolderInput,
+  FolderPlus,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   useMeetings,
+  useMeetingFolders,
   useCreateMeeting,
+  useCreateMeetingFolder,
+  useDeleteMeetingFolder,
+  useMoveMeeting,
+  useRenameMeetingFolder,
 } from "../../hooks/useMeetings";
+import { meetingFolder } from "../../api/meetings";
 import { useMeetingSort, type MeetingSortKey } from "../../hooks/useMeetingSort";
 import { type TodoSortKey } from "../../hooks/useTodoSort";
 import { useJournals } from "../../hooks/useJournals";
@@ -28,6 +36,9 @@ import { formatError } from "../../lib/errors";
 import { categoryColor } from "../../lib/todoCategory";
 import { TaskAddModal } from "../tasks/TaskAddModal";
 import { JournalOverlay } from "../calendar/JournalOverlay";
+import { MeetingsTreeView } from "../meetings/MeetingsTreeView";
+import { MoveFolderModal } from "../meetings/MoveFolderModal";
+import { useToast } from "../Toast";
 
 /* ── Meetings Side Panel ── */
 
@@ -36,68 +47,90 @@ type MeetingsPanelProps = {
   onSelect: (id: string) => void;
 };
 
-const dateFmt = new Intl.DateTimeFormat("ko-KR", {
-  month: "short",
-  day: "numeric",
-  weekday: "short",
-});
-
-function formatShort(d: string | null): string {
-  if (!d) return "";
-  const parsed = new Date(d + "T00:00:00");
-  if (Number.isNaN(parsed.getTime())) return d;
-  return dateFmt.format(parsed);
-}
-
 export function MeetingsSidePanel({
   selectedId,
   onSelect,
 }: MeetingsPanelProps) {
   const { data, isLoading } = useMeetings();
+  const { data: folders } = useMeetingFolders();
   const createMutation = useCreateMeeting();
-  const [createError, setCreateError] = useState<string | null>(null);
+  const createFolderMutation = useCreateMeetingFolder();
+  const deleteFolderMutation = useDeleteMeetingFolder();
+  const renameFolderMutation = useRenameMeetingFolder();
+  const moveMutation = useMoveMeeting();
+  const toast = useToast();
   const [sortKey, setSortKey] = useMeetingSort();
+  const [contextMenu, setContextMenu] = useState<{
+    meetingId: string;
+    x: number;
+    y: number;
+  } | null>(null);
+  const [folderContextMenu, setFolderContextMenu] = useState<{
+    folder: string;
+    x: number;
+    y: number;
+  } | null>(null);
+  const [moveModalFor, setMoveModalFor] = useState<string | null>(null);
+  // 폴더 행 in-place 편집 — 옵시디안 패턴. 새 폴더 만든 직후 자동 진입 / 우클릭
+  // "이름 변경" 으로도 진입. value 가 비면 commit 시 cancel 로 처리.
+  const [editingFolder, setEditingFolder] = useState<
+    { folder: string; value: string } | null
+  >(null);
 
-  // 키 우선순위: date → time → mtime. date_desc / date_asc 가 방향 결정,
-  // 그 안에서 time 도 같은 방향. date 없는 메모는 맨 아래, 같은 date 안에서
-  // time 없는 메모도 맨 아래 — 정보 없는 쪽을 끝으로 몰아 정렬 어긋남 회피.
-  const sortedData = useMemo(() => {
-    if (!data) return data;
-    const arr = data.slice();
-    if (sortKey === "name") {
-      arr.sort((a, b) => {
+  // 메모 정렬 — 폴더 안에서만 적용. 폴더 위계는 alphabetic 고정 (정렬 popover 무관).
+  // 키 우선순위: date → time → mtime. date 없는 메모는 같은 그룹 안 맨 아래.
+  const sortComparator = useMemo(() => {
+    return (a: Meeting, b: Meeting): number => {
+      if (sortKey === "name") {
         const ta = (a.title ?? "").trim();
         const tb = (b.title ?? "").trim();
         if (!ta && !tb) return b.mtime - a.mtime;
         if (!ta) return 1;
         if (!tb) return -1;
         return ta.localeCompare(tb, "ko");
-      });
-    } else {
+      }
       const asc = sortKey === "date_asc";
-      arr.sort((a, b) => {
-        const da = a.date ?? "";
-        const db = b.date ?? "";
-        if (da !== db) {
-          if (!da) return 1;
-          if (!db) return -1;
-          return asc ? da.localeCompare(db) : db.localeCompare(da);
-        }
-        const ta = a.time ?? "";
-        const tb = b.time ?? "";
-        if (ta !== tb) {
-          if (!ta) return 1;
-          if (!tb) return -1;
-          return asc ? ta.localeCompare(tb) : tb.localeCompare(ta);
-        }
-        return asc ? a.mtime - b.mtime : b.mtime - a.mtime;
-      });
+      const da = a.date ?? "";
+      const db = b.date ?? "";
+      if (da !== db) {
+        if (!da) return 1;
+        if (!db) return -1;
+        return asc ? da.localeCompare(db) : db.localeCompare(da);
+      }
+      const ta = a.time ?? "";
+      const tb = b.time ?? "";
+      if (ta !== tb) {
+        if (!ta) return 1;
+        if (!tb) return -1;
+        return asc ? ta.localeCompare(tb) : tb.localeCompare(ta);
+      }
+      return asc ? a.mtime - b.mtime : b.mtime - a.mtime;
+    };
+  }, [sortKey]);
+
+  // 컨텍스트 메뉴 닫기 — 바깥 클릭 / ESC / scroll. 메모 + 폴더 컨텍스트 메뉴 공통.
+  useEffect(() => {
+    if (!contextMenu && !folderContextMenu) return;
+    function close() {
+      setContextMenu(null);
+      setFolderContextMenu(null);
     }
-    return arr;
-  }, [data, sortKey]);
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") close();
+    }
+    // mousedown 으로 (클릭 시작 시점에 즉시 닫음 — child 메뉴 항목의 click 도
+    // 자기 onClick 안에서 닫기 trigger 함)
+    window.addEventListener("mousedown", close);
+    window.addEventListener("scroll", close, true);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("mousedown", close);
+      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [contextMenu, folderContextMenu]);
 
   async function handleCreate() {
-    setCreateError(null);
     try {
       const now = new Date();
       const y = now.getFullYear();
@@ -115,9 +148,111 @@ export function MeetingsSidePanel({
       });
       onSelect(created.uid);
     } catch (e) {
-      setCreateError(formatError(e));
+      toast.show(formatError(e));
     }
   }
+
+  // 옵시디안 패턴: "+폴더" 클릭 → "새 폴더" default 이름으로 즉시 생성 → 그 폴더
+  // 행에 인라인 rename 자동 진입. 이미 "새 폴더" 가 있으면 "새 폴더 2" 식으로 N
+  // 증가. 빠른 생성 + 즉시 이름 입력 = 한 단계 흐름.
+  async function handleCreateFolder() {
+    const base = "새 폴더";
+    const existing = new Set(
+      (folders ?? []).map((f) => f.replace(/^meetings\//, "")),
+    );
+    let candidate = base;
+    let n = 2;
+    while (existing.has(candidate)) {
+      candidate = `${base} ${n}`;
+      n++;
+    }
+    try {
+      const full = await createFolderMutation.mutateAsync(candidate);
+      const folderRel = full.replace(/^meetings\//, "");
+      // 즉시 rename mode 로. 입력은 폴더 행 안 input (MeetingsTreeView 가 렌더).
+      setEditingFolder({ folder: folderRel, value: folderRel });
+    } catch (e) {
+      toast.show(formatError(e));
+    }
+  }
+
+  function handleContextMenu(meetingId: string, x: number, y: number) {
+    setContextMenu({ meetingId, x, y });
+  }
+
+  function handleFolderContextMenu(folder: string, x: number, y: number) {
+    setFolderContextMenu({ folder, x, y });
+  }
+
+  // 폴더 안 메모 카운트 — useMeetings list 에서 derive. sub-folder 도 포함.
+  function countInFolder(folder: string): number {
+    if (!data) return 0;
+    return data.filter((m) => {
+      const f = meetingFolder(m.id);
+      return f === folder || f.startsWith(folder + "/");
+    }).length;
+  }
+
+  function openRenameInput(folder: string) {
+    const lastSeg = folder.split("/").pop() ?? folder;
+    setEditingFolder({ folder, value: lastSeg });
+  }
+
+  async function commitEditingFolder() {
+    if (!editingFolder) return;
+    const { folder, value } = editingFolder;
+    const lastSeg = folder.split("/").pop() ?? folder;
+    const trimmed = value.trim();
+    if (trimmed === "" || trimmed === lastSeg) {
+      setEditingFolder(null);
+      return;
+    }
+    try {
+      await renameFolderMutation.mutateAsync({ folder, newName: trimmed });
+      setEditingFolder(null);
+    } catch (e) {
+      // 실패 시 input 닫고 원래 이름 복원 — server data 가 list 새로고침 시 그대로.
+      // 에러는 우측하단 toast 로.
+      setEditingFolder(null);
+      toast.show(formatError(e));
+    }
+  }
+
+  async function handleDeleteFolder(folder: string) {
+    const n = countInFolder(folder);
+    const msg =
+      n === 0
+        ? `폴더 '${folder}' 를 삭제할까요?`
+        : `폴더 '${folder}' 와 안에 있는 메모 ${n}개를 휴지통으로 옮길까요?`;
+    if (!window.confirm(msg)) return;
+    try {
+      await deleteFolderMutation.mutateAsync(folder);
+    } catch (e) {
+      toast.show(formatError(e));
+    }
+  }
+
+  // DnD drop 직접 처리 (모달 안 거치고). 충돌 시 toast.
+  async function handleMoveDrop(uid: string, folder: string) {
+    try {
+      await moveMutation.mutateAsync({ uid, folder });
+    } catch (e) {
+      toast.show(formatError(e));
+    }
+  }
+
+  // 모달 경유 이동 — modal 안에서 commit 결과 throw 받아서 모달에 toast.
+  async function handleMoveFromModal(folder: string) {
+    if (!moveModalFor) return;
+    const m = (data ?? []).find((x) => x.id === moveModalFor);
+    if (!m) throw new Error("메모를 찾을 수 없습니다");
+    await moveMutation.mutateAsync({ uid: m.uid, folder });
+  }
+
+  const moveModalMeeting = useMemo(() => {
+    if (!moveModalFor || !data) return null;
+    return data.find((m) => m.id === moveModalFor) ?? null;
+  }, [moveModalFor, data]);
 
   return (
     <div className="relative flex h-full flex-col">
@@ -138,6 +273,16 @@ export function MeetingsSidePanel({
           <SortMenu value={sortKey} onChange={setSortKey} />
           <button
             type="button"
+            onClick={() => void handleCreateFolder()}
+            disabled={createFolderMutation.isPending}
+            title="새 폴더"
+            className="flex h-7 w-7 items-center justify-center rounded-md transition disabled:opacity-50"
+            style={{ color: "var(--text-secondary)", minHeight: 0 }}
+          >
+            <FolderPlus className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
             onClick={handleCreate}
             disabled={createMutation.isPending}
             title="새 메모장"
@@ -148,19 +293,6 @@ export function MeetingsSidePanel({
           </button>
         </div>
       </div>
-
-      {createError ? (
-        <div
-          className="mx-3 mt-2 rounded px-2 py-1 text-xs"
-          style={{
-            borderLeft: "2px solid var(--accent-red)",
-            backgroundColor: "var(--accent-red-bg)",
-            color: "var(--accent-red-text)",
-          }}
-        >
-          {createError}
-        </div>
-      ) : null}
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         {isLoading ? (
@@ -173,7 +305,7 @@ export function MeetingsSidePanel({
               />
             ))}
           </div>
-        ) : !sortedData || sortedData.length === 0 ? (
+        ) : (!data || data.length === 0) && (!folders || folders.length === 0) ? (
           <div
             className="px-4 py-8 text-center text-sm"
             style={{ color: "var(--text-muted)" }}
@@ -181,18 +313,168 @@ export function MeetingsSidePanel({
             아직 메모장이 없어요
           </div>
         ) : (
-          <ul className="p-2">
-            {sortedData.map((m) => (
-              <MeetingItem
-                key={m.uid}
-                meeting={m}
-                active={m.uid === selectedId}
-                onClick={() => onSelect(m.uid)}
-              />
-            ))}
-          </ul>
+          <MeetingsTreeView
+            meetings={data ?? []}
+            extraFolders={folders ?? []}
+            selectedUid={selectedId}
+            sortMeetings={sortComparator}
+            editingFolder={editingFolder}
+            editingFolderPending={renameFolderMutation.isPending}
+            onEditingFolderChange={(v) =>
+              setEditingFolder((prev) => (prev ? { ...prev, value: v } : prev))
+            }
+            onEditingFolderCommit={() => void commitEditingFolder()}
+            onEditingFolderCancel={() => setEditingFolder(null)}
+            onSelect={onSelect}
+            onContextMenu={handleContextMenu}
+            onFolderContextMenu={handleFolderContextMenu}
+            onMoveDrop={(uid, folder) => void handleMoveDrop(uid, folder)}
+          />
         )}
       </div>
+
+      {contextMenu ? (
+        <MeetingContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onMove={() => {
+            setMoveModalFor(contextMenu.meetingId);
+            setContextMenu(null);
+          }}
+        />
+      ) : null}
+
+      {folderContextMenu ? (
+        <FolderContextMenu
+          x={folderContextMenu.x}
+          y={folderContextMenu.y}
+          folder={folderContextMenu.folder}
+          onRename={() => {
+            const f = folderContextMenu.folder;
+            setFolderContextMenu(null);
+            openRenameInput(f);
+          }}
+          onDelete={() => {
+            const f = folderContextMenu.folder;
+            setFolderContextMenu(null);
+            void handleDeleteFolder(f);
+          }}
+        />
+      ) : null}
+
+      <MoveFolderModal
+        open={moveModalFor !== null}
+        meetingId={moveModalFor}
+        meetingTitle={moveModalMeeting?.title ?? ""}
+        onClose={() => setMoveModalFor(null)}
+        onMove={handleMoveFromModal}
+      />
+    </div>
+  );
+}
+
+// 폴더 우클릭 컨텍스트 메뉴 — 이름 변경 + 삭제.
+function FolderContextMenu({
+  x,
+  y,
+  folder,
+  onRename,
+  onDelete,
+}: {
+  x: number;
+  y: number;
+  folder: string;
+  onRename: () => void;
+  onDelete: () => void;
+}) {
+  const MENU_W = 200;
+  const MENU_H = 88;
+  const left = Math.min(x, window.innerWidth - MENU_W - 8);
+  const top = Math.min(y, window.innerHeight - MENU_H - 8);
+  return (
+    <div
+      className="fixed z-50 overflow-hidden rounded-md shadow-lg"
+      style={{
+        left,
+        top,
+        backgroundColor: "var(--bg-surface)",
+        border: "1px solid var(--border-default)",
+        minWidth: MENU_W,
+      }}
+      onMouseDown={(e) => e.stopPropagation()}
+    >
+      <div
+        className="truncate px-3 pt-2 pb-1 text-[10px] uppercase tracking-wider"
+        style={{ color: "var(--text-muted)" }}
+      >
+        {folder}
+      </div>
+      <button
+        type="button"
+        onClick={onRename}
+        className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition"
+        style={{ color: "var(--text-primary)", minHeight: 0 }}
+      >
+        <Pencil
+          className="h-3.5 w-3.5 shrink-0"
+          style={{ color: "var(--text-muted)" }}
+        />
+        <span>이름 변경...</span>
+      </button>
+      <button
+        type="button"
+        onClick={onDelete}
+        className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition"
+        style={{ color: "var(--accent-red)", minHeight: 0 }}
+      >
+        <Trash2 className="h-3.5 w-3.5 shrink-0" />
+        <span>폴더 삭제...</span>
+      </button>
+    </div>
+  );
+}
+
+// 메모 우클릭 컨텍스트 메뉴. 현재는 '폴더로 이동' 하나만. 추후 항목 추가 시
+// 같은 패턴으로 button list 만 늘리면 됨.
+function MeetingContextMenu({
+  x,
+  y,
+  onMove,
+}: {
+  x: number;
+  y: number;
+  onMove: () => void;
+}) {
+  // 우측/하단 viewport 초과 방지 — 간단히 좌표만 clamp (메뉴 크기 추정).
+  const MENU_W = 180;
+  const MENU_H = 44;
+  const left = Math.min(x, window.innerWidth - MENU_W - 8);
+  const top = Math.min(y, window.innerHeight - MENU_H - 8);
+  return (
+    <div
+      className="fixed z-50 overflow-hidden rounded-md shadow-lg"
+      style={{
+        left,
+        top,
+        backgroundColor: "var(--bg-surface)",
+        border: "1px solid var(--border-default)",
+        minWidth: MENU_W,
+      }}
+      // mousedown 으로 메뉴 자체 클릭이 outside-close trigger 되지 않도록 막음
+      onMouseDown={(e) => e.stopPropagation()}
+    >
+      <button
+        type="button"
+        onClick={onMove}
+        className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition"
+        style={{ color: "var(--text-primary)", minHeight: 0 }}
+      >
+        <FolderInput
+          className="h-3.5 w-3.5 shrink-0"
+          style={{ color: "var(--text-muted)" }}
+        />
+        <span>폴더로 이동...</span>
+      </button>
     </div>
   );
 }
@@ -432,42 +714,6 @@ const MARKDOWN_HINTS: Array<{ syntax: string; desc: string; section?: string }> 
   { syntax: "|---|---|", desc: "표 헤더 구분선" },
   { syntax: "|:---|---:|", desc: "정렬 (왼쪽/오른쪽)" },
 ];
-
-function MeetingItem({
-  meeting,
-  active,
-  onClick,
-}: {
-  meeting: Meeting;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <li className="list-none">
-      <button
-        type="button"
-        onClick={onClick}
-        className="w-full rounded-md px-3 py-2 text-left transition"
-        style={{
-          backgroundColor: active ? "var(--bg-surface-active)" : undefined,
-          color: active ? "var(--text-primary)" : "var(--text-secondary)",
-          minHeight: 0,
-        }}
-      >
-        <div className="truncate text-sm font-medium">
-          {meeting.title?.trim() || "(제목 없음)"}
-        </div>
-        <div
-          className="mt-0.5 truncate text-xs"
-          style={{ color: "var(--text-secondary)" }}
-        >
-          {formatShort(meeting.date)}
-          {meeting.attendees ? ` · ${meeting.attendees}` : ""}
-        </div>
-      </button>
-    </li>
-  );
-}
 
 /* ── Calendar Day Detail Panel ── */
 

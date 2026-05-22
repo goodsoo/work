@@ -303,18 +303,50 @@ function filePathToDate(filePath: string): string {
   return m ? m[1] : "";
 }
 
-// meetings/{slug}.md — date 없음. date 는 순수 frontmatter optional.
+// 메모 경로에서 폴더 부분 추출. `meetings/foo.md` → `""`, `meetings/work/foo.md`
+// → `"work"`, `meetings/work/2026/foo.md` → `"work/2026"`. id 가 `meetings/` 로
+// 시작 안 하면 빈 문자열 (방어).
+export function meetingFolder(meetingPath: string): string {
+  if (!meetingPath.startsWith("meetings/")) return "";
+  const rest = meetingPath.slice("meetings/".length);
+  const lastSlash = rest.lastIndexOf("/");
+  if (lastSlash === -1) return "";
+  return rest.slice(0, lastSlash);
+}
+
+// `meetings/{folder?}/{slug}.md` 빌더. folder 가 빈 문자열이면 root.
+function buildMeetingPath(folder: string, slug: string): string {
+  const f = folder.replace(/^\/+|\/+$/g, "");
+  return f === "" ? `meetings/${slug}.md` : `meetings/${f}/${slug}.md`;
+}
+
+// 폴더 path 정규화 + 검증. 외부 슬래시 trim, `..` 차단, segment 별 slugify 적용
+// (UNSAFE_FILENAME_RE 동일 규칙). 빈 segment 는 squash.
+// 빈 문자열 입력 → 빈 문자열 출력 (root).
+export function normalizeFolderPath(folder: string): string {
+  const trimmed = folder.replace(/^\/+|\/+$/g, "").trim();
+  if (trimmed === "") return "";
+  const parts = trimmed.split("/").filter(Boolean);
+  if (parts.some((p) => p === "..")) {
+    throw new Error(`folder path traversal blocked: ${folder}`);
+  }
+  return parts.map((p) => slugify(p)).join("/");
+}
+
+// meetings/{folder?}/{slug}.md — date 없음. date 는 순수 frontmatter optional.
 // 새 메모 default ("untitled") 충돌 시만 -2 suffix. 사용자 명시 title 의 충돌은
 // computeRenamedMeetingPath 가 throw 로 처리 (자동 -2 안 함).
 export async function generateMeetingPath(
   adapter: VaultAdapter,
   title: string,
+  folder = "",
 ): Promise<string> {
   const slug = slugify(title);
-  let candidate = `meetings/${slug}.md`;
+  const f = normalizeFolderPath(folder);
+  let candidate = buildMeetingPath(f, slug);
   let n = 2;
   while (await adapter.exists(candidate)) {
-    candidate = `meetings/${slug}-${n}.md`;
+    candidate = buildMeetingPath(f, `${slug}-${n}`);
     n++;
   }
   return candidate;
@@ -335,18 +367,91 @@ export class TitleConflictError extends Error {
 // title 변경 시 새 path 계산. 같으면 currentId 반환 (no-op).
 // 다른 메모와 충돌 시 throw — 사용자가 다른 title 로 재시도해야 함.
 // 자동 -2 suffix 안 함 (의도된 title 과 다른 파일명을 silently 만들지 않기 위해).
+// 폴더는 currentId 에서 유지 — title rename 으로 폴더가 바뀌진 않음 (별도 move API).
 export async function computeRenamedMeetingPath(
   adapter: VaultAdapter,
   currentId: string,
   newTitle: string,
 ): Promise<string> {
   const slug = slugify(newTitle);
-  const target = `meetings/${slug}.md`;
+  const folder = meetingFolder(currentId);
+  const target = buildMeetingPath(folder, slug);
   if (target === currentId) return currentId;
   if (await adapter.exists(target)) {
     throw new TitleConflictError(slug, target);
   }
   return target;
+}
+
+// 같은 title 그대로 둔 채 폴더만 이동. newFolder 가 currentId 와 같은 폴더면 no-op.
+// 충돌 시 throw (같은 folder 안에 같은 title 메모 존재).
+export async function computeMovedMeetingPath(
+  adapter: VaultAdapter,
+  currentId: string,
+  newFolder: string,
+): Promise<string> {
+  if (!currentId.startsWith("meetings/")) {
+    throw new Error(`not a meeting path: ${currentId}`);
+  }
+  const base = currentId.split("/").pop() ?? "";
+  const slug = base.replace(/\.md$/, "");
+  const target = buildMeetingPath(normalizeFolderPath(newFolder), slug);
+  if (target === currentId) return currentId;
+  if (await adapter.exists(target)) {
+    throw new TitleConflictError(slug, target);
+  }
+  return target;
+}
+
+// 폴더 이동 — 메인 + sidecar 한 묶음 rename. 새 폴더가 디스크에 없으면 mkdir 선행.
+// computeMovedMeetingPath 가 throw 안 한 케이스 (충돌 X) 만 호출.
+export async function moveMeetingToFolder(
+  adapter: VaultAdapter,
+  oldPath: string,
+  newPath: string,
+): Promise<void> {
+  if (oldPath === newPath) return;
+  // newPath 의 부모 폴더 (`meetings/{folder}` 또는 `meetings`) mkdir 보장.
+  // Tauri rename 은 부모가 없으면 실패.
+  const parentSlash = newPath.lastIndexOf("/");
+  if (parentSlash > 0) {
+    const parent = newPath.slice(0, parentSlash);
+    await adapter.mkdir(parent);
+  }
+  await renameMeetingFiles(adapter, oldPath, newPath);
+}
+
+// 폴더 자체의 마지막 segment 이름만 바꿈. 부모 path 유지 — 위계 이동 X.
+// "work" → "프로젝트" (root 폴더 rename), "work/2026" → "work/2027" (sub-folder rename).
+// 안에 있는 메모는 디스크 rename 으로 자동 따라옴 (POSIX mv). 충돌 시 throw.
+// oldFolder 는 meetings-relative ("work" 또는 "work/2026"), newName 은 새 마지막 segment.
+// 반환: 새 vault-relative path ("meetings/프로젝트").
+export async function renameMeetingFolder(
+  adapter: VaultAdapter,
+  oldFolder: string,
+  newName: string,
+): Promise<string> {
+  const normalized = normalizeFolderPath(oldFolder);
+  if (normalized === "") {
+    throw new Error("root 폴더는 이름을 바꿀 수 없습니다");
+  }
+  const newSeg = slugify(newName);
+  if (newSeg === "" || newSeg === "untitled") {
+    throw new Error("폴더 이름이 비어있습니다");
+  }
+  const lastSlash = normalized.lastIndexOf("/");
+  const parent = lastSlash === -1 ? "" : normalized.slice(0, lastSlash);
+  const newRel = parent === "" ? newSeg : `${parent}/${newSeg}`;
+  if (newRel === normalized) return `meetings/${normalized}`;
+  const oldFull = `meetings/${normalized}`;
+  const newFull = `meetings/${newRel}`;
+  if (await adapter.exists(newFull)) {
+    throw new TitleConflictError(newSeg, newFull);
+  }
+  // 부모 폴더가 사라진 경우 (외부 삭제 등) 만 mkdir. parent === "" 이면 meetings/ 가 부모.
+  await adapter.mkdir(parent === "" ? "meetings" : `meetings/${parent}`);
+  await adapter.rename(oldFull, newFull);
+  return newFull;
 }
 
 // 메인 + 두 sidecar 한 묶음 rename. sidecar 가 없으면 skip.
@@ -376,8 +481,20 @@ export function journalPath(date: string): string {
 // ─────────────────────────────────────────────────────────────────────────────
 // Scan operations
 
+// meetings/ 안 모든 폴더 path 반환 (빈 폴더 포함, vault root 기준).
+// `["meetings/work", "meetings/work/2026", "meetings/personal"]` 처럼.
+// 메모 0개라도 옵시디안에서 mkdir 한 폴더는 보여야 — 사이드바 트리가 buildMeetingsTree
+// 에 이 list 를 extra 로 전달.
+export async function scanMeetingFolders(
+  adapter: VaultAdapter,
+): Promise<string[]> {
+  return adapter.listFoldersRecursive("meetings");
+}
+
 export async function scanMeetings(adapter: VaultAdapter): Promise<MeetingMeta[]> {
-  const files = await adapter.list("meetings");
+  // listRecursive — nav-restructure 이후 `meetings/{folder}/...` 중첩 폴더 지원.
+  // sub-folder 안 메모도 사이드바 트리에 잡히도록.
+  const files = await adapter.listRecursive("meetings");
   const results: MeetingMeta[] = [];
   for (const path of files) {
     if (!path.endsWith(".md")) continue;

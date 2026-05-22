@@ -1,0 +1,96 @@
+import type { Meeting } from "../api/meetings";
+import { meetingFolder } from "../api/meetings";
+
+export interface MeetingsFolderNode {
+  name: string; // last segment ("work", "2026")
+  path: string; // full folder path ("work/2026") — root 은 ""
+  children: MeetingsFolderNode[];
+  meetings: Meeting[]; // 이 폴더 직속 메모만 (자식 폴더 메모는 children 노드 안에)
+}
+
+export interface MeetingsTree {
+  folders: MeetingsFolderNode[]; // 최상위 폴더들 (root 안의 sub-folder)
+  rootMeetings: Meeting[]; // root 직속 메모 ("기타" 그룹 — 폴더 없는 메모)
+}
+
+export type MeetingComparator = (a: Meeting, b: Meeting) => number;
+
+const folderNameCompare = (a: string, b: string): number =>
+  a.localeCompare(b, "ko");
+
+// folder path 를 트리 노드로 ensure-create. 같은 path 가 이미 있으면 그대로 반환.
+function ensureFolder(
+  root: MeetingsFolderNode,
+  folderPath: string,
+): MeetingsFolderNode {
+  if (folderPath === "") return root;
+  const segments = folderPath.split("/");
+  let node = root;
+  for (let i = 0; i < segments.length; i++) {
+    const seg = segments[i];
+    const childPath = segments.slice(0, i + 1).join("/");
+    let child = node.children.find((c) => c.name === seg);
+    if (!child) {
+      child = { name: seg, path: childPath, children: [], meetings: [] };
+      node.children.push(child);
+    }
+    node = child;
+  }
+  return node;
+}
+
+// flat list 의 메모를 폴더 트리로 변환. meetings/{folder}/{title}.md 경로의
+// folder 부분으로 grouping. folder 없는 메모는 rootMeetings 로.
+// extraFolders — disk 에 mkdir 된 빈 폴더까지 보여주기 위해 추가 path list.
+// path 는 vault-relative ("meetings/work") 또는 meetings-relative ("work") 둘 다 허용.
+// sortMeetings 가 없으면 입력 순서 유지 (사용처에서 미리 정렬해서 넘기는 패턴 OK).
+// 폴더는 segment 별 alphabetic (ko) — 정렬 popover 와 무관 (폴더는 위계, 메모만 정렬).
+export function buildMeetingsTree(
+  meetings: Meeting[],
+  sortMeetings?: MeetingComparator,
+  extraFolders: string[] = [],
+): MeetingsTree {
+  const rootNode: MeetingsFolderNode = {
+    name: "",
+    path: "",
+    children: [],
+    meetings: [],
+  };
+
+  // extra folder path 정규화 — "meetings/" prefix 떼고 빈 segment 거름.
+  for (const raw of extraFolders) {
+    let p = raw.replace(/^\/+|\/+$/g, "");
+    if (p.startsWith("meetings/")) p = p.slice("meetings/".length);
+    if (p === "" || p === "meetings") continue;
+    if (p.split("/").some((s) => s.startsWith(".") || s === "")) continue;
+    ensureFolder(rootNode, p);
+  }
+
+  for (const m of meetings) {
+    const folder = meetingFolder(m.id);
+    const node = ensureFolder(rootNode, folder);
+    node.meetings.push(m);
+  }
+
+  // 자식 폴더 alphabetic. 메모는 옵션 sort.
+  function sortNode(node: MeetingsFolderNode): void {
+    node.children.sort((a, b) => folderNameCompare(a.name, b.name));
+    if (sortMeetings) node.meetings.sort(sortMeetings);
+    for (const c of node.children) sortNode(c);
+  }
+  sortNode(rootNode);
+
+  return { folders: rootNode.children, rootMeetings: rootNode.meetings };
+}
+
+// 트리에서 모든 폴더 path 를 평면 list 로. picker UI 에 쓸 용도.
+// 깊이 우선 (parent 먼저). root ("") 도 첫 entry 로 포함 (= "기타" / 폴더 없음).
+export function flattenFolderPaths(tree: MeetingsTree): string[] {
+  const out: string[] = [""];
+  function walk(node: MeetingsFolderNode): void {
+    out.push(node.path);
+    for (const c of node.children) walk(c);
+  }
+  for (const f of tree.folders) walk(f);
+  return out;
+}

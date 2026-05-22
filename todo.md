@@ -17,13 +17,6 @@ PR 단위로 묶음. 각 PR 의 **한 줄 임팩트** 는 카드 frontmatter `im
 - [ ] **태그 필터** — 사이드바 위 태그 chip 행. frontmatter `tags: [foo, bar]` union. 클릭 = 그 태그 메모만, 다중 선택 = AND. 태그 입력 UI 는 별 작업 (frontmatter 직접 편집 의존).
 - [ ] **즐겨찾기 / pin** — 메모 카드에 별/핀 토글. frontmatter `pinned: true` (옵시디안 호환). 사이드바 상단 고정 + 정렬 그룹 분리.
 
-### PR — 사이드바 폴더 (서브 그룹) `ui_ux`
-한 줄 임팩트: `meetings/{folder}/...` 트리 사이드바, 옵시디안 호환
-
-- [ ] vault `meetings/` 안 sub-folder 인식 + 사이드바 트리 렌더 (collapse/expand). 옵시디안과 같은 폴더 구조 = 모바일 옵시디안 호환 유지.
-- [ ] 새 폴더 생성 / 메모 폴더 이동 (사이드바 drag&drop 또는 컨텍스트 메뉴). 정렬은 기존 `useMeetingSort` 폴더 안에서도 적용.
-- [ ] 폴더 없는 메모 (vault root `meetings/`) 는 "기타" 그룹으로 트리 하단.
-
 ### PR — 보기모드 todo 라인 → todo 페이지 추가 버튼 `ui_ux`
 한 줄 임팩트: 보기 모드에서도 본문 `- [ ]` 한 줄을 todo 페이지로 한 클릭 등록
 
@@ -42,6 +35,28 @@ PR 단위로 묶음. 각 PR 의 **한 줄 임팩트** 는 카드 frontmatter `im
 
 ---
 
+## 📅 캘린더
+
+### PR — 사이드바 순서 + 셀 표시 재정비 `ui_ux`
+한 줄 임팩트: 일기·할일·메모 순 사이드바 + 셀은 할일 시간순 + 메모 압축
+
+- [ ] **사이드바 list 순서** — `CalendarDayPanel` (`SidePanel.tsx:455`) 안: 헤더 → 일기 CTA(기존) → 할일 → 메모. 현재는 일기 CTA → 메모 → 할일 이라 meeting/todo 렌더 블록 swap. 완료 todo 포함은 이미 동작 (`SidePanel.tsx:475-483` filter 가 done 도 잡음).
+- [ ] **셀 안 메모 압축** — `MonthGrid` cell 에서 meeting chip 제거 + 우상단 일기 BookOpen 아이콘 옆에 `ClipboardList + N` 아이콘+숫자 한 줄. `buildCellEvents` 가 meeting 안 push 하게 + 우상단 corner 영역에 메모 count 노출. 0건이면 안 보임.
+- [ ] **선택된 날 강조 (accent-blue ring)** — `MonthGrid.tsx:95` 의 `bg-surface` 대체 → `box-shadow: inset 0 0 0 2px var(--accent-blue)` (cell border 안 침범). 오늘 (red dot) 과 selection (blue ring) 두 차원 분리. 라이트/다크 모두 검증.
+- [ ] **할일 카테고리 dot** — todo chip 텍스트 앞에 4px colored dot (아래 "카테고리 색 시스템" PR 의 토큰 사용). 텍스트 색은 기존 유지.
+
+### PR — 할 일 카테고리 색 시스템 `ui_ux`
+한 줄 임팩트: 업무/일정/기타 한눈에 색 구분 — 캘린더 셀·사이드바·할일 페이지 공통
+
+- [ ] **색 토큰 정의** — `TodoCategory` 별 token (예: `--cat-work` / `--cat-schedule` / `--cat-other` + 미분류 fallback). 라이트/다크 모두. `DESIGN.md` 갱신.
+- [ ] **단일 lookup 함수** — `lib/todoCategory.ts` 같은 곳에 `categoryColor(category): string` → 모든 호출처 (캘린더 셀 dot, 사이드바 체크박스, todos 페이지 체크박스) 가 같은 source 사용. 동적 카테고리 PR (`PR — 동적 카테고리`) 진입 시 lookup 함수만 확장.
+- [ ] **캘린더 셀 dot** — `MonthGrid` todo chip 앞 4px dot (위 PR 의 chunk).
+- [ ] **캘린더 사이드바 체크박스** — `CalendarDayPanel` (`SidePanel.tsx:660-682`) todo row 체크박스 border/배경 색을 카테고리 색으로. 텍스트 색 X.
+- [ ] **할 일 페이지 체크박스 (`TodoRow`)** — 동일 패턴 체크박스 색만 카테고리 색.
+- [ ] **미분류 / legacy** — `category=null` 일 땐 dot 안 그리고 체크박스 회색 (기존). 라이트/다크 둘 다 시각 ok 확인.
+
+---
+
 ## ✨ 신규 기능
 
 ### PR — 루틴 (매일 하는 할일) `ui_ux`
@@ -52,26 +67,26 @@ PR 단위로 묶음. 각 PR 의 **한 줄 임팩트** 는 카드 frontmatter `im
 - [ ] ActivityBar 새 탭 "루틴" (⌘5). 좌측 routine 리스트 (오늘 체크박스 + 현재 streak `🔥7`), 우측 12주 GitHub-style heatmap + 통계 (현재/최장 streak, 30일 완료율)
 - [ ] 놓친 날 자동 fail (streak break). 수동 휴무일 토글 (`- [-] 휴무 YYYY-MM-DD`) 로 streak 보호
 
-### PR — Tauri 윈도우 헤더 통합 `ui_ux`
-한 줄 임팩트: ActivityBar 가 헤더로 흡수돼 본문 +48px 확보 + 무경계 (traffic light 옆 같은 줄로)
-
-- [ ] `tauri.conf.json` `titleBarStyle: "Overlay"` + `hiddenTitle: true`. ActivityBar 를 traffic light 옆 같은 줄로
-- [ ] 헤더 배경 = sidepanel 배경 통일 (전체 한 덩어리)
-- [ ] ActivityBar 빈 공간에 `data-tauri-drag-region` 명시
-- [ ] macOS 전용 — Windows/Linux fallback (native title bar 유지)
-
-### PR — 사이드바 collapse 단축키 `ui_ux`
-한 줄 임팩트: `Cmd+\` 로 SidePanel 토글, 본문 집중 모드
-
-- [ ] 옵시디안 패턴 — `Cmd+\` 로 SidePanel 토글. localStorage persist (`goodsoob:sidebarCollapsed`).
-- [ ] 애니메이션 = 좌측 slide. 본문 width 자동 확장. ActivityBar 는 그대로 노출.
-- [ ] 모바일은 별개 (이미 단일 컬럼).
-
 ### PR — 단축키 자료/통계 페이지 `ui_ux` 🟡
 한 줄 임팩트: 분기 평가용 — 회의 N건 / 일기 streak / todos 완료율 한 화면
 
 - [ ] ActivityBar 새 탭 또는 portfolio 탭 안 별 view. 후순위 — dogfood 통증 작음, 평가 시즌 근접에 진입 결정.
 - [ ] vault scan 기반 — meetings 수 (월별), journals streak, todos 완료율 (이번 달 / 분기). 외부 의존 0.
+
+### PR — Multi-vault (개인 / 회사 vault 전환) `backend`
+한 줄 임팩트: 개인용 / 회사용 vault 따로 전환 — 같은 앱에서 컨텍스트 분리
+
+- [ ] **vault list 관리** — 설정 모달에 vault 추가/이름/path/삭제 UI. 메타는 `~/.goodsoob/vaults.json` 같은 외부 메타 (vault 자신 안에 두면 닭-알). 현재 단일 vault path 도 여기에 흡수.
+- [ ] **vault switcher** — 윈도우 헤더 vault badge 클릭 → dropdown. 전환 = 모든 React Query invalidate + watcher 재구독 + `selectedMeetingId` 리셋.
+- [ ] **vault 별 상태 분리** — localStorage key 에 vault id 네임스페이스. 최근 메모 / 필터 / sort / sidebar collapse 등 vault 별 보존.
+- [ ] **첫 진입 / path missing** — vault list 비었거나 선택 vault path 가 없을 때 진입 모달 (새 vault 또는 폴더 선택).
+
+### PR — 디자인 시스템 정식화 `other`
+한 줄 임팩트: DESIGN.md 토큰 / 컴포넌트 / 패턴을 정식 시스템으로
+
+- [ ] 의도 명확화 (진입 전 office-hours 한 사이클 — 토큰 정리 / 컴포넌트 라이브러리 / 시각 정의서 / 본인용 vs 외부 공개 중 어디).
+- [ ] DESIGN.md 토큰 정렬 + 누락분 보강 (현재 18개 시맨틱 토큰 → 그룹화 / 사용처 명시).
+- [ ] 공통 컴포넌트 추출 — 모달 (`PR — 오버레이 컴포넌트 통일`) / 마크다운 에디터 (`PR — 마크다운 에디터 컴포넌트 통일`) 와 합칠 수 있음.
 
 ---
 
@@ -104,12 +119,6 @@ PR 단위로 묶음. 각 PR 의 **한 줄 임팩트** 는 카드 frontmatter `im
 
 - [ ] **카드 크기/레이아웃 재설계** — 현재 카드 너무 크고 한눈에 중요 정보 (impact_summary / 날짜 / 카테고리) 안 들어옴. 정보 우선순위 정리 + 작은 카드 그리드.
 - [ ] **카드 inline 편집** — 현재 lightbox 모달 진입 후 편집. 카드 클릭 = inline 펼침 + 편집 모드 전환 검토. 메모장 패턴 (제목 → 본문 inline) 과 비교.
-
-### PR — portfolio sync 안정성 `fix`
-한 줄 임팩트: 사이드바 [동기화] 가 Tauri callback 손실 없이 작동
-
-- [ ] **사이드바 [동기화] (incremental) callback 손실** — `useGhSync.run({incremental:true})` 호출 시 Tauri 가 `Couldn't find callback id ...` warning 후 promise 영원 pending. `runningRef` 가 stuck → 다음 클릭 무시. portfolio-card-redesign PR (#TBD) 에서 임시로 5초 background auto-sync 비활성 + race 차단 (`runningRef`) 추가. 진짜 원인 — HMR 이슈인지, readSyncState + sync 두 Tauri command 의 sequencing race 인지, gh CLI spawn 직렬화 문제인지 파악 후 fix. 가이드북 [전체 다시 훑기] 는 정상 작동 (since 없는 path).
-- [ ] **5초 background auto-sync 재활성** — 위 fix 완료 후 design 의 silent fetch 기능 복원. CLAUDE.md V0.7 의 "5초 background auto-sync + 사이드바 수동 트리거" 명시 항목.
 
 ### PR — sync 시 PR body 의 7섹션 자동 파싱 → frontmatter `backend`
 한 줄 임팩트: PR 양식 그대로 적은 임팩트/카테고리가 카드 frontmatter 에 자동 들어감
@@ -148,6 +157,21 @@ PR 단위로 묶음. 각 PR 의 **한 줄 임팩트** 는 카드 frontmatter `im
 한 줄 임팩트: GitHub PR 무관 카드 (오프라인 업무 / 회의 발표) 도 portfolio 에 직접 추가
 
 - [ ] portfolio 탭에서 "새 카드" 버튼 → title/date/category/impact_summary 입력 + screenshots dropzone → 저장. frontmatter `github_pr_id` 없거나 0 → sync 가 건드리지 않음 (legacy 카드 schema 그대로 활용). 평가 자료에 PR 외 활동도 포함.
+
+### PR — portfolio 사이드바 정렬/필터 + UI 개선 `ui_ux`
+한 줄 임팩트: 카드 많아져도 사이드바에서 좁히기 — 정렬/카테고리/프로젝트 필터
+
+- [ ] **정렬 옵션** — 최신 PR / 카테고리 / 프로젝트 / 영향 (impact_summary 채워진 것 우선). `useMeetingSort` 패턴 재활용 (localStorage persist).
+- [ ] **카테고리 필터 chip** — ui_ux / backend / infra / fix / other. 다중 선택 = OR. 메모장 태그 필터 PR 과 패턴 통일.
+- [ ] **프로젝트 필터** — `projects.md` 그룹별 좁히기. 다중 선택.
+- [ ] **사이드바 UI 폴리시** — 메모장 사이드바 카드 밀도 / spacing / 색 토큰 통일. 헤더 + 검색 입력 (`PR — 메모 검색` 합쳐 portfolio 카드도 검색).
+
+### PR — 가이드북 UIUX 다듬기 `ui_ux`
+한 줄 임팩트: 동기화 진행 표시 + 가독성 정돈
+
+- [ ] **동기화 progress 표시** — 현재 가이드북 [전체 다시 훑기] 클릭 시 진행 상태 안 보임. 현재 N/M PR 처리 중 + 단계 (search → enrich → upsert) 노출.
+- [ ] **가독성** — line height / font size / spacing / max-width 조정. 본문 한 화면 안 한 단락 + 여백 충분.
+- [ ] **섹션 구분 명확화** — 헤더 위계 / 구분선 / 카드 화이트스페이스. 읽기 흐름 끊김 줄이기.
 
 ### PR — gh 호출 인프라 강화 `backend`
 한 줄 임팩트: gh 인증/네트워크 실패도 매끄럽게

@@ -93,9 +93,9 @@ export function PortfolioGuideModal({
           <Section icon={<RefreshCcw className="h-4 w-4" />} title="동기화">
             <p>
               <strong>사이드바 [동기화]</strong> = 마지막 sync 이후 변경된 PR
-              만 가져옴 (<Code>gh search prs --author @me is:merged
-              merged:&gt;=last_sync-1d</Code>). 평소엔 이거면 충분 — 빠르고
-              가벼움. 앱 켜면 5초 뒤 자동 한 번 더 돔.
+              만 가져옴 (<Code>gh search prs --author @me --merged
+              --merged-at &apos;&gt;=last_sync-1d&apos;</Code>). 평소엔 이거면 충분 —
+              빠르고 가벼움. 앱 켜면 5초 뒤 자동 한 번 더 돔.
             </p>
             <p>
               vault <Code>portfolio/</Code> 폴더에 카드 md 파일로 누적. repo →
