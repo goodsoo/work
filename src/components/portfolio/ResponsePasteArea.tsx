@@ -7,10 +7,9 @@ import { parsePRResponse } from "../../lib/clipboardPrompt";
 type Props = {
   onParsed: (impact: string, category: string) => void;
   onError?: (message: string) => void;
-  compact?: boolean;
 };
 
-export function ResponsePasteArea({ onParsed, onError, compact = false }: Props) {
+export function ResponsePasteArea({ onParsed, onError }: Props) {
   const [raw, setRaw] = useState("");
   const [unparsed, setUnparsed] = useState(false);
 
@@ -44,15 +43,9 @@ export function ResponsePasteArea({ onParsed, onError, compact = false }: Props)
             queueMicrotask(() => tryParse(text));
           }
         }}
-        rows={compact ? 1 : 2}
-        placeholder={
-          compact ? "Claude 응답 붙여넣기" : "Claude 응답 붙여넣기..."
-        }
-        className={
-          compact
-            ? "w-full resize-none rounded-md px-2 py-1 text-[11px] transition"
-            : "w-full resize-y rounded-md px-2 py-1.5 text-xs transition"
-        }
+        rows={2}
+        placeholder="Claude 응답 붙여넣기..."
+        className="w-full resize-y rounded-md px-2 py-1.5 text-xs transition"
         style={{
           backgroundColor: "var(--bg-surface)",
           border: `1px solid ${unparsed ? "var(--accent-red)" : "var(--border-default)"}`,

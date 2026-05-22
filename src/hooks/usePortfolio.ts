@@ -12,6 +12,7 @@ import {
   portfolioWorkPath,
   purgePortfolioWork,
   readPortfolioProjects,
+  readSyncState,
   readPortfolioWork,
   restorePortfolioWork,
   scanPortfolio,
@@ -262,8 +263,17 @@ export function useGhSync() {
   });
   const abortRef = useRef<AbortController | null>(null);
 
+  const runningRef = useRef(false);
+
   const run = useCallback(
-    async (opts: Pick<SyncPortfolioOpts, "since"> = {}) => {
+    async (
+      opts: Pick<SyncPortfolioOpts, "since"> & { incremental?: boolean } = {},
+    ) => {
+      // race 차단 — 이미 sync 진행 중이면 새 호출 무시. background auto-sync + 사용자 클릭
+      // 동시 발생 시 Tauri callback id 충돌 (callback 손실) 회피.
+      if (runningRef.current) return null;
+      runningRef.current = true;
+
       const controller = new AbortController();
       abortRef.current = controller;
       setState((s) => ({
@@ -274,8 +284,24 @@ export function useGhSync() {
         error: null,
       }));
       try {
+        // incremental: hook 안에서 last_sync 읽어 since 결정. 호출처 closure 단순화.
+        let since = opts.since;
+        if (opts.incremental && !since) {
+          try {
+            const st = await readSyncState(adapter);
+            if (st.last_sync) {
+              since = new Date(
+                new Date(st.last_sync).getTime() - 24 * 60 * 60 * 1000,
+              )
+                .toISOString()
+                .slice(0, 10);
+            }
+          } catch {
+            // last_sync 읽기 실패 — 전체 sync 로 fallback (since 없이)
+          }
+        }
         const result = await syncPortfolio(adapter, {
-          since: opts.since,
+          since,
           signal: controller.signal,
           onProgress: (current, total) =>
             setState((s) => ({ ...s, current, total })),
@@ -295,6 +321,7 @@ export function useGhSync() {
         throw err;
       } finally {
         abortRef.current = null;
+        runningRef.current = false;
       }
     },
     [adapter, qc],

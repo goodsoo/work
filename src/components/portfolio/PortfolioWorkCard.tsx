@@ -80,7 +80,7 @@ export function PortfolioWorkCard({ work, projects }: Props) {
   if (excluded) {
     return (
       <div
-        className="relative flex w-full items-stretch gap-3 overflow-hidden rounded-lg p-3"
+        className="relative flex w-full items-stretch gap-3 rounded-lg p-3"
         style={{
           backgroundColor: "var(--bg-surface)",
           border: "1px solid var(--border-default)",
@@ -128,10 +128,10 @@ export function PortfolioWorkCard({ work, projects }: Props) {
           >
             {fm.github_title}
           </span>
-          <div className="mt-auto flex flex-wrap items-center gap-x-1.5 gap-y-1 pt-1">
+          <div className="mt-auto flex flex-nowrap items-center gap-x-1.5 overflow-hidden pt-1">
             {dateLabel ? (
               <span
-                className="inline-flex items-center whitespace-nowrap rounded-md px-1.5 py-0.5 text-[11px]"
+                className="inline-flex shrink-0 items-center whitespace-nowrap rounded-md px-1.5 py-0.5 text-[11px]"
                 style={{
                   backgroundColor: "var(--bg-surface-hover)",
                   color: "var(--text-secondary)",
@@ -143,18 +143,18 @@ export function PortfolioWorkCard({ work, projects }: Props) {
             ) : null}
             {projectLabel ? (
               <span
-                className="inline-flex max-w-[40%] items-center whitespace-nowrap rounded-md px-1.5 py-0.5 text-[11px]"
+                className="inline-flex shrink-0 items-center whitespace-nowrap rounded-md px-1.5 py-0.5 text-[11px]"
                 style={{
                   backgroundColor: "var(--bg-surface-hover)",
                   color: "var(--text-secondary)",
                 }}
                 title={fullProjectName ?? ""}
               >
-                <span className="truncate">{projectLabel}</span>
+                {projectLabel}
               </span>
             ) : null}
             <span
-              className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md px-1.5 py-0.5 text-[11px]"
+              className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-1.5 py-0.5 text-[11px]"
               style={{
                 backgroundColor: "var(--bg-surface-hover)",
                 color: "var(--text-secondary)",
@@ -168,7 +168,7 @@ export function PortfolioWorkCard({ work, projects }: Props) {
               {categoryLabel}
             </span>
             <span
-              className="inline-flex items-center whitespace-nowrap rounded-md px-1.5 py-0.5 text-[11px]"
+              className="inline-flex shrink-0 items-center whitespace-nowrap rounded-md px-1.5 py-0.5 text-[11px]"
               style={{
                 backgroundColor: "var(--bg-surface-hover)",
                 color: "var(--text-muted)",
@@ -227,7 +227,7 @@ export function PortfolioWorkCard({ work, projects }: Props) {
             setModalOpen(true);
           }
         }}
-        className="group relative flex w-full cursor-pointer items-stretch gap-3 overflow-hidden rounded-lg p-3 pr-9 text-left transition hover:border-[var(--text-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"
+        className="group relative flex w-full cursor-pointer items-stretch gap-3 rounded-lg p-3 pr-9 text-left transition hover:border-[var(--text-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"
         style={{
           backgroundColor: "var(--bg-surface)",
           border: isEmpty
@@ -277,10 +277,10 @@ export function PortfolioWorkCard({ work, projects }: Props) {
           >
             {fm.github_title}
           </span>
-          <div className="mt-auto flex flex-wrap items-center gap-x-1.5 gap-y-1 pt-1">
+          <div className="mt-auto flex flex-nowrap items-center gap-x-1.5 overflow-hidden pt-1">
             {dateLabel ? (
               <span
-                className="inline-flex items-center whitespace-nowrap rounded-md px-1.5 py-0.5 text-[11px]"
+                className="inline-flex shrink-0 items-center whitespace-nowrap rounded-md px-1.5 py-0.5 text-[11px]"
                 style={{
                   backgroundColor: "var(--bg-surface-hover)",
                   color: "var(--text-secondary)",
@@ -292,18 +292,18 @@ export function PortfolioWorkCard({ work, projects }: Props) {
             ) : null}
             {projectLabel ? (
               <span
-                className="inline-flex max-w-[40%] items-center whitespace-nowrap rounded-md px-1.5 py-0.5 text-[11px]"
+                className="inline-flex shrink-0 items-center whitespace-nowrap rounded-md px-1.5 py-0.5 text-[11px]"
                 style={{
                   backgroundColor: "var(--bg-surface-hover)",
                   color: "var(--text-secondary)",
                 }}
                 title={fullProjectName ?? ""}
               >
-                <span className="truncate">{projectLabel}</span>
+                {projectLabel}
               </span>
             ) : null}
             <span
-              className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md px-1.5 py-0.5 text-[11px]"
+              className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-1.5 py-0.5 text-[11px]"
               style={{
                 backgroundColor: "var(--bg-surface-hover)",
                 color: "var(--text-secondary)",
@@ -317,7 +317,7 @@ export function PortfolioWorkCard({ work, projects }: Props) {
               {categoryLabel}
             </span>
             <span
-              className="inline-flex items-center whitespace-nowrap rounded-md px-1.5 py-0.5 text-[11px]"
+              className="inline-flex shrink-0 items-center whitespace-nowrap rounded-md px-1.5 py-0.5 text-[11px]"
               style={{
                 backgroundColor: "var(--bg-surface-hover)",
                 color: "var(--text-muted)",
@@ -334,7 +334,7 @@ export function PortfolioWorkCard({ work, projects }: Props) {
           className="absolute right-2 top-2"
           onClick={(e) => e.stopPropagation()}
         >
-          <PortfolioCardMenu work={work} projects={projects} />
+          <PortfolioCardMenu work={work} />
         </div>
       </div>
 

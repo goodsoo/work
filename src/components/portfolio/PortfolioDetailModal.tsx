@@ -11,6 +11,7 @@ import {
   Sparkles,
   Check,
   Loader2,
+  Pencil,
 } from "lucide-react";
 import type {
   PortfolioCategory,
@@ -63,7 +64,13 @@ export function PortfolioDetailModal({ work, projects, onClose }: Props) {
   const vaultRoot = adapter.getRoot();
 
   const [activeShot, setActiveShot] = useState(0);
+  const [editing, setEditing] = useState(false);
+  // edit mode draft — 수정 완료 누르면 mutate, 취소/닫기면 버림.
   const [impactDraft, setImpactDraft] = useState(fm.impact_summary);
+  const [categoryDraft, setCategoryDraft] = useState<PortfolioCategory>(
+    fm.category,
+  );
+  const [projectDraft, setProjectDraft] = useState(fm.project);
   const [promptCopied, setPromptCopied] = useState(false);
   const [requesting, setRequesting] = useState(false);
   const [requestError, setRequestError] = useState<string | null>(null);
@@ -71,6 +78,40 @@ export function PortfolioDetailModal({ work, projects, onClose }: Props) {
     { impact: string; category: PortfolioCategory } | null
   >(null);
   const fullWork = usePortfolioWork(work.prSlug);
+
+  const resetDraft = () => {
+    setImpactDraft(fm.impact_summary);
+    setCategoryDraft(fm.category);
+    setProjectDraft(fm.project);
+    setSuggestion(null);
+    setRequestError(null);
+  };
+
+  const handleEnterEdit = () => {
+    resetDraft();
+    setEditing(true);
+  };
+  const handleCancelEdit = () => {
+    resetDraft();
+    setEditing(false);
+  };
+  const handleSaveEdit = () => {
+    const trimmedImpact = impactDraft.trim();
+    updateFm.mutate({
+      impact_summary: trimmedImpact,
+      category: categoryDraft,
+      project: projectDraft,
+    });
+    setEditing(false);
+    setSuggestion(null);
+  };
+
+  // 모달 닫기 — edit mode 중이면 변경 자동 취소 + 닫기.
+  const handleClose = () => {
+    if (editing) resetDraft();
+    setEditing(false);
+    onClose();
+  };
 
   const screenshotSrc = (path: string) => vaultAssetSrc(vaultRoot, path);
   const categoryLabel = CATEGORY_LABEL[fm.category] ?? fm.category;
@@ -82,7 +123,11 @@ export function PortfolioDetailModal({ work, projects, onClose }: Props) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        onClose();
+        if (editing) {
+          handleCancelEdit();
+        } else {
+          handleClose();
+        }
         return;
       }
       if (fm.screenshots.length === 0) return;
@@ -94,14 +139,8 @@ export function PortfolioDetailModal({ work, projects, onClose }: Props) {
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [onClose, fm.screenshots.length]);
-
-  const commitImpact = () => {
-    const next = impactDraft.trim();
-    if (next !== fm.impact_summary) {
-      updateFm.mutate({ impact_summary: next });
-    }
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editing, fm.screenshots.length]);
 
   const handleDelete = () => {
     const ok = window.confirm(
@@ -182,13 +221,11 @@ export function PortfolioDetailModal({ work, projects, onClose }: Props) {
     }
   };
 
+  // edit mode 안에서 호출됨. draft 에만 반영 — [수정 완료] 누를 때 실제 mutate.
   const applySuggestion = () => {
     if (!suggestion) return;
     setImpactDraft(suggestion.impact);
-    updateFm.mutate({
-      impact_summary: suggestion.impact,
-      category: suggestion.category,
-    });
+    setCategoryDraft(suggestion.category);
     setSuggestion(null);
   };
 
@@ -196,7 +233,7 @@ export function PortfolioDetailModal({ work, projects, onClose }: Props) {
 
   return (
     <div
-      onClick={onClose}
+      onClick={handleClose}
       className="fixed inset-0 z-50 flex items-center justify-center p-6"
       style={{ backgroundColor: "var(--bg-overlay)" }}
     >
@@ -232,15 +269,65 @@ export function PortfolioDetailModal({ work, projects, onClose }: Props) {
             {fm.github_pr_number > 0 ? ` · PR #${fm.github_pr_number}` : ""}
             {relTime ? ` · ${relTime}` : ""}
           </span>
-          <button
-            type="button"
-            onClick={onClose}
-            title="닫기 (ESC)"
-            className="ml-auto flex h-8 w-8 items-center justify-center rounded-md transition"
-            style={{ color: "var(--text-secondary)" }}
-          >
-            <X className="h-4 w-4" />
-          </button>
+          <div className="ml-auto flex items-center gap-1">
+            {editing ? (
+              <>
+                <button
+                  type="button"
+                  onClick={handleSaveEdit}
+                  className="inline-flex h-7 items-center gap-1 rounded-md px-2 text-xs font-medium transition"
+                  style={{
+                    backgroundColor: "var(--btn-primary)",
+                    color: "var(--btn-primary-text)",
+                    minHeight: 0,
+                  }}
+                  title="변경 저장"
+                >
+                  <Check className="h-3.5 w-3.5" />
+                  수정 완료
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCancelEdit}
+                  className="inline-flex h-7 items-center gap-1 rounded-md px-2 text-xs font-medium transition"
+                  style={{
+                    backgroundColor: "var(--bg-surface-hover)",
+                    color: "var(--text-primary)",
+                    border: "1px solid var(--border-default)",
+                    minHeight: 0,
+                  }}
+                  title="변경 버리기 (ESC)"
+                >
+                  취소
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={handleEnterEdit}
+                className="inline-flex h-7 items-center gap-1 rounded-md px-2 text-xs font-medium transition"
+                style={{
+                  backgroundColor: "var(--bg-surface-hover)",
+                  color: "var(--text-primary)",
+                  border: "1px solid var(--border-default)",
+                  minHeight: 0,
+                }}
+                title="편집 모드 진입"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+                편집
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={handleClose}
+              title="닫기 (ESC)"
+              className="flex h-8 w-8 items-center justify-center rounded-md transition"
+              style={{ color: "var(--text-secondary)" }}
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
         </div>
 
         {/* 본문 — 좌 viewer / 우 편집. grid row 강제 1fr (컨텐츠가 85vh 넘어도 cell 이 grid 영역만 차지하도록). */}
@@ -354,52 +441,60 @@ export function PortfolioDetailModal({ work, projects, onClose }: Props) {
             ) : null}
 
           </div>
-            {/* dropzone — scroll 밖, 항상 보임 */}
-            <div
-              className="flex shrink-0 gap-2 border-t px-4 py-3"
-              style={{ borderColor: "var(--border-subtle)" }}
-            >
-              <div className="flex-1">
-                <ScreenshotDropzone
-                  prSlug={work.prSlug}
-                  existing={fm.screenshots}
-                  label="before"
-                />
+            {/* dropzone — edit mode 에서만 노출. 업로드는 즉시 vault 적용 (취소와 무관). */}
+            {editing ? (
+              <div
+                className="flex shrink-0 gap-2 border-t px-4 py-3"
+                style={{ borderColor: "var(--border-subtle)" }}
+              >
+                <div className="flex-1">
+                  <ScreenshotDropzone
+                    prSlug={work.prSlug}
+                    existing={fm.screenshots}
+                    label="before"
+                  />
+                </div>
+                <div className="flex-1">
+                  <ScreenshotDropzone
+                    prSlug={work.prSlug}
+                    existing={fm.screenshots}
+                    label="after"
+                  />
+                </div>
               </div>
-              <div className="flex-1">
-                <ScreenshotDropzone
-                  prSlug={work.prSlug}
-                  existing={fm.screenshots}
-                  label="after"
-                />
-              </div>
-            </div>
+            ) : null}
           </div>
 
           {/* 우측: 편집 패널 — scroll content + sticky footer */}
           <div className="flex min-h-0 flex-col overflow-hidden">
           <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
             <Field label="한 줄 임팩트">
-              <input
-                value={impactDraft}
-                onChange={(e) => setImpactDraft(e.target.value)}
-                onBlur={commitImpact}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    commitImpact();
-                    (e.target as HTMLInputElement).blur();
-                  }
-                }}
-                placeholder="60자 이내 한 문장"
-                maxLength={60}
-                className="w-full rounded-md px-2 py-1.5 text-sm font-semibold"
-                style={{
-                  backgroundColor: "var(--bg-surface)",
-                  border: "1px solid var(--border-default)",
-                  color: "var(--text-primary)",
-                }}
-              />
+              {editing ? (
+                <input
+                  value={impactDraft}
+                  onChange={(e) => setImpactDraft(e.target.value)}
+                  placeholder="60자 이내 한 문장"
+                  maxLength={60}
+                  className="w-full rounded-md px-2 py-1.5 text-sm font-semibold"
+                  style={{
+                    backgroundColor: "var(--bg-surface)",
+                    border: "1px solid var(--border-default)",
+                    color: "var(--text-primary)",
+                  }}
+                />
+              ) : (
+                <div
+                  className="break-words text-sm font-semibold"
+                  style={{
+                    color: fm.impact_summary
+                      ? "var(--text-primary)"
+                      : "var(--text-muted)",
+                    fontStyle: fm.impact_summary ? "normal" : "italic",
+                  }}
+                >
+                  {fm.impact_summary || "한 줄 임팩트 추가 필요"}
+                </div>
+              )}
             </Field>
 
             <Field label="PR 제목">
@@ -427,50 +522,79 @@ export function PortfolioDetailModal({ work, projects, onClose }: Props) {
             </Field>
 
             <Field label="카테고리">
-              <select
-                value={fm.category}
-                onChange={(e) =>
-                  updateFm.mutate({
-                    category: e.target.value as PortfolioCategory,
-                  })
-                }
-                className="w-full rounded-md px-2 py-1.5 text-sm"
-                style={{
-                  backgroundColor: "var(--bg-surface)",
-                  border: "1px solid var(--border-default)",
-                  color: "var(--text-primary)",
-                }}
-              >
-                <option value="ui_ux">UI/UX</option>
-                <option value="backend">Backend</option>
-                <option value="infra">Infra</option>
-                <option value="fix">Fix</option>
-                <option value="other">기타</option>
-              </select>
+              {editing ? (
+                <select
+                  value={categoryDraft}
+                  onChange={(e) =>
+                    setCategoryDraft(e.target.value as PortfolioCategory)
+                  }
+                  className="w-full rounded-md px-2 py-1.5 text-sm"
+                  style={{
+                    backgroundColor: "var(--bg-surface)",
+                    border: "1px solid var(--border-default)",
+                    color: "var(--text-primary)",
+                  }}
+                >
+                  <option value="ui_ux">UI/UX</option>
+                  <option value="backend">Backend</option>
+                  <option value="infra">Infra</option>
+                  <option value="fix">Fix</option>
+                  <option value="other">기타</option>
+                </select>
+              ) : (
+                <div
+                  className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-sm"
+                  style={{
+                    backgroundColor: "var(--bg-surface-hover)",
+                    color: "var(--text-primary)",
+                  }}
+                >
+                  <span
+                    className="h-1.5 w-1.5 rounded-full"
+                    style={{ backgroundColor: categoryColor }}
+                  />
+                  {categoryLabel}
+                </div>
+              )}
             </Field>
 
             <Field label="프로젝트">
-              <select
-                value={fm.project}
-                onChange={(e) =>
-                  updateFm.mutate({ project: e.target.value })
-                }
-                className="w-full rounded-md px-2 py-1.5 text-sm"
-                style={{
-                  backgroundColor: "var(--bg-surface)",
-                  border: "1px solid var(--border-default)",
-                  color: "var(--text-primary)",
-                }}
-              >
-                <option value="">분류안됨</option>
-                {projects.map((p) => (
-                  <option key={p.slug} value={p.slug}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
+              {editing ? (
+                <select
+                  value={projectDraft}
+                  onChange={(e) => setProjectDraft(e.target.value)}
+                  className="w-full rounded-md px-2 py-1.5 text-sm"
+                  style={{
+                    backgroundColor: "var(--bg-surface)",
+                    border: "1px solid var(--border-default)",
+                    color: "var(--text-primary)",
+                  }}
+                >
+                  <option value="">분류안됨</option>
+                  {projects.map((p) => (
+                    <option key={p.slug} value={p.slug}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <div
+                  className="text-sm"
+                  style={{
+                    color: fm.project
+                      ? "var(--text-primary)"
+                      : "var(--text-muted)",
+                  }}
+                >
+                  {fm.project
+                    ? projects.find((p) => p.slug === fm.project)?.name ??
+                      fm.project
+                    : "분류안됨"}
+                </div>
+              )}
             </Field>
 
+            {editing ? (
             <Field label="Claude 로 자동 채움">
               <div className="flex flex-col gap-2">
                 <button
@@ -625,16 +749,14 @@ export function PortfolioDetailModal({ work, projects, onClose }: Props) {
                     <ResponsePasteArea
                       onParsed={(impact, category) => {
                         setImpactDraft(impact);
-                        updateFm.mutate({
-                          impact_summary: impact,
-                          category: category as PortfolioCategory,
-                        });
+                        setCategoryDraft(category as PortfolioCategory);
                       }}
                     />
                   </div>
                 </details>
               </div>
             </Field>
+            ) : null}
 
             <div
               className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 border-t pt-3 text-[11px]"
