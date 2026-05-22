@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Sun, Moon, Menu, Settings } from "lucide-react";
+import { Sun, Moon, Menu, Settings, ChevronDown } from "lucide-react";
 import { useTheme } from "../../hooks/useTheme";
 import {
   useSidePanelWidth,
@@ -8,6 +8,7 @@ import {
 } from "../../hooks/useSidePanelWidth";
 import { useDrawer } from "../../hooks/useDrawer";
 import { isTauri } from "../../lib/isTauri";
+import { useVault } from "../../lib/vault/useVault";
 import { SettingsModal } from "../settings/SettingsModal";
 import { BottomTabs, TABS, type Tab } from "./BottomTabs";
 
@@ -21,6 +22,9 @@ type Props = {
   // SidePanel column 의 footer 왼쪽에 들어가는 페이지별 액션 (예: 메모장의 도움말/휴지통).
   // 비워두면 footer 에 theme toggle 만 보임.
   sidePanelFooter?: ReactNode;
+  // 데스크탑 SidePanel collapse 상태. true = 사이드바 숨김 + main 이 윈도우 전체.
+  // 옵시디안 패턴 — Cmd+\ 단축키로 토글, useSidebarCollapsed 가 관리.
+  sidebarCollapsed?: boolean;
   children: ReactNode;
 };
 
@@ -29,6 +33,7 @@ export function AppShell({
   onTabChange,
   sidePanel,
   sidePanelFooter,
+  sidebarCollapsed = false,
   children,
 }: Props) {
   const { theme, toggle } = useTheme();
@@ -36,9 +41,10 @@ export function AppShell({
   const drawer = useDrawer();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const hasSidePanel = sidePanel != null;
+  const desktopSidePanelVisible = hasSidePanel && !sidebarCollapsed;
   const ThemeIcon = theme === "light" ? Sun : Moon;
 
-  const mainPaddingLeft = hasSidePanel ? `${width}px` : "0px";
+  const mainPaddingLeft = desktopSidePanelVisible ? `${width}px` : "0px";
 
   // BottomTab 변경 시 drawer 자동 닫기
   function handleTabChange(next: Tab) {
@@ -88,9 +94,72 @@ export function AppShell({
       className="min-h-svh"
       style={{ paddingTop: "var(--safe-top)", backgroundColor: "var(--bg-base)" }}
     >
+      {/* 데스크탑 윈도우 헤더 — macOS Tauri Overlay titlebar 와 같은 줄.
+          좌측 traffic lights padding + 탭 4개 + 우측 빈 drag region.
+          inset 0 환경 (Windows/Linux/web) 에선 height 0 으로 자연 invisible. */}
+      <header
+        data-tauri-drag-region
+        className="hidden lg:flex lg:items-stretch"
+        style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          height: "var(--titlebar-inset)",
+          // sidebar visible 일 때 vault column 이 traffic lights 영역 포함 (column 안 padding 처리).
+          // collapse 시 vault column 사라지므로 header 가 직접 traffic lights padding.
+          paddingLeft: desktopSidePanelVisible ? 0 : "var(--titlebar-traffic-inset)",
+          backgroundColor: "var(--border-default)",
+          borderBottom: "1px solid var(--border-default)",
+          zIndex: 50,
+          gap: "0.5rem",
+        }}
+      >
+        {desktopSidePanelVisible ? (
+          <div
+            data-tauri-drag-region
+            className="flex shrink-0 items-center"
+            style={{
+              width: `${width}px`,
+              paddingLeft: "var(--titlebar-traffic-inset)",
+              paddingRight: "0.5rem",
+            }}
+          >
+            <VaultBadge onClick={() => setSettingsOpen(true)} />
+          </div>
+        ) : null}
+        <div data-tauri-drag-region className="flex h-full items-stretch">
+          <HeaderTabs activeTab={activeTab} onTabChange={onTabChange} />
+        </div>
+        {/* 가운데 flex-1 = drag region 빈 공간 */}
+        <div data-tauri-drag-region className="flex-1" />
+        {/* 우측: settings + theme. button 자체는 click, 사이 gap 은 drag region. */}
+        <div data-tauri-drag-region className="flex items-center gap-0.5 pr-2">
+          <button
+            type="button"
+            onClick={() => setSettingsOpen(true)}
+            title="설정"
+            aria-label="설정"
+            className="flex h-7 w-7 items-center justify-center rounded-md transition hover:bg-[var(--bg-surface-hover)]"
+            style={{ color: "var(--text-secondary)", minHeight: 0 }}
+          >
+            <Settings className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={(e) => toggle({ origin: { x: e.clientX, y: e.clientY } })}
+            title={theme === "light" ? "다크 모드로" : "라이트 모드로"}
+            className="flex h-7 w-7 items-center justify-center rounded-md transition hover:bg-[var(--bg-surface-hover)]"
+            style={{ color: "var(--text-secondary)", minHeight: 0 }}
+          >
+            <ThemeIcon className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      </header>
+
       {/* Desktop: Side Panel (상단 탭 row + sidePanel + 하단 테마 토글) */}
       <div className="hidden lg:fixed lg:inset-y-0 lg:left-0 lg:z-30 lg:flex">
-        {hasSidePanel ? (
+        {desktopSidePanelVisible ? (
           <div
             className="relative"
             style={{
@@ -99,36 +168,19 @@ export function AppShell({
               borderRight: "1px solid var(--border-default)",
             }}
           >
-            <div className="flex h-full flex-col">
-              <TopTabsRow activeTab={activeTab} onTabChange={onTabChange} />
+            <div
+              className="flex h-full flex-col"
+              style={{ paddingTop: "var(--titlebar-inset)" }}
+            >
               <div className="relative min-h-0 flex-1">{sidePanel}</div>
-              <div
-                className="flex shrink-0 items-center justify-between gap-2 px-3 py-2"
-                style={{ borderTop: "1px solid var(--border-subtle)" }}
-              >
-                <div className="flex min-w-0 items-center">{sidePanelFooter}</div>
-                <div className="flex items-center gap-0.5">
-                  <button
-                    type="button"
-                    onClick={() => setSettingsOpen(true)}
-                    title="설정"
-                    aria-label="설정"
-                    className="flex h-7 w-7 items-center justify-center rounded-md transition"
-                    style={{ color: "var(--text-muted)", minHeight: 0 }}
-                  >
-                    <Settings className="h-3.5 w-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={(e) => toggle({ origin: { x: e.clientX, y: e.clientY } })}
-                    title={theme === "light" ? "다크 모드로" : "라이트 모드로"}
-                    className="flex h-7 w-7 items-center justify-center rounded-md transition"
-                    style={{ color: "var(--text-muted)", minHeight: 0 }}
-                  >
-                    <ThemeIcon className="h-3.5 w-3.5" />
-                  </button>
+              {sidePanelFooter ? (
+                <div
+                  className="flex shrink-0 items-center px-3 py-2"
+                  style={{ borderTop: "1px solid var(--border-subtle)" }}
+                >
+                  <div className="flex min-w-0 items-center">{sidePanelFooter}</div>
                 </div>
-              </div>
+              ) : null}
             </div>
             <SidePanelResizer width={width} onChange={setWidth} />
           </div>
@@ -219,9 +271,10 @@ export function AppShell({
           {
             paddingBottom: "calc(var(--safe-bottom) + 72px)",
             ["--gs-main-pl" as string]: mainPaddingLeft,
+            ["--gs-main-pt" as string]: "var(--titlebar-inset)",
           } as React.CSSProperties
         }
-        className="animate-page-in lg:!pb-0 lg:h-screen lg:overflow-y-auto lg:overscroll-none lg:[padding-left:var(--gs-main-pl)]"
+        className="animate-page-in lg:!pb-0 lg:h-screen lg:overflow-y-auto lg:overscroll-none lg:[padding-left:var(--gs-main-pl)] lg:[padding-top:var(--gs-main-pt)]"
       >
         {children}
       </main>
@@ -303,9 +356,10 @@ function SidePanelResizer({
   );
 }
 
-// SidePanel 상단의 4개 아이콘 탭 row (라벨 없음, flex-1 균등 분할).
-// 라벨/단축키는 title attribute 로 hover tooltip.
-function TopTabsRow({
+// 윈도우 헤더 안의 4개 탭 아이콘 (가로 row, traffic lights 옆).
+// active 탭은 folder tab pattern — main 영역 색으로 빠져나와 헤더 borderBottom 을
+// -1px 넘어가서 시각적으로 main 콘텐츠와 이어짐. Chrome tab strip / 옵시디안 패턴.
+function HeaderTabs({
   activeTab,
   onTabChange,
 }: {
@@ -313,14 +367,7 @@ function TopTabsRow({
   onTabChange: (tab: Tab) => void;
 }) {
   return (
-    <nav
-      className="flex shrink-0 items-stretch"
-      style={{
-        height: "3.5rem", // 본문 sticky 헤더와 통일
-        borderBottom: "1px solid var(--border-default)",
-      }}
-      aria-label="primary"
-    >
+    <nav className="flex h-full items-end gap-0.5" aria-label="primary">
       {TABS.map(({ id, label, icon: Icon }, i) => {
         const active = id === activeTab;
         const title = isTauri ? `${label}  ⌘${i + 1}` : label;
@@ -332,19 +379,60 @@ function TopTabsRow({
             aria-current={active ? "page" : undefined}
             title={title}
             aria-label={label}
-            className="flex flex-1 items-center justify-center transition"
+            className="flex h-7 items-center justify-center gap-1.5 px-2 transition hover:bg-[var(--bg-surface-hover)]"
             style={{
-              borderBottom: active
-                ? "2px solid var(--btn-primary)"
-                : "2px solid transparent",
-              color: active ? "var(--text-primary)" : "var(--text-muted)",
+              backgroundColor: active ? "var(--bg-base)" : "transparent",
+              color: active ? "var(--text-primary)" : "var(--text-secondary)",
+              marginBottom: active ? "-1px" : 0,
+              // 폴더 탭 — active 의 상/좌/우 border 가 헤더 borderBottom 과 같은 선으로 이어짐.
+              // bottom 은 transparent 로 height 일관성 유지 + main 영역과 시각 연결.
+              borderTop: active
+                ? "1px solid var(--border-default)"
+                : "1px solid transparent",
+              borderLeft: active
+                ? "1px solid var(--border-default)"
+                : "1px solid transparent",
+              borderRight: active
+                ? "1px solid var(--border-default)"
+                : "1px solid transparent",
+              borderBottom: "1px solid transparent",
+              borderTopLeftRadius: active ? 6 : 4,
+              borderTopRightRadius: active ? 6 : 4,
+              borderBottomLeftRadius: active ? 0 : 4,
+              borderBottomRightRadius: active ? 0 : 4,
               minHeight: 0,
+              boxSizing: "border-box",
             }}
           >
-            <Icon className="h-[18px] w-[18px]" strokeWidth={active ? 2 : 1.5} />
+            <Icon className="h-4 w-4" strokeWidth={active ? 2 : 1.5} />
           </button>
         );
       })}
     </nav>
+  );
+}
+
+// 윈도우 헤더 좌측의 vault 이름 chip — 추후 vault switcher dropdown 진입점.
+// 지금은 클릭 시 SettingsModal (vault section default) 열림.
+// vault > tabs 시각 계층 명시 — vault 가 root container 임을 좌→우 순서로 표현.
+function VaultBadge({ onClick }: { onClick: () => void }) {
+  const { vaultRoot } = useVault();
+  if (!vaultRoot) return null;
+  const name = vaultRoot.split("/").filter(Boolean).pop() ?? vaultRoot;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={vaultRoot}
+      aria-label={`vault: ${name}`}
+      className="flex h-7 max-w-full items-center gap-1 rounded-md px-2 text-[13px] font-medium transition hover:bg-[var(--bg-surface-hover)]"
+      style={{
+        color: "var(--text-primary)",
+        minHeight: 0,
+      }}
+    >
+      <span className="truncate">{name}</span>
+      <ChevronDown className="h-3 w-3 shrink-0 opacity-60" />
+    </button>
   );
 }

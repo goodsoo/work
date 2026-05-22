@@ -382,7 +382,7 @@ export function CalendarPage({ targetDate, onSelectedDateChange }: Props) {
         <div
           className="grid items-center gap-2 px-3 backdrop-blur lg:px-5"
           style={{
-            height: "3.5rem",
+            height: "var(--page-header-h)",
             gridTemplateColumns:
               "minmax(0, 1fr) minmax(0, auto) minmax(0, 1fr)",
             backgroundColor: "var(--bg-overlay)",

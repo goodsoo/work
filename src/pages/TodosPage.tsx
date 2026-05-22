@@ -142,11 +142,12 @@ export function TodosPage({
   return (
     <>
       {/* 메모장 MeetingForm 헤더와 동일 markup — 3-col grid (left/center/right),
-          height 3.5rem, sticky. left: undo/redo, center: 제목 (text-base font-semibold). */}
+          py-3 sticky (사이드바 헤더와 자연 52px 통일). left: undo/redo,
+          center: 제목 (text-base font-semibold). */}
       <div
         className="sticky top-0 z-20 grid items-center gap-2 overflow-hidden px-3 backdrop-blur lg:relative lg:top-auto lg:shrink-0"
         style={{
-          height: "3.5rem",
+          height: "var(--page-header-h)",
           gridTemplateColumns: "minmax(0, 1fr) minmax(0, auto) minmax(0, 1fr)",
           backgroundColor: "var(--bg-overlay)",
           borderBottom: "1px solid var(--border-subtle)",

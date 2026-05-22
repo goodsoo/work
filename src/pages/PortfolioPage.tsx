@@ -43,31 +43,55 @@ export function PortfolioPage({ activeFilter, onSync, syncRunning }: Props) {
     [worksQuery.data, activeFilter],
   );
 
-  // 빈 vault → CTA, 필터 결과 0 → 별도 메시지
-  if (worksQuery.isLoading) {
-    return <SkeletonGrid count={6} />;
-  }
-
   const allWorks = worksQuery.data ?? [];
-  if (allWorks.length === 0) {
-    return <EmptyVault onSync={onSync} running={syncRunning} />;
-  }
-
-  if (filtered.length === 0) {
-    return <EmptyFilter filter={activeFilter} />;
-  }
 
   return (
-    <div className="px-6 pt-6">
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {filtered.map((w) => (
-          <PortfolioWorkCard
-            key={w.prSlug}
-            work={w}
-            projects={projectsQuery.data ?? []}
-          />
-        ))}
-      </div>
+    <>
+      <PortfolioHeader />
+      {worksQuery.isLoading ? (
+        <SkeletonGrid count={6} />
+      ) : allWorks.length === 0 ? (
+        <EmptyVault onSync={onSync} running={syncRunning} />
+      ) : filtered.length === 0 ? (
+        <EmptyFilter filter={activeFilter} />
+      ) : (
+        <div className="px-6 pt-6">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {filtered.map((w) => (
+              <PortfolioWorkCard
+                key={w.prSlug}
+                work={w}
+                projects={projectsQuery.data ?? []}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+// 메모장 / 할일 본문 헤더와 동일 패턴 (py-3 → 자연 52px = 사이드바 헤더와 통일).
+// 좌/우 액션은 일단 비움 — 추후 sync 트리거 등 추가 가능.
+function PortfolioHeader() {
+  return (
+    <div
+      className="sticky top-0 z-20 grid items-center gap-2 overflow-hidden px-3 backdrop-blur lg:relative lg:top-auto lg:shrink-0"
+      style={{
+        height: "var(--page-header-h)",
+        gridTemplateColumns: "minmax(0, 1fr) minmax(0, auto) minmax(0, 1fr)",
+        backgroundColor: "var(--bg-overlay)",
+        borderBottom: "1px solid var(--border-subtle)",
+      }}
+    >
+      <div />
+      <h1
+        className="justify-self-center text-base font-semibold"
+        style={{ color: "var(--text-primary)" }}
+      >
+        내 작업
+      </h1>
+      <div />
     </div>
   );
 }
