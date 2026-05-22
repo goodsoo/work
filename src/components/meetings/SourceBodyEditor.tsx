@@ -347,7 +347,8 @@ export function SourceBodyEditor({ content, onChange, onSendLineToInbox }: Props
       }
       // 다른 키 (typing 등) 는 통과 — onChange 가 다시 trigger 평가.
     }
-    if (e.key === "Tab") {
+    if (e.key === "Tab" && !e.altKey) {
+      // Opt+Tab 은 window-level sub-tab cycle 로 양보 (MeetingForm).
       // 항상 preventDefault — applyIndent 가 null 이어도 native Tab 이 prev focusable
       // (참석자 input 등) 로 빠져나가는 것 차단. textarea 안 머무름.
       e.preventDefault();

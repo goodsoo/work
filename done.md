@@ -6,6 +6,18 @@
 
 ## 2026-05-22
 
+### PR #31 — 메모장/일기 단축키 단순화 (Q/W/E 제거 + Opt+Tab cycle)
+
+- **한 줄 임팩트**: 한글 IME 와 안 싸우는 메모장 sub-tab 단축키
+- **Q/W/E single-key + Opt+Q/W/E 두 블록 제거** (`MeetingForm.tsx`) — 통증: textarea 안에서 "ㅂ/ㅈ/ㄷ" (Q/W/E 자리) 타이핑이 단축키 분기와 헷갈렸음 + macOS Opt dead-key (œ/∑/´) preventDefault 도 같이 사라짐. e.code 매칭으로 IME 무관이긴 했지만 "메모 안에선 안 막힘 / 밖에선 발사" 라는 분기 자체가 인지 부하.
+- **Opt+Tab / Opt+Shift+Tab = sub-tab cycle** (본문→음성기록→요약→본문, Shift 역순). textarea/input focus 무관. `SourceBodyEditor.tsx` 의 Tab handler 에 `!e.altKey` 가드 추가 — 일반 Tab=indent 보존하면서 Opt+Tab 만 window-level cycle 로 양보. 평소 indent 동작 깨짐 0.
+- **Cmd+Shift+E = 본문 탭 편집/보기 토글** — `SourceBodyEditor` 의 Cmd+E (inline-code wrap, `` `text` ``) 와 충돌 회피로 Shift 동반. 다른 탭에선 no-op.
+- **일기 (JournalOverlay) 도 Cmd+Shift+E 로 통일** — 기존 Cmd+E 였는데 메모장과 같은 키로 묶음. Eye/Pencil 토글 버튼 툴팁도 `⌘⇧E`.
+- **설정 → 단축키 탭 갱신** — sub-tab 그룹 (Opt+Tab cycle + Cmd+Shift+E) + "일기 (캘린더)" 그룹 신설 + 본문 편집 그룹에 `⌘Enter → 할 일 inbox` 누락분 보강.
+- **TabBtn `Q/W/E` kbd chip + ModeChip 툴팁 + EmptyBodyCTA `Q` kbd** 모두 `⌘⇧E` 표기 또는 제거.
+- 5 modified (CLAUDE.md + 4 src). 221 tests passing. typecheck clean.
+- commit `efa3554`
+
 ### PR #30 — 본문 word-wrap + gutter dynamic alignment
 
 - **한 줄 임팩트**: 한국어 메모 자연 줄넘김 + gutter 정확 정렬

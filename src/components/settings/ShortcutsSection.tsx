@@ -31,11 +31,11 @@ const GROUPS: Group[] = [
     ],
   },
   {
-    title: "메모 sub-tab (입력 밖에서만)",
+    title: "메모 sub-tab",
     items: [
-      { keys: ["Q"], label: "본문 탭", note: "본문일 땐 편집/보기 토글" },
-      { keys: ["W"], label: "음성 기록 탭" },
-      { keys: ["E"], label: "요약 탭" },
+      { keys: ["⌥", "Tab"], label: "다음 sub-tab", note: "본문→음성기록→요약, 입력 안에서도" },
+      { keys: ["⌥", "⇧", "Tab"], label: "이전 sub-tab" },
+      { keys: ["⌘", "⇧", "E"], label: "편집/보기 토글", note: "본문 탭일 때만" },
     ],
   },
   {
@@ -53,12 +53,21 @@ const GROUPS: Group[] = [
       { keys: ["⌘", "I"], label: "기울임", note: "*text*" },
       { keys: ["⌘", "E"], label: "인라인 코드", note: "`text`" },
       { keys: ["⌘", "⇧", "D"], label: "줄 복제" },
+      { keys: ["⌘", "Enter"], label: "현재 줄 → 할 일 inbox", note: "체크박스 라인만" },
       { keys: ["⌥", "↑"], label: "줄 위로 이동" },
       { keys: ["⌥", "↓"], label: "줄 아래로 이동" },
       { keys: ["Tab"], label: "들여쓰기 (2-space)" },
       { keys: ["⇧", "Tab"], label: "내어쓰기" },
       { keys: ["Enter"], label: "리스트/인용 자동 연장", note: "빈 marker 에서 누르면 종료" },
       { keys: ["⇧", "Enter"], label: "리스트 연장 없이 줄바꿈", note: "빈 줄 여러 개 만들 때" },
+    ],
+  },
+  {
+    title: "일기 (캘린더)",
+    items: [
+      { keys: ["⌘", "Enter"], label: "저장하고 닫기" },
+      { keys: ["⌘", "⇧", "E"], label: "편집/보기 토글", note: "내용 있을 때만" },
+      { keys: ["Esc"], label: "닫기" },
     ],
   },
 ];
