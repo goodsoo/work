@@ -16,7 +16,7 @@
 - **Modal backdrop drag-out fix (5개)** — `ConfirmDialog` / `TrashModal` / `SettingsModal` / `TaskAddModal` / `ScreenshotLightbox` 의 backdrop `onClick={close}` → `onMouseDown` + `e.target===e.currentTarget` 가드로 일괄 통일. 본문 textarea/img 안에서 시작한 drag 가 backdrop 에서 mouseup 되어 모달이 닫히던 패턴 차단. `JournalOverlay` 만들면서 발견하고 같은 패턴 6번째 반복인 거 확인 — 별도 PR 로 `<Modal>` 추출 후보 (todo.md 추가).
 - **후속 PR 후보 todo.md 등록** — `<Modal>` / `<Overlay>` 공통 컴포넌트 추출 (6개 모달 같은 boilerplate), `SourceBodyEditor` 를 prop 로 일반화해서 일기 / todo description 등에도 재사용.
 - 9 modified + 1 new (`JournalOverlay.tsx`). 221 tests passing.
-- commit `0753f9f`
+- commit `72a3149`
 
 ### PR #27 — 할일 페이지 UI/UX 개편 + 휴지통
 
