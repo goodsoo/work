@@ -119,8 +119,11 @@ export function MeetingsSidePanel({
   return (
     <div className="relative flex h-full flex-col">
       <div
-        className="flex shrink-0 items-center justify-between px-4 py-3"
-        style={{ borderBottom: "1px solid var(--border-default)" }}
+        className="flex shrink-0 items-center justify-between px-4"
+        style={{
+          height: "var(--page-header-h)",
+          borderBottom: "1px solid var(--border-default)",
+        }}
       >
         <h2
           className="font-serif text-sm font-medium"
@@ -255,7 +258,7 @@ function MarkdownHelp() {
           className="absolute inset-0 z-30 flex flex-col overflow-y-auto"
           style={{ backgroundColor: "var(--bg-surface)" }}
         >
-          <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: "1px solid var(--border-default)" }}>
+          <div className="flex items-center justify-between px-4" style={{ height: "var(--page-header-h)", borderBottom: "1px solid var(--border-default)" }}>
             <span className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>마크다운 문법</span>
             <button
               type="button"
@@ -548,8 +551,11 @@ export function CalendarDayPanel({
     <div className="flex h-full flex-col">
       {/* Date header */}
       <div
-        className="flex shrink-0 items-center justify-between px-4 py-3"
-        style={{ borderBottom: "1px solid var(--border-default)" }}
+        className="flex shrink-0 items-center justify-between px-4"
+        style={{
+          height: "var(--page-header-h)",
+          borderBottom: "1px solid var(--border-default)",
+        }}
       >
         <div className="flex items-center gap-2">
           {today ? (
@@ -834,8 +840,11 @@ export function TodosSidePanel({
   return (
     <div className="flex h-full flex-col">
       <div
-        className="flex shrink-0 items-center justify-between px-4 py-3"
-        style={{ borderBottom: "1px solid var(--border-default)" }}
+        className="flex shrink-0 items-center justify-between px-4"
+        style={{
+          height: "var(--page-header-h)",
+          borderBottom: "1px solid var(--border-default)",
+        }}
       >
         <h2
           className="font-serif text-sm font-medium"

@@ -569,12 +569,13 @@ export function MeetingForm({ meetingId, onBack }: Props) {
 
   return (
     <div className="min-h-svh lg:flex lg:h-screen lg:min-h-0 lg:flex-col">
-      {/* Header — 사이드바 헤더와 같은 높이 (3.5rem). desktop 에선 flex item (top fixed),
-          mobile 은 sticky. grid 로 좌/우 그룹 width 변화 무관 제목 viewport-center. */}
+      {/* Header — 사이드바 헤더와 동일 패턴 (px-3 py-3 + h-7 button → 자연 52px).
+          desktop 에선 flex item (top fixed), mobile 은 sticky. grid 로 좌/우 그룹 width
+          변화 무관 제목 viewport-center. */}
       <div
         className="sticky top-0 z-20 grid items-center gap-2 overflow-hidden px-3 backdrop-blur lg:shrink-0 lg:relative lg:top-auto"
         style={{
-          height: "3.5rem",
+          height: "var(--page-header-h)",
           gridTemplateColumns: "minmax(0, 1fr) minmax(0, auto) minmax(0, 1fr)",
           backgroundColor: "var(--bg-overlay)",
           borderBottom: "1px solid var(--border-subtle)",

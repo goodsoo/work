@@ -28,6 +28,7 @@ import { useMeetings, useCreateMeeting, useDeleteMeeting } from "./hooks/useMeet
 import { useVault } from "./lib/vault/useVault";
 import { maybeAutoBackup } from "./lib/backup";
 import { DrawerProvider, useDrawer } from "./hooks/useDrawer";
+import { useSidebarCollapsed } from "./hooks/useSidebarCollapsed";
 import { todayIso } from "./lib/dates";
 import { isTauri } from "./lib/isTauri";
 
@@ -100,6 +101,7 @@ function AppContent() {
   };
   const { adapter, isReady } = useVault();
   const meetings = useMeetings();
+  const sidebar = useSidebarCollapsed();
   const createMeetingMutation = useCreateMeeting();
   const deleteMeetingMutation = useDeleteMeeting();
   const autoSyncDone = useRef(false);
@@ -198,11 +200,17 @@ function AppContent() {
     return () => window.removeEventListener("keydown", blockNavKeys);
   }, []);
 
-  // Desktop (Tauri) 전용 페이지 단축키: Cmd+1/2/3/4
+  // Desktop (Tauri) 전용 페이지 단축키: Cmd+1/2/3/4, Cmd+\ (사이드바 토글, 옵시디안 패턴)
   useEffect(() => {
     if (!isTauri) return;
     function onKeyDown(e: KeyboardEvent) {
       if (!(e.metaKey || e.ctrlKey) || e.shiftKey || e.altKey) return;
+      // Cmd+\ — 사이드바 collapse 토글 (input/textarea 안에서도 동작)
+      if (e.key === "\\") {
+        e.preventDefault();
+        sidebar.toggle();
+        return;
+      }
       let next: Tab | null = null;
       if (e.key === "1") next = "meetings";
       else if (e.key === "2") next = "calendar";
@@ -216,7 +224,7 @@ function AppContent() {
     return () => window.removeEventListener("keydown", onKeyDown);
     // switchTab 은 의도적으로 dep 제외 — 매 렌더 새 ref 라 listener re-register 폭주 회피.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedMeetingId]);
+  }, [selectedMeetingId, sidebar.toggle]);
 
   // 메모장 단축키 (Tauri only):
   // - Cmd+N: 새 메모 생성 + 자동 선택 (textarea 안에서도 동작)
@@ -411,6 +419,7 @@ function AppContent() {
       onTabChange={changeTab}
       sidePanel={sidePanel}
       sidePanelFooter={sidePanelFooter}
+      sidebarCollapsed={sidebar.collapsed}
     >
       {tab === "meetings" ? (
         selectedMeetingId ? (
