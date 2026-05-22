@@ -6,6 +6,18 @@
 
 ## 2026-05-22
 
+### PR #28 — 캘린더 page 정비 (일기 진입 + month 스크롤 복원)
+
+- **한 줄 임팩트**: 캘린더에서 일기 빠른 진입 + 스크롤 위치도 페이지 전환 후 복원
+- **일기 빠른 진입 동선** — 캘린더 사이드 패널 헤더 바로 아래 별도 section. 일기 없는 날 = dashed border + Plus + "일기 쓰기" CTA, 있는 날 = `BookOpen` + 본문 첫 100자 미리보기 카드 + hover 시 펜 아이콘. 클릭 → 오버레이. items list 의 일기 줄은 제거 (헤더 section 으로 승격). 빈 상태 카피 "이날의 일정 / 할 일이 없어요" (일기는 위 section 이라 별도).
+- **JournalOverlay (신규)** — 설정창 spec (`max-w-3xl` + `min(560px, 80vh)`) 오버레이. edit/view 토글 (`useViewMode` 와 의도적 분리 — persist X, 닫으면 edit 으로 reset, "방금 쓴 거 이어 쓰기" 자연). 단축키: `ESC` 닫기 / `⌘Enter` 저장&닫기 / `⌘E` 모드 토글 (content 비어있으면 무효, `e.code === "KeyE"` 매칭 — 한글 IME 무관). `useDebouncedSave` (1초 debounce). 빈 본문 1초 후 자동 `deleteJournal` (사용자 명시 "내용 전부 지우면 되니까"). 모듈 `DRAFT_CACHE` 로 저장 실패 케이스 보존. backdrop drag-out 가드 (`onMouseDown` + `e.target===e.currentTarget`).
+- **MonthGrid 일기 아이콘 통일** — 셀 우상단 텍스트 `✎` → `BookOpen` 아이콘 (사이드바 카드와 동일 시각 언어). 셀 `relative` + 아이콘 `absolute right-1 top-1 pointer-events-none`.
+- **month 스크롤 복원** — `CalendarPage` 모듈 `calendarStateCache` 도입. anchorIso (오늘 주 일요일 ISO) 가 캐시와 동일할 때만 valid — 자정 넘기면 자동 폐기 (그 땐 오늘 기준 재배치가 자연). `scrollTop` / `centerWeekOffset` / `visibleWeekOffset` / `selectedDate` / `lastTarget` 5개 전부 복원. `latestStateRef` + `scrollTopRef` 로 unmount cleanup 시점 stale closure 차단. `initialScrollTopRef` 첫 layout effect 한 번 소비. `targetDate` round-trip race 차단 — `lastTarget` 도 cache 에 박아 같은 값 재진입 시 스크롤 재설정 안 되게.
+- **Modal backdrop drag-out fix (5개)** — `ConfirmDialog` / `TrashModal` / `SettingsModal` / `TaskAddModal` / `ScreenshotLightbox` 의 backdrop `onClick={close}` → `onMouseDown` + `e.target===e.currentTarget` 가드로 일괄 통일. 본문 textarea/img 안에서 시작한 drag 가 backdrop 에서 mouseup 되어 모달이 닫히던 패턴 차단. `JournalOverlay` 만들면서 발견하고 같은 패턴 6번째 반복인 거 확인 — 별도 PR 로 `<Modal>` 추출 후보 (todo.md 추가).
+- **후속 PR 후보 todo.md 등록** — `<Modal>` / `<Overlay>` 공통 컴포넌트 추출 (6개 모달 같은 boilerplate), `SourceBodyEditor` 를 prop 로 일반화해서 일기 / todo description 등에도 재사용.
+- 9 modified + 1 new (`JournalOverlay.tsx`). 221 tests passing.
+- commit `0753f9f`
+
 ### PR #27 — 할일 페이지 UI/UX 개편 + 휴지통
 
 - **한 줄 임팩트**: 매일 쓰는 할일 페이지, 큰 정리

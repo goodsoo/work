@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { addDays } from "date-fns";
+import { BookOpen } from "lucide-react";
 import { todayIso, isToday } from "../../lib/dates";
 import type { Meeting } from "../../api/meetings";
 import type { Journal } from "../../api/journals";
@@ -87,7 +88,7 @@ export function MonthGrid({
             key={date}
             type="button"
             onClick={() => onDayClick(date)}
-            className="flex flex-col overflow-hidden px-1 py-0.5 text-left transition"
+            className="relative flex flex-col overflow-hidden px-1 py-0.5 text-left transition"
             style={{
               borderBottom: "1px solid var(--border-subtle)",
               borderRight: "1px solid var(--border-subtle)",
@@ -131,16 +132,16 @@ export function MonthGrid({
                   </span>
                 </>
               )}
-              {items?.journal ? (
-                <span
-                  className="text-[10px]"
-                  style={{ color: "var(--text-muted)" }}
-                  title="일기"
-                >
-                  ✎
-                </span>
-              ) : null}
             </div>
+
+            {/* 일기 표시 — 사이드바 카드와 동일 BookOpen 아이콘. 셀 우상단 corner. */}
+            {items?.journal ? (
+              <BookOpen
+                className="pointer-events-none absolute right-1 top-1 h-3 w-3"
+                style={{ color: "var(--text-muted)" }}
+                aria-label="일기"
+              />
+            ) : null}
 
             {/* Event chips */}
             <div className="mt-0.5 min-h-0 flex-1 space-y-px overflow-hidden">

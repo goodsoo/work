@@ -50,7 +50,11 @@ export function ConfirmDialog({
       role="dialog"
       aria-modal="true"
       aria-labelledby="confirm-dialog-title"
-      onClick={onCancel}
+      // backdrop close: mousedown 시작점이 backdrop 자체일 때만. inner 안에서 시작한
+      // 드래그가 바깥에서 mouseup 되어 click 이 backdrop 으로 발사되는 케이스 차단.
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onCancel();
+      }}
       className="fixed inset-0 z-50 flex items-center justify-center p-6"
       style={{ backgroundColor: "rgba(0,0,0,0.4)" }}
     >

@@ -65,15 +65,6 @@ PR 단위로 묶음. 각 PR 의 **한 줄 임팩트** 는 카드 frontmatter `im
 - [ ] ActivityBar 빈 공간에 `data-tauri-drag-region` 명시
 - [ ] macOS 전용 — Windows/Linux fallback (native title bar 유지)
 
-### PR — 캘린더 page 정비 (일기 진입 + month 스크롤 복원) `ui_ux`
-한 줄 임팩트: 캘린더에서 일기 빠른 진입 + 스크롤 위치도 페이지 전환 후 복원
-
-- [ ] **일기 빠른 진입** — 캘린더 사이드 패널 헤더 바로 아래 "일기 쓰기" 버튼. 일기 없는 날 = "+" CTA, 있는 날 = 미리보기 카드 + 펜 아이콘.
-- [ ] 버튼/카드 클릭 = **오버레이 편집창** (설정창 스타일). 캘린더 가리지만 한 단계만, 넓은 입력 공간 + 집중. 닫기 = ESC 또는 X.
-- [ ] 작성/저장 후 사이드 패널엔 **미리보기 카드** — 본문 첫 2-3줄 또는 100자 정도. 카드 다시 클릭 = 오버레이 재진입.
-- [ ] 데이터: 기존 `journals/` vault 폴더 (`useDebouncedSave` 자동 저장). 진입 동선만 캘린더 통합.
-- [ ] **month 스크롤 복원** — 캘린더 스크롤만으로 다른 월 본 상태도 페이지 전환 시 복원 (selectedDate 안 바뀌어도). 메모장 `SCROLL_CACHE` 패턴 차용 가능.
-
 ### PR — 사이드바 collapse 단축키 `ui_ux`
 한 줄 임팩트: `Cmd+\` 로 SidePanel 토글, 본문 집중 모드
 
@@ -90,6 +81,20 @@ PR 단위로 묶음. 각 PR 의 **한 줄 임팩트** 는 카드 frontmatter `im
 ---
 
 ## 🎨 폴리시
+
+### PR — 오버레이 컴포넌트 통일 `other`
+한 줄 임팩트: 6+ 모달 boilerplate (`backdrop` + ESC + 사이즈 spec) 한 컴포넌트로
+
+- [ ] 공통 `<Modal>` (또는 `<Overlay>`) 추출 — `backdrop onMouseDown` close + `e.target===e.currentTarget` 가드, ESC 닫기, rgba bg, center align, 사이즈 prop (`sm | md | lg` 또는 width/height). SettingsModal / TrashModal / TaskAddModal / ConfirmDialog / ScreenshotLightbox / JournalOverlay 6개가 같은 패턴 반복.
+- [ ] 사이즈 spec: 설정창 표준 = `max-w-3xl` + `min(560px, 80vh)`. 작은 confirm 류는 `max-w-sm`. lightbox 는 full-screen variant.
+- [ ] 기존 모달들 마이그레이션 — body 만 children prop 으로, 헤더 closure 아이콘 / 사이즈 prop 만 다름.
+
+### PR — 마크다운 에디터 컴포넌트 통일 `other`
+한 줄 임팩트: `SourceBodyEditor` 의 풀세트 (gutter / wrap / slash / 단축키) 를 prop 으로 토글, 일기 등에서도 재사용
+
+- [ ] `SourceBodyEditor` 에 `wrap?: "off" | "soft"`, `enableSlashCommand?`, `enableGutter?`, `enableShortcuts?` 같은 prop 추가. 회의록은 기존 동작 (모두 on), 일기는 wrap=soft + gutter/slash off 정도로 가져옴.
+- [ ] 일기 오버레이의 plain textarea → `SourceBodyEditor` (옵션 끄고) 로 교체. 메모장과 동일한 마크다운 편집 UX (자동 들여쓰기, `⌘B/I/E` wrap 등) 일기에도 적용.
+- [ ] 추후 todo description 등 다른 마크다운 입력에도 같은 컴포넌트 쓸 수 있게 baseline.
 
 ### PR — chrome user-select 차단 `fix`
 한 줄 임팩트: 사이드바 헤더 / 캘린더 셀 / 버튼 라벨 실수 드래그 selection 차단
