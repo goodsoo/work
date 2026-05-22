@@ -91,11 +91,6 @@ PR 단위로 묶음. 각 PR 의 **한 줄 임팩트** 는 카드 frontmatter `im
 
 ## 🎨 폴리시
 
-### PR — toast/에러 박스 overflow 수정 `fix`
-한 줄 임팩트: 긴 에러 메세지도 박스 안에 잘 fit + 재시도 버튼 보임
-
-- [ ] toast 컨테이너 max-width + 텍스트 영역 min-w-0 + break-words + 액션 버튼 flex-shrink-0. 한 컴포넌트 수정으로 모든 toast 적용. 현재는 긴 에러 시 텍스트가 박스 밖으로 나가고 재시도 버튼이 밀려서 안 보임.
-
 ### PR — chrome user-select 차단 `fix`
 한 줄 임팩트: 사이드바 헤더 / 캘린더 셀 / 버튼 라벨 실수 드래그 selection 차단
 

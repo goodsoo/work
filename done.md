@@ -4,6 +4,19 @@
 
 ---
 
+## 2026-05-22
+
+### PR #26 — 에러 토스트 디자인 갈아엎기 + overflow fix
+
+- **frosted glass 갈아엎기** — 디자인 시안 8개 띄워서 5번 (iOS frosted) 선택. `--surface-frost` / `--surface-frost-border` / `--surface-frost-shadow` 3개 토큰 (light/dark 둘 다) 으로 일반화. backdrop-blur-xl + rounded-2xl + 큰 그림자. 좌측 빨간 4px stripe (AI slop 톤) 제거.
+- **3-row 레이아웃** — 상단 (Ban 아이콘 + 타이틀/"ERROR" + ✕), 중간 (본문, `wrap-anywhere break-all`), 하단 (액션 footer). overflow 의 구조적 원인 (한 줄 안에서 본문이 액션 버튼 밀어내던 패턴) 해결.
+- **버튼 위계** — solid 빨간 [재시도] (primary) + ghost icon [복사] (secondary). 본인 dogfood 시 errno/path 만나면 Claude 에 paste 가 next-step → 복사 항상 보임. 1.5초 ✓ swap 으로 피드백.
+- **아이콘 Ban (접근금지)** — AlertCircle (`(!)`) 보다 "차단/실패" 의미 더 분명.
+- **wrap-anywhere + break-all** — `goodsoob-` 다음 줄 깨짐 패턴 차단. 긴 path/URL 이 width 끝까지 채워서 답답한 빈공간 제거. 한글은 자연스러운 음절 break.
+- commit `eef08b1`
+
+---
+
 ## 2026-05-21
 
 ### PR #25 — 빈 본문 편집 진입 CTA + 메모 모드 chip
