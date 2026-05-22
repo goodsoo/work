@@ -122,23 +122,30 @@ export interface GhPRDetail {
   body: string;
 }
 
-// gh search prs --author @me --state closed (post-filter merged) [merged:>=since].
+// gh search prs --author @me --merged [--merged-at >=since].
 // limit default 1000 (gh 자동 페이지네이션 X — V0.7.x 에서 페이지 처리 추가).
+//
+// V0.7.x bug fix: 옛 코드는 positional `'is:merged merged:>=DATE'` 로 두 qualifier 를
+// 한 arg 에 넣었는데 gh search prs 가 빈 배열을 반환 (positional 안 `>=` 연산자
+// 미지원 추정). `--merged --merged-at '>=DATE'` flag 형으로 변경 — 같은 의미,
+// 정상 동작. since 없는 full sync 는 `--merged` 만으로 충분.
 export async function ghSearchMyPRs(
   opts: { since?: string; limit?: number } = {},
 ): Promise<GhSearchResult[]> {
-  const searchQual = opts.since ? `is:merged merged:>=${opts.since}` : "is:merged";
   const args = [
     "search",
     "prs",
     "--author",
     "@me",
-    searchQual,
+    "--merged",
     "--limit",
     String(opts.limit ?? 1000),
     "--json",
     "id,number,title,body,url,state,closedAt,repository",
   ];
+  if (opts.since) {
+    args.push("--merged-at", `>=${opts.since}`);
+  }
   const result = await runGh(args);
   if (result.code !== 0) throw new GhSyncError(result.stderr, result.code);
   try {

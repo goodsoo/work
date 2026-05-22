@@ -4,6 +4,19 @@
 
 ---
 
+## 2026-05-23
+
+### PR #35 — portfolio sync 안정성 (gh search 빈 배열 fix + stuck 회복)
+
+- **한 줄 임팩트**: 내 작업 sync 가 새 PR 안 빠뜨림
+- **진짜 버그 — `gh search prs` positional 두 qualifier**: 옛 코드는 `'is:merged merged:>=DATE'` 한 arg 박았는데 gh CLI 가 빈 배열 반환 (full sync `'is:merged'` 단일은 정상). 결과적으로 last_sync 이후 머지된 PR 들이 incremental 에 누락 → 매번 [전체 다시 훑기] 수동 호출. `--merged --merged-at '>=DATE'` flag 형으로 분리해 정상 동작 (터미널 직접 확인: 0건 vs 21건).
+- **runningRef stuck 회복 경로 보강**: HMR / Tauri full-reload 중 in-flight invoke 응답이 사라져 promise pending 되는 dev 환경 시나리오 방어. `useGhSync` 에 callIdRef 모노토닉 가드 — hang 된 invoke 가 뒤늦게 resolve 돼도 stale setState 무시. `cancel()` 강화 — abort + callId 증가 + runningRef 강제 false. `SyncButton` 진행 중 X 아이콘으로 manual 회복 경로 노출.
+- **`readSyncState` 5s timeout fallback**: hang 시 since 없이 full sync 로 자동 fallback (since 만 손해). 옛 broken sync 가 또 나와도 incremental 가 멈추지 X.
+- **5초 background auto-sync 재활성**: 옛 portfolio-card-redesign PR 의 임시 비활성 해제. CLAUDE.md V0.7 의 "5초 background auto-sync + 사이드바 수동 트리거" 명시 항목 복원.
+- 6 modified. 221 tests passing. typecheck clean. 실제 동작 검증 (신규 7 + 갱신 14).
+
+---
+
 ## 2026-05-22
 
 ### PR #34 — 메모장 사이드바 폴더 트리 + 탭 순서 swap

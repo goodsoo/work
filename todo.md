@@ -98,12 +98,6 @@ PR 단위로 묶음. 각 PR 의 **한 줄 임팩트** 는 카드 frontmatter `im
 - [ ] **카드 크기/레이아웃 재설계** — 현재 카드 너무 크고 한눈에 중요 정보 (impact_summary / 날짜 / 카테고리) 안 들어옴. 정보 우선순위 정리 + 작은 카드 그리드.
 - [ ] **카드 inline 편집** — 현재 lightbox 모달 진입 후 편집. 카드 클릭 = inline 펼침 + 편집 모드 전환 검토. 메모장 패턴 (제목 → 본문 inline) 과 비교.
 
-### PR — portfolio sync 안정성 `fix`
-한 줄 임팩트: 사이드바 [동기화] 가 Tauri callback 손실 없이 작동
-
-- [ ] **사이드바 [동기화] (incremental) callback 손실** — `useGhSync.run({incremental:true})` 호출 시 Tauri 가 `Couldn't find callback id ...` warning 후 promise 영원 pending. `runningRef` 가 stuck → 다음 클릭 무시. portfolio-card-redesign PR (#TBD) 에서 임시로 5초 background auto-sync 비활성 + race 차단 (`runningRef`) 추가. 진짜 원인 — HMR 이슈인지, readSyncState + sync 두 Tauri command 의 sequencing race 인지, gh CLI spawn 직렬화 문제인지 파악 후 fix. 가이드북 [전체 다시 훑기] 는 정상 작동 (since 없는 path).
-- [ ] **5초 background auto-sync 재활성** — 위 fix 완료 후 design 의 silent fetch 기능 복원. CLAUDE.md V0.7 의 "5초 background auto-sync + 사이드바 수동 트리거" 명시 항목.
-
 ### PR — sync 시 PR body 의 7섹션 자동 파싱 → frontmatter `backend`
 한 줄 임팩트: PR 양식 그대로 적은 임팩트/카테고리가 카드 frontmatter 에 자동 들어감
 
