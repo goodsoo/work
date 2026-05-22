@@ -96,12 +96,6 @@ PR 단위로 묶음. 각 PR 의 **한 줄 임팩트** 는 카드 frontmatter `im
 - [ ] 일기 오버레이의 plain textarea → `SourceBodyEditor` (옵션 끄고) 로 교체. 메모장과 동일한 마크다운 편집 UX (자동 들여쓰기, `⌘B/I/E` wrap 등) 일기에도 적용.
 - [ ] 추후 todo description 등 다른 마크다운 입력에도 같은 컴포넌트 쓸 수 있게 baseline.
 
-### PR — chrome user-select 차단 `fix`
-한 줄 임팩트: 사이드바 헤더 / 캘린더 셀 / 버튼 라벨 실수 드래그 selection 차단
-
-- [ ] **UI chrome `user-select: none`** — 마우스 실수 드래그로 사이드바 헤더 / 캘린더 셀 / 버튼 라벨 등이 파랗게 selection 되는 거 차단. 텍스트 복사 의도 있는 영역 (메모 본문, 메모 제목, 일정 제목, transcript) 은 그대로 유지.
-- [ ] chrome vs content 경계 정의 — wrapper 단에서 `select-none` 박고 content 컴포넌트는 `select-text` override.
-
 ### PR — 동적 카테고리 (사용자 정의 분류) `backend`
 한 줄 임팩트: 업무/미팅 외 본인 카테고리 자유 추가
 

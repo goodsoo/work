@@ -125,6 +125,25 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     overscroll-behavior: none;
+    /* chrome (사이드바/네비/버튼/캘린더 셀 등) 마우스 드래그 텍스트 selection 차단.
+       복사 의도 영역 (input/textarea/.markdown-view) 은 아래에서 override. */
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  /* 입력/편집 텍스트는 항상 selectable — 메모 제목, transcript, attendees,
+     일기 본문, todo 제목, impact_summary 등 모든 form input. */
+  input,
+  textarea {
+    user-select: text;
+    -webkit-user-select: text;
+  }
+
+  /* 메모 본문 보기 모드 — react-markdown 렌더 트리. 사용자가 회의록 본문을 외부로
+     복사하는 주 경로. .markdown-view 클래스는 MarkdownView.tsx 가 박음. */
+  .markdown-view {
+    user-select: text;
+    -webkit-user-select: text;
   }
 
   /* Desktop: body scroll 막고 main 안에서만 scroll — viewport 전체 scrollbar 회피 */

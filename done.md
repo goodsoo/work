@@ -6,6 +6,16 @@
 
 ## 2026-05-22
 
+### PR #29 — chrome user-select 차단
+
+- **한 줄 임팩트**: chrome 영역 (사이드바 / 탭 / 캘린더 셀) 실수 드래그 selection 차단
+- **wrapper 단 `select-none` + content `select-text` override 패턴** — `body` 에 `user-select: none` 박고, `input` / `textarea` / `.markdown-view` 만 `user-select: text` 로 override. CSS 19줄로 끝 — chrome/content 경계가 명확해서 컴포넌트별로 박을 필요 없음.
+- **chrome 영역 (selection 차단)**: 사이드바 메모 리스트, 상단 탭 row (메모/캘린더/할 일/내 작업), 메모장 sub-tab (메모/음성 기록/요약), 캘린더 셀 (날짜 / 요일 row / 월 라벨), 헤더 버튼, todo / portfolio 카드 wrapper.
+- **content 영역 (그대로 selectable)**: 메모 본문 (편집 textarea + 보기 `MarkdownView`), 메모 제목 input, transcript textarea, todo 제목 input, portfolio impact_summary input, 요약 callout 안 텍스트 (form input 들이 자연 selectable + `.markdown-view` 클래스만 추가 override).
+- **이미 박혀있는 `select-none` 컴포넌트는 그대로** — `TimelineBlock` 의 letter (M/J/T/S), `SourceBodyEditor` 의 line gutter 등은 자체 명시 selector 라 root 규칙과 무관.
+- 221 tests passing. typecheck clean.
+- commit `e681d31`
+
 ### PR #28 — 캘린더 page 정비 (일기 진입 + month 스크롤 복원)
 
 - **한 줄 임팩트**: 캘린더에서 일기 빠른 진입 + 스크롤 위치도 페이지 전환 후 복원
