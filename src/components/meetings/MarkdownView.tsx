@@ -80,13 +80,6 @@ export function MarkdownView({ content, onChange }: Props) {
   // VaultContext 는 provider 밖에서도 null 로 안전 — 테스트 환경 (jsdom) 호환.
   const vaultCtx = useContext(VaultContext);
   const vaultRoot = vaultCtx?.vaultRoot ?? null;
-  if (!content.trim()) {
-    return (
-      <p style={{ color: "var(--text-muted)" }} className="text-sm">
-        메모가 비어있어요. 편집으로 전환해서 적어보세요.
-      </p>
-    );
-  }
   return (
     <div
       className="markdown-view text-base leading-relaxed"
