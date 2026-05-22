@@ -14,7 +14,7 @@
 - **GutterMarker per-line height + glyph 첫 visual line 고정** — 마커 컨테이너 높이 = 그 source line 의 wrap 된 총 높이. glyph (H1, bullet, quote, ...) 자체는 첫 visual line (`LINE_HEIGHT`) 안에 정렬 (`alignItems: flex-start`). wrap 으로 3줄 차지하는 bullet 항목도 marker 는 첫 줄 옆에 한 번만.
 - **슬래시 popover anchorTop 보정** — `cumulativeHeight(lineHeights, slashLine + 1)` 으로 wrap 누적 위치 계산. 측정 전엔 `LINE_HEIGHT_PX` (26px) fallback — 깜빡거림 회피.
 - **단일 파일 (SourceBodyEditor.tsx) 약 100줄 변경**. 221 tests passing.
-- commit `<commit-sha>`
+- commit `4489ec6`
 
 ### PR #29 — chrome user-select 차단
 
