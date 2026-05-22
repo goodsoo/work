@@ -47,6 +47,18 @@
 - 14 modified + 2 new + 2 screenshots. 221 tests passing. typecheck clean.
 - commit `055532f`
 
+### PR #32 — F-1 카드 + 모달 편집 + 가이드북 + 휴지통 분리
+
+- **한 줄 임팩트**: 카드 한눈에 N장 + 모달로 안전한 편집
+- **F-1 가로형 dense 카드** — 썸네일 96×72 left + impact main + PR title 부제 + 메타 chip 4개 (날짜·프로젝트·카테고리·코드줄). 카테고리 dot 색 5종, 프로젝트 = repo 부분만, 메타 row 좁아지면 자연 truncate. 1280px 폭에서 카드 일람 가능 — 회고/평가 자료 가치 회복.
+- **카드 = 읽기 전용, 편집은 모달 통합** — PortfolioDetailModal: 좌 viewer (큰 스크린샷 + 좌우 nav + thumb strip + dropzone) / 우 편집 패널 (impact, 카테고리/프로젝트 select, Claude 자동 채움). read-only ↔ edit mode 분리. `[편집]` 진입 → draft state → `[수정 완료]` / `[취소]` / 모달 닫기 = 자동 취소. todo "inline 편집" 대신 modal 편집으로 trade — impact 실수 저장 0.
+- **Claude CLI 자동 호출** — `claude -p` shell spawn (gh CLI 패턴 동일). 구독 자격 활용, API key 결제 0. 응답 → draft 박스에 `[적용]` / `[다시 요청]` / `[×]`. 수동 paste 도 details 토글로 보존.
+- **휴지통 도메인 분리** — vault `.trash/` (메모장) 와 `portfolio/.trash/` 분리. 복원 = 항상 `included: false` (미사용 자리). 휴지통/가이드북에 "전체 동기화 시 부활" 안내.
+- **가이드북 모달** — 사이드바의 PR 가이드 / Legacy 프롬프트 + 동기화 설명 + `[전체 다시 훑기]` 모달 안으로 통합. 사이드바 깔끔.
+- **incremental vs 전체 sync 분리** — 사이드바 = incremental, 가이드북 = 전체. `useGhSync.run` race 차단 (`runningRef`) + 5초 background auto-sync 임시 비활성 (todo 에 안정성 PR 등록).
+- 본인 수정 frontmatter (impact / category / project / included / screenshots) 는 sync 가 절대 안 덮어씀.
+- commit `a282157`
+
 ### PR #31 — 메모장/일기 단축키 단순화 (Q/W/E 제거 + Opt+Tab cycle)
 
 - **한 줄 임팩트**: 한글 IME 와 안 싸우는 메모장 sub-tab 단축키
