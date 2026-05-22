@@ -1,7 +1,8 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   Trash2,
-  AlertCircle,
+  Ban,
+  Copy,
   ListPlus,
   Check,
   Undo2,
@@ -231,6 +232,16 @@ export function MeetingForm({ meetingId, onBack }: Props) {
 
 
   const [actionError, setActionError] = useState<string | null>(null);
+  const [copiedToast, setCopiedToast] = useState<string | null>(null);
+  async function copyToastMessage(text: string, id: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedToast(id);
+      setTimeout(() => setCopiedToast((cur) => (cur === id ? null : cur)), 1500);
+    } catch {
+      // clipboard 권한 없으면 silent — 사용자가 다시 누르면 됨
+    }
+  }
   const titleInputRef = useRef<HTMLInputElement>(null);
   // ESC revert 직후 onBlur 가 commitTitle 다시 발사하는 것 차단용.
   const skipNextTitleCommit = useRef(false);
@@ -724,63 +735,128 @@ export function MeetingForm({ meetingId, onBack }: Props) {
         >
           {updateMutation.isError ? (
             <div
-              className="animate-page-in flex items-start gap-2 rounded-lg p-3 text-sm shadow-lg"
+              className="animate-page-in flex flex-col gap-2 rounded-2xl p-3 text-sm backdrop-blur-xl backdrop-saturate-150"
               style={{
-                borderLeft: "4px solid var(--accent-red)",
-                backgroundColor: "var(--accent-red-bg)",
-                color: "var(--accent-red-text)",
+                backgroundColor: "var(--surface-frost)",
+                border: "1px solid var(--surface-frost-border)",
+                boxShadow: "var(--surface-frost-shadow)",
+                color: "var(--text-primary)",
               }}
             >
-              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-              <div className="flex-1">
-                <div className="font-medium">자동 저장 실패</div>
-                {updateMutation.error ? (
-                  <div className="mt-0.5 text-xs opacity-80">
-                    {formatError(updateMutation.error)}
-                  </div>
-                ) : null}
+              <div className="flex items-center gap-2">
+                <Ban
+                  className="h-4 w-4 shrink-0"
+                  style={{ color: "var(--accent-red)" }}
+                />
+                <span className="min-w-0 flex-1 truncate font-semibold">
+                  자동 저장 실패
+                </span>
+                <button
+                  type="button"
+                  onClick={() => updateMutation.reset()}
+                  title="닫기"
+                  aria-label="닫기"
+                  className="shrink-0 rounded p-0.5 transition"
+                  style={{ color: "var(--text-muted)", minHeight: 0 }}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={retrySave}
-                disabled={updateMutation.isPending}
-                className="text-xs underline disabled:opacity-40"
-                style={{ minHeight: 0 }}
-              >
-                {updateMutation.isPending ? "재시도 중..." : "재시도"}
-              </button>
-              <button
-                type="button"
-                onClick={() => updateMutation.reset()}
-                title="닫기"
-                aria-label="닫기"
-                className="rounded p-0.5 transition"
-                style={{ color: "var(--accent-red-text)", minHeight: 0 }}
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
+              {updateMutation.error ? (
+                <div
+                  className="text-xs break-all wrap-anywhere"
+                  style={{ color: "var(--text-secondary)" }}
+                >
+                  {formatError(updateMutation.error)}
+                </div>
+              ) : null}
+              <div className="flex justify-end gap-1.5">
+                <button
+                  type="button"
+                  onClick={() =>
+                    copyToastMessage(
+                      updateMutation.error ? formatError(updateMutation.error) : "자동 저장 실패",
+                      "update",
+                    )
+                  }
+                  title="에러 메시지 복사"
+                  aria-label="에러 메시지 복사"
+                  className="rounded-md p-1.5 transition hover:bg-black/5"
+                  style={{ color: "var(--text-muted)", minHeight: 0 }}
+                >
+                  {copiedToast === "update" ? (
+                    <Check className="h-3.5 w-3.5" style={{ color: "var(--accent-green)" }} />
+                  ) : (
+                    <Copy className="h-3.5 w-3.5" />
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={retrySave}
+                  disabled={updateMutation.isPending}
+                  className="rounded-md px-2.5 py-1 text-xs font-medium transition hover:opacity-90 disabled:opacity-40"
+                  style={{
+                    backgroundColor: "var(--accent-red)",
+                    color: "#fff",
+                    minHeight: 0,
+                  }}
+                >
+                  {updateMutation.isPending ? "재시도 중..." : "재시도"}
+                </button>
+              </div>
             </div>
           ) : null}
           {actionError ? (
             <div
-              className="animate-page-in flex items-start gap-2 rounded-lg p-3 text-sm shadow-lg"
+              className="animate-page-in flex flex-col gap-2 rounded-2xl p-3 text-sm backdrop-blur-xl backdrop-saturate-150"
               style={{
-                borderLeft: "4px solid var(--accent-red)",
-                backgroundColor: "var(--accent-red-bg)",
-                color: "var(--accent-red-text)",
+                backgroundColor: "var(--surface-frost)",
+                border: "1px solid var(--surface-frost-border)",
+                boxShadow: "var(--surface-frost-shadow)",
+                color: "var(--text-primary)",
               }}
             >
-              <span className="flex-1">{actionError}</span>
-              <button
-                type="button"
-                onClick={() => setActionError(null)}
-                title="닫기"
-                aria-label="닫기"
-                className="rounded p-0.5 transition"
-                style={{ color: "var(--accent-red-text)", minHeight: 0 }}
+              <div className="flex items-center gap-2">
+                <Ban
+                  className="h-4 w-4 shrink-0"
+                  style={{ color: "var(--accent-red)" }}
+                />
+                <span className="min-w-0 flex-1 truncate font-semibold">
+                  ERROR
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setActionError(null)}
+                  title="닫기"
+                  aria-label="닫기"
+                  className="shrink-0 rounded p-0.5 transition"
+                  style={{ color: "var(--text-muted)", minHeight: 0 }}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+              <div
+                className="text-xs break-all wrap-anywhere"
+                style={{ color: "var(--text-secondary)" }}
               >
-                <X className="h-3.5 w-3.5" />
-              </button>
+                {actionError}
+              </div>
+              <div className="flex justify-end gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => copyToastMessage(actionError, "action")}
+                  title="에러 메시지 복사"
+                  aria-label="에러 메시지 복사"
+                  className="rounded-md p-1.5 transition hover:bg-black/5"
+                  style={{ color: "var(--text-muted)", minHeight: 0 }}
+                >
+                  {copiedToast === "action" ? (
+                    <Check className="h-3.5 w-3.5" style={{ color: "var(--accent-green)" }} />
+                  ) : (
+                    <Copy className="h-3.5 w-3.5" />
+                  )}
+                </button>
+              </div>
             </div>
           ) : null}
         </div>
