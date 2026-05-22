@@ -8,8 +8,10 @@ import {
   ArrowUpDown,
   Check,
   Pencil,
+  Circle,
+  XCircle,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   useMeetings,
   useCreateMeeting,
@@ -23,6 +25,7 @@ import type { Todo, TodoCategory } from "../../api/todos";
 import { TODO_CATEGORIES } from "../../api/todos";
 import { formatDateLong, isToday, todayIso } from "../../lib/dates";
 import { formatError } from "../../lib/errors";
+import { categoryColor } from "../../lib/todoCategory";
 import { TaskAddModal } from "../tasks/TaskAddModal";
 import { JournalOverlay } from "../calendar/JournalOverlay";
 
@@ -680,7 +683,13 @@ export function CalendarDayPanel({
             ))}
 
             {/* Todos — due_time 있으면 시각 prefix */}
-            {todos.map((t) => (
+            {todos.map((t) => {
+              const catColor = categoryColor(t.category);
+              const pendingBorder = catColor || "var(--text-muted)";
+              const pendingFill = catColor
+                ? `color-mix(in srgb, ${catColor} 4%, transparent)`
+                : "transparent";
+              return (
               <div
                 key={t.id}
                 className="flex items-start gap-2 rounded-md px-3 py-2 transition"
@@ -688,11 +697,12 @@ export function CalendarDayPanel({
                 <button
                   type="button"
                   onClick={() => handleToggle(t)}
-                  className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border transition"
+                  className="mt-0.5 flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-md border transition"
                   style={{
-                    borderColor: t.done ? "var(--border-default)" : "var(--text-muted)",
-                    backgroundColor: t.done ? "var(--bg-surface-active)" : undefined,
-                    color: t.done ? "var(--text-secondary)" : "transparent",
+                    borderColor: t.done ? "var(--text-secondary)" : pendingBorder,
+                    backgroundColor: t.done ? "var(--text-secondary)" : pendingFill,
+                    color: t.done ? "var(--text-inverse)" : "transparent",
+                    borderWidth: t.done ? 1 : 1.5,
                     minHeight: 0,
                   }}
                 >
@@ -722,7 +732,8 @@ export function CalendarDayPanel({
                   {t.title}
                 </span>
               </div>
-            ))}
+              );
+            })}
 
           </div>
         )}
@@ -822,10 +833,47 @@ export function TodosSidePanel({
     return { status, category };
   }, [todos, statusFilter, categoryFilter]);
 
-  const statusItems: Array<{ id: TodosStatusFilter; label: string; count: number }> = [
-    { id: "all", label: "전체", count: counts.status.all },
-    { id: "pending", label: "미완료", count: counts.status.pending },
-    { id: "done", label: "완료", count: counts.status.done },
+  // status leading 아이콘 — 카테고리 dot 과 동일한 12px 박스 안에서 정렬.
+  // "전체" 는 카테고리 "전체"와 동일하게 leading 비움 (시각 비대칭이 의미 신호).
+  const statusItems: Array<{
+    id: TodosStatusFilter;
+    label: string;
+    count: number;
+    leading: ReactNode;
+  }> = [
+    { id: "all", label: "전체", count: counts.status.all, leading: null },
+    {
+      id: "pending",
+      label: "미완료",
+      count: counts.status.pending,
+      leading: (
+        <Circle
+          className="h-3 w-3"
+          strokeWidth={1.75}
+          style={{ color: "var(--text-secondary)" }}
+        />
+      ),
+    },
+    {
+      id: "done",
+      label: "완료",
+      count: counts.status.done,
+      // CheckCircle2 (lucide) 의 내부 체크가 12px 사이즈에서 너무 작아 보여 →
+      // filled 원 + Check (체크만 아이콘, strokeWidth 굵게) wrapper 로 교체.
+      // 체크 path 가 원 영역을 더 많이 차지 → 작은 사이즈에서도 또렷.
+      leading: (
+        <span
+          className="inline-flex h-3 w-3 items-center justify-center rounded-full"
+          style={{ backgroundColor: "var(--text-secondary)" }}
+        >
+          <Check
+            className="h-2 w-2"
+            strokeWidth={3.5}
+            style={{ color: "var(--text-inverse)" }}
+          />
+        </span>
+      ),
+    },
   ];
   const categoryItems: Array<{ id: TodosCategoryFilter; label: string; count: number }> = [
     { id: "all", label: "전체", count: counts.category.all },
@@ -871,6 +919,7 @@ export function TodosSidePanel({
             <TodosFilterItem
               key={item.id}
               item={item}
+              leading={item.leading}
               active={item.id === statusFilter}
               onClick={() => onStatusChange(item.id)}
             />
@@ -879,14 +928,33 @@ export function TodosSidePanel({
             className="my-2"
             style={{ borderTop: "1px solid var(--border-subtle)" }}
           />
-          {categoryItems.map((item) => (
-            <TodosFilterItem
-              key={item.id}
-              item={item}
-              active={item.id === categoryFilter}
-              onClick={() => onCategoryChange(item.id)}
-            />
-          ))}
+          {categoryItems.map((item) => {
+            // 카테고리 필터 entry 옆에 시맨틱 색 dot — 캘린더 / 체크박스 와
+            // 동일 토큰. uncategorized 는 회색 (--text-muted) 로 명시. "전체"
+            // 는 status "전체" 와 동일하게 leading 비움.
+            const dotColor =
+              item.id === "uncategorized"
+                ? "var(--text-muted)"
+                : item.id === "all"
+                  ? ""
+                  : categoryColor(item.id as TodoCategory);
+            const leading = dotColor ? (
+              <span
+                aria-hidden
+                className="inline-block h-2 w-2 rounded-full"
+                style={{ backgroundColor: dotColor }}
+              />
+            ) : null;
+            return (
+              <TodosFilterItem
+                key={item.id}
+                item={item}
+                leading={leading}
+                active={item.id === categoryFilter}
+                onClick={() => onCategoryChange(item.id)}
+              />
+            );
+          })}
         </div>
         {/* 취소됨 — 사이드바 하단 별도 entry. 클릭 시 다른 필터 무시. */}
         <div
@@ -895,6 +963,13 @@ export function TodosSidePanel({
         >
           <TodosFilterItem
             item={{ label: "취소됨", count: counts.status.cancelled }}
+            leading={
+              <XCircle
+                className="h-3 w-3"
+                strokeWidth={1.75}
+                style={{ color: "var(--text-secondary)" }}
+              />
+            }
             active={statusFilter === "cancelled"}
             onClick={() => onStatusChange("cancelled")}
           />
@@ -908,10 +983,12 @@ function TodosFilterItem({
   item,
   active,
   onClick,
+  leading,
 }: {
   item: { label: string; count: number };
   active: boolean;
   onClick: () => void;
+  leading?: ReactNode;
 }) {
   return (
     <button
@@ -926,7 +1003,16 @@ function TodosFilterItem({
         minHeight: 0,
       }}
     >
-      <span>{item.label}</span>
+      <span className="inline-flex items-center gap-2">
+        {/* 12px fixed area — dot/icon 다 가운데 정렬 → 라벨 좌측 align 통일. */}
+        <span
+          aria-hidden
+          className="inline-flex h-3 w-3 shrink-0 items-center justify-center"
+        >
+          {leading}
+        </span>
+        {item.label}
+      </span>
       <span
         className="font-mono text-xs"
         style={{

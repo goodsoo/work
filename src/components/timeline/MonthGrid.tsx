@@ -2,9 +2,10 @@ import { useMemo } from "react";
 import { addDays } from "date-fns";
 import { BookOpen } from "lucide-react";
 import { todayIso, isToday } from "../../lib/dates";
+import { categoryColor } from "../../lib/todoCategory";
 import type { Meeting } from "../../api/meetings";
 import type { Journal } from "../../api/journals";
-import type { Todo } from "../../api/todos";
+import type { Todo, TodoCategory } from "../../api/todos";
 
 export type DayItems = {
   meetings: Meeting[];
@@ -22,6 +23,7 @@ type CellEvent = {
   type: "meeting" | "todo";
   time?: string;
   done?: boolean;
+  category?: TodoCategory | null;
 };
 
 const MAX_CELL_EVENTS = 3;
@@ -145,32 +147,45 @@ export function MonthGrid({
 
             {/* Event chips */}
             <div className="mt-0.5 min-h-0 flex-1 space-y-px overflow-hidden">
-              {visible.map((ev) => (
-                <div
-                  key={ev.key}
-                  className={`truncate rounded-sm px-1 py-px text-[11px] leading-tight ${
-                    ev.done ? "line-through" : ""
-                  }`}
-                  style={
-                    ev.type === "meeting"
-                      ? {
-                          backgroundColor: "var(--accent-blue-bg)",
-                          color: "var(--accent-blue-text)",
-                        }
-                      : ev.done
-                        ? { color: "var(--text-muted)" }
-                        : {
-                            backgroundColor: "var(--bg-surface)",
-                            color: "var(--text-secondary)",
+              {visible.map((ev) => {
+                const dotColor =
+                  ev.type === "todo" && !ev.done ? categoryColor(ev.category ?? null) : "";
+                return (
+                  <div
+                    key={ev.key}
+                    className={`flex items-center gap-1 truncate rounded-sm px-1 py-px text-[11px] leading-tight ${
+                      ev.done ? "line-through" : ""
+                    }`}
+                    style={
+                      ev.type === "meeting"
+                        ? {
+                            backgroundColor: "var(--accent-blue-bg)",
+                            color: "var(--accent-blue-text)",
                           }
-                  }
-                >
-                  {ev.time ? (
-                    <span className="opacity-60">{ev.time} </span>
-                  ) : null}
-                  {ev.label}
-                </div>
-              ))}
+                        : ev.done
+                          ? { color: "var(--text-muted)" }
+                          : {
+                              backgroundColor: "var(--bg-surface)",
+                              color: "var(--text-secondary)",
+                            }
+                    }
+                  >
+                    {dotColor ? (
+                      <span
+                        aria-hidden
+                        className="inline-block h-1.5 w-1.5 shrink-0 rounded-full"
+                        style={{ backgroundColor: dotColor }}
+                      />
+                    ) : null}
+                    <span className="truncate">
+                      {ev.time ? (
+                        <span className="opacity-60">{ev.time} </span>
+                      ) : null}
+                      {ev.label}
+                    </span>
+                  </div>
+                );
+              })}
               {overflow > 0 ? (
                 <div
                   className="px-1 text-[10px]"
@@ -207,6 +222,7 @@ function buildCellEvents(items: DayItems | undefined): CellEvent[] {
       type: "todo",
       time: t.due_time ?? undefined,
       done: t.done,
+      category: t.category,
     });
   }
 

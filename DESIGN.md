@@ -29,6 +29,22 @@
 | `--btn-primary-text` | `#ffffff` | `#18181b` | primary 버튼 텍스트 |
 | `--focus-ring` | `#3b82f6` | `#60a5fa` | focus 표시 |
 
+#### 카테고리 dot 토큰
+
+포트폴리오 카드 / 할 일 chip 의 카테고리 식별색. **`src/lib/todoCategory.ts` `categoryColor()` 가 todo 쪽 단일 lookup** — MonthGrid dot / SidePanel 체크박스 / TodoRow 체크박스 모두 이 함수만 사용. 포트폴리오는 `PortfolioWorkCard.tsx` 등의 `CATEGORY_COLOR` map.
+
+| 토큰 | 라이트 | 다크 | 용도 |
+|------|--------|------|------|
+| `--cat-uiux` | `#2563eb` | `#60a5fa` | 포트폴리오 ui_ux |
+| `--cat-backend` | `#16a34a` | `#4ade80` | 포트폴리오 backend |
+| `--cat-infra` | `#d97706` | `#fbbf24` | 포트폴리오 infra |
+| `--cat-fix` | `#dc2626` | `#f87171` | 포트폴리오 fix |
+| `--cat-other` | `#7c3aed` | `#a78bfa` | 포트폴리오 other + todo other (공유) |
+| `--cat-work` | `#ea580c` | `#fb923c` | todo 업무 (주황 — `--cat-other` 보라와 명확히 구분) |
+| `--cat-schedule` | `#0d9488` | `#2dd4bf` | todo 일정 |
+
+미분류 (`category: null`) 인 todo 는 색 미적용 — 체크박스 border 가 `--text-muted` (기본 회색) 유지, 캘린더 셀 chip 에 dot 안 그림. legacy 카드 보호.
+
 ### 사용 방법
 
 ```tsx
