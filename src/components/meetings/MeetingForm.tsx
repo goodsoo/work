@@ -400,19 +400,12 @@ export function MeetingForm({ meetingId, onBack }: Props) {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
-  // 단축키 (Tauri only):
+  // 단축키:
   //   Cmd/Ctrl+Z/Y/Shift+Z = docHistory undo/redo (전체 도큐먼트 timeline. 제목 제외).
   //     focus 가 제목 input 이면 native input undo 사용 (preventDefault X).
-  //   Q / W / E = sub-tab 메모 / 음성 기록 / 요약 (input/textarea 밖에서만). Q 두 번째 =
-  //     본문 탭일 때 편집/보기 토글. e.code 매칭으로 한글 IME 켜져 있어도 동작.
+  //   Opt+Tab / Opt+Shift+Tab = sub-tab cycle 본문→음성기록→요약 (textarea/input 무관).
+  //   Cmd+Shift+E = 본문 탭일 때 편집/보기 토글 (Cmd+E inline-code wrap 충돌 회피).
   useEffect(() => {
-    function isInTextInput(t: EventTarget | null): boolean {
-      if (!(t instanceof HTMLElement)) return false;
-      const tag = t.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true;
-      return t.isContentEditable;
-    }
-
     function isInTitleInput(): boolean {
       return document.activeElement === titleInputRef.current;
     }
@@ -438,46 +431,23 @@ export function MeetingForm({ meetingId, onBack }: Props) {
         if (t) routeToSource((t.to as DocSnapshot).__source);
         return;
       }
-      // Opt+Q/W/E — input/textarea 안에서도 동작 (브라우저/Tauri 둘 다).
-      // macOS default 글자 (œ/∑/´ dead-key) preventDefault.
-      if (e.altKey && !cmd && !e.shiftKey) {
-        if (e.code === "KeyQ") {
-          e.preventDefault();
-          if (activeTab === "body") {
-            setViewMode(viewMode === "edit" ? "view" : "edit");
-          } else {
-            setActiveTab("body");
-          }
-          return;
-        }
-        if (e.code === "KeyW") {
-          e.preventDefault();
-          setActiveTab("transcript");
-          return;
-        }
-        if (e.code === "KeyE") {
-          e.preventDefault();
-          setActiveTab("summary");
-          return;
-        }
+      // Opt+Tab — sub-tab cycle (textarea/input focus 무관, Opt 없는 Tab=indent 는 보존).
+      // 본문→음성기록→요약→본문. Shift 동반 시 역순.
+      if (e.altKey && !cmd && e.key === "Tab") {
+        e.preventDefault();
+        const order: ActiveTab[] = ["body", "transcript", "summary"];
+        const idx = order.indexOf(activeTab);
+        const dir = e.shiftKey ? -1 : 1;
+        setActiveTab(order[(idx + dir + order.length) % order.length]);
+        return;
       }
-      if (!isTauri) return;
-      // single-key sub-tab — modifier 있으면 무시.
-      if (cmd || e.shiftKey || e.altKey) return;
-      if (isInTextInput(e.target)) return;
-      if (e.code === "KeyQ") {
+      // Cmd+Shift+E — 본문 탭일 때 편집/보기 토글.
+      // SourceBodyEditor 의 Cmd+E (inline-code wrap) 충돌 회피로 Shift 동반.
+      if (cmd && e.shiftKey && !e.altKey && e.code === "KeyE") {
+        if (activeTab !== "body") return;
         e.preventDefault();
-        if (activeTab === "body") {
-          setViewMode(viewMode === "edit" ? "view" : "edit");
-        } else {
-          setActiveTab("body");
-        }
-      } else if (e.code === "KeyW") {
-        e.preventDefault();
-        setActiveTab("transcript");
-      } else if (e.code === "KeyE") {
-        e.preventDefault();
-        setActiveTab("summary");
+        setViewMode(viewMode === "edit" ? "view" : "edit");
+        return;
       }
     }
     window.addEventListener("keydown", onKeyDown);
@@ -886,19 +856,16 @@ export function MeetingForm({ meetingId, onBack }: Props) {
           <div className="flex gap-1">
             <TabBtn
               label="메모"
-              shortcut={isTauri ? "Q" : undefined}
               active={activeTab === "body"}
               onClick={() => setActiveTab("body")}
             />
             <TabBtn
               label="음성 기록"
-              shortcut={isTauri ? "W" : undefined}
               active={activeTab === "transcript"}
               onClick={() => setActiveTab("transcript")}
             />
             <TabBtn
               label="요약"
-              shortcut={isTauri ? "E" : undefined}
               active={activeTab === "summary"}
               onClick={() => setActiveTab("summary")}
             />
@@ -1162,9 +1129,7 @@ function ModeChip({
   onToggle: () => void;
 }) {
   const isEdit = viewMode === "edit";
-  const title = isTauri
-    ? `${isEdit ? "보기" : "편집"} 모드로  Q`
-    : `${isEdit ? "보기" : "편집"} 모드로`;
+  const title = `${isEdit ? "보기" : "편집"} 모드로  ⌘⇧E`;
   return (
     <button
       type="button"
@@ -1303,7 +1268,7 @@ function EmptyBodyCTA({ onStartEdit }: { onStartEdit: () => void }) {
               backgroundColor: "var(--bg-surface)",
             }}
           >
-            Q
+            ⌘⇧E
           </kbd>
         </div>
       ) : null}
@@ -1313,7 +1278,6 @@ function EmptyBodyCTA({ onStartEdit }: { onStartEdit: () => void }) {
 
 function TabBtn({
   label,
-  shortcut,
   badge,
   badgeAccent,
   onBadgeClick,
@@ -1322,7 +1286,6 @@ function TabBtn({
   onClick,
 }: {
   label: string;
-  shortcut?: string;
   badge?: string | null;
   badgeAccent?: boolean;
   onBadgeClick?: () => void;
@@ -1330,12 +1293,11 @@ function TabBtn({
   active: boolean;
   onClick: () => void;
 }) {
-  const title = shortcut ? `${label}  ${shortcut}` : label;
   return (
     <button
       type="button"
       onClick={onClick}
-      title={title}
+      title={label}
       aria-current={active ? "page" : undefined}
       className="flex items-center gap-1.5 px-3 py-2 text-sm transition"
       style={{
@@ -1349,20 +1311,6 @@ function TabBtn({
       }}
     >
       <span>{label}</span>
-      {shortcut ? (
-        <kbd
-          aria-hidden
-          className="rounded font-mono text-[10px] leading-none"
-          style={{
-            padding: "2px 5px",
-            border: "1px solid var(--border-subtle)",
-            color: "var(--text-muted)",
-            backgroundColor: "var(--bg-surface)",
-          }}
-        >
-          {shortcut}
-        </kbd>
-      ) : null}
       {badge ? (
         <span
           role={onBadgeClick ? "button" : undefined}

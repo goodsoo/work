@@ -87,7 +87,7 @@ export function JournalOverlay({ isOpen, date, onClose }: Props) {
   // 모달 단축키:
   //   ESC — 닫기
   //   Cmd/Ctrl+Enter — 저장&닫기
-  //   Cmd/Ctrl+E — 편집/보기 토글 (content 비어있으면 무효)
+  //   Cmd/Ctrl+Shift+E — 편집/보기 토글 (content 비어있으면 무효). 메모장 단축키와 통일.
   useEffect(() => {
     if (!isOpen) return;
     function onKey(e: KeyboardEvent) {
@@ -97,14 +97,14 @@ export function JournalOverlay({ isOpen, date, onClose }: Props) {
         return;
       }
       const cmd = e.metaKey || e.ctrlKey;
-      if (!cmd || e.altKey || e.shiftKey) return;
-      if (e.key === "Enter") {
+      if (!cmd || e.altKey) return;
+      if (!e.shiftKey && e.key === "Enter") {
         e.preventDefault();
         handleClose();
         return;
       }
       // e.code 사용해서 한글 IME 무관 (KeyE 매칭).
-      if (e.code === "KeyE") {
+      if (e.shiftKey && e.code === "KeyE") {
         if (content.trim().length === 0) return;
         e.preventDefault();
         setViewMode((m) => (m === "edit" ? "view" : "edit"));
@@ -217,7 +217,7 @@ function ModeChip({
   onToggle: () => void;
 }) {
   const isEdit = viewMode === "edit";
-  const title = `${isEdit ? "보기" : "편집"} 모드로  ⌘E`;
+  const title = `${isEdit ? "보기" : "편집"} 모드로  ⌘⇧E`;
   return (
     <button
       type="button"
