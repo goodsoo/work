@@ -65,7 +65,17 @@ export function PortfolioCardMenu({ work, projects }: Props) {
   };
 
   const handleIncludedToggle = () => {
-    updateFm.mutate({ included: !work.frontmatter.included });
+    const fm = work.frontmatter;
+    if (fm.included) {
+      const ok = window.confirm(
+        `"${fm.github_title}" 을(를) 평가 자료에서 제외합니다. 사이드바 "미사용" 필터에서 다시 켤 수 있어요.`,
+      );
+      if (!ok) {
+        close();
+        return;
+      }
+    }
+    updateFm.mutate({ included: !fm.included });
     close();
   };
 
@@ -91,7 +101,7 @@ export function PortfolioCardMenu({ work, projects }: Props) {
 
   const handleDelete = () => {
     const ok = window.confirm(
-      `"${work.frontmatter.github_title}" PR 카드를 휴지통으로 보냅니다.`,
+      `"${work.frontmatter.github_title}" 카드를 휴지통으로 보냅니다. 진행할까요?`,
     );
     if (!ok) return;
     deleteWork.mutate(work.prSlug);
@@ -145,9 +155,7 @@ export function PortfolioCardMenu({ work, projects }: Props) {
             onClick={() => setSubmenu(submenu === "project" ? null : "project")}
           />
           <MenuItem
-            label={
-              work.frontmatter.included ? "미사용으로 표시" : "평가 자료에 포함"
-            }
+            label={work.frontmatter.included ? "미사용" : "포함"}
             onClick={handleIncludedToggle}
           />
           <div
@@ -155,7 +163,7 @@ export function PortfolioCardMenu({ work, projects }: Props) {
             style={{ backgroundColor: "var(--border-default)" }}
           />
           <MenuItem
-            label="영구 삭제"
+            label="삭제"
             danger
             onClick={handleDelete}
           />

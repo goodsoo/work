@@ -9,10 +9,11 @@ type Props = {
   prSlug: string;
   existing: PortfolioScreenshot[];
   label: ScreenshotLabel;
+  compact?: boolean;
 };
 
 // PNG/JPG drop or click-to-select → 1600px JPEG → vault binary write → frontmatter patch.
-export function ScreenshotDropzone({ prSlug, existing, label }: Props) {
+export function ScreenshotDropzone({ prSlug, existing, label, compact = false }: Props) {
   const { adapter } = useVault();
   const updateFm = useUpdatePortfolioFrontmatter(prSlug);
   const [dragOver, setDragOver] = useState(false);
@@ -50,6 +51,59 @@ export function ScreenshotDropzone({ prSlug, existing, label }: Props) {
       setUploading(false);
     }
   };
+
+  if (compact) {
+    const tip = uploading
+      ? "업로드 중..."
+      : label === "before"
+      ? "Before 이미지 드롭/클릭"
+      : label === "after"
+      ? "After 이미지 드롭/클릭"
+      : "이미지 드롭/클릭";
+    const chipLabel = label === "before" ? "+B" : label === "after" ? "+A" : "+";
+    return (
+      <label
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDragOver(true);
+        }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragOver(false);
+          if (e.dataTransfer.files.length > 0) {
+            void handleFiles(e.dataTransfer.files);
+          }
+        }}
+        title={error ? `${tip} — ${error}` : tip}
+        className="flex h-7 cursor-pointer items-center justify-center rounded-md border border-dashed px-2 text-[11px] font-medium transition"
+        style={{
+          borderColor: dragOver
+            ? "var(--accent-blue)"
+            : error
+            ? "var(--accent-red)"
+            : "var(--border-default)",
+          backgroundColor: dragOver ? "var(--accent-blue-bg)" : "transparent",
+          color: error ? "var(--accent-red-text)" : "var(--text-secondary)",
+          minWidth: 36,
+        }}
+      >
+        <input
+          type="file"
+          accept="image/*"
+          multiple
+          className="hidden"
+          onChange={(e) => {
+            if (e.target.files && e.target.files.length > 0) {
+              void handleFiles(e.target.files);
+              e.target.value = "";
+            }
+          }}
+        />
+        {uploading ? <Upload className="h-3 w-3 animate-pulse" /> : chipLabel}
+      </label>
+    );
+  }
 
   return (
     <label

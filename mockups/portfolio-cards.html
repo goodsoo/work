@@ -1,0 +1,905 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<title>portfolio card redesign — 시안 비교</title>
+<style>
+  :root {
+    --bg-base: #1a1a1a;
+    --bg-surface: #242424;
+    --bg-surface-hover: #2a2a2a;
+    --bg-surface-active: #333333;
+    --text-primary: #e4e4e7;
+    --text-secondary: #a1a1aa;
+    --text-muted: #71717a;
+    --border-default: #3f3f46;
+    --border-subtle: #2a2a2a;
+    --accent-blue: #60a5fa;
+    --accent-green: #4ade80;
+    --accent-red: #f87171;
+    --accent-amber: #fbbf24;
+    --accent-violet: #a78bfa;
+
+    --cat-uiux: #60a5fa;
+    --cat-backend: #4ade80;
+    --cat-infra: #fbbf24;
+    --cat-fix: #f87171;
+    --cat-other: #a78bfa;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Pretendard Variable", "Pretendard", -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg-base);
+    color: var(--text-primary);
+    line-height: 1.5;
+  }
+  .page { max-width: 1320px; margin: 0 auto; padding: 32px 24px 80px; }
+  h1 { font-size: 22px; margin: 0 0 4px; font-weight: 700; }
+  .lede { color: var(--text-secondary); font-size: 13px; margin: 0 0 32px; }
+  .toc { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 32px; }
+  .toc a {
+    font-size: 12px; padding: 6px 12px; border-radius: 999px;
+    background: var(--bg-surface); color: var(--text-secondary);
+    border: 1px solid var(--border-default); text-decoration: none;
+  }
+  .toc a:hover { color: var(--text-primary); background: var(--bg-surface-hover); }
+
+  section { margin-bottom: 56px; }
+  .section-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 16px; }
+  .section-head h2 { font-size: 16px; margin: 0; font-weight: 600; }
+  .section-head .note { font-size: 12px; color: var(--text-secondary); }
+  .section-head .tag {
+    font-size: 10px; padding: 2px 6px; border-radius: 4px;
+    background: var(--bg-surface-hover); color: var(--text-muted);
+    letter-spacing: 0.06em; text-transform: uppercase;
+  }
+  .desc { font-size: 13px; color: var(--text-secondary); margin: 0 0 16px; }
+
+  /* ───────── 공통 카드 helpers ───────── */
+  .chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 11px; padding: 2px 7px; border-radius: 4px;
+    background: var(--bg-surface-hover); color: var(--text-secondary);
+  }
+  .chip-color { width: 6px; height: 6px; border-radius: 50%; }
+  .meta-muted { font-size: 11px; color: var(--text-muted); }
+  .empty-impact { color: var(--text-muted); font-style: italic; }
+  .thumb-placeholder {
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-muted); font-size: 11px;
+    background: var(--bg-surface-hover);
+  }
+  .thumb-placeholder svg { opacity: 0.5; }
+
+  /* ────────────────────────────────────────────────
+     A. 압축 4열 — 텍스트 우선 + 작은 썸네일
+     ──────────────────────────────────────────────── */
+  .a-grid {
+    display: grid; gap: 12px;
+    grid-template-columns: repeat(4, 1fr);
+  }
+  .a-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-default);
+    border-radius: 8px;
+    overflow: hidden;
+    display: flex; flex-direction: column;
+  }
+  .a-thumb {
+    aspect-ratio: 16/7;
+    background: var(--bg-surface-hover);
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  .a-body { padding: 12px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
+  .a-title {
+    font-size: 13px; font-weight: 600; color: var(--text-primary);
+    line-height: 1.35;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .a-impact {
+    font-size: 13px; color: var(--text-primary);
+    font-weight: 500;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .a-meta {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-top: auto; padding-top: 6px;
+  }
+
+  /* ────────────────────────────────────────────────
+     B. 갤러리 5열 — 썸네일 우선 + 텍스트 minimal
+     ──────────────────────────────────────────────── */
+  .b-grid {
+    display: grid; gap: 10px;
+    grid-template-columns: repeat(5, 1fr);
+  }
+  .b-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-default);
+    border-radius: 6px;
+    overflow: hidden;
+    position: relative;
+    aspect-ratio: 1 / 1.05;
+    display: flex; flex-direction: column;
+  }
+  .b-thumb {
+    aspect-ratio: 4 / 3;
+    background: var(--bg-surface-hover);
+    flex-shrink: 0;
+  }
+  .b-body {
+    padding: 8px 10px 10px;
+    display: flex; flex-direction: column; gap: 4px;
+    flex: 1;
+  }
+  .b-title {
+    font-size: 12px; font-weight: 600; line-height: 1.3;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .b-meta { display: flex; gap: 6px; align-items: center; margin-top: auto; }
+  .b-impact-overlay {
+    position: absolute; left: 0; right: 0; bottom: 0;
+    padding: 8px 10px;
+    background: linear-gradient(transparent, rgba(0,0,0,0.85));
+    color: #fff; font-size: 11px;
+    opacity: 0; transition: opacity 150ms;
+  }
+  .b-card:hover .b-impact-overlay { opacity: 1; }
+
+  /* ────────────────────────────────────────────────
+     C. 카테고리 컬러 사이드 바 — 4열, 텍스트 위주
+     ──────────────────────────────────────────────── */
+  .c-grid {
+    display: grid; gap: 12px;
+    grid-template-columns: repeat(4, 1fr);
+  }
+  .c-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-default);
+    border-radius: 6px;
+    display: flex;
+    overflow: hidden;
+    min-height: 120px;
+  }
+  .c-bar { width: 3px; flex-shrink: 0; }
+  .c-body { padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 0; }
+  .c-title {
+    font-size: 13px; font-weight: 600;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    overflow: hidden; line-height: 1.35;
+  }
+  .c-impact {
+    font-size: 13px; color: var(--text-secondary);
+    line-height: 1.4;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .c-meta {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-top: auto; padding-top: 6px;
+  }
+  .c-thumb-strip {
+    display: flex; gap: 4px; margin-top: 4px;
+  }
+  .c-thumb-strip div {
+    width: 36px; height: 24px;
+    background: var(--bg-surface-hover);
+    border-radius: 3px;
+  }
+
+  /* ────────────────────────────────────────────────
+     D. list dense 가로형 — 3열
+     ──────────────────────────────────────────────── */
+  .d-grid {
+    display: grid; gap: 10px;
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .d-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-default);
+    border-radius: 6px;
+    display: flex; gap: 10px; padding: 10px;
+    align-items: stretch;
+  }
+  .d-thumb {
+    width: 96px; height: 72px;
+    background: var(--bg-surface-hover);
+    border-radius: 4px; flex-shrink: 0;
+  }
+  .d-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .d-title {
+    font-size: 13px; font-weight: 600;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .d-impact {
+    font-size: 12px; color: var(--text-primary);
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    overflow: hidden; line-height: 1.4;
+  }
+  .d-meta {
+    display: flex; gap: 8px; align-items: center; margin-top: auto;
+  }
+
+  /* ────────────────────────────────────────────────
+     E. 카탈로그 — 2열, impact 가 주인공
+     ──────────────────────────────────────────────── */
+  .e-grid {
+    display: grid; gap: 16px;
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .e-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-default);
+    border-radius: 10px;
+    padding: 20px 22px;
+    display: flex; flex-direction: column; gap: 12px;
+  }
+  .e-row1 { display: flex; align-items: center; gap: 10px; }
+  .e-impact-big {
+    font-size: 18px; font-weight: 600; line-height: 1.35;
+    color: var(--text-primary);
+  }
+  .e-impact-empty {
+    font-size: 14px; color: var(--text-muted); font-style: italic;
+  }
+  .e-title {
+    font-size: 12px; color: var(--text-secondary);
+    font-family: var(--font-mono, ui-monospace);
+    line-height: 1.4;
+  }
+  .e-strip { display: flex; gap: 6px; }
+  .e-strip div {
+    width: 56px; height: 38px;
+    background: var(--bg-surface-hover);
+    border-radius: 4px;
+    border: 1px solid var(--border-subtle);
+  }
+  .e-meta {
+    display: flex; gap: 10px; align-items: center;
+    font-size: 11px; color: var(--text-muted);
+    margin-top: 4px; padding-top: 10px;
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  /* ────────────────────────────────────────────────
+     F. D + impact 주인공 (최종 후보)
+     ──────────────────────────────────────────────── */
+  .f-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-default);
+    border-radius: 8px;
+    display: flex; gap: 12px; padding: 12px;
+    align-items: stretch;
+    transition: border-color 150ms, background 150ms;
+  }
+  .f-card:hover {
+    border-color: var(--text-muted);
+    background: var(--bg-surface-hover);
+  }
+  .f-thumb {
+    width: 96px; height: 72px;
+    background: var(--bg-surface-hover);
+    border-radius: 4px; flex-shrink: 0;
+  }
+  .f-body {
+    flex: 1; min-width: 0;
+    display: flex; flex-direction: column;
+    gap: 4px;
+  }
+  .f-impact {
+    font-size: 14px; font-weight: 600;
+    color: var(--text-primary);
+    line-height: 1.35;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .f-impact-empty {
+    font-size: 14px; font-weight: 500;
+    color: var(--text-muted);
+    font-style: italic;
+    line-height: 1.35;
+  }
+  .f-title {
+    font-size: 11px;
+    color: var(--text-secondary);
+    line-height: 1.4;
+    font-family: var(--font-mono, ui-monospace, monospace);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .f-title-as-main {
+    font-size: 13px; font-weight: 600;
+    color: var(--text-primary);
+    line-height: 1.4;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .f-meta {
+    display: flex; gap: 8px; align-items: center;
+    margin-top: auto; padding-top: 4px;
+  }
+  .edit-hint {
+    margin-left: auto; color: var(--text-muted);
+    font-size: 12px; opacity: 0;
+    transition: opacity 150ms;
+  }
+  .f-card:hover .edit-hint { opacity: 1; }
+
+  /* sample thumb 색감 (placeholder 들에 약간 색) */
+  .tone-1 { background: linear-gradient(135deg, #2d3748, #1a202c) !important; }
+  .tone-2 { background: linear-gradient(135deg, #3a3a3a, #232323) !important; }
+  .tone-3 { background: linear-gradient(135deg, #2a4a5e, #1a2533) !important; }
+  .tone-4 { background: linear-gradient(135deg, #3a2a4a, #1d1a2a) !important; }
+  .tone-empty { background-image:
+    repeating-linear-gradient(45deg, transparent, transparent 8px, rgba(255,255,255,0.02) 8px, rgba(255,255,255,0.02) 16px);
+  }
+
+  .legend {
+    display: flex; gap: 12px; align-items: center; margin-top: 8px;
+    font-size: 11px; color: var(--text-muted);
+  }
+  .legend span { display: inline-flex; align-items: center; gap: 4px; }
+  .legend i {
+    width: 8px; height: 8px; border-radius: 50%; display: inline-block;
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>portfolio card redesign — 시안 비교</h1>
+  <p class="lede">같은 6장 sample 카드를 5가지 레이아웃으로. 색감/간격은 현재 다크 토큰 그대로.</p>
+
+  <div class="legend">
+    <span><i style="background:var(--cat-uiux)"></i>UI/UX</span>
+    <span><i style="background:var(--cat-backend)"></i>Backend</span>
+    <span><i style="background:var(--cat-infra)"></i>Infra</span>
+    <span><i style="background:var(--cat-fix)"></i>Fix</span>
+    <span><i style="background:var(--cat-other)"></i>기타</span>
+  </div>
+
+  <nav class="toc">
+    <a href="#f" style="background:var(--accent-blue); color:#0a1424; border-color:var(--accent-blue); font-weight:600;">★ F. D + impact 주인공 (최종 후보)</a>
+    <a href="#a">A. 압축 4열</a>
+    <a href="#b">B. 갤러리 5열</a>
+    <a href="#c">C. 컬러 사이드바 4열</a>
+    <a href="#d">D. 가로형 list dense 3열</a>
+    <a href="#e">E. 카탈로그 2열</a>
+  </nav>
+
+  <!-- ───────── F ───────── -->
+  <section id="f" style="border:1px solid var(--accent-blue); border-radius:12px; padding:24px; background:rgba(96,165,250,0.03);">
+    <div class="section-head">
+      <span class="tag" style="background:var(--accent-blue); color:#0a1424;">★ F</span>
+      <h2>D + impact 주인공 — 가로형 dense 3열, impact 가 메인 텍스트</h2>
+      <span class="note">D 의 가로형 레이아웃 + E 의 위계 (impact 크게, PR 제목 작게)</span>
+    </div>
+    <p class="desc">썸네일 left, 텍스트 right. impact 가 카드의 시각적 주인공 — PR 제목은 부제. 정보 밀도 + "내가 만든 가치" 한눈에. 한 화면 12–15장.</p>
+
+    <h3 style="font-size:13px; color:var(--text-secondary); margin:16px 0 10px; font-weight:500;">F-1. 빈 impact 는 placeholder 가 자리 차지 (impact slot 유지)</h3>
+    <div class="d-grid">
+      <article class="f-card">
+        <div class="f-thumb tone-empty"></div>
+        <div class="f-body">
+          <div class="f-impact-empty">한 줄 임팩트 추가 필요</div>
+          <div class="f-title">nav: ActivityBar 제거 + SidePanel 상단 탭 row 통합</div>
+          <div class="f-meta">
+            <span class="chip"><i class="chip-color" style="background:var(--cat-uiux)"></i>UI/UX</span>
+            <span class="meta-muted">+137 −89 · 2일 전</span>
+          </div>
+        </div>
+      </article>
+      <article class="f-card">
+        <div class="f-thumb tone-empty"></div>
+        <div class="f-body">
+          <div class="f-impact-empty">한 줄 임팩트 추가 필요</div>
+          <div class="f-title">refactor(css): adopt canonical switch + motion namespace cleanup</div>
+          <div class="f-meta">
+            <span class="chip"><i class="chip-color" style="background:var(--cat-uiux)"></i>UI/UX</span>
+            <span class="meta-muted">+61 −202 · 2일 전</span>
+          </div>
+        </div>
+      </article>
+      <article class="f-card">
+        <div class="f-thumb tone-1"></div>
+        <div class="f-body">
+          <div class="f-impact">메모 시작 망설임 사라짐</div>
+          <div class="f-title">feat(memo): 빈 본문 편집 진입 CTA + 모드 chip</div>
+          <div class="f-meta">
+            <span class="chip"><i class="chip-color" style="background:var(--cat-uiux)"></i>UI/UX</span>
+            <span class="meta-muted">+89 −42 · 1일 전</span>
+          </div>
+        </div>
+      </article>
+      <article class="f-card">
+        <div class="f-thumb tone-2"></div>
+        <div class="f-body">
+          <div class="f-impact">PR 분류 정확도 ↑</div>
+          <div class="f-title">feat: portfolio sync 강화 + 날짜 min + lint 정리</div>
+          <div class="f-meta">
+            <span class="chip"><i class="chip-color" style="background:var(--cat-backend)"></i>Backend</span>
+            <span class="meta-muted">+156 −98 · 3일 전</span>
+          </div>
+        </div>
+      </article>
+      <article class="f-card">
+        <div class="f-thumb tone-3"></div>
+        <div class="f-body">
+          <div class="f-impact">테마 전환이 매끄러움</div>
+          <div class="f-title">feat: 라디얼 wipe + ship done 자동 반영</div>
+          <div class="f-meta">
+            <span class="chip"><i class="chip-color" style="background:var(--cat-uiux)"></i>UI/UX</span>
+            <span class="meta-muted">+203 −45 · 5일 전</span>
+          </div>
+        </div>
+      </article>
+      <article class="f-card">
+        <div class="f-thumb tone-4"></div>
+        <div class="f-body">
+          <div class="f-impact">타이핑 중 undo 안 먹던 이슈 해결</div>
+          <div class="f-title">fix: useStateHistory race + 사이드바 정렬</div>
+          <div class="f-meta">
+            <span class="chip"><i class="chip-color" style="background:var(--cat-fix)"></i>Fix</span>
+            <span class="meta-muted">+120 −67 · 1주 전</span>
+          </div>
+        </div>
+      </article>
+    </div>
+
+    <h3 style="font-size:13px; color:var(--text-secondary); margin:28px 0 10px; font-weight:500;">F-2. 빈 impact 는 PR 제목이 메인 텍스트로 대체 (placeholder 없음)</h3>
+    <p class="desc" style="font-size:12px; margin-top:-6px;">impact 가 비어있으면 시각 노이즈 없이 깔끔하게 PR 제목 자리 차지. 작성 유도는 hover 시 ✏️ 아이콘으로.</p>
+    <div class="d-grid">
+      <article class="f-card f-card-empty">
+        <div class="f-thumb tone-empty"></div>
+        <div class="f-body">
+          <div class="f-title-as-main">nav: ActivityBar 제거 + SidePanel 상단 탭 row 통합</div>
+          <div class="f-meta">
+            <span class="chip"><i class="chip-color" style="background:var(--cat-uiux)"></i>UI/UX</span>
+            <span class="meta-muted">+137 −89 · 2일 전</span>
+            <span class="edit-hint">✎</span>
+          </div>
+        </div>
+      </article>
+      <article class="f-card f-card-empty">
+        <div class="f-thumb tone-empty"></div>
+        <div class="f-body">
+          <div class="f-title-as-main">refactor(css): adopt canonical switch + motion namespace cleanup</div>
+          <div class="f-meta">
+            <span class="chip"><i class="chip-color" style="background:var(--cat-uiux)"></i>UI/UX</span>
+            <span class="meta-muted">+61 −202 · 2일 전</span>
+            <span class="edit-hint">✎</span>
+          </div>
+        </div>
+      </article>
+      <article class="f-card">
+        <div class="f-thumb tone-1"></div>
+        <div class="f-body">
+          <div class="f-impact">메모 시작 망설임 사라짐</div>
+          <div class="f-title">feat(memo): 빈 본문 편집 진입 CTA + 모드 chip</div>
+          <div class="f-meta">
+            <span class="chip"><i class="chip-color" style="background:var(--cat-uiux)"></i>UI/UX</span>
+            <span class="meta-muted">+89 −42 · 1일 전</span>
+          </div>
+        </div>
+      </article>
+      <article class="f-card">
+        <div class="f-thumb tone-2"></div>
+        <div class="f-body">
+          <div class="f-impact">PR 분류 정확도 ↑</div>
+          <div class="f-title">feat: portfolio sync 강화 + 날짜 min + lint 정리</div>
+          <div class="f-meta">
+            <span class="chip"><i class="chip-color" style="background:var(--cat-backend)"></i>Backend</span>
+            <span class="meta-muted">+156 −98 · 3일 전</span>
+          </div>
+        </div>
+      </article>
+      <article class="f-card">
+        <div class="f-thumb tone-3"></div>
+        <div class="f-body">
+          <div class="f-impact">테마 전환이 매끄러움</div>
+          <div class="f-title">feat: 라디얼 wipe + ship done 자동 반영</div>
+          <div class="f-meta">
+            <span class="chip"><i class="chip-color" style="background:var(--cat-uiux)"></i>UI/UX</span>
+            <span class="meta-muted">+203 −45 · 5일 전</span>
+          </div>
+        </div>
+      </article>
+      <article class="f-card">
+        <div class="f-thumb tone-4"></div>
+        <div class="f-body">
+          <div class="f-impact">타이핑 중 undo 안 먹던 이슈 해결</div>
+          <div class="f-title">fix: useStateHistory race + 사이드바 정렬</div>
+          <div class="f-meta">
+            <span class="chip"><i class="chip-color" style="background:var(--cat-fix)"></i>Fix</span>
+            <span class="meta-muted">+120 −67 · 1주 전</span>
+          </div>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <!-- ───────── A ───────── -->
+  <section id="a">
+    <div class="section-head">
+      <span class="tag">A</span>
+      <h2>압축 4열 — 텍스트 우선 + 작은 썸네일</h2>
+      <span class="note">썸네일 16:7 슬림, impact 가 메인. 한 화면 8–12장.</span>
+    </div>
+    <p class="desc">현재 16:10 큰 썸네일을 슬림하게 줄이고 텍스트 영역을 키움. 빈 impact 도 같은 카드 크기 유지 — 일관된 그리드.</p>
+    <div class="a-grid">
+      <article class="a-card">
+        <div class="a-thumb tone-empty thumb-placeholder">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 18l6-6-6-6"/></svg>
+        </div>
+        <div class="a-body">
+          <div class="a-title">nav: ActivityBar 제거 + SidePanel 상단 탭 row 통합</div>
+          <div class="a-impact empty-impact">임팩트 미작성</div>
+          <div class="a-meta">
+            <span class="chip"><i class="chip-color" style="background:var(--cat-uiux)"></i>UI/UX</span>
+            <span class="meta-muted">+137 −89 · 2일 전</span>
+          </div>
+        </div>
+      </article>
+      <article class="a-card">
+        <div class="a-thumb tone-empty"></div>
+        <div class="a-body">
+          <div class="a-title">refactor(css): adopt canonical switch + motion namespace cleanup</div>
+          <div class="a-impact empty-impact">임팩트 미작성</div>
+          <div class="a-meta">
+            <span class="chip"><i class="chip-color" style="background:var(--cat-uiux)"></i>UI/UX</span>
+            <span class="meta-muted">+61 −202 · 2일 전</span>
+          </div>
+        </div>
+      </article>
+      <article class="a-card">
+        <div class="a-thumb tone-1"></div>
+        <div class="a-body">
+          <div class="a-title">feat(memo): 빈 본문 편집 진입 CTA + 모드 chip</div>
+          <div class="a-impact">메모 시작 망설임 사라짐</div>
+          <div class="a-meta">
+            <span class="chip"><i class="chip-color" style="background:var(--cat-uiux)"></i>UI/UX</span>
+            <span class="meta-muted">+89 −42 · 1일 전</span>
+          </div>
+        </div>
+      </article>
+      <article class="a-card">
+        <div class="a-thumb tone-2"></div>
+        <div class="a-body">
+          <div class="a-title">feat: portfolio sync 강화 + 날짜 min + lint 정리</div>
+          <div class="a-impact">PR 분류 정확도 ↑</div>
+          <div class="a-meta">
+            <span class="chip"><i class="chip-color" style="background:var(--cat-backend)"></i>Backend</span>
+            <span class="meta-muted">+156 −98 · 3일 전</span>
+          </div>
+        </div>
+      </article>
+      <article class="a-card">
+        <div class="a-thumb tone-3"></div>
+        <div class="a-body">
+          <div class="a-title">feat: 라디얼 wipe + ship done 자동 반영</div>
+          <div class="a-impact">테마 전환이 매끄러움</div>
+          <div class="a-meta">
+            <span class="chip"><i class="chip-color" style="background:var(--cat-uiux)"></i>UI/UX</span>
+            <span class="meta-muted">+203 −45 · 5일 전</span>
+          </div>
+        </div>
+      </article>
+      <article class="a-card">
+        <div class="a-thumb tone-4"></div>
+        <div class="a-body">
+          <div class="a-title">fix: useStateHistory race + 사이드바 정렬</div>
+          <div class="a-impact">타이핑 중 undo 안 먹던 이슈 해결</div>
+          <div class="a-meta">
+            <span class="chip"><i class="chip-color" style="background:var(--cat-fix)"></i>Fix</span>
+            <span class="meta-muted">+120 −67 · 1주 전</span>
+          </div>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <!-- ───────── B ───────── -->
+  <section id="b">
+    <div class="section-head">
+      <span class="tag">B</span>
+      <h2>갤러리 5열 — 썸네일 우선</h2>
+      <span class="note">썸네일 4:3, 텍스트 minimal. hover 시 impact overlay.</span>
+    </div>
+    <p class="desc">시각이 주인공 — 작업 갤러리 느낌. impact 는 hover 오버레이로 부각. 한 화면 10–15장.</p>
+    <div class="b-grid">
+      <article class="b-card">
+        <div class="b-thumb tone-empty"></div>
+        <div class="b-body">
+          <div class="b-title">nav: ActivityBar 제거 + SidePanel 통합</div>
+          <div class="b-meta">
+            <span class="chip"><i class="chip-color" style="background:var(--cat-uiux)"></i>UI/UX</span>
+            <span class="meta-muted">2일 전</span>
+          </div>
+        </div>
+        <div class="b-impact-overlay">임팩트 미작성</div>
+      </article>
+      <article class="b-card">
+        <div class="b-thumb tone-empty"></div>
+        <div class="b-body">
+          <div class="b-title">refactor(css): canonical switch</div>
+          <div class="b-meta">
+            <span class="chip"><i class="chip-color" style="background:var(--cat-uiux)"></i>UI/UX</span>
+            <span class="meta-muted">2일 전</span>
+          </div>
+        </div>
+        <div class="b-impact-overlay">임팩트 미작성</div>
+      </article>
+      <article class="b-card">
+        <div class="b-thumb tone-1"></div>
+        <div class="b-body">
+          <div class="b-title">feat(memo): 빈 본문 편집 CTA</div>
+          <div class="b-meta">
+            <span class="chip"><i class="chip-color" style="background:var(--cat-uiux)"></i>UI/UX</span>
+            <span class="meta-muted">1일 전</span>
+          </div>
+        </div>
+        <div class="b-impact-overlay">메모 시작 망설임 사라짐</div>
+      </article>
+      <article class="b-card">
+        <div class="b-thumb tone-2"></div>
+        <div class="b-body">
+          <div class="b-title">feat: portfolio sync 강화</div>
+          <div class="b-meta">
+            <span class="chip"><i class="chip-color" style="background:var(--cat-backend)"></i>Backend</span>
+            <span class="meta-muted">3일 전</span>
+          </div>
+        </div>
+        <div class="b-impact-overlay">PR 분류 정확도 ↑</div>
+      </article>
+      <article class="b-card">
+        <div class="b-thumb tone-3"></div>
+        <div class="b-body">
+          <div class="b-title">feat: 라디얼 wipe 테마 전환</div>
+          <div class="b-meta">
+            <span class="chip"><i class="chip-color" style="background:var(--cat-uiux)"></i>UI/UX</span>
+            <span class="meta-muted">5일 전</span>
+          </div>
+        </div>
+        <div class="b-impact-overlay">테마 전환이 매끄러움</div>
+      </article>
+      <article class="b-card">
+        <div class="b-thumb tone-4"></div>
+        <div class="b-body">
+          <div class="b-title">fix: useStateHistory race</div>
+          <div class="b-meta">
+            <span class="chip"><i class="chip-color" style="background:var(--cat-fix)"></i>Fix</span>
+            <span class="meta-muted">1주 전</span>
+          </div>
+        </div>
+        <div class="b-impact-overlay">undo 누락 race 해결</div>
+      </article>
+    </div>
+  </section>
+
+  <!-- ───────── C ───────── -->
+  <section id="c">
+    <div class="section-head">
+      <span class="tag">C</span>
+      <h2>카테고리 컬러 사이드바 4열 — 텍스트 위주</h2>
+      <span class="note">좌측 3px 컬러 바. 썸네일은 우측 작은 strip.</span>
+    </div>
+    <p class="desc">카테고리 즉시 인지 + 텍스트 (제목/임팩트) 가 카드 본체. 썸네일은 보조. 한 화면 8–12장.</p>
+    <div class="c-grid">
+      <article class="c-card">
+        <div class="c-bar" style="background:var(--cat-uiux)"></div>
+        <div class="c-body">
+          <div class="c-title">nav: ActivityBar 제거 + SidePanel 상단 탭 통합</div>
+          <div class="c-impact empty-impact">임팩트 미작성</div>
+          <div class="c-meta">
+            <span class="meta-muted">UI/UX · +137 −89</span>
+            <span class="meta-muted">2일 전</span>
+          </div>
+        </div>
+      </article>
+      <article class="c-card">
+        <div class="c-bar" style="background:var(--cat-uiux)"></div>
+        <div class="c-body">
+          <div class="c-title">refactor(css): canonical switch + motion 정리</div>
+          <div class="c-impact empty-impact">임팩트 미작성</div>
+          <div class="c-meta">
+            <span class="meta-muted">UI/UX · +61 −202</span>
+            <span class="meta-muted">2일 전</span>
+          </div>
+        </div>
+      </article>
+      <article class="c-card">
+        <div class="c-bar" style="background:var(--cat-uiux)"></div>
+        <div class="c-body">
+          <div class="c-title">feat(memo): 빈 본문 편집 진입 CTA + 모드 chip</div>
+          <div class="c-impact">메모 시작 망설임 사라짐</div>
+          <div class="c-thumb-strip"><div class="tone-1"></div><div class="tone-1"></div></div>
+          <div class="c-meta">
+            <span class="meta-muted">UI/UX · +89 −42</span>
+            <span class="meta-muted">1일 전</span>
+          </div>
+        </div>
+      </article>
+      <article class="c-card">
+        <div class="c-bar" style="background:var(--cat-backend)"></div>
+        <div class="c-body">
+          <div class="c-title">feat: portfolio sync 강화 + 날짜 min + lint 정리</div>
+          <div class="c-impact">PR 분류 정확도 ↑</div>
+          <div class="c-meta">
+            <span class="meta-muted">Backend · +156 −98</span>
+            <span class="meta-muted">3일 전</span>
+          </div>
+        </div>
+      </article>
+      <article class="c-card">
+        <div class="c-bar" style="background:var(--cat-uiux)"></div>
+        <div class="c-body">
+          <div class="c-title">feat: 라디얼 wipe + ship done 자동 반영</div>
+          <div class="c-impact">테마 전환이 매끄러움</div>
+          <div class="c-thumb-strip"><div class="tone-3"></div><div class="tone-3"></div><div class="tone-3"></div></div>
+          <div class="c-meta">
+            <span class="meta-muted">UI/UX · +203 −45</span>
+            <span class="meta-muted">5일 전</span>
+          </div>
+        </div>
+      </article>
+      <article class="c-card">
+        <div class="c-bar" style="background:var(--cat-fix)"></div>
+        <div class="c-body">
+          <div class="c-title">fix: useStateHistory race + 사이드바 정렬</div>
+          <div class="c-impact">타이핑 중 undo 안 먹던 이슈 해결</div>
+          <div class="c-meta">
+            <span class="meta-muted">Fix · +120 −67</span>
+            <span class="meta-muted">1주 전</span>
+          </div>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <!-- ───────── D ───────── -->
+  <section id="d">
+    <div class="section-head">
+      <span class="tag">D</span>
+      <h2>가로형 list dense 3열</h2>
+      <span class="note">썸네일 left, 텍스트 right. 정보 밀도 max.</span>
+    </div>
+    <p class="desc">한 카드 안에 모든 정보가 한 줄로 정렬. 스캔 빠름. 한 화면 12–18장. 옵시디안 카드 뷰 / Linear list 패턴.</p>
+    <div class="d-grid">
+      <article class="d-card">
+        <div class="d-thumb tone-empty"></div>
+        <div class="d-body">
+          <div class="d-title">nav: ActivityBar 제거 + SidePanel 통합</div>
+          <div class="d-impact empty-impact">임팩트 미작성</div>
+          <div class="d-meta">
+            <span class="chip"><i class="chip-color" style="background:var(--cat-uiux)"></i>UI/UX</span>
+            <span class="meta-muted">+137 −89 · 2일 전</span>
+          </div>
+        </div>
+      </article>
+      <article class="d-card">
+        <div class="d-thumb tone-empty"></div>
+        <div class="d-body">
+          <div class="d-title">refactor(css): canonical switch</div>
+          <div class="d-impact empty-impact">임팩트 미작성</div>
+          <div class="d-meta">
+            <span class="chip"><i class="chip-color" style="background:var(--cat-uiux)"></i>UI/UX</span>
+            <span class="meta-muted">+61 −202 · 2일 전</span>
+          </div>
+        </div>
+      </article>
+      <article class="d-card">
+        <div class="d-thumb tone-1"></div>
+        <div class="d-body">
+          <div class="d-title">feat(memo): 빈 본문 편집 진입 CTA</div>
+          <div class="d-impact">메모 시작 망설임 사라짐</div>
+          <div class="d-meta">
+            <span class="chip"><i class="chip-color" style="background:var(--cat-uiux)"></i>UI/UX</span>
+            <span class="meta-muted">+89 −42 · 1일 전</span>
+          </div>
+        </div>
+      </article>
+      <article class="d-card">
+        <div class="d-thumb tone-2"></div>
+        <div class="d-body">
+          <div class="d-title">feat: portfolio sync 강화 + 날짜 min</div>
+          <div class="d-impact">PR 분류 정확도 ↑</div>
+          <div class="d-meta">
+            <span class="chip"><i class="chip-color" style="background:var(--cat-backend)"></i>Backend</span>
+            <span class="meta-muted">+156 −98 · 3일 전</span>
+          </div>
+        </div>
+      </article>
+      <article class="d-card">
+        <div class="d-thumb tone-3"></div>
+        <div class="d-body">
+          <div class="d-title">feat: 라디얼 wipe + ship done</div>
+          <div class="d-impact">테마 전환이 매끄러움</div>
+          <div class="d-meta">
+            <span class="chip"><i class="chip-color" style="background:var(--cat-uiux)"></i>UI/UX</span>
+            <span class="meta-muted">+203 −45 · 5일 전</span>
+          </div>
+        </div>
+      </article>
+      <article class="d-card">
+        <div class="d-thumb tone-4"></div>
+        <div class="d-body">
+          <div class="d-title">fix: useStateHistory race + 사이드바 정렬</div>
+          <div class="d-impact">타이핑 중 undo 안 먹던 이슈 해결</div>
+          <div class="d-meta">
+            <span class="chip"><i class="chip-color" style="background:var(--cat-fix)"></i>Fix</span>
+            <span class="meta-muted">+120 −67 · 1주 전</span>
+          </div>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <!-- ───────── E ───────── -->
+  <section id="e">
+    <div class="section-head">
+      <span class="tag">E</span>
+      <h2>카탈로그 2열 — impact 가 주인공 (회고형)</h2>
+      <span class="note">큰 impact 텍스트 + 작은 메타 + 썸네일 strip. 회고/포트폴리오 view.</span>
+    </div>
+    <p class="desc">"내가 어떤 가치를 만들었나" 가 가장 눈에 띔. PR 제목은 부제. 한 화면 4–6장. 사람한테 보여주는 모드 (회고 / 발표용).</p>
+    <div class="e-grid">
+      <article class="e-card">
+        <div class="e-row1">
+          <span class="chip"><i class="chip-color" style="background:var(--cat-uiux)"></i>UI/UX</span>
+          <span class="meta-muted">PR #19 · 2일 전</span>
+        </div>
+        <div class="e-impact-empty">한 줄 임팩트 추가 필요</div>
+        <div class="e-title">nav: ActivityBar 제거 + SidePanel 상단 탭 row 통합</div>
+        <div class="e-meta">
+          <span>+137 −89</span><span>·</span><span>3 files</span>
+        </div>
+      </article>
+      <article class="e-card">
+        <div class="e-row1">
+          <span class="chip"><i class="chip-color" style="background:var(--cat-uiux)"></i>UI/UX</span>
+          <span class="meta-muted">PR #25 · 1일 전</span>
+        </div>
+        <div class="e-impact-big">메모 시작 망설임 사라짐</div>
+        <div class="e-title">feat(memo): 빈 본문 편집 진입 CTA + 모드 chip</div>
+        <div class="e-strip">
+          <div class="tone-1"></div><div class="tone-1"></div>
+        </div>
+        <div class="e-meta">
+          <span>+89 −42</span><span>·</span><span>5 files</span>
+        </div>
+      </article>
+      <article class="e-card">
+        <div class="e-row1">
+          <span class="chip"><i class="chip-color" style="background:var(--cat-backend)"></i>Backend</span>
+          <span class="meta-muted">PR #24 · 3일 전</span>
+        </div>
+        <div class="e-impact-big">PR 분류 정확도 ↑</div>
+        <div class="e-title">feat: portfolio sync 강화 + 날짜 min + lint 정리</div>
+        <div class="e-strip">
+          <div class="tone-2"></div>
+        </div>
+        <div class="e-meta">
+          <span>+156 −98</span><span>·</span><span>8 files</span>
+        </div>
+      </article>
+      <article class="e-card">
+        <div class="e-row1">
+          <span class="chip"><i class="chip-color" style="background:var(--cat-uiux)"></i>UI/UX</span>
+          <span class="meta-muted">PR #23 · 5일 전</span>
+        </div>
+        <div class="e-impact-big">테마 전환이 매끄러움</div>
+        <div class="e-title">feat: 라디얼 wipe + ship done 자동 반영</div>
+        <div class="e-strip">
+          <div class="tone-3"></div><div class="tone-3"></div><div class="tone-3"></div>
+        </div>
+        <div class="e-meta">
+          <span>+203 −45</span><span>·</span><span>6 files</span>
+        </div>
+      </article>
+    </div>
+  </section>
+</div>
+</body>
+</html>

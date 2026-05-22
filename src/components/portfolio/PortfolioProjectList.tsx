@@ -78,25 +78,43 @@ export function PortfolioProjectList({
         onClick={() => onFilterChange({ kind: "uncategorized" })}
       />
 
-      {projects.length > 0 ? (
-        <div
-          className="my-2 h-px"
-          style={{ backgroundColor: "var(--border-default)" }}
-        />
-      ) : null}
-
-      {projects.map((p) => (
-        <FilterItem
-          key={p.slug}
-          label={renderProjectName(p.name)}
-          count={counts.byProject.get(p.slug) ?? 0}
-          active={
-            activeFilter.kind === "project" && activeFilter.slug === p.slug
-          }
-          colorDot={p.color ? COLOR_DOT[p.color] ?? p.color : undefined}
-          onClick={() => onFilterChange({ kind: "project", slug: p.slug })}
-        />
-      ))}
+      {(() => {
+        // PR 없는 프로젝트는 사이드바에서 숨김 (projects.md 자체엔 유지 — 옵시디안에서 직접 편집 가능).
+        // 단 현재 선택된 프로젝트가 0건이어도 노출 유지 — 사용자가 막 비운 직후에도 그 자리 보임.
+        const visible = projects.filter((p) => {
+          if ((counts.byProject.get(p.slug) ?? 0) > 0) return true;
+          if (
+            activeFilter.kind === "project" &&
+            activeFilter.slug === p.slug
+          )
+            return true;
+          return false;
+        });
+        if (visible.length === 0) return null;
+        return (
+          <>
+            <div
+              className="my-2 h-px"
+              style={{ backgroundColor: "var(--border-default)" }}
+            />
+            {visible.map((p) => (
+              <FilterItem
+                key={p.slug}
+                label={renderProjectName(p.name)}
+                count={counts.byProject.get(p.slug) ?? 0}
+                active={
+                  activeFilter.kind === "project" &&
+                  activeFilter.slug === p.slug
+                }
+                colorDot={p.color ? COLOR_DOT[p.color] ?? p.color : undefined}
+                onClick={() =>
+                  onFilterChange({ kind: "project", slug: p.slug })
+                }
+              />
+            ))}
+          </>
+        );
+      })()}
 
       <div
         className="my-2 h-px"

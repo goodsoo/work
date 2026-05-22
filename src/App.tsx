@@ -5,9 +5,11 @@ import { GlobalTooltip } from "./components/Tooltip";
 import type { Tab } from "./components/nav/BottomTabs";
 import { MeetingForm } from "./components/meetings/MeetingForm";
 import { TrashModal } from "./components/meetings/TrashModal";
+import { PortfolioTrashModal } from "./components/portfolio/PortfolioTrashModal";
 import {
   MeetingsSidePanel,
   MeetingsSidePanelFooter,
+  PortfolioSidePanelFooter,
   CalendarDayPanel,
   TodosSidePanel,
   TodosSidePanelFooter,
@@ -78,7 +80,31 @@ function AppContent() {
   // 메모 + todo 휴지통 별도 — 데이터 영역 다름.
   const [trashOpen, setTrashOpen] = useState(false);
   const [todoTrashOpen, setTodoTrashOpen] = useState(false);
+  const [portfolioTrashOpen, setPortfolioTrashOpen] = useState(false);
   const portfolioSync = useGhSync();
+
+  // last_sync - 1일 buffer 의 YYYY-MM-DD. 첫 sync (last_sync 없음) 면 undefined → 전체.
+  // gh search 의 `merged:>=YYYY-MM-DD` 가 날짜 단위라 1일 buffer 충분.
+  const portfolioRunIncrementalSync = async () => {
+    try {
+      const s = await readSyncState(adapter);
+      const since = s.last_sync
+        ? new Date(new Date(s.last_sync).getTime() - 24 * 60 * 60 * 1000)
+            .toISOString()
+            .slice(0, 10)
+        : undefined;
+      await portfolioSync.run(since ? { since } : {});
+    } catch {
+      // useGhSync state.error 에 반영 — sidebar 가 표시
+    }
+  };
+  const portfolioRunFullSync = async () => {
+    try {
+      await portfolioSync.run({});
+    } catch {
+      // 동일 — state.error
+    }
+  };
   const { adapter, isReady } = useVault();
   const meetings = useMeetings();
   const createMeetingMutation = useCreateMeeting();
@@ -383,20 +409,21 @@ function AppContent() {
         activeFilter={portfolioFilter}
         onFilterChange={setPortfolioFilter}
         syncState={portfolioSync.state}
-        onSyncRun={() => {
-          portfolioSync.run({}).catch(() => {
-            // error 는 portfolioSync.state.error 에 반영, sidebar 가 표시
-          });
-        }}
+        onSyncRun={portfolioRunIncrementalSync}
+        onFullSyncRun={portfolioRunFullSync}
       />
     ) : undefined;
 
-  // 메모장 + todos 탭 footer 에 휴지통 entry. 각각 별도 modal.
+  // 탭별 footer slot. 휴지통은 overlay 모달, 도메인별 분리.
   const sidePanelFooter =
     tab === "meetings" ? (
       <MeetingsSidePanelFooter onTrashOpen={() => setTrashOpen(true)} />
     ) : tab === "todos" ? (
       <TodosSidePanelFooter onTrashOpen={() => setTodoTrashOpen(true)} />
+    ) : tab === "portfolio" ? (
+      <PortfolioSidePanelFooter
+        onTrashOpen={() => setPortfolioTrashOpen(true)}
+      />
     ) : undefined;
 
   return (
@@ -439,6 +466,10 @@ function AppContent() {
       <TodoTrashModal
         open={todoTrashOpen}
         onClose={() => setTodoTrashOpen(false)}
+      />
+      <PortfolioTrashModal
+        isOpen={portfolioTrashOpen}
+        onClose={() => setPortfolioTrashOpen(false)}
       />
     </AppShell>
   );

@@ -5,10 +5,15 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useRef, useState } from "react";
 import {
   ATTACHMENTS_DIR,
+  PORTFOLIO_TRASH_DIR,
   PROJECTS_FILE,
+  emptyPortfolioTrash,
+  listTrashedPortfolioWorks,
   portfolioWorkPath,
+  purgePortfolioWork,
   readPortfolioProjects,
   readPortfolioWork,
+  restorePortfolioWork,
   scanPortfolio,
   syncPortfolio,
   writePortfolioProjects,
@@ -18,6 +23,7 @@ import {
   type PortfolioWorkMeta,
   type SyncPortfolioOpts,
   type SyncPortfolioResult,
+  type TrashedPortfolioWork,
 } from "../api/portfolio";
 import { useVault } from "../lib/vault/useVault";
 import { patchFrontmatter } from "../lib/vault/parser";
@@ -25,6 +31,7 @@ import { patchFrontmatter } from "../lib/vault/parser";
 const worksKey = ["portfolio"] as const;
 const workKey = (slug: string) => ["portfolio", "work", slug] as const;
 const projectsKey = ["portfolio-projects"] as const;
+const trashKey = ["portfolio", "trash"] as const;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Works
@@ -102,21 +109,24 @@ export function useUpdatePortfolioFrontmatter(slug: string) {
   });
 }
 
-// 영구 삭제 = .trash/ 로 이동 (옵시디안 휴지통 호환).
-// design v2.3 outside voice T3: _attachments/{slug}/ 짝도 .trash/ 로.
+// 삭제 = portfolio/.trash/ 로 이동 (메모장 vault `.trash/` 와 별개 — portfolio 도메인 내부 휴지통).
+// _attachments/{slug}/ 짝도 같은 stamp 로 portfolio/.trash/ 이동.
 export function useDeletePortfolioWork() {
   const { adapter, watcher } = useVault();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (slug: string) => {
       const cardPath = portfolioWorkPath(slug);
-      await adapter.mkdir(".trash");
+      await adapter.mkdir(PORTFOLIO_TRASH_DIR);
       const stamp = new Date()
         .toISOString()
         .replace(/[:.]/g, "-")
         .slice(0, 19);
       // 카드 파일 이동
-      await adapter.rename(cardPath, `.trash/${stamp}-${slug}.md`);
+      await adapter.rename(
+        cardPath,
+        `${PORTFOLIO_TRASH_DIR}/${stamp}-${slug}.md`,
+      );
       watcher.markSelfWrite(cardPath);
       // _attachments/{slug}/ 짝 이동 — best effort, 없으면 skip
       const attachDir = `${ATTACHMENTS_DIR}/${slug}`;
@@ -124,7 +134,7 @@ export function useDeletePortfolioWork() {
         if (await adapter.exists(attachDir)) {
           await adapter.rename(
             attachDir,
-            `.trash/${stamp}-attachments-${slug}`,
+            `${PORTFOLIO_TRASH_DIR}/${stamp}-attachments-${slug}`,
           );
         }
       } catch {
@@ -137,6 +147,67 @@ export function useDeletePortfolioWork() {
         prev?.filter((w) => w.prSlug !== slug),
       );
       qc.removeQueries({ queryKey: workKey(slug) });
+      qc.invalidateQueries({ queryKey: trashKey });
+    },
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Trash
+
+export function useTrashedPortfolioWorks() {
+  const { adapter, isReady } = useVault();
+  return useQuery({
+    queryKey: trashKey,
+    queryFn: () => listTrashedPortfolioWorks(adapter),
+    enabled: isReady,
+  });
+}
+
+// 복원 — trashPath → 원위치. 충돌 시 throw → 호출처에서 toast.
+export function useRestorePortfolioWork() {
+  const { adapter, watcher } = useVault();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (trashPath: string) => {
+      const restored = await restorePortfolioWork(adapter, trashPath);
+      watcher.markSelfWrite(restored);
+      return restored;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: worksKey });
+      qc.invalidateQueries({ queryKey: trashKey });
+    },
+  });
+}
+
+// 영구 삭제 (휴지통에서만) — 카드 + attachments 폴더 안 파일 모두 삭제.
+export function usePurgePortfolioWork() {
+  const { adapter } = useVault();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (trashPath: string) => {
+      await purgePortfolioWork(adapter, trashPath);
+      return trashPath;
+    },
+    onSuccess: (trashPath) => {
+      qc.setQueryData<TrashedPortfolioWork[]>(trashKey, (prev) =>
+        prev?.filter((t) => t.trashPath !== trashPath),
+      );
+    },
+  });
+}
+
+// 휴지통 비우기 — portfolio/.trash 안 카드 + attachments 모두 영구 삭제.
+export function useEmptyPortfolioTrash() {
+  const { adapter } = useVault();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      await emptyPortfolioTrash(adapter);
+    },
+    onSuccess: () => {
+      qc.setQueryData<TrashedPortfolioWork[]>(trashKey, []);
     },
   });
 }
