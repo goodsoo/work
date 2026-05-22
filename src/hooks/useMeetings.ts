@@ -1,12 +1,17 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import {
   createMeeting,
+  createMeetingFolder,
   deleteMeeting,
+  deleteMeetingFolder,
   emptyTrash,
   getMeeting,
   listDeletedMeetings,
+  listMeetingFolders,
   listMeetings,
+  moveMeeting,
   purgeMeeting,
+  renameMeetingFolder,
   restoreMeeting,
   updateMeeting,
   type Meeting,
@@ -86,6 +91,59 @@ export function useMeetings() {
     queryKey: meetingsKey,
     queryFn: () => listMeetings(adapter),
     enabled: isReady,
+  });
+}
+
+// vault 의 meetings/ 안 모든 폴더 (빈 폴더 포함). queryKey prefix 가 ["meetings"]
+// 라 watcher 의 list invalidation 이 같이 trigger — 폴더 변경 시 자동 refetch.
+const meetingFoldersKey = ["meetings", "folders"] as const;
+export function useMeetingFolders() {
+  const { adapter, isReady } = useVault();
+  return useQuery({
+    queryKey: meetingFoldersKey,
+    queryFn: () => listMeetingFolders(adapter),
+    enabled: isReady,
+  });
+}
+
+export function useCreateMeetingFolder() {
+  const { adapter } = useVault();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (folderPath: string) => createMeetingFolder(adapter, folderPath),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: meetingFoldersKey });
+    },
+  });
+}
+
+// 폴더 이름 변경 — 부모 path 유지, 안 메모는 자동 따라옴. invalidate 만 — 옛/새
+// path 둘 다 watcher 가 외부 변경으로 잡을 수 있지만 list refetch 가 결국 같은
+// 결과로 수렴해서 harmless. 사용자 체감 0.
+export function useRenameMeetingFolder() {
+  const { adapter } = useVault();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ folder, newName }: { folder: string; newName: string }) =>
+      renameMeetingFolder(adapter, folder, newName),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: meetingsKey });
+      qc.invalidateQueries({ queryKey: meetingFoldersKey });
+    },
+  });
+}
+
+// 폴더 삭제 — 안 메모 휴지통 이동 + 디스크 dir 정리. 호출자가 confirm 책임.
+export function useDeleteMeetingFolder() {
+  const { adapter } = useVault();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (folderPath: string) => deleteMeetingFolder(adapter, folderPath),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: meetingsKey });
+      qc.invalidateQueries({ queryKey: deletedMeetingsKey });
+      qc.invalidateQueries({ queryKey: ["todos"] });
+    },
   });
 }
 
@@ -181,6 +239,31 @@ export function useUpdateMeeting(uid: string) {
         prev?.map((m) => (m.uid === uid ? updated : m)),
       );
       qc.invalidateQueries({ queryKey: ["todos"] });
+    },
+  });
+}
+
+// 폴더 이동 — title 유지, path 만 변경. uid 는 영구라 detail cache 그대로.
+// 옛/새 path 둘 다 self-write 마크 — watcher 가 우리 변경을 외부 변경으로 오인 X.
+export function useMoveMeeting() {
+  const { adapter, watcher } = useVault();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ uid, folder }: { uid: string; folder: string }) => {
+      const path = uidToPath(qc, uid);
+      if (!path) throw new Error(`meeting not found: uid=${uid}`);
+      markMeetingSelfWrite(watcher, path);
+      const moved = await moveMeeting(adapter, path, folder);
+      if (moved.id !== path) {
+        markMeetingSelfWrite(watcher, moved.id);
+      }
+      return moved;
+    },
+    onSuccess: (moved) => {
+      qc.setQueryData(meetingKey(moved.uid), moved);
+      qc.setQueryData<Meeting[]>(meetingsKey, (prev) =>
+        prev?.map((m) => (m.uid === moved.uid ? moved : m)),
+      );
     },
   });
 }

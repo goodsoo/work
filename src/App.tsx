@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { VaultGate } from "./components/vault/VaultGate";
 import { AppShell } from "./components/nav/AppShell";
 import { GlobalTooltip } from "./components/Tooltip";
-import type { Tab } from "./components/nav/BottomTabs";
+import { ToastProvider } from "./components/Toast";
+import { TABS, type Tab } from "./components/nav/BottomTabs";
 import { MeetingForm } from "./components/meetings/MeetingForm";
 import { TrashModal } from "./components/meetings/TrashModal";
 import { PortfolioTrashModal } from "./components/portfolio/PortfolioTrashModal";
@@ -36,9 +37,11 @@ function readTabFromHash(): Tab {
   const h = window.location.hash;
   if (h.startsWith("#meeting-")) return "meetings";
   if (h === "#calendar") return "calendar";
+  if (h === "#meetings") return "meetings";
   if (h === "#todos") return "todos";
   if (h === "#portfolio") return "portfolio";
-  return "meetings";
+  // 빈 hash = 첫 탭 (캘린더). nav-restructure 후 캘린더가 default landing.
+  return TABS[0].id;
 }
 
 function readMeetingFromHash(): string | null {
@@ -56,9 +59,11 @@ export default function App() {
   return (
     <VaultGate>
       <GlobalTooltip />
-      <DrawerProvider>
-        <AppContent />
-      </DrawerProvider>
+      <ToastProvider>
+        <DrawerProvider>
+          <AppContent />
+        </DrawerProvider>
+      </ToastProvider>
     </VaultGate>
   );
 }
@@ -200,7 +205,8 @@ function AppContent() {
     return () => window.removeEventListener("keydown", blockNavKeys);
   }, []);
 
-  // Desktop (Tauri) 전용 페이지 단축키: Cmd+1/2/3/4, Cmd+\ (사이드바 토글, 옵시디안 패턴)
+  // Desktop (Tauri) 전용 단축키: Cmd+1/2/3/4 (TABS index 기반), Cmd+\ (사이드바 토글).
+  // 탭 순서 바뀌면 단축키 의미도 자동 swap (캘린더 첫번째 → Cmd+1=캘린더).
   useEffect(() => {
     if (!isTauri) return;
     function onKeyDown(e: KeyboardEvent) {
@@ -211,14 +217,12 @@ function AppContent() {
         sidebar.toggle();
         return;
       }
-      let next: Tab | null = null;
-      if (e.key === "1") next = "meetings";
-      else if (e.key === "2") next = "calendar";
-      else if (e.key === "3") next = "todos";
-      else if (e.key === "4") next = "portfolio";
-      if (!next) return;
+      const idx = "1234".indexOf(e.key);
+      if (idx === -1) return;
+      const target = TABS[idx];
+      if (!target) return;
       e.preventDefault();
-      switchTab(next);
+      switchTab(target.id);
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);

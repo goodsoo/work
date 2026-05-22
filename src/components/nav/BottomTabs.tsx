@@ -10,9 +10,11 @@ type Props = {
 
 // SidePanel / ActivityBar / 단축키 분기에서 공유. 함수/상수도 같은 파일에서 export.
 // eslint-disable-next-line react-refresh/only-export-components
+// 순서 = 사용 빈도 + Cmd+1..4 의미 (App.tsx 단축키가 TABS index 기반).
+// 캘린더 첫 진입이 본인 daily routine — 메모장은 메모 선택 후 본문 작업이라 진입 빈도 낮음.
 export const TABS: Array<{ id: Tab; label: string; icon: LucideIcon }> = [
-  { id: "meetings", label: "메모장", icon: ClipboardList },
   { id: "calendar", label: "캘린더", icon: CalendarDays },
+  { id: "meetings", label: "메모장", icon: ClipboardList },
   { id: "todos", label: "할 일", icon: ListChecks },
   { id: "portfolio", label: "내 작업", icon: Briefcase },
 ];
