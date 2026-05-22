@@ -40,8 +40,12 @@ type Props = {
 };
 
 // textarea의 한 줄 높이 (line-height = 1.625rem, text-base 기준).
+// wrap 측정이 아직 안 됐을 때 fallback. 측정 끝나면 mirror div 의 per-line offsetHeight 사용.
 const LINE_HEIGHT = "1.625rem";
+const LINE_HEIGHT_PX = 26; // 1.625rem * 16px
 const GUTTER_WIDTH = "1.75rem";
+const TEXTAREA_PADDING_LEFT = "0.5rem";
+const TEXTAREA_PADDING_BOTTOM = "1rem";
 
 type SlashState = {
   slashStart: number; // value 안 `/` 의 offset
@@ -54,7 +58,11 @@ export function SourceBodyEditor({ content, onChange, onSendLineToInbox }: Props
   const [draft, setDraft] = useState(content);
   const [caretLine, setCaretLine] = useState<number | null>(null);
   const [slashState, setSlashState] = useState<SlashState | null>(null);
+  // mirror div 가 측정한 source line 별 actual visual height (wrap 포함, px).
+  // 초기엔 빈 배열 — 그 동안 GutterMarker 는 LINE_HEIGHT fallback.
+  const [lineHeights, setLineHeights] = useState<number[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const mirrorRef = useRef<HTMLDivElement>(null);
   const skipNextValueSyncRef = useRef(true);
   // 다음 render 직후 textarea selection 을 강제로 set 할 위치. Tab/Enter/Paste 같은
   // 프로그램 edit 에서 caret 을 정확히 이동시키기 위함.
@@ -138,11 +146,31 @@ export function SourceBodyEditor({ content, onChange, onSendLineToInbox }: Props
     setDraft(content);
   }, [content]);
 
+  // mirror div 의 자식 (source line 별 div) offsetHeight 측정 → lineHeights state.
+  // 변경 없는 경우 setState skip — render loop 차단.
+  function measureLineHeights() {
+    const mirror = mirrorRef.current;
+    if (!mirror) return;
+    const children = mirror.children;
+    const next: number[] = new Array(children.length);
+    for (let i = 0; i < children.length; i++) {
+      next[i] = (children[i] as HTMLElement).offsetHeight;
+    }
+    setLineHeights((prev) => {
+      if (prev.length !== next.length) return next;
+      for (let i = 0; i < next.length; i++) {
+        if (prev[i] !== next[i]) return next;
+      }
+      return prev;
+    });
+  }
+
   useLayoutEffect(() => {
     const el = textareaRef.current;
     if (!el) return;
     el.style.height = "auto";
     el.style.height = el.scrollHeight + "px";
+    measureLineHeights();
     if (pendingSelectionRef.current) {
       const { start, end } = pendingSelectionRef.current;
       el.setSelectionRange(start, end);
@@ -151,6 +179,31 @@ export function SourceBodyEditor({ content, onChange, onSendLineToInbox }: Props
       setCaretLine(el.value.slice(0, start).split("\n").length - 1);
     }
   }, [draft]);
+
+  // textarea width 변경 (사이드패널 collapse, 창 리사이즈 등) → mirror 재측정.
+  // rAF 로 한 frame 합쳐서 측정 — 연속 리사이즈에서 thrash 회피.
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    let raf = 0;
+    const ro = new ResizeObserver(() => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        // textarea height 도 wrap 변화로 바뀔 수 있음 — 재계산.
+        const ta = textareaRef.current;
+        if (ta) {
+          ta.style.height = "auto";
+          ta.style.height = ta.scrollHeight + "px";
+        }
+        measureLineHeights();
+      });
+    });
+    ro.observe(el);
+    return () => {
+      cancelAnimationFrame(raf);
+      ro.disconnect();
+    };
+  }, []);
 
   // macOS 의 "스마트 인용 부호와 줄표" 가 -- → — 자동 치환을 emit 할 때,
   // beforeinput inputType "insertReplacementText" 로 들어옴 — preventDefault.
@@ -404,43 +457,81 @@ export function SourceBodyEditor({ content, onChange, onSendLineToInbox }: Props
             key={i}
             kind={kind}
             active={i === caretLine}
+            // mirror 가 아직 측정 안 했거나 새 줄이면 LINE_HEIGHT_PX fallback.
+            // wrap 된 줄은 측정한 px height 그대로 — textarea 의 visual line top 과 정렬.
+            heightPx={lineHeights[i] ?? LINE_HEIGHT_PX}
             onClick={() => focusLine(i)}
           />
         ))}
       </div>
-      <textarea
-        ref={textareaRef}
-        value={draft}
-        onChange={(e) => {
-          skipNextValueSyncRef.current = true;
-          setDraft(e.target.value);
-          onChange(e.target.value);
-          updateCaretLine();
-          updateSlashTrigger(e.target.value, e.target.selectionStart ?? 0);
-        }}
-        onKeyDown={onKeyDown}
-        onPaste={onPaste}
-        onSelect={updateCaretLine}
-        onKeyUp={updateCaretLine}
-        onClick={updateCaretLine}
-        onFocus={updateCaretLine}
-        onBlur={() => setCaretLine(null)}
-        placeholder="메모 내용을 적어주세요..."
-        className="flex-1 resize-none bg-transparent text-base outline-none"
-        autoCorrect="off"
-        autoCapitalize="off"
-        spellCheck={false}
-        style={{
-          color: "var(--text-primary)",
-          lineHeight: LINE_HEIGHT,
-          padding: 0,
-          paddingLeft: "0.5rem",
-          paddingBottom: "1rem", // 가로 scrollbar 가 마지막 줄 위에 겹치지 않게 여유
-          overflowY: "hidden",
-          overscrollBehaviorX: "none", // 좌우만 bounce 제거 — y 는 부모 scroll 로 propagate
-        }}
-        wrap="off"
-      />
+      <div className="relative flex-1">
+        <textarea
+          ref={textareaRef}
+          value={draft}
+          onChange={(e) => {
+            skipNextValueSyncRef.current = true;
+            setDraft(e.target.value);
+            onChange(e.target.value);
+            updateCaretLine();
+            updateSlashTrigger(e.target.value, e.target.selectionStart ?? 0);
+          }}
+          onKeyDown={onKeyDown}
+          onPaste={onPaste}
+          onSelect={updateCaretLine}
+          onKeyUp={updateCaretLine}
+          onClick={updateCaretLine}
+          onFocus={updateCaretLine}
+          onBlur={() => setCaretLine(null)}
+          placeholder="메모 내용을 적어주세요..."
+          className="block w-full resize-none bg-transparent text-base outline-none"
+          autoCorrect="off"
+          autoCapitalize="off"
+          spellCheck={false}
+          style={{
+            color: "var(--text-primary)",
+            lineHeight: LINE_HEIGHT,
+            padding: 0,
+            paddingLeft: TEXTAREA_PADDING_LEFT,
+            paddingBottom: TEXTAREA_PADDING_BOTTOM,
+            overflowY: "hidden",
+            overflowX: "hidden", // wrap=soft 라 가로 scroll 발생 X — 명시
+            overscrollBehavior: "none",
+            wordBreak: "break-word", // 긴 영문 단어/URL 도 강제 wrap (CJK 는 어차피 char-단위)
+          }}
+          wrap="soft"
+        />
+        {/* hidden mirror — textarea 와 동일 width / font / padding 으로 source line 별
+            wrap 된 actual visual height 측정. 자식 1개 = source line 1개 (\n 으로 split). */}
+        <div
+          ref={mirrorRef}
+          aria-hidden
+          style={{
+            position: "absolute",
+            inset: 0,
+            visibility: "hidden",
+            pointerEvents: "none",
+            paddingLeft: TEXTAREA_PADDING_LEFT,
+            paddingBottom: TEXTAREA_PADDING_BOTTOM,
+            paddingTop: 0,
+            paddingRight: 0,
+            boxSizing: "border-box",
+            fontFamily: "inherit",
+            fontSize: "1rem", // text-base
+            lineHeight: LINE_HEIGHT,
+            whiteSpace: "pre-wrap",
+            overflowWrap: "break-word",
+            wordBreak: "break-word",
+          }}
+        >
+          {draft.split("\n").map((line, i) => (
+            // 빈 줄도 한 줄 차지하도록 zero-width space.
+            // pre-wrap 이라 trailing space 도 보존돼서 textarea wrap 동작과 일치.
+            <div key={i} style={{ minHeight: LINE_HEIGHT }}>
+              {line.length === 0 ? "​" : line}
+            </div>
+          ))}
+        </div>
+      </div>
       {slashState ? (
         <SlashCommandPopover
           filter={slashState.filter}
@@ -449,21 +540,33 @@ export function SourceBodyEditor({ content, onChange, onSendLineToInbox }: Props
           onClose={() => setSlashState(null)}
           // gutter (1.75rem) + textarea paddingLeft (0.5rem) = 2.25rem 안쪽.
           anchorLeft="2.25rem"
-          // slash 줄 바로 아래 — (slashLine + 1) * LINE_HEIGHT.
-          anchorTop={`calc(${slashState.slashLine + 1} * ${LINE_HEIGHT})`}
+          // slash 줄 바로 아래. wrap 된 줄이면 그 줄 끝까지의 cumulative height.
+          // 측정 전엔 LINE_HEIGHT_PX 기준 fallback.
+          anchorTop={`${cumulativeHeight(lineHeights, slashState.slashLine + 1)}px`}
         />
       ) : null}
     </div>
   );
 }
 
+function cumulativeHeight(heights: number[], count: number): number {
+  let sum = 0;
+  for (let i = 0; i < count; i++) {
+    sum += heights[i] ?? LINE_HEIGHT_PX;
+  }
+  return sum;
+}
+
 function GutterMarker({
   kind,
   active,
+  heightPx,
   onClick,
 }: {
   kind: LineKind;
   active: boolean;
+  // mirror 측정 결과 — source line 이 wrap 되면 여러 visual line 의 합계 px.
+  heightPx: number;
   onClick: () => void;
 }) {
   const label = labelForKind(kind);
@@ -474,18 +577,20 @@ function GutterMarker({
     <div
       title={label || "이 줄로 이동"}
       onClick={onClick}
-      className="flex cursor-pointer items-center justify-center"
+      className="flex cursor-pointer justify-center"
       style={{
-        height: LINE_HEIGHT,
+        height: `${heightPx}px`,
         lineHeight: LINE_HEIGHT,
         color: active ? "var(--accent-blue)" : undefined,
+        // wrap 으로 여러 visual line 인 경우 glyph 는 첫 visual line 에 정렬.
+        alignItems: "flex-start",
       }}
     >
       <span
         className="relative inline-flex items-center justify-center"
         style={{
           width: "1.5rem",
-          height: "1.5rem",
+          height: LINE_HEIGHT, // glyph 자체는 한 visual line 높이 — 첫 줄에만.
           backgroundColor: active ? "var(--accent-blue-bg)" : undefined,
           borderRadius: active ? "0.375rem" : undefined,
         }}

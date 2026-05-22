@@ -6,6 +6,16 @@
 
 ## 2026-05-22
 
+### PR #30 — 본문 word-wrap + gutter dynamic alignment
+
+- **한 줄 임팩트**: 한국어 메모 자연 줄넘김 + gutter 정확 정렬
+- **textarea `wrap="off"` → `"soft"`** — 긴 한국어 줄이 가로 스크롤로 빠져나가 잘리던 문제. 매일 통증이었던 부분. 그냥 wrap 만 켜면 source line 별 1:1 gutter marker 가 wrap 된 visual line 과 어긋남 — marker 는 마크다운 학습 보조 핵심이라 깨지면 안 됨.
+- **hidden mirror `<div>` per-line 측정** — textarea 와 동일 width/font/line-height/padding/`white-space: pre-wrap` 으로 source line 별 actual visual height 측정. `lineHeights` state 가 mirror children 의 `offsetHeight` 배열. measure 는 변경 없을 때 setState skip (render loop 차단). `useLayoutEffect` 동기 측정 (draft 바뀔 때) + `ResizeObserver` + rAF debounce (사이드패널 collapse / 창 리사이즈) 둘 다.
+- **GutterMarker per-line height + glyph 첫 visual line 고정** — 마커 컨테이너 높이 = 그 source line 의 wrap 된 총 높이. glyph (H1, bullet, quote, ...) 자체는 첫 visual line (`LINE_HEIGHT`) 안에 정렬 (`alignItems: flex-start`). wrap 으로 3줄 차지하는 bullet 항목도 marker 는 첫 줄 옆에 한 번만.
+- **슬래시 popover anchorTop 보정** — `cumulativeHeight(lineHeights, slashLine + 1)` 으로 wrap 누적 위치 계산. 측정 전엔 `LINE_HEIGHT_PX` (26px) fallback — 깜빡거림 회피.
+- **단일 파일 (SourceBodyEditor.tsx) 약 100줄 변경**. 221 tests passing.
+- commit `<commit-sha>`
+
 ### PR #29 — chrome user-select 차단
 
 - **한 줄 임팩트**: chrome 영역 (사이드바 / 탭 / 캘린더 셀) 실수 드래그 selection 차단

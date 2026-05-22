@@ -10,11 +10,6 @@ PR 단위로 묶음. 각 PR 의 **한 줄 임팩트** 는 카드 frontmatter `im
 
 ## 🚀 메모 에디터 (마크다운) 강화
 
-### PR — 본문 word-wrap + gutter dynamic alignment `ui_ux`
-한 줄 임팩트: 한국어 메모 자연 줄넘김 + gutter 정확 정렬
-
-- [ ] textarea `wrap="on"` + gutter marker 가 wrap 된 visual line 과 align. hidden mirror div 가 같은 width/font/line-height 으로 source line 별 actual visual height 측정 → gutter marker height 동기. ResizeObserver 로 textarea width 변경 감지 + debounce. ~40-50줄
-
 ### PR — 사이드바 메모 탐색 (검색 + 태그 + 즐겨찾기) `ui_ux`
 한 줄 임팩트: 메모 많아져도 사이드바에서 즉시 좁히기 — 이름·태그·즐겨찾기
 
