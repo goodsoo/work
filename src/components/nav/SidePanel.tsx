@@ -7,6 +7,7 @@ import {
   Trash2,
   ArrowUpDown,
   Check,
+  Pencil,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -23,6 +24,7 @@ import { TODO_CATEGORIES } from "../../api/todos";
 import { formatDateLong, isToday, todayIso } from "../../lib/dates";
 import { formatError } from "../../lib/errors";
 import { TaskAddModal } from "../tasks/TaskAddModal";
+import { JournalOverlay } from "../calendar/JournalOverlay";
 
 /* ── Meetings Side Panel ── */
 
@@ -459,6 +461,7 @@ export function CalendarDayPanel({
   const todosQ = useTodos();
   const updateTodo = useUpdateTodo();
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showJournalOverlay, setShowJournalOverlay] = useState(false);
 
   const today = isToday(selectedDate);
 
@@ -516,10 +519,8 @@ export function CalendarDayPanel({
     });
   }
 
-  const hasItems =
-    meetings.length > 0 ||
-    todos.length > 0 ||
-    journal !== null;
+  // journal 은 header 바로 아래 별도 section. items list 에는 안 들어감.
+  const hasItems = meetings.length > 0 || todos.length > 0;
 
   return (
     <div className="flex h-full flex-col">
@@ -554,6 +555,60 @@ export function CalendarDayPanel({
         </button>
       </div>
 
+      {/* Journal CTA — 일기 빠른 진입. 없는 날은 dashed border + 펜 + 한 줄, 있는 날은
+          미리보기 카드 (본문 첫 ~100자) + 펜 아이콘. 클릭 시 overlay 열림. */}
+      <div
+        className="shrink-0 px-3 pt-3 pb-2"
+        style={{ borderBottom: "1px solid var(--border-subtle)" }}
+      >
+        {journal ? (
+          <button
+            type="button"
+            onClick={() => setShowJournalOverlay(true)}
+            className="group flex w-full items-start gap-2 rounded-md px-3 py-2 text-left transition hover:bg-[var(--bg-surface-hover)]"
+            style={{ minHeight: 0 }}
+          >
+            <BookOpen
+              className="mt-0.5 h-3.5 w-3.5 shrink-0"
+              style={{ color: "var(--text-muted)" }}
+            />
+            <div className="min-w-0 flex-1">
+              <div
+                className="flex items-center justify-between gap-2 text-xs font-medium"
+                style={{ color: "var(--text-secondary)" }}
+              >
+                <span>일기</span>
+                <Pencil
+                  className="h-3 w-3 opacity-0 transition group-hover:opacity-100"
+                  style={{ color: "var(--text-muted)" }}
+                />
+              </div>
+              <div
+                className="mt-0.5 line-clamp-3 whitespace-pre-wrap font-serif text-sm leading-snug"
+                style={{ color: "var(--text-secondary)" }}
+              >
+                {journal.content?.trim() || "(내용 없음)"}
+              </div>
+            </div>
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setShowJournalOverlay(true)}
+            className="flex w-full items-center gap-2 rounded-md border border-dashed px-3 py-2 text-left text-sm transition hover:bg-[var(--bg-surface-hover)]"
+            style={{
+              borderColor: "var(--border-default)",
+              color: "var(--text-muted)",
+              minHeight: 0,
+            }}
+            aria-label="일기 쓰기"
+          >
+            <Plus className="h-3.5 w-3.5 shrink-0" />
+            <span>일기 쓰기</span>
+          </button>
+        )}
+      </div>
+
       {/* Items */}
       <div className="flex-1 overflow-y-auto">
         {!hasItems ? (
@@ -561,7 +616,7 @@ export function CalendarDayPanel({
             className="px-4 py-8 text-center text-sm"
             style={{ color: "var(--text-muted)" }}
           >
-            이날은 비어있어요
+            이날의 일정 / 할 일이 없어요
           </div>
         ) : (
           <div className="space-y-1 p-3">
@@ -641,29 +696,6 @@ export function CalendarDayPanel({
               </div>
             ))}
 
-            {/* Journal */}
-            {journal ? (
-              <div className="flex items-start gap-2 rounded-md px-3 py-2">
-                <BookOpen
-                  className="mt-0.5 h-3.5 w-3.5 shrink-0"
-                  style={{ color: "var(--text-muted)" }}
-                />
-                <div className="min-w-0 flex-1">
-                  <div
-                    className="text-xs font-medium"
-                    style={{ color: "var(--text-secondary)" }}
-                  >
-                    일기
-                  </div>
-                  <div
-                    className="mt-0.5 line-clamp-3 text-sm"
-                    style={{ color: "var(--text-secondary)" }}
-                  >
-                    {journal.content?.slice(0, 200) || "(내용 없음)"}
-                  </div>
-                </div>
-              </div>
-            ) : null}
           </div>
         )}
       </div>
@@ -672,6 +704,11 @@ export function CalendarDayPanel({
         open={showAddModal}
         onClose={() => setShowAddModal(false)}
         prefill={{ due_date: selectedDate, category: "schedule" }}
+      />
+      <JournalOverlay
+        isOpen={showJournalOverlay}
+        date={selectedDate}
+        onClose={() => setShowJournalOverlay(false)}
       />
     </div>
   );

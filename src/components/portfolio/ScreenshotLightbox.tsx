@@ -39,7 +39,11 @@ export function ScreenshotLightbox({
 
   return (
     <div
-      onClick={onClose}
+      // backdrop close: mousedown 시작점이 backdrop 자체일 때만. 이미지/버튼 위에서
+      // 시작한 드래그가 바깥에서 mouseup 되어 닫히는 케이스 차단.
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
       className="fixed inset-0 z-50 flex flex-col items-center justify-center p-6"
       style={{ backgroundColor: "rgba(0,0,0,0.9)" }}
     >

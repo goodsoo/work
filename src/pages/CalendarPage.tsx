@@ -45,6 +45,20 @@ function timestampToLocalIsoDate(ts: string): string {
   return todayIso(new Date(ts));
 }
 
+// 모듈 레벨 cache: 페이지 전환으로 CalendarPage 가 unmount/remount 되어도 스크롤 위치
+// 유지. 메모장 SCROLL_CACHE 패턴 차용. 새로고침 시 reset.
+// `anchorIso` 는 캐시가 anchor (오늘 주의 일요일) 가 동일한 세션 안에서만 유효함을
+// 보장. 자정을 넘기면 anchor 가 바뀌므로 cache 폐기 (그땐 오늘 기준으로 다시 위치 잡기가 자연스러움).
+type CalendarStateCache = {
+  anchorIso: string;
+  centerWeekOffset: number;
+  visibleWeekOffset: number;
+  scrollTop: number;
+  selectedDate: string;
+  lastTarget: string | null;
+};
+let calendarStateCache: CalendarStateCache | null = null;
+
 export function CalendarPage({ targetDate, onSelectedDateChange }: Props) {
   const meetingsQ = useMeetings();
   const journalsQ = useJournals();
@@ -55,26 +69,46 @@ export function CalendarPage({ targetDate, onSelectedDateChange }: Props) {
   const [anchorWeekStart] = useState<Date>(() =>
     startOfWeek(new Date(), { weekStartsOn: 0 }),
   );
+  const anchorIso = useMemo(() => todayIso(anchorWeekStart), [anchorWeekStart]);
+  // 캐시 valid 여부 — anchor 가 동일할 때만 사용 (자정 넘기면 폐기).
+  const cachedInitial = useMemo<CalendarStateCache | null>(() => {
+    if (!calendarStateCache) return null;
+    if (calendarStateCache.anchorIso !== anchorIso) return null;
+    return calendarStateCache;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   // minCenterOffset: centerWeekOffset 의 하한. 버퍼가 2026년 이전으로 안 빠지게.
   const minCenterOffset = useMemo(
     () => computeMinCenterOffset(anchorWeekStart),
     [anchorWeekStart],
   );
-  // centerWeekOffset: 버퍼 중심이 anchor 로부터 몇 주 떨어져 있는지. 초기 0 인데
-  // minCenter > 0 (= 아직 2026년 초반 사용 중) 이면 클램프됨 → 오늘은 idx=WEEK_CENTER 가 아닌
-  // (WEEK_CENTER - minCenter) 에 위치.
-  const [centerWeekOffset, setCenterWeekOffset] = useState(() =>
-    Math.max(0, computeMinCenterOffset(anchorWeekStart)),
-  );
+  // centerWeekOffset: 버퍼 중심이 anchor 로부터 몇 주 떨어져 있는지. cache 있으면 거기서 복원
+  // (anchor 동일 보장), 없으면 minCenter 클램프. 자정 넘긴 케이스도 cachedInitial=null 이라 안전.
+  const [centerWeekOffset, setCenterWeekOffset] = useState(() => {
+    const min = computeMinCenterOffset(anchorWeekStart);
+    if (cachedInitial) return Math.max(min, cachedInitial.centerWeekOffset);
+    return Math.max(0, min);
+  });
   // visibleWeekOffset: 현재 viewport 최상단의 주가 anchor 로부터 몇 주.
-  const [visibleWeekOffset, setVisibleWeekOffset] = useState(0);
-  const [selectedDate, setSelectedDate] = useState<string>(today);
+  const [visibleWeekOffset, setVisibleWeekOffset] = useState(
+    () => cachedInitial?.visibleWeekOffset ?? 0,
+  );
+  const [selectedDate, setSelectedDate] = useState<string>(
+    () => cachedInitial?.selectedDate ?? today,
+  );
 
   const containerRef = useRef<HTMLDivElement>(null);
   const rowHeightRef = useRef<number>(140);
   // rebalance 진행 중일 때 scroll을 복원할 target px. null 이면 idle.
   const rebalanceTargetRef = useRef<number | null>(null);
   const initialScrollDone = useRef(false);
+  // cache 가 있으면 그 scrollTop 으로 초기 복원. 첫 layout effect 에서 한 번만 소비.
+  const initialScrollTopRef = useRef<number | null>(
+    cachedInitial?.scrollTop ?? null,
+  );
+  // 최신 scrollTop — onScroll 마다 갱신. unmount 시 cache 저장에 사용 (cleanup 시점에
+  // containerRef.current 가 null 일 수 있어 안전한 ref 복사).
+  const scrollTopRef = useRef<number>(cachedInitial?.scrollTop ?? 0);
 
   const isLoading =
     meetingsQ.isLoading ||
@@ -140,8 +174,12 @@ export function CalendarPage({ targetDate, onSelectedDateChange }: Props) {
     return map;
   }, [meetingsQ.data, journalsQ.data, todosQ.data]);
 
-  // External target date (from side panel)
-  const [lastTarget, setLastTarget] = useState<string | null>(null);
+  // External target date (from side panel). cache 가 있으면 같은 값을 복원 — page
+  // 전환 후 돌아왔을 때 같은 targetDate 가 들어와도 "외부 트리거" 로 오인해서 스크롤이
+  // 재설정되지 않도록.
+  const [lastTarget, setLastTarget] = useState<string | null>(
+    () => cachedInitial?.lastTarget ?? null,
+  );
   if (targetDate && targetDate !== lastTarget) {
     setLastTarget(targetDate);
     setSelectedDate(targetDate);
@@ -172,7 +210,8 @@ export function CalendarPage({ targetDate, onSelectedDateChange }: Props) {
   }
 
   // Initial 또는 rebalance 시 scroll 위치 복원.
-  // Initial: 오늘을 viewport top 으로. 오늘 offset=0, idx_today = WEEK_CENTER - centerOff.
+  // Initial: cache 가 있으면 그 scrollTop, 없으면 오늘을 viewport top 으로
+  // (오늘 offset=0, idx_today = WEEK_CENTER - centerOff).
   useLayoutEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -182,10 +221,13 @@ export function CalendarPage({ targetDate, onSelectedDateChange }: Props) {
         if (!e || !e.clientHeight) return;
         rowHeightRef.current = measureRowHeight();
         const rh = rowHeightRef.current;
-        const initialTarget = (WEEK_CENTER - centerWeekOffset) * rh;
+        const initialTarget =
+          initialScrollTopRef.current ?? (WEEK_CENTER - centerWeekOffset) * rh;
         const target = rebalanceTargetRef.current ?? initialTarget;
         e.scrollTop = target;
+        scrollTopRef.current = target;
         rebalanceTargetRef.current = null;
+        initialScrollTopRef.current = null;
         initialScrollDone.current = true;
       });
     }
@@ -200,6 +242,35 @@ export function CalendarPage({ targetDate, onSelectedDateChange }: Props) {
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
+  // Latest state ref — unmount cleanup 시점에 동기 closure 의 stale 값 대신 사용.
+  const latestStateRef = useRef({
+    centerWeekOffset,
+    visibleWeekOffset,
+    selectedDate,
+    lastTarget,
+    anchorIso,
+  });
+  useEffect(() => {
+    latestStateRef.current = {
+      centerWeekOffset,
+      visibleWeekOffset,
+      selectedDate,
+      lastTarget,
+      anchorIso,
+    };
+  }, [centerWeekOffset, visibleWeekOffset, selectedDate, lastTarget, anchorIso]);
+
+  // Unmount 시 cache 저장 — 페이지 전환 후 돌아왔을 때 복원용. 새로고침 시 모듈
+  // 재import 되며 cache 비워짐.
+  useEffect(() => {
+    return () => {
+      calendarStateCache = {
+        ...latestStateRef.current,
+        scrollTop: scrollTopRef.current,
+      };
+    };
+  }, []);
+
   // Scroll handler — visible week 갱신 + edge 근접 시 rebalance.
   // round 사용해서 subpixel 으로 인한 off-by-one 방지 (snap 됐는데 헤더가 한 주 이전으로 잡히는 버그).
   // 클램프: newCenter 가 minCenter 보다 작아질 수 없음 (2026 이전 차단).
@@ -207,6 +278,7 @@ export function CalendarPage({ targetDate, onSelectedDateChange }: Props) {
     const el = containerRef.current;
     const rh = rowHeightRef.current;
     if (!el || !rh) return;
+    scrollTopRef.current = el.scrollTop;
     const idx = Math.round(el.scrollTop / rh);
     setVisibleWeekOffset(centerWeekOffset + (idx - WEEK_CENTER));
 
