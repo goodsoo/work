@@ -14,6 +14,7 @@ import {
   useCreateMeeting,
 } from "../../hooks/useMeetings";
 import { useMeetingSort, type MeetingSortKey } from "../../hooks/useMeetingSort";
+import { type TodoSortKey } from "../../hooks/useTodoSort";
 import { useJournals } from "../../hooks/useJournals";
 import { useTodos, useUpdateTodo } from "../../hooks/useTodos";
 import type { Meeting } from "../../api/meetings";
@@ -670,53 +671,111 @@ export function CalendarDayPanel({
       <TaskAddModal
         open={showAddModal}
         onClose={() => setShowAddModal(false)}
-        prefill={{ due_date: selectedDate }}
+        prefill={{ due_date: selectedDate, category: "schedule" }}
       />
     </div>
   );
 }
 
-/* ── Todos Side Panel (category filter) ── */
+/* ── Todos Side Panel — 상태 필터 + 카테고리 필터 (독립 차원, AND 결합) ── */
 
-type TodosFilter = TodoCategory | "all" | "uncategorized";
+export type TodosStatusFilter = "all" | "pending" | "done" | "cancelled";
+export type TodosCategoryFilter =
+  | "all"
+  | "uncategorized"
+  | TodoCategory;
 
 type TodosPanelProps = {
-  activeCategory: TodosFilter;
-  onCategoryChange: (cat: TodosFilter) => void;
+  statusFilter: TodosStatusFilter;
+  onStatusChange: (next: TodosStatusFilter) => void;
+  categoryFilter: TodosCategoryFilter;
+  onCategoryChange: (next: TodosCategoryFilter) => void;
+  sortKey: TodoSortKey;
+  onSortKeyChange: (next: TodoSortKey) => void;
 };
 
 export function TodosSidePanel({
-  activeCategory,
+  statusFilter,
+  onStatusChange,
+  categoryFilter,
   onCategoryChange,
+  sortKey,
+  onSortKeyChange,
 }: TodosPanelProps) {
   const { data } = useTodos();
+  const todos = data ?? [];
 
+  // 두 차원 독립. 한 차원 count 는 다른 차원과 AND 후 — 사용자가 "현재 다른
+  // 차원 적용 후 이 옵션 누르면 몇 개?" 미리 보기. (예: status=done 일 때
+  // 카테고리별 count 는 done 만 센 값.)
+  // status: 미완료 = !done && !cancelled (actionable), 완료 = done, 취소 = cancelled.
+  // cancelled 는 별도 view 로 분리 (사이드바 하단 entry). deleted 는 footer 의
+  // 휴지통 modal 에서 처리 — 다른 모든 필터 (전체/미완료/완료 + 카테고리) 에서
+  // 격리.
   const counts = useMemo(() => {
-    const list = data ?? [];
-    const map: Record<string, number> = { all: 0, work: 0, meeting: 0, uncategorized: 0 };
-    for (const t of list) {
-      if (t.done) continue;
-      map.all++;
-      if (t.category) map[t.category]++;
-      else map.uncategorized++;
+    function inStatus(t: Todo): boolean {
+      if (t.deleted) return false; // deleted 는 절대 안 셈
+      if (statusFilter === "cancelled") return t.cancelled;
+      if (t.cancelled) return false;
+      if (statusFilter === "all") return true;
+      if (statusFilter === "pending") return !t.done;
+      return t.done;
     }
-    return map;
-  }, [data]);
+    function inCategory(t: Todo): boolean {
+      if (categoryFilter === "all") return true;
+      if (categoryFilter === "uncategorized") return !t.category;
+      return t.category === categoryFilter;
+    }
+    const status: Record<TodosStatusFilter, number> = {
+      all: 0,
+      pending: 0,
+      done: 0,
+      cancelled: 0,
+    };
+    const category: Record<string, number> = { all: 0, uncategorized: 0 };
+    for (const c of TODO_CATEGORIES) category[c.id] = 0;
+    for (const t of todos) {
+      if (t.deleted) continue; // 휴지통 modal 에서만 보임
+      if (t.cancelled) {
+        status.cancelled++;
+        continue;
+      }
+      if (inCategory(t)) {
+        status.all++;
+        if (t.done) status.done++;
+        else status.pending++;
+      }
+      if (inStatus(t)) {
+        category.all++;
+        if (t.category) {
+          category[t.category] = (category[t.category] ?? 0) + 1;
+        } else {
+          category.uncategorized++;
+        }
+      }
+    }
+    return { status, category };
+  }, [todos, statusFilter, categoryFilter]);
 
-  const items: Array<{ id: TodoCategory | "all" | "uncategorized"; label: string; count: number }> = [
-    { id: "all", label: "전체", count: counts.all },
+  const statusItems: Array<{ id: TodosStatusFilter; label: string; count: number }> = [
+    { id: "all", label: "전체", count: counts.status.all },
+    { id: "pending", label: "미완료", count: counts.status.pending },
+    { id: "done", label: "완료", count: counts.status.done },
+  ];
+  const categoryItems: Array<{ id: TodosCategoryFilter; label: string; count: number }> = [
+    { id: "all", label: "전체", count: counts.category.all },
+    { id: "uncategorized", label: "미분류", count: counts.category.uncategorized },
     ...TODO_CATEGORIES.map((c) => ({
-      id: c.id,
+      id: c.id as TodosCategoryFilter,
       label: c.label,
-      count: counts[c.id] ?? 0,
+      count: counts.category[c.id] ?? 0,
     })),
-    { id: "uncategorized", label: "미분류", count: counts.uncategorized },
   ];
 
   return (
     <div className="flex h-full flex-col">
       <div
-        className="flex shrink-0 items-center px-4 py-3"
+        className="flex shrink-0 items-center justify-between px-4 py-3"
         style={{ borderBottom: "1px solid var(--border-default)" }}
       >
         <h2
@@ -725,37 +784,112 @@ export function TodosSidePanel({
         >
           할 일
         </h2>
+        <div className="flex items-center gap-0.5">
+          <SortMenu value={sortKey} onChange={onSortKeyChange} />
+          <button
+            type="button"
+            onClick={() => window.dispatchEvent(new Event("todos:add-request"))}
+            title="새 할 일"
+            className="flex h-7 w-7 items-center justify-center rounded-md transition"
+            style={{ color: "var(--text-secondary)", minHeight: 0 }}
+          >
+            <Plus className="h-4 w-4" />
+          </button>
+        </div>
       </div>
-      <nav className="flex-1 overflow-y-auto p-2" aria-label="카테고리">
-        {items.map((item) => {
-          const active = item.id === activeCategory;
-          return (
-            <button
+      <nav className="flex min-h-0 flex-1 flex-col p-2" aria-label="필터">
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          {statusItems.map((item) => (
+            <TodosFilterItem
               key={item.id}
-              type="button"
+              item={item}
+              active={item.id === statusFilter}
+              onClick={() => onStatusChange(item.id)}
+            />
+          ))}
+          <div
+            className="my-2"
+            style={{ borderTop: "1px solid var(--border-subtle)" }}
+          />
+          {categoryItems.map((item) => (
+            <TodosFilterItem
+              key={item.id}
+              item={item}
+              active={item.id === categoryFilter}
               onClick={() => onCategoryChange(item.id)}
-              className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-sm transition ${
-                active ? "font-medium" : ""
-              }`}
-              style={{
-                backgroundColor: active ? "var(--bg-surface-active)" : undefined,
-                color: active ? "var(--text-primary)" : "var(--text-secondary)",
-                minHeight: 0,
-              }}
-            >
-              <span>{item.label}</span>
-              <span
-                className="font-mono text-xs"
-                style={{
-                  color: active ? "var(--text-secondary)" : "var(--text-muted)",
-                }}
-              >
-                {item.count}
-              </span>
-            </button>
-          );
-        })}
+            />
+          ))}
+        </div>
+        {/* 취소됨 — 사이드바 하단 별도 entry. 클릭 시 다른 필터 무시. */}
+        <div
+          className="mt-2 pt-2"
+          style={{ borderTop: "1px solid var(--border-default)" }}
+        >
+          <TodosFilterItem
+            item={{ label: "취소됨", count: counts.status.cancelled }}
+            active={statusFilter === "cancelled"}
+            onClick={() => onStatusChange("cancelled")}
+          />
+        </div>
       </nav>
+    </div>
+  );
+}
+
+function TodosFilterItem({
+  item,
+  active,
+  onClick,
+}: {
+  item: { label: string; count: number };
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-sm transition ${
+        active ? "font-medium" : ""
+      }`}
+      style={{
+        backgroundColor: active ? "var(--bg-surface-active)" : undefined,
+        color: active ? "var(--text-primary)" : "var(--text-secondary)",
+        minHeight: 0,
+      }}
+    >
+      <span>{item.label}</span>
+      <span
+        className="font-mono text-xs"
+        style={{
+          color: active ? "var(--text-secondary)" : "var(--text-muted)",
+        }}
+      >
+        {item.count}
+      </span>
+    </button>
+  );
+}
+
+// AppShell.sidePanelFooter slot 으로 주입. 할 일 탭의 휴지통 entry.
+// 메모장 MeetingsSidePanelFooter 와 동일 패턴.
+export function TodosSidePanelFooter({
+  onTrashOpen,
+}: {
+  onTrashOpen: () => void;
+}) {
+  return (
+    <div className="flex items-center gap-1">
+      <button
+        type="button"
+        onClick={onTrashOpen}
+        title="휴지통"
+        aria-label="휴지통"
+        className="flex h-7 w-7 items-center justify-center rounded-md transition"
+        style={{ color: "var(--text-muted)", minHeight: 0 }}
+      >
+        <Trash2 className="h-3.5 w-3.5" />
+      </button>
     </div>
   );
 }

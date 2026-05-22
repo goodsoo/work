@@ -6,6 +6,22 @@
 
 ## 2026-05-22
 
+### PR #27 — 할일 페이지 UI/UX 개편 + 휴지통
+
+- **한 줄 임팩트**: 매일 쓰는 할일 페이지, 큰 정리
+- **카드 형태 + read-only/edit toggle** — 메모장 본문 토글 spirit. 카드 클릭 → edit, 외부 클릭/Enter/확인 → commit, ESC → cancel. 편집 중 draft 만 변경 → 정렬 안 흔들리고 한 번에 mutation. `TodoRow` 의 `updateDraft`(ref + setState 동기) 로 외부 클릭 시 LooseDate/Time blur 강제 → microtask 후 commit (typing 값 누락 race fix).
+- **메모↔할일 backlink** — `#from-<uid>` inline tag. `lineToTaskPrefill(line, meetingId)` 이 메모 → 할일 ⌘⏎ 시점에 박음. uid 영구라 메모 rename 후에도 안 깨짐. 보기 모드 chip 클릭 시 confirm popover (메모 meta 미리보기 + 메모로 이동 / 취소). 사라진 메모 = "(연결 끊김)" + "연결 해제" outline-red button. md 의 `#from-` tag 자동 정리 X (사용자 결정 우선).
+- **cancelled `[-]` / deleted `[D]`** — 옵시디안 Tasks plugin convention. `setTodoCheckChar` generic + buildTodoLine 우선순위 (deleted > cancelled > done > pending). cancelled = 사이드바 하단 entry 별도. deleted = 휴지통 modal 격리 (사이드바 entry X). 휴지통: 복원 / 영구 삭제 + 비우기 + ConfirmDialog. 메모장 TrashModal 동일 UX.
+- **undo/redo header + 카드 flash** — `useTodoUndo` hook (module-level stack, listener 패턴, cross-page 유지). 사이드패널 → 메인 panel 헤더 (3.5rem grid: 좌 undo·redo / 중앙 "할 일" / 우 여백) 메모장 패턴 통일. flash = class 기반 `.todo-card-flash` (enter animation 재실행 차단).
+- **두 차원 필터 + 정렬** — 상태 (전체/미완료/완료) + 카테고리 (전체/미분류/업무/일정/기타) 독립 AND. cancelled/deleted 격리. 정렬 (최신/오래된/이름) — `useTodoSort` + sidebar `SortMenu`. due_date+due_time, **null first** (기한 미적용 todo 최상단 = 보채기). 체크 토글 시 정렬 영향 X (`_source.line` 기반 미사용, due_date 기반).
+- **D+N / 오늘 / 내일 / D-N due chip** — 제목 앞 chip. overdue 빨강 `accent-red-bg`, 오늘 파랑 `accent-blue-bg`, 임박 (1-3일) outline (회색 fill "끝난" 느낌 회피). 4일+ 미래는 chip 없음.
+- **TaskAddModal 통합** — 사이드패널 `+` button → modal (캘린더 + 와 같은 모달). 카테고리 tag-chip (rounded-full pill). `category: "schedule"` prefill (캘린더에서 만든 todo 가 자동 "일정" 그룹).
+- **CategoryPicker / MeetingPicker / SourceMeetingLink** — `# {label}` Hash icon, `📄 {title}` FileText icon. 검색 popover 패턴 일관 (외부 클릭/ESC 닫기, 최신순 + 날짜 표시).
+- **글자수 제한 + word-wrap** — title input `maxLength=200`, 보기 모드 `break-words` 로 긴 todo 줄바꿈 자연.
+- **vault parser/writer** — `CHECKBOX_RE` `[ x-D]` 인식, `TodoItem.cancelled/deleted` 필드, buildTodoLine 의 `#from-<uid>` tag (extra_tags 분리 + reconstruct 시 보존).
+- 31 modified, 8 new, 1 deleted. 168 tests passing.
+- commit `ab0f4e3`
+
 ### PR #26 — 에러 토스트 디자인 갈아엎기 + overflow fix
 
 - **frosted glass 갈아엎기** — 디자인 시안 8개 띄워서 5번 (iOS frosted) 선택. `--surface-frost` / `--surface-frost-border` / `--surface-frost-shadow` 3개 토큰 (light/dark 둘 다) 으로 일반화. backdrop-blur-xl + rounded-2xl + 큰 그림자. 좌측 빨간 4px stripe (AI slop 톤) 제거.

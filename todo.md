@@ -97,16 +97,13 @@ PR 단위로 묶음. 각 PR 의 **한 줄 임팩트** 는 카드 frontmatter `im
 - [ ] **UI chrome `user-select: none`** — 마우스 실수 드래그로 사이드바 헤더 / 캘린더 셀 / 버튼 라벨 등이 파랗게 selection 되는 거 차단. 텍스트 복사 의도 있는 영역 (메모 본문, 메모 제목, 일정 제목, transcript) 은 그대로 유지.
 - [ ] chrome vs content 경계 정의 — wrapper 단에서 `select-none` 박고 content 컴포넌트는 `select-text` override.
 
-### PR — 할일 페이지 UI/UX 개편 `ui_ux` 🟢
-한 줄 임팩트: 할일 리스트 + 입력 흐름 dogfood 통증 한 번에 정리
+### PR — 동적 카테고리 (사용자 정의 분류) `backend`
+한 줄 임팩트: 업무/미팅 외 본인 카테고리 자유 추가
 
-진행 중 — `feat/todos-revamp` worktree
-
-- [ ] **리스트 UI 정리** — 구분선 톤 다운 (현재 너무 진함). 정보 레이아웃 재배치 (제목/메타/액션 위계 명확).
-- [ ] **체크 실수 복원** — 단일 클릭 = 실수 잦음. 더블클릭으로 체크 토글 또는 ⌘Z undo 도입 (둘 다 양립 가능).
-- [ ] **날짜/시간 입력 통일** — 메모장 메타 row 와 같은 패턴 (date input + time input). 현재는 날짜만 + 입력 불편 + 시간 없음. 메모장과 컴포넌트 공유 후보.
-- [ ] **추가 헤더 sticky** — 할일 추가 입력란을 상단 sticky 로 고정, 또는 위로 스크롤 시 등장. 현재는 매번 최상단으로 가야 함.
-- [ ] **정렬 옵션** — 사이드바 메모 정렬 (`useMeetingSort`) 패턴 todos 에도. 마감일순/생성순/카테고리순 popover.
+- [ ] **데이터 모델** — `TodoCategory` union → `string`. vault 안 `categories.md` (한 줄당 `id: label`) 가 source of truth. 기본 `work / schedule / other` 부트스트랩.
+- [ ] **UI** — 추가/삭제 위치 결정 (TaskAddModal select 안 inline / 설정 패널 / 사이드바 헤더 편집 모드). 사이드패널 필터 + 캘린더 사이드는 동적 빌드.
+- [ ] **Sanitize 정책** — 카테고리 삭제 시 그 카테고리 todo 처리: (a) vault 라인 `#xxx` 자동 strip (b) UI null 표시 + 라인 보존 (c) 삭제 차단 + 옮기라고 경고. 한 가지 고르기.
+- [ ] **알 수 없는 카테고리 표기** — vault 의 `#unknown` 같은 tag 가 카테고리 list 에 없을 때 UI 에서 어떻게 보일지 (지금은 null 로 무시 + 라인 보존).
 
 ### PR — portfolio 카드 시각 재설계 `ui_ux`
 한 줄 임팩트: 카드 크기 축소 + 한눈에 정보 + inline 편집

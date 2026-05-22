@@ -5,11 +5,17 @@ type Props = {
   value: string;
   onCommit: (next: string) => void;
   fullWidth?: boolean;
+  compact?: boolean;
 };
 
 // 너그러운 시간 input. blur/Enter 시 parseLooseTime → HH:mm 정규화.
 // 파싱 실패 시 이전 값으로 revert.
-export function LooseTimeInput({ value, onCommit, fullWidth = false }: Props) {
+export function LooseTimeInput({
+  value,
+  onCommit,
+  fullWidth = false,
+  compact = false,
+}: Props) {
   const [draft, setDraft] = useState(value);
   const skipCommitRef = useRef(false);
   useEffect(() => {
@@ -56,7 +62,7 @@ export function LooseTimeInput({ value, onCommit, fullWidth = false }: Props) {
       }}
       placeholder="hh:mm"
       maxLength={11}
-      className="border-0 bg-transparent text-sm leading-none outline-none"
+      className={`m-0 appearance-none border-0 bg-transparent p-0 leading-none outline-none ${compact ? "text-xs" : "text-sm"}`}
       style={{
         color: "var(--text-primary)",
         width: fullWidth ? "100%" : `${Math.max(draft.length, 5)}ch`,

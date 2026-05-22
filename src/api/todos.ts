@@ -3,21 +3,30 @@ import { extractTodos, toggleTodo, type TodoItem } from "../lib/vault/tasks";
 import { scanAllTodos } from "../lib/vault/scan";
 
 export type TodoPriority = "high" | "medium" | "low";
-export type TodoCategory = "work" | "meeting";
+export type TodoCategory = "work" | "schedule" | "other";
 export const TODO_CATEGORIES: Array<{ id: TodoCategory; label: string }> = [
   { id: "work", label: "업무" },
-  { id: "meeting", label: "미팅" },
+  { id: "schedule", label: "일정" },
+  { id: "other", label: "기타" },
 ];
 
 export interface Todo {
   id: string; // `${file}#L${line}`
   title: string;
   done: boolean;
+  // 옵시디안 `- [-]` convention. done/deleted 와 mutually exclusive.
+  cancelled: boolean;
+  // soft-delete. vault 라인엔 `- [D]` (custom char). 휴지통 view 에서만 보임.
+  // done/cancelled 와 mutually exclusive.
+  deleted: boolean;
   done_at: string | null;
   priority: TodoPriority;
   category: TodoCategory | null;
   due_date: string | null;
   due_time: string | null;
+  // 메모 → 할일 ⌘⏎ 로 만든 todo 면 원본 메모 uid. vault 라인엔
+  // `#from-<uid>` tag 로 직렬화. uid 영구라 메모 rename 후에도 안 깨짐.
+  source_meeting_uid: string | null;
   // V0.5.3 호환 — UI 가 의존. vault 에선 파일 mtime / "now" 로 대체.
   created_at: string;
   updated_at: string;
@@ -28,20 +37,29 @@ export interface Todo {
 export interface TodoInsert {
   title: string;
   done?: boolean;
+  cancelled?: boolean;
+  deleted?: boolean;
   category?: TodoCategory | null;
   due_date?: string | null;
   due_time?: string | null;
   priority?: TodoPriority;
+  source_meeting_uid?: string | null;
 }
+
+// vault 라인의 `#from-<uid>` tag prefix. uid = uuid (`-` 포함) 도 tag 정규식 매칭.
+const FROM_TAG_PREFIX = "from-";
 
 export interface TodoUpdate {
   title?: string;
   done?: boolean;
+  cancelled?: boolean;
+  deleted?: boolean;
   done_at?: string | null;
   category?: TodoCategory | null;
   due_date?: string | null;
   due_time?: string | null;
   priority?: TodoPriority;
+  source_meeting_uid?: string | null;
 }
 
 // ─── id ↔ source ───────────────────────────────────────────────────────────
@@ -59,7 +77,7 @@ export function parseTodoId(id: string): { file: string; line: number } {
 // ─── TodoItem (vault parser 결과) → Todo (API 노출) ─────────────────────────
 
 function isCategory(t: string): t is TodoCategory {
-  return t === "work" || t === "meeting";
+  return t === "work" || t === "schedule" || t === "other";
 }
 
 function isPriority(t: string): t is TodoPriority {
@@ -69,16 +87,20 @@ function isPriority(t: string): t is TodoPriority {
 function todoFromItem(item: TodoItem, mtimeIso?: string): Todo {
   const categoryTag = item.tags.find(isCategory);
   const priorityTag = item.tags.find(isPriority);
+  const fromTag = item.tags.find((t) => t.startsWith(FROM_TAG_PREFIX));
   const iso = mtimeIso ?? new Date().toISOString();
   return {
     id: makeTodoId(item.source.file, item.source.line),
     title: item.text,
     done: item.done,
+    cancelled: item.cancelled,
+    deleted: item.deleted,
     done_at: null, // vault md 에선 추적 안 함. UI 표시용으론 done flag 면 충분.
     priority: priorityTag ?? "medium",
     category: categoryTag ?? null,
     due_date: item.due ?? null,
     due_time: item.time ?? null,
+    source_meeting_uid: fromTag ? fromTag.slice(FROM_TAG_PREFIX.length) : null,
     created_at: iso,
     updated_at: iso,
     _source: item.source,
@@ -96,13 +118,23 @@ function sanitizeTaskTitle(title: string): string {
 export function buildTodoLine(input: {
   title: string;
   done?: boolean;
+  cancelled?: boolean;
+  deleted?: boolean;
   category?: TodoCategory | null;
   due_date?: string | null;
   due_time?: string | null;
   priority?: TodoPriority;
+  source_meeting_uid?: string | null;
   extra_tags?: string[];
 }): string {
-  const check = input.done ? "x" : " ";
+  // 우선: deleted > cancelled > done > pending. 3 final state 중 하나만 true.
+  const check = input.deleted
+    ? "D"
+    : input.cancelled
+      ? "-"
+      : input.done
+        ? "x"
+        : " ";
   // 시스템 생성 라인은 항상 ` --- ` + ISO 날짜. 옛 vault 의 ` — ` + M/D 도
   // parser 가 호환 매칭. ISO 박는 이유: M/D 만 박으면 연도가 read 시점 따라 점프
   // (2026 에 박은 5/22 가 2027 에 read 시 2027-05-22 로 해석되는 footgun).
@@ -116,7 +148,12 @@ export function buildTodoLine(input: {
   if (input.priority && input.priority !== "medium") {
     line += ` #${input.priority}`;
   }
+  if (input.source_meeting_uid) {
+    line += ` #${FROM_TAG_PREFIX}${input.source_meeting_uid}`;
+  }
+  // extra_tags 에 from- prefix 가 있으면 중복 박지 않음 (위에서 처리됨).
   for (const tag of input.extra_tags ?? []) {
+    if (tag.startsWith(FROM_TAG_PREFIX)) continue;
     line += ` #${tag}`;
   }
   return line;
@@ -160,11 +197,14 @@ export async function createTodo(
     id: makeTodoId(INBOX_PATH, lineNum),
     title: input.title,
     done: input.done ?? false,
+    cancelled: input.cancelled ?? false,
+    deleted: input.deleted ?? false,
     done_at: null,
     priority: input.priority ?? "medium",
     category: input.category ?? null,
     due_date: input.due_date ?? null,
     due_time: input.due_time ?? null,
+    source_meeting_uid: input.source_meeting_uid ?? null,
     created_at: iso,
     updated_at: iso,
     _source: { file: INBOX_PATH, line: lineNum },
@@ -193,9 +233,14 @@ export async function updateTodo(
     if (!existing) {
       throw new Error(`todo not found at line ${line} of ${file}`);
     }
+    const existingFromTag = existing.tags.find((t) =>
+      t.startsWith(FROM_TAG_PREFIX),
+    );
     const merged = {
       title: patch.title ?? existing.text,
       done: patch.done ?? existing.done,
+      cancelled: patch.cancelled ?? existing.cancelled,
+      deleted: patch.deleted ?? existing.deleted,
       category:
         patch.category !== undefined
           ? patch.category
@@ -205,8 +250,15 @@ export async function updateTodo(
       priority:
         patch.priority ??
         (existing.tags.find(isPriority) ?? "medium"),
+      source_meeting_uid:
+        patch.source_meeting_uid !== undefined
+          ? patch.source_meeting_uid
+          : existingFromTag
+            ? existingFromTag.slice(FROM_TAG_PREFIX.length)
+            : null,
       extra_tags: existing.tags.filter(
-        (t) => !isCategory(t) && !isPriority(t),
+        (t) =>
+          !isCategory(t) && !isPriority(t) && !t.startsWith(FROM_TAG_PREFIX),
       ),
     };
     const lines = raw.split("\n");

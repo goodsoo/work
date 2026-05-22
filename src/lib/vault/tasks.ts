@@ -4,13 +4,16 @@ export interface TodoItem {
   id: string;
   text: string;
   done: boolean;
+  cancelled: boolean; // 옵시디안 Tasks plugin convention `- [-]`. done/deleted 와 mutually exclusive.
+  deleted: boolean;   // 삭제됨 — soft-delete. custom char `- [D]`. 휴지통 view 에서만 보임.
   due?: string; // ISO YYYY-MM-DD
   time?: string; // HH:MM
   tags: string[];
   source: { file: string; line: number }; // line은 0-based
 }
 
-const CHECKBOX_RE = /^(\s*)- \[([ x])\] (.+)$/;
+// `[ ]` to-do, `[x]` done, `[-]` cancelled, `[D]` deleted (soft-delete).
+const CHECKBOX_RE = /^(\s*)- \[([ xD-])\] (.+)$/;
 const TAG_RE = /(?:^|\s)#([\p{L}\p{N}_-]+)/gu;
 // em dash (— U+2014) 또는 triple hyphen (---). 한국어 키보드는 em dash 직접 입력
 // 어려워서 --- 도 같이 매칭. -- (2개) 는 CLI 옵션 / 영어 본문 false positive 우려로
@@ -42,7 +45,10 @@ export function extractTodos(filePath: string, raw: string): TodoItem[] {
 
     const m = line.match(CHECKBOX_RE);
     if (!m) continue;
-    const done = m[2] === "x";
+    const checkChar = m[2];
+    const done = checkChar === "x";
+    const cancelled = checkChar === "-";
+    const deleted = checkChar === "D";
     const content = m[3].trim();
 
     const parsed = parseTodoContent(content);
@@ -50,6 +56,8 @@ export function extractTodos(filePath: string, raw: string): TodoItem[] {
       id: stableId(filePath, content),
       text: parsed.text,
       done,
+      cancelled,
+      deleted,
       due: parsed.due,
       time: parsed.time,
       tags: parsed.tags,
@@ -161,24 +169,33 @@ function stableId(filePath: string, content: string): string {
   return Math.abs(h).toString(36);
 }
 
-// 체크박스 토글: 정확한 라인의 `- [ ]` ↔ `- [x]` 만 patch.
-// 텍스트 부분은 건드리지 않음. 외부 편집으로 라인 이동했어도 라인 내 패턴만 일치하면 OK.
+// 체크박스 status patch: ` ` / `x` / `-` 중 하나로 set. 텍스트 부분은 건드리지 않음.
+// 외부 편집으로 라인 이동했어도 라인 내 패턴만 일치하면 OK.
+export function setTodoCheckChar(
+  raw: string,
+  line: number,
+  char: " " | "x" | "-" | "D",
+): string {
+  const lines = raw.split("\n");
+  const target = lines[line];
+  if (target === undefined) {
+    throw new Error(`setTodoCheckChar: line ${line} out of range (total ${lines.length})`);
+  }
+  const m = target.match(CHECKBOX_RE);
+  if (!m) {
+    throw new Error(
+      `setTodoCheckChar: line ${line} is not a checkbox: ${target}`,
+    );
+  }
+  lines[line] = `${m[1]}- [${char}] ${m[3]}`;
+  return lines.join("\n");
+}
+
+// 호환 — done boolean only path. cancelled 는 별도 호출 또는 라인 reconstruct.
 export function toggleTodo(
   raw: string,
   line: number,
   done: boolean,
 ): string {
-  const lines = raw.split("\n");
-  const target = lines[line];
-  if (target === undefined) {
-    throw new Error(`toggleTodo: line ${line} out of range (total ${lines.length})`);
-  }
-  const m = target.match(CHECKBOX_RE);
-  if (!m) {
-    throw new Error(
-      `toggleTodo: line ${line} is not a checkbox: ${target}`,
-    );
-  }
-  lines[line] = `${m[1]}- [${done ? "x" : " "}] ${m[3]}`;
-  return lines.join("\n");
+  return setTodoCheckChar(raw, line, done ? "x" : " ");
 }
