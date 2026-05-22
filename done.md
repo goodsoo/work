@@ -6,6 +6,18 @@
 
 ## 2026-05-22
 
+### PR #34 — 메모장 사이드바 폴더 트리 + 탭 순서 swap
+
+- **한 줄 임팩트**: 메모장 폴더 트리 + 메뉴 순서 변경
+- **탭 swap** (`BottomTabs.tsx`, `App.tsx`) — TABS 배열을 캘린더 → 메모장 → 할 일 → 내 작업 순으로 (사용 빈도 우선). Cmd+1/2/3/4 가 TABS index 기반 자동 매핑이라 Cmd+1=캘린더로 의미 변경. 빈 hash default 도 캘린더 + `#meetings` hash 추가.
+- **폴더 트리** (옵시디안 호환). `adapter.listRecursive` / `listFoldersRecursive` 신규 — `meetings/{folder}/` 중첩 구조 + 빈 폴더 모두 scan. `scan.ts` 에 `meetingFolder` / `normalizeFolderPath` / `moveMeetingToFolder` / `renameMeetingFolder` 등 helper. `buildMeetingsTree(meetings, sort, extraFolders)` 가 메모 + disk 빈 폴더 합쳐 트리 빌드.
+- **사이드바 UI** — `MeetingsTreeView` 신규. 옵시디안 스타일 컴팩트 단일 라인 + chevron 만 폴더에 + 메모는 column align (아이콘 X). 트리 vertical guide 라인 (`border-default` 컬러로 진하게). 클릭존 = 아이콘 직전부터 (indent 공간은 wrapper paddingLeft, dead zone). 메모 진하게 (text-primary), 폴더 흐리게 (text-secondary) — leaf > organizational 위계. inline 메타: 올해 `MM/DD`, 작년 이전 `YY/MM/DD`.
+- **폴더 CRUD** — 헤더 `+폴더` 버튼: '새 폴더' 즉시 생성 + 인라인 rename 자동 진입 (옵시디안 패턴). 폴더 우클릭: 이름 변경 (in-place input) / 폴더 삭제 (안 메모 휴지통 이동 + 빈 dir 정리). 메모 우클릭: 폴더로 이동... → `MoveFolderModal`.
+- **DnD** 메모 → 폴더 — Tauri `dragDropEnabled: false` 로 native file-drop 가로채기 해제 + `WebkitUserDrag: element` 명시 (macOS WKWebView 호환). dragover 의 `preventDefault` 무조건 호출 (types 검사가 일부 WebView 에서 빈 배열 반환).
+- **글로벌 Toast 시스템** (`Toast.tsx` 신규) — frost 카드 우측하단. mutation 실패 (메모 생성/폴더 생성/이동/이름변경/삭제) 모두 `useToast().show()` 통합. 사이드바 inline error row 제거.
+- **정렬** — 폴더 alphabetic 고정, 메모만 `useMeetingSort` 적용. 폴더 / 메모 순서는 정렬 옵션과 무관하게 폴더 먼저.
+- 19 files, 266 tests passing. typecheck clean.
+
 ### PR #33 — macOS 윈도우 헤더 통합 + sidebar collapse
 
 - **한 줄 임팩트**: 윈도우 헤더 통합으로 본문 +56px
