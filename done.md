@@ -16,7 +16,7 @@
 - **설정 → 단축키 탭 갱신** — sub-tab 그룹 (Opt+Tab cycle + Cmd+Shift+E) + "일기 (캘린더)" 그룹 신설 + 본문 편집 그룹에 `⌘Enter → 할 일 inbox` 누락분 보강.
 - **TabBtn `Q/W/E` kbd chip + ModeChip 툴팁 + EmptyBodyCTA `Q` kbd** 모두 `⌘⇧E` 표기 또는 제거.
 - 5 modified (CLAUDE.md + 4 src). 221 tests passing. typecheck clean.
-- commit `efa3554`
+- commit `83ed237`
 
 ### PR #30 — 본문 word-wrap + gutter dynamic alignment
 
