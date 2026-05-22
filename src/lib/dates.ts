@@ -92,6 +92,13 @@ export function isPast(iso: string, reference = new Date()): boolean {
   return differenceInCalendarDays(target, ref) < 0;
 }
 
+/** 오늘 기준 일수 차이. 음수 = 과거 (D+N), 0 = 오늘, 양수 = 미래. */
+export function daysFromToday(iso: string, reference = new Date()): number {
+  const target = parseIsoDate(iso);
+  const ref = parseIsoDate(todayIso(reference));
+  return differenceInCalendarDays(target, ref);
+}
+
 /**
  * Loose date parser → ISO (yyyy-MM-dd) or null.
  *

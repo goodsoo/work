@@ -908,7 +908,7 @@ export function MeetingForm({ meetingId, onBack }: Props) {
                   setDoc("body", { ...doc, body: v });
                 }}
                 onSendLineToInbox={(lineText) => {
-                  setTaskModalPrefill(lineToTaskPrefill(lineText));
+                  setTaskModalPrefill(lineToTaskPrefill(lineText, meetingId));
                   setTaskModalOpen(true);
                 }}
               />
@@ -1046,17 +1046,21 @@ export function MeetingForm({ meetingId, onBack }: Props) {
 //   #work / #meeting       = category
 //   #high / #medium / #low = priority
 // 매칭 안 되는 토큰은 모두 본문으로 (예 `[안건 1]` 같은 bracket).
-function lineToTaskPrefill(lineText: string): Partial<TodoInsert> {
+function lineToTaskPrefill(
+  lineText: string,
+  meetingUid: string,
+): Partial<TodoInsert> {
   const items = extractTodos("inbox.md", `${lineText}\n`);
   const item = items[0];
-  if (!item) return {};
+  if (!item) return { source_meeting_uid: meetingUid };
   const prefill: Partial<TodoInsert> = {
     title: item.text,
     done: item.done,
+    source_meeting_uid: meetingUid,
   };
   if (item.due) prefill.due_date = item.due;
   if (item.time) prefill.due_time = item.time;
-  const cat = item.tags.find((t): t is TodoCategory => t === "work" || t === "meeting");
+  const cat = item.tags.find((t): t is TodoCategory => t === "work" || t === "schedule" || t === "other");
   if (cat) prefill.category = cat;
   const pri = item.tags.find((t): t is TodoPriority =>
     t === "high" || t === "medium" || t === "low",

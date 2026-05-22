@@ -10,9 +10,12 @@ import {
   MeetingsSidePanelFooter,
   CalendarDayPanel,
   TodosSidePanel,
+  TodosSidePanelFooter,
+  type TodosStatusFilter,
+  type TodosCategoryFilter,
 } from "./components/nav/SidePanel";
-import type { TodoCategory } from "./api/todos";
-type TodosFilter = TodoCategory | "all" | "uncategorized";
+import { useTodoSort } from "./hooks/useTodoSort";
+import { TodoTrashModal } from "./components/todos/TodoTrashModal";
 import { CalendarPage } from "./pages/CalendarPage";
 import { TodosPage } from "./pages/TodosPage";
 import { PortfolioPage } from "./pages/PortfolioPage";
@@ -65,12 +68,16 @@ function AppContent() {
     readMeetingFromHash(),
   );
   const [calendarDate, setCalendarDate] = useState<string>(todayIso());
-  const [todoCategory, setTodoCategory] = useState<TodosFilter>("all");
+  const [todoStatus, setTodoStatus] = useState<TodosStatusFilter>("all");
+  const [todoCategory, setTodoCategory] = useState<TodosCategoryFilter>("all");
+  const [todoSortKey, setTodoSortKey] = useTodoSort();
   const [portfolioFilter, setPortfolioFilter] = useState<ProjectFilter>({
     kind: "all",
   });
   // 휴지통은 overlay — utility 액션이라 SettingsModal 과 같은 패턴.
+  // 메모 + todo 휴지통 별도 — 데이터 영역 다름.
   const [trashOpen, setTrashOpen] = useState(false);
+  const [todoTrashOpen, setTodoTrashOpen] = useState(false);
   const portfolioSync = useGhSync();
   const { adapter, isReady } = useVault();
   const meetings = useMeetings();
@@ -360,8 +367,12 @@ function AppContent() {
       />
     ) : tab === "todos" ? (
       <TodosSidePanel
-        activeCategory={todoCategory}
+        statusFilter={todoStatus}
+        onStatusChange={setTodoStatus}
+        categoryFilter={todoCategory}
         onCategoryChange={setTodoCategory}
+        sortKey={todoSortKey}
+        onSortKeyChange={setTodoSortKey}
       />
     ) : tab === "portfolio" ? (
       <PortfolioSidePanel
@@ -376,10 +387,12 @@ function AppContent() {
       />
     ) : undefined;
 
-  // 메모장 탭에서만 도움말 + 휴지통 footer. 휴지통은 overlay 모달로 열림.
+  // 메모장 + todos 탭 footer 에 휴지통 entry. 각각 별도 modal.
   const sidePanelFooter =
     tab === "meetings" ? (
       <MeetingsSidePanelFooter onTrashOpen={() => setTrashOpen(true)} />
+    ) : tab === "todos" ? (
+      <TodosSidePanelFooter onTrashOpen={() => setTodoTrashOpen(true)} />
     ) : undefined;
 
   return (
@@ -409,11 +422,19 @@ function AppContent() {
           syncRunning={portfolioSync.state.running}
         />
       ) : (
-        <TodosPage categoryFilter={todoCategory} />
+        <TodosPage
+          statusFilter={todoStatus}
+          categoryFilter={todoCategory}
+          sortKey={todoSortKey}
+        />
       )}
       <TrashModal
         isOpen={trashOpen}
         onClose={() => setTrashOpen(false)}
+      />
+      <TodoTrashModal
+        open={todoTrashOpen}
+        onClose={() => setTodoTrashOpen(false)}
       />
     </AppShell>
   );

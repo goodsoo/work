@@ -4,7 +4,6 @@ import {
   TODO_CATEGORIES,
   type TodoCategory,
   type TodoInsert,
-  type TodoPriority,
 } from "../../api/todos";
 import { LooseDateInput } from "../common/LooseDateInput";
 import { LooseTimeInput } from "../common/LooseTimeInput";
@@ -13,14 +12,8 @@ type Props = {
   open: boolean;
   onClose: () => void;
   // 메모 "할일로 보내기" / 캘린더 셀 클릭 등에서 prefill 채워서 띄움.
-  // title/date/time/category/priority 모두 optional. 사용자가 모달 안에서 다듬음.
+  // title/date/time/category 모두 optional. 사용자가 모달 안에서 다듬음.
   prefill?: Partial<TodoInsert>;
-};
-
-const PRIORITY_LABEL: Record<TodoPriority, string> = {
-  high: "높음",
-  medium: "보통",
-  low: "낮음",
 };
 
 export function TaskAddModal({ open, onClose, prefill }: Props) {
@@ -29,8 +22,9 @@ export function TaskAddModal({ open, onClose, prefill }: Props) {
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
   const [category, setCategory] = useState<TodoCategory | null>(null);
-  const [priority, setPriority] = useState<TodoPriority>("medium");
   const [done, setDone] = useState(false);
+  // 메모 → 할일 prefill 시점에 set, 사용자가 모달에서 못 바꿈 (origin 정보).
+  const [sourceMeetingUid, setSourceMeetingUid] = useState<string | null>(null);
   const titleRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -39,8 +33,8 @@ export function TaskAddModal({ open, onClose, prefill }: Props) {
     setDate(prefill?.due_date ?? "");
     setTime(prefill?.due_time ?? "");
     setCategory(prefill?.category ?? null);
-    setPriority(prefill?.priority ?? "medium");
     setDone(prefill?.done ?? false);
+    setSourceMeetingUid(prefill?.source_meeting_uid ?? null);
     requestAnimationFrame(() => titleRef.current?.focus());
   }, [open, prefill]);
 
@@ -70,7 +64,7 @@ export function TaskAddModal({ open, onClose, prefill }: Props) {
         due_date: date || null,
         due_time: date && time ? time : null, // 시간만 있고 날짜 없으면 무시
         category,
-        priority,
+        source_meeting_uid: sourceMeetingUid,
       },
       { onSuccess: () => onClose() },
     );
@@ -116,6 +110,7 @@ export function TaskAddModal({ open, onClose, prefill }: Props) {
             onChange={(e) => setTitle(e.target.value)}
             placeholder="예: 보고서 작성"
             aria-required="true"
+            maxLength={200}
             className="mt-1 w-full rounded-md px-2 py-1.5 text-sm outline-none"
             style={{
               backgroundColor: "var(--bg-surface)",
@@ -165,58 +160,28 @@ export function TaskAddModal({ open, onClose, prefill }: Props) {
           </label>
         </div>
 
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          <label className="block">
-            <span
-              className="text-xs font-medium"
-              style={{ color: "var(--text-secondary)" }}
-            >
-              카테고리
-            </span>
-            <select
-              value={category ?? ""}
-              onChange={(e) =>
-                setCategory((e.target.value || null) as TodoCategory | null)
-              }
-              className="mt-1 w-full rounded-md px-2 py-1.5 text-sm"
-              style={{
-                backgroundColor: "var(--bg-surface)",
-                border: "1px solid var(--border-default)",
-                color: "var(--text-primary)",
-              }}
-            >
-              <option value="">없음</option>
-              {TODO_CATEGORIES.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="block">
-            <span
-              className="text-xs font-medium"
-              style={{ color: "var(--text-secondary)" }}
-            >
-              우선순위
-            </span>
-            <select
-              value={priority}
-              onChange={(e) => setPriority(e.target.value as TodoPriority)}
-              className="mt-1 w-full rounded-md px-2 py-1.5 text-sm"
-              style={{
-                backgroundColor: "var(--bg-surface)",
-                border: "1px solid var(--border-default)",
-                color: "var(--text-primary)",
-              }}
-            >
-              {(Object.keys(PRIORITY_LABEL) as TodoPriority[]).map((p) => (
-                <option key={p} value={p}>
-                  {PRIORITY_LABEL[p]}
-                </option>
-              ))}
-            </select>
-          </label>
+        <div className="mt-3">
+          <span
+            className="text-xs font-medium"
+            style={{ color: "var(--text-secondary)" }}
+          >
+            카테고리
+          </span>
+          <div className="mt-1 flex flex-wrap gap-1.5">
+            <CategoryChip
+              label="미분류"
+              active={category === null}
+              onClick={() => setCategory(null)}
+            />
+            {TODO_CATEGORIES.map((c) => (
+              <CategoryChip
+                key={c.id}
+                label={c.label}
+                active={category === c.id}
+                onClick={() => setCategory(c.id)}
+              />
+            ))}
+          </div>
         </div>
 
         <label className="mt-3 flex items-center gap-2 text-xs">
@@ -265,5 +230,31 @@ export function TaskAddModal({ open, onClose, prefill }: Props) {
         </div>
       </form>
     </div>
+  );
+}
+
+function CategoryChip({
+  label,
+  active,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="rounded-full px-3 py-1 text-xs transition"
+      style={{
+        backgroundColor: active ? "var(--btn-primary)" : "var(--bg-surface)",
+        color: active ? "var(--btn-primary-text)" : "var(--text-secondary)",
+        border: `1px solid ${active ? "var(--btn-primary)" : "var(--border-default)"}`,
+        minHeight: 0,
+      }}
+    >
+      {label}
+    </button>
   );
 }

@@ -16,7 +16,10 @@ export function PageHeader({ left, right, secondaryRow }: Props) {
         borderBottom: "1px solid var(--border-default)",
       }}
     >
-      <div className="mx-auto w-full max-w-2xl px-5 py-3 lg:max-w-4xl">
+      <div
+        className="mx-auto flex w-full max-w-2xl flex-col justify-center px-5 lg:max-w-4xl"
+        style={{ minHeight: "3.5rem" }}
+      >
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex min-w-0 items-center gap-2">{left}</div>
           {right ? (
