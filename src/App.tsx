@@ -108,10 +108,20 @@ function AppContent() {
   const autoBackupDone = useRef(false);
   const autoSelectedRef = useRef(didAutoSelectThisSession);
 
-  // 5초 background auto-sync 임시 비활성 — Tauri callback 손실로 hook 의 runningRef
-  // 가 stuck 되는 케이스 발견 (portfolio-card-redesign PR). 사용자 명시 [동기화]
-  // 클릭만으로도 본인 사용에 충분. 안정화 후 재활성 검토.
-  void autoSyncDone;
+  // V0.7 design step 3 (1B): vault ready 후 5초 background sync 1회 (since=last_sync).
+  // 본인 매일 앱 켜면 silent fetch — 의식 0 으로 카드 누적. Tauri 만 (gh 호출 필요).
+  // useGhSync 의 callId 가드 + cancel 강제 리셋 덕분에 stuck 회복 가능 (V0.7.x).
+  useEffect(() => {
+    if (!isTauri || !isReady || autoSyncDone.current) return;
+    autoSyncDone.current = true;
+    const t = setTimeout(() => {
+      portfolioSync.run({ incremental: true }).catch(() => {
+        // 에러는 useGhSync state.error 에 반영됨 — 사이드바가 표시
+      });
+    }, 5000);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isReady]);
 
   // 자동 백업 — vault ready 후 10초 뒤 1회. interval/keepCount 설정에 따라 실행.
   useEffect(() => {
@@ -397,6 +407,7 @@ function AppContent() {
         onFilterChange={setPortfolioFilter}
         syncState={portfolioSync.state}
         onSyncRun={portfolioRunIncrementalSync}
+        onSyncCancel={portfolioSync.cancel}
         onFullSyncRun={portfolioRunFullSync}
       />
     ) : undefined;

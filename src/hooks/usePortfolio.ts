@@ -251,6 +251,27 @@ export interface GhSyncProgress {
   lastResult: SyncPortfolioResult | null;
 }
 
+// readSyncState 가 hang 되면 5초 후 full sync 로 fallback. Tauri 의
+// "Couldn't find callback id" 후 invoke 응답이 영영 안 오는 경우 (dev 중 vite
+// full-reload 와 동시 sync) 의 stuck 방어. since 만 손해.
+const READ_SYNC_STATE_TIMEOUT_MS = 5000;
+
+async function readSyncStateWithTimeout(
+  adapter: Parameters<typeof readSyncState>[0],
+): Promise<Awaited<ReturnType<typeof readSyncState>> | null> {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  try {
+    return await Promise.race([
+      readSyncState(adapter),
+      new Promise<null>((resolve) => {
+        timer = setTimeout(() => resolve(null), READ_SYNC_STATE_TIMEOUT_MS);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 export function useGhSync() {
   const { adapter } = useVault();
   const qc = useQueryClient();
@@ -262,8 +283,10 @@ export function useGhSync() {
     lastResult: null,
   });
   const abortRef = useRef<AbortController | null>(null);
-
   const runningRef = useRef(false);
+  // 매 run() 마다 증가. cancel() 도 증가시켜 in-flight 의 setState 를 무효화.
+  // hang 된 invoke 가 뒤늦게 resolve 되어도 stale 라 무시 → state/UI 깨끗.
+  const callIdRef = useRef(0);
 
   const run = useCallback(
     async (
@@ -273,6 +296,7 @@ export function useGhSync() {
       // 동시 발생 시 Tauri callback id 충돌 (callback 손실) 회피.
       if (runningRef.current) return null;
       runningRef.current = true;
+      const myCallId = ++callIdRef.current;
 
       const controller = new AbortController();
       abortRef.current = controller;
@@ -287,48 +311,62 @@ export function useGhSync() {
         // incremental: hook 안에서 last_sync 읽어 since 결정. 호출처 closure 단순화.
         let since = opts.since;
         if (opts.incremental && !since) {
-          try {
-            const st = await readSyncState(adapter);
-            if (st.last_sync) {
-              since = new Date(
-                new Date(st.last_sync).getTime() - 24 * 60 * 60 * 1000,
-              )
-                .toISOString()
-                .slice(0, 10);
-            }
-          } catch {
-            // last_sync 읽기 실패 — 전체 sync 로 fallback (since 없이)
+          const st = await readSyncStateWithTimeout(adapter);
+          // null = timeout 또는 read 실패 → full sync (since 없이) 로 fallback.
+          if (st?.last_sync) {
+            since = new Date(
+              new Date(st.last_sync).getTime() - 24 * 60 * 60 * 1000,
+            )
+              .toISOString()
+              .slice(0, 10);
           }
         }
         const result = await syncPortfolio(adapter, {
           since,
           signal: controller.signal,
-          onProgress: (current, total) =>
-            setState((s) => ({ ...s, current, total })),
+          onProgress: (current, total) => {
+            // stale callId 면 progress 도 무시 — cancel 이후 hang 풀린 호출 보호.
+            if (callIdRef.current !== myCallId) return;
+            setState((s) => ({ ...s, current, total }));
+          },
         });
-        setState({
-          running: false,
-          current: result.total,
-          total: result.total,
-          error: null,
-          lastResult: result,
-        });
-        qc.invalidateQueries({ queryKey: worksKey });
+        // success: callId 가 여전히 본인 것이어야 state 반영. cancel() 후라면 skip.
+        if (callIdRef.current === myCallId) {
+          setState({
+            running: false,
+            current: result.total,
+            total: result.total,
+            error: null,
+            lastResult: result,
+          });
+          qc.invalidateQueries({ queryKey: worksKey });
+        }
         return result;
       } catch (err) {
         const error = err instanceof Error ? err : new Error(String(err));
-        setState((s) => ({ ...s, running: false, error }));
+        if (callIdRef.current === myCallId) {
+          setState((s) => ({ ...s, running: false, error }));
+        }
         throw err;
       } finally {
-        abortRef.current = null;
-        runningRef.current = false;
+        if (callIdRef.current === myCallId) {
+          abortRef.current = null;
+          runningRef.current = false;
+        }
       }
     },
     [adapter, qc],
   );
 
+  // 사용자 manual 취소 또는 stuck 회복. abort 가 hung Tauri invoke 를 못 풀어도
+  // callId 를 advance + runningRef 리셋해 다음 click 받음. 뒤늦게 resolve 되는
+  // stale promise 의 setState 는 callId 가드로 무시.
   const cancel = useCallback(() => {
     abortRef.current?.abort();
+    callIdRef.current++;
+    runningRef.current = false;
+    abortRef.current = null;
+    setState((s) => ({ ...s, running: false }));
   }, []);
 
   return { state, run, cancel };
