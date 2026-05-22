@@ -136,7 +136,7 @@ function parseTodoContent(content: string): ParsedContent {
           if (d) due = d;
         }
         if (!time) {
-          const isDateLike = /[/\-]/.test(tok) && /\d/.test(tok);
+          const isDateLike = /[/-]/.test(tok) && /\d/.test(tok);
           if (!isDateLike) {
             const t = parseLooseTime(tok);
             if (t) time = t;

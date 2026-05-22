@@ -1,7 +1,8 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   Trash2,
-  AlertCircle,
+  Ban,
+  Copy,
   ListPlus,
   Check,
   Undo2,
@@ -45,7 +46,7 @@ import { LooseDateInput } from "../common/LooseDateInput";
 import { LooseTimeInput } from "../common/LooseTimeInput";
 
 // 파일시스템 + 옵시디안 link syntax 금지 문자. title input commit 시 검사.
-const TITLE_UNSAFE_RE = /[/\\:*?"<>|#\^\[\]]/;
+const TITLE_UNSAFE_RE = /[/\\:*?"<>|#^[\]]/;
 
 type Props = {
   meetingId: string;
@@ -183,7 +184,7 @@ export function MeetingForm({ meetingId, onBack }: Props) {
       time: data?.time ?? "",
       attendees: data?.attendees ? data.attendees.join(", ") : "",
     }),
-    [data?.date, data?.time, data?.attendees],
+    [data],
   );
 
   const initialDoc = useMemo<DocSnapshot>(
@@ -231,6 +232,16 @@ export function MeetingForm({ meetingId, onBack }: Props) {
 
 
   const [actionError, setActionError] = useState<string | null>(null);
+  const [copiedToast, setCopiedToast] = useState<string | null>(null);
+  async function copyToastMessage(text: string, id: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedToast(id);
+      setTimeout(() => setCopiedToast((cur) => (cur === id ? null : cur)), 1500);
+    } catch {
+      // clipboard 권한 없으면 silent — 사용자가 다시 누르면 됨
+    }
+  }
   const titleInputRef = useRef<HTMLInputElement>(null);
   // ESC revert 직후 onBlur 가 commitTitle 다시 발사하는 것 차단용.
   const skipNextTitleCommit = useRef(false);
@@ -247,6 +258,8 @@ export function MeetingForm({ meetingId, onBack }: Props) {
     setTitleDraft(initialTitle);
   }, [initialTitle]);
   useEffect(() => {
+    // 외부 meta.attendees 가 바뀌면 draft 동기화 (다른 mutation/sync). 의도된 sync.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setAttendeesDraft(meta.attendees);
   }, [meta.attendees]);
 
@@ -329,6 +342,7 @@ export function MeetingForm({ meetingId, onBack }: Props) {
 
   // 메모 전환 시 그 메모의 마지막 탭으로 (cache miss 면 본문).
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setActiveTabState(ACTIVE_TAB_CACHE.get(meetingId) ?? "body");
   }, [meetingId]);
 
@@ -468,6 +482,9 @@ export function MeetingForm({ meetingId, onBack }: Props) {
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
+    // routeToSource / setActiveTab 은 의도적으로 dep 제외 — listener 매 typing 마다
+    // re-register 폭주 회피 (안의 클로저는 ref 통해 최신 값 사용).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [docHistory, activeTab, viewMode, setViewMode]);
 
   async function handleDelete() {
@@ -568,6 +585,18 @@ export function MeetingForm({ meetingId, onBack }: Props) {
     setDoc(`summary:${key}`, { ...doc, summary: { ...summary, [key]: value } }, true);
   }
 
+  // 빈 메모 CTA 클릭 — 편집 모드 전환 + 다음 frame 에 본문 textarea focus.
+  // 본문 탭 active 일 때 transcript textarea 는 unmount → 활성 textarea 는 SourceBodyEditor 의 것 1개.
+  function startEditing() {
+    setViewMode("edit");
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const ta = scrollContainerRef.current?.querySelector("textarea");
+        if (ta instanceof HTMLTextAreaElement) ta.focus();
+      });
+    });
+  }
+
   return (
     <div className="min-h-svh lg:flex lg:h-screen lg:min-h-0 lg:flex-col">
       {/* Header — 사이드바 헤더와 같은 높이 (3.5rem). desktop 에선 flex item (top fixed),
@@ -657,37 +686,8 @@ export function MeetingForm({ meetingId, onBack }: Props) {
           } as React.CSSProperties}
         />
 
-        {/* Right: edit toggle / copy / delete */}
+        {/* Right: copy / delete (편집/보기 토글은 서브 헤더 ModeChip 으로 이전) */}
         <div className="flex shrink-0 items-center gap-1 justify-self-end">
-          <button
-            type="button"
-            onClick={() =>
-              activeTab === "body"
-                ? setViewMode(viewMode === "edit" ? "view" : "edit")
-                : setActiveTab("body")
-            }
-            title={
-              activeTab === "body"
-                ? isTauri
-                  ? `${viewMode === "edit" ? "보기 모드" : "편집 모드"}  Q`
-                  : viewMode === "edit"
-                    ? "보기 모드"
-                    : "편집 모드"
-                : "메모 탭으로 이동"
-            }
-            className="rounded-md px-1.5 py-1 transition"
-            style={{
-              border: "1px solid var(--border-subtle)",
-              color: activeTab === "body" ? "var(--text-secondary)" : "var(--text-muted)",
-              minHeight: 0,
-            }}
-          >
-            {viewMode === "edit" ? (
-              <Eye className="h-3.5 w-3.5" />
-            ) : (
-              <Pencil className="h-3.5 w-3.5" />
-            )}
-          </button>
           <CopyButton meeting={meetingForCopy} onError={setActionError} compact />
           <button
             type="button"
@@ -718,63 +718,128 @@ export function MeetingForm({ meetingId, onBack }: Props) {
         >
           {updateMutation.isError ? (
             <div
-              className="animate-page-in flex items-start gap-2 rounded-lg p-3 text-sm shadow-lg"
+              className="animate-page-in flex flex-col gap-2 rounded-2xl p-3 text-sm backdrop-blur-xl backdrop-saturate-150"
               style={{
-                borderLeft: "4px solid var(--accent-red)",
-                backgroundColor: "var(--accent-red-bg)",
-                color: "var(--accent-red-text)",
+                backgroundColor: "var(--surface-frost)",
+                border: "1px solid var(--surface-frost-border)",
+                boxShadow: "var(--surface-frost-shadow)",
+                color: "var(--text-primary)",
               }}
             >
-              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-              <div className="flex-1">
-                <div className="font-medium">자동 저장 실패</div>
-                {updateMutation.error ? (
-                  <div className="mt-0.5 text-xs opacity-80">
-                    {formatError(updateMutation.error)}
-                  </div>
-                ) : null}
+              <div className="flex items-center gap-2">
+                <Ban
+                  className="h-4 w-4 shrink-0"
+                  style={{ color: "var(--accent-red)" }}
+                />
+                <span className="min-w-0 flex-1 truncate font-semibold">
+                  자동 저장 실패
+                </span>
+                <button
+                  type="button"
+                  onClick={() => updateMutation.reset()}
+                  title="닫기"
+                  aria-label="닫기"
+                  className="shrink-0 rounded p-0.5 transition"
+                  style={{ color: "var(--text-muted)", minHeight: 0 }}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={retrySave}
-                disabled={updateMutation.isPending}
-                className="text-xs underline disabled:opacity-40"
-                style={{ minHeight: 0 }}
-              >
-                {updateMutation.isPending ? "재시도 중..." : "재시도"}
-              </button>
-              <button
-                type="button"
-                onClick={() => updateMutation.reset()}
-                title="닫기"
-                aria-label="닫기"
-                className="rounded p-0.5 transition"
-                style={{ color: "var(--accent-red-text)", minHeight: 0 }}
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
+              {updateMutation.error ? (
+                <div
+                  className="text-xs break-all wrap-anywhere"
+                  style={{ color: "var(--text-secondary)" }}
+                >
+                  {formatError(updateMutation.error)}
+                </div>
+              ) : null}
+              <div className="flex justify-end gap-1.5">
+                <button
+                  type="button"
+                  onClick={() =>
+                    copyToastMessage(
+                      updateMutation.error ? formatError(updateMutation.error) : "자동 저장 실패",
+                      "update",
+                    )
+                  }
+                  title="에러 메시지 복사"
+                  aria-label="에러 메시지 복사"
+                  className="rounded-md p-1.5 transition hover:bg-black/5"
+                  style={{ color: "var(--text-muted)", minHeight: 0 }}
+                >
+                  {copiedToast === "update" ? (
+                    <Check className="h-3.5 w-3.5" style={{ color: "var(--accent-green)" }} />
+                  ) : (
+                    <Copy className="h-3.5 w-3.5" />
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={retrySave}
+                  disabled={updateMutation.isPending}
+                  className="rounded-md px-2.5 py-1 text-xs font-medium transition hover:opacity-90 disabled:opacity-40"
+                  style={{
+                    backgroundColor: "var(--accent-red)",
+                    color: "#fff",
+                    minHeight: 0,
+                  }}
+                >
+                  {updateMutation.isPending ? "재시도 중..." : "재시도"}
+                </button>
+              </div>
             </div>
           ) : null}
           {actionError ? (
             <div
-              className="animate-page-in flex items-start gap-2 rounded-lg p-3 text-sm shadow-lg"
+              className="animate-page-in flex flex-col gap-2 rounded-2xl p-3 text-sm backdrop-blur-xl backdrop-saturate-150"
               style={{
-                borderLeft: "4px solid var(--accent-red)",
-                backgroundColor: "var(--accent-red-bg)",
-                color: "var(--accent-red-text)",
+                backgroundColor: "var(--surface-frost)",
+                border: "1px solid var(--surface-frost-border)",
+                boxShadow: "var(--surface-frost-shadow)",
+                color: "var(--text-primary)",
               }}
             >
-              <span className="flex-1">{actionError}</span>
-              <button
-                type="button"
-                onClick={() => setActionError(null)}
-                title="닫기"
-                aria-label="닫기"
-                className="rounded p-0.5 transition"
-                style={{ color: "var(--accent-red-text)", minHeight: 0 }}
+              <div className="flex items-center gap-2">
+                <Ban
+                  className="h-4 w-4 shrink-0"
+                  style={{ color: "var(--accent-red)" }}
+                />
+                <span className="min-w-0 flex-1 truncate font-semibold">
+                  ERROR
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setActionError(null)}
+                  title="닫기"
+                  aria-label="닫기"
+                  className="shrink-0 rounded p-0.5 transition"
+                  style={{ color: "var(--text-muted)", minHeight: 0 }}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+              <div
+                className="text-xs break-all wrap-anywhere"
+                style={{ color: "var(--text-secondary)" }}
               >
-                <X className="h-3.5 w-3.5" />
-              </button>
+                {actionError}
+              </div>
+              <div className="flex justify-end gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => copyToastMessage(actionError, "action")}
+                  title="에러 메시지 복사"
+                  aria-label="에러 메시지 복사"
+                  className="rounded-md p-1.5 transition hover:bg-black/5"
+                  style={{ color: "var(--text-muted)", minHeight: 0 }}
+                >
+                  {copiedToast === "action" ? (
+                    <Check className="h-3.5 w-3.5" style={{ color: "var(--accent-green)" }} />
+                  ) : (
+                    <Copy className="h-3.5 w-3.5" />
+                  )}
+                </button>
+              </div>
             </div>
           ) : null}
         </div>
@@ -850,6 +915,14 @@ export function MeetingForm({ meetingId, onBack }: Props) {
                       summary.action_items.reduce((s, i) => s + i.length, 0)
               }
             />
+            {activeTab === "body" ? (
+              <ModeChip
+                viewMode={viewMode}
+                onToggle={() =>
+                  setViewMode(viewMode === "edit" ? "view" : "edit")
+                }
+              />
+            ) : null}
           </div>
         </div>
 
@@ -912,8 +985,18 @@ export function MeetingForm({ meetingId, onBack }: Props) {
                   setTaskModalOpen(true);
                 }}
               />
+            ) : body.trim() === "" ? (
+              <EmptyBodyCTA onStartEdit={startEditing} />
             ) : (
-              <MarkdownView content={body} />
+              <MarkdownView
+                content={body}
+                onChange={(v) => {
+                  // 체크박스 토글은 단일 캐릭터 변경 — 별 history entry 로 두는 게
+                  // 옵시디안 동작에 맞음 (입력처럼 coalesce 하면 직전 textarea 변경에
+                  // 합쳐져 undo 가 어색해짐).
+                  setDoc("body", { ...doc, body: v }, true);
+                }}
+              />
             )}
           </div>
         ) : null}
@@ -1069,6 +1152,42 @@ function lineToTaskPrefill(
   return prefill;
 }
 
+// 본문 탭 활성 시 글자수 옆 chip — 현재 viewMode 표시 + 클릭 토글.
+// 헤더 우측 Eye/Pencil 토글 버튼을 대체.
+function ModeChip({
+  viewMode,
+  onToggle,
+}: {
+  viewMode: "edit" | "view";
+  onToggle: () => void;
+}) {
+  const isEdit = viewMode === "edit";
+  const title = isTauri
+    ? `${isEdit ? "보기" : "편집"} 모드로  Q`
+    : `${isEdit ? "보기" : "편집"} 모드로`;
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      title={title}
+      className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs transition"
+      style={{
+        border: "1px solid var(--border-subtle)",
+        color: isEdit ? "var(--accent-blue-text)" : "var(--text-secondary)",
+        backgroundColor: isEdit ? "var(--accent-blue-bg)" : "var(--bg-surface)",
+        minHeight: 0,
+      }}
+    >
+      {isEdit ? (
+        <Pencil className="h-3 w-3" />
+      ) : (
+        <Eye className="h-3 w-3" />
+      )}
+      <span>{isEdit ? "편집" : "보기"}</span>
+    </button>
+  );
+}
+
 function CharCountBadge({ count }: { count: number }) {
   if (count <= 0) return null;
   return (
@@ -1143,6 +1262,52 @@ function MetaReadOnly({ meta }: { meta: MetaDoc }) {
         </div>
       ))}
     </div>
+  );
+}
+
+function EmptyBodyCTA({ onStartEdit }: { onStartEdit: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onStartEdit}
+      className="group flex w-full flex-col items-center justify-center gap-3 rounded-lg text-center transition"
+      style={{
+        minHeight: "60vh",
+        border: "1px dashed var(--border-subtle)",
+        color: "var(--text-muted)",
+        backgroundColor: "transparent",
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.backgroundColor = "var(--bg-surface)";
+        e.currentTarget.style.color = "var(--text-secondary)";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.backgroundColor = "transparent";
+        e.currentTarget.style.color = "var(--text-muted)";
+      }}
+    >
+      <Pencil className="h-6 w-6" />
+      <div className="text-sm">
+        편집을 시작하려면 클릭하세요
+      </div>
+      {isTauri ? (
+        <div className="flex items-center gap-1.5 text-xs">
+          <span>또는</span>
+          <kbd
+            className="rounded font-mono leading-none"
+            style={{
+              padding: "2px 6px",
+              fontSize: "11px",
+              border: "1px solid var(--border-subtle)",
+              color: "var(--text-muted)",
+              backgroundColor: "var(--bg-surface)",
+            }}
+          >
+            Q
+          </kbd>
+        </div>
+      ) : null}
+    </button>
   );
 }
 

@@ -16,6 +16,8 @@ import {
   type GhPRDetail,
   type GhSearchResult,
 } from "../lib/portfolio/gh";
+import { downloadImageToVault } from "../lib/portfolio/imageDownload";
+import { extractPRBodyImages, planImagePaths } from "../lib/portfolio/imageImport";
 
 export const PORTFOLIO_DIR = "portfolio";
 export const PROJECTS_FILE = "portfolio/projects.md";
@@ -453,13 +455,16 @@ export interface UpsertPortfolioWorkInput {
   // projects.md 의 entries — 신규 카드의 project 자동 매핑에 사용.
   // 기존 카드는 본인 수정 보존 (v2.2 3A) — 매핑이 덮어쓰지 않음.
   projects?: PortfolioProject[];
+  // V0.7.x — PR body 이미지에서 자동 추출/다운로드한 스크린샷.
+  // existing.screenshots 가 비었을 때만 사용 (본인 dropzone 박은 거 보존).
+  importedScreenshots?: PortfolioScreenshot[];
 }
 
 export async function upsertPortfolioWork(
   adapter: VaultAdapter,
   input: UpsertPortfolioWorkInput,
 ): Promise<PortfolioWork> {
-  const { search, detail, existing, projects } = input;
+  const { search, detail, existing, projects, importedScreenshots } = input;
   const [owner, repo] = search.repository.nameWithOwner.split("/");
   const slug = prSlug(owner, repo, search.number);
   const path = portfolioWorkPath(slug);
@@ -468,17 +473,25 @@ export async function upsertPortfolioWork(
     ? projectSlugForRepo(projects, search.repository.nameWithOwner)
     : "";
 
+  // PR body 이미지 자동 import: existing.screenshots 가 비었을 때만 사용.
+  // 본인이 옵시디안에서 박은 거 (length > 0) 는 sync 가 덮어쓰지 않음 (보존).
+  const existingScreenshots = existing?.frontmatter.screenshots ?? [];
+  const screenshots: PortfolioScreenshot[] =
+    existingScreenshots.length > 0
+      ? existingScreenshots
+      : (importedScreenshots ?? []);
+
   const userFields: PortfolioUserFields = existing
     ? {
         // 본인이 명시 분류한 project 는 보존, "분류안됨" (빈) 이면 자동 매핑.
-        // included/category/impact/screenshots 는 무조건 보존 (3A).
+        // included/category/impact 는 무조건 보존 (3A).
         project: existing.frontmatter.project || autoProject,
         included: existing.frontmatter.included,
         category: existing.frontmatter.category,
         impact_summary: existing.frontmatter.impact_summary,
-        screenshots: existing.frontmatter.screenshots,
+        screenshots,
       }
-    : { ...defaultUserFields(), project: autoProject };
+    : { ...defaultUserFields(), project: autoProject, screenshots };
 
   // body 우선순위: detail.body (gh pr view, 더 fresh) > search.body (gh search prs).
   const rawDescription = detail.body || search.body || "";
@@ -657,6 +670,8 @@ export interface SyncPortfolioOpts {
   // 테스트 / mock 용 injection. default 인자로 hide → call site 변경 0 (v2.2 3A test #8).
   searchFn?: typeof ghSearchMyPRs;
   enrichFn?: typeof ghEnrichPR;
+  // PR body 이미지 다운로드 (Tauri shell+curl 위임). 테스트 / mock 용 injection.
+  downloadFn?: (relPath: string, url: string) => Promise<void>;
   // 진행률 콜백 (modal). current = 0-indexed, total = 전체 PR 수.
   onProgress?: (current: number, total: number) => void;
   // 사용자 cancel.
@@ -671,12 +686,46 @@ function throwIfAborted(signal?: AbortSignal): void {
   }
 }
 
+// gh pr view / curl 동시 호출 상한. gh CLI 한 호출당 1-2초, curl 다운로드 0.3-2초
+// — 5 동시로 wall clock 1/5 단축. 너무 키우면 GitHub rate limit + macOS 의 sh fork
+// 부하 (현실적 5 면 안정).
+const NETWORK_CONCURRENCY = 5;
+
+// p-limit 류 dep 안 쓰고 fixed-size worker pool 로 처리. abort/error 는 worker
+// 안에서 throw → Promise.all 이 즉시 reject (다른 worker 도 다음 i++ 안 집어듦).
+async function processWithConcurrency<I, O>(
+  items: I[],
+  concurrency: number,
+  worker: (item: I, index: number) => Promise<O>,
+  signal: AbortSignal | undefined,
+  onItemDone?: () => void,
+): Promise<O[]> {
+  const results = new Array<O>(items.length);
+  let next = 0;
+  async function run(): Promise<void> {
+    while (true) {
+      const i = next++;
+      if (i >= items.length) return;
+      throwIfAborted(signal);
+      results[i] = await worker(items[i], i);
+      onItemDone?.();
+    }
+  }
+  const workerCount = Math.min(concurrency, items.length);
+  await Promise.all(Array.from({ length: workerCount }, run));
+  return results;
+}
+
 export async function syncPortfolio(
   adapter: VaultAdapter,
   opts: SyncPortfolioOpts = {},
 ): Promise<SyncPortfolioResult> {
   const search = opts.searchFn ?? ghSearchMyPRs;
   const enrich = opts.enrichFn ?? ghEnrichPR;
+  const download =
+    opts.downloadFn ??
+    ((relPath: string, url: string) =>
+      downloadImageToVault(adapter, relPath, url));
 
   throwIfAborted(opts.signal);
   await adapter.mkdir(PORTFOLIO_DIR); // 기존 vault (V0.6) 에 portfolio/ 없는 경우 보장
@@ -698,20 +747,68 @@ export async function syncPortfolio(
     await writePortfolioProjects(adapter, projects);
   }
 
-  // vault scan → github_pr_id 인덱스. rename 자동 감지에 사용.
+  // vault scan → github_pr_id + slug 인덱스. rename 자동 감지 + 본인 screenshots 보존에 사용.
   const allWorks = await scanPortfolio(adapter);
   const byId = new Map<number, PortfolioWorkMeta>();
+  const bySlug = new Map<string, PortfolioWorkMeta>();
   for (const w of allWorks) {
     const id = w.frontmatter.github_pr_id;
     if (id) byId.set(id, w);
+    bySlug.set(w.prSlug, w);
   }
 
+  // Phase A: 각 PR 의 enrich + (필요 시) PR body 이미지 다운로드. 5 concurrency 로
+  // wall clock 의 대부분 (gh pr view + curl) 을 N/5 로 압축. progress 콜백은 PR 완료
+  // 카운트 기준 (사용자가 체감하는 "GitHub 에서 가져오는" 진행도).
+  let progressDone = 0;
+  const phaseA = await processWithConcurrency(
+    closed,
+    NETWORK_CONCURRENCY,
+    async (pr) => {
+      const detail = await enrich(pr.url);
+
+      // PR body 이미지 자동 import: existing.screenshots 가 비었을 때만.
+      // 본인 dropzone 박은 거 (length > 0) 는 보존.
+      const [owner, repo] = pr.repository.nameWithOwner.split("/");
+      const slug = prSlug(owner, repo, pr.number);
+      const existingMeta = byId.get(pr.id) ?? bySlug.get(slug);
+      const existingShots = existingMeta?.frontmatter.screenshots ?? [];
+
+      const imported: PortfolioScreenshot[] = [];
+      if (existingShots.length === 0) {
+        const images = extractPRBodyImages(detail.body);
+        if (images.length > 0) {
+          const plan = planImagePaths(slug, images);
+          for (const { image, relPath } of plan) {
+            try {
+              const already = await adapter.exists(relPath);
+              if (!already) await download(relPath, image.url);
+              imported.push({
+                path: relPath,
+                label: image.label,
+                caption: image.caption,
+              });
+            } catch {
+              // best effort — 실패한 이미지는 다음 sync 가 재시도.
+            }
+          }
+        }
+      }
+      return { detail, imported };
+    },
+    opts.signal,
+    () => {
+      progressDone++;
+      opts.onProgress?.(progressDone, closed.length);
+    },
+  );
+
+  // Phase B: vault write 는 직렬 — file rename / write 충돌 / id 매칭 race 회피.
   let added = 0;
   let preserved = 0;
   let projectsMutated = false;
   for (let i = 0; i < closed.length; i++) {
     throwIfAborted(opts.signal);
-    opts.onProgress?.(i, closed.length);
     const pr = closed[i];
     const [owner, repo] = pr.repository.nameWithOwner.split("/");
     const newSlug = prSlug(owner, repo, pr.number);
@@ -734,12 +831,12 @@ export async function syncPortfolio(
 
     // 2) existing fetch (rename 후 새 slug 또는 같은 slug)
     const existing = await readPortfolioWork(adapter, newSlug);
-    const detail = await enrich(pr.url);
     await upsertPortfolioWork(adapter, {
       search: pr,
-      detail,
+      detail: phaseA[i].detail,
       existing,
       projects, // 신규 카드 자동 매핑
+      importedScreenshots: phaseA[i].imported,
     });
     if (existing) preserved++;
     else added++;

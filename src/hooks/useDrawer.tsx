@@ -28,6 +28,8 @@ export function DrawerProvider({ children }: { children: ReactNode }) {
   return <DrawerContext.Provider value={value}>{children}</DrawerContext.Provider>;
 }
 
+// Provider 컴포넌트와 hook 을 같은 파일에서 export — 의도된 패턴.
+// eslint-disable-next-line react-refresh/only-export-components
 export function useDrawer() {
   return useContext(DrawerContext);
 }

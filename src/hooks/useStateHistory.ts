@@ -1,3 +1,7 @@
+// V0.7.1 race-fix 패턴: render 안에서 ref.current 갱신 + clearTimeout 이 의도된
+// 동작. set+immediate flush 의 stale closure 문제 차단용. React Compiler 의
+// `react-hooks/refs` 규칙은 일반적으로 옳지만 이 파일은 의도적 예외.
+/* eslint-disable react-hooks/refs */
 import { useCallback, useEffect, useRef, useState } from "react";
 
 type CachedState<T> = { value: T; history: T[]; pointer: number };

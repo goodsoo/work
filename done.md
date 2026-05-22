@@ -22,7 +22,57 @@
 - 31 modified, 8 new, 1 deleted. 168 tests passing.
 - commit `ab0f4e3`
 
+### PR #26 — 에러 토스트 디자인 갈아엎기 + overflow fix
+
+- **frosted glass 갈아엎기** — 디자인 시안 8개 띄워서 5번 (iOS frosted) 선택. `--surface-frost` / `--surface-frost-border` / `--surface-frost-shadow` 3개 토큰 (light/dark 둘 다) 으로 일반화. backdrop-blur-xl + rounded-2xl + 큰 그림자. 좌측 빨간 4px stripe (AI slop 톤) 제거.
+- **3-row 레이아웃** — 상단 (Ban 아이콘 + 타이틀/"ERROR" + ✕), 중간 (본문, `wrap-anywhere break-all`), 하단 (액션 footer). overflow 의 구조적 원인 (한 줄 안에서 본문이 액션 버튼 밀어내던 패턴) 해결.
+- **버튼 위계** — solid 빨간 [재시도] (primary) + ghost icon [복사] (secondary). 본인 dogfood 시 errno/path 만나면 Claude 에 paste 가 next-step → 복사 항상 보임. 1.5초 ✓ swap 으로 피드백.
+- **아이콘 Ban (접근금지)** — AlertCircle (`(!)`) 보다 "차단/실패" 의미 더 분명.
+- **wrap-anywhere + break-all** — `goodsoob-` 다음 줄 깨짐 패턴 차단. 긴 path/URL 이 width 끝까지 채워서 답답한 빈공간 제거. 한글은 자연스러운 음절 break.
+- commit `eef08b1`
+
+---
+
 ## 2026-05-21
+
+### PR #25 — 빈 본문 편집 진입 CTA + 메모 모드 chip
+
+- **빈 메모 + 보기 모드 CTA 박스** — 본문 비어있고 viewMode=`view` 일 때 점선 박스 (60vh) 렌더 — 클릭하면 viewMode `edit` 전환 + 다음 frame 에 textarea focus. 자동 전환은 사용자가 명시적으로 view 로 둔 의도를 덮을 수 있어 회피.
+- **MarkdownView 의 빈 상태 fallback 제거** — "메모가 비어있어요. 편집으로 전환해서 적어보세요." 단순 텍스트 fallback 은 MeetingForm 분기가 가로채서 dead code. TrashPreview 는 이미 `content?.trim()` 분기라 영향 없음.
+- **ModeChip 도입** — 사용자 요청. 헤더 우측 토글 버튼은 아이콘이 "다음 액션" 을 가리켜 직관적이지 않음 → 서브 헤더 글자수 옆에 현재 상태 chip (편집=accent-blue / 보기=회색). 클릭 토글 + Q 키 그대로.
+- **헤더 우측 Eye/Pencil 토글 버튼 제거** — ModeChip 이 대체. 복사 + 삭제 두 개만 남김.
+- commit `1384a64`
+
+### PR #24 — portfolio sync 강화 + 날짜 min + lint 정리 (backend 묶음)
+
+- **gh enrich concurrency 5 병렬** — `processWithConcurrency` worker pool 도입. enrich + 이미지 다운로드를 같은 worker 안에서 5 동시 처리, vault write 는 직렬 (충돌 회피). 100 PR 기준 wall clock 3분 → 30초 예상.
+- **PR body 이미지 자동 import** — sync 가 PR body 의 markdown `![](url)` + GitHub drag&drop `<img src>` 추출 → Tauri shell+curl 위임으로 vault `_attachments/{slug}/{before|after}-N.{ext}` 다운로드 → `screenshots` frontmatter 자동 채움. `## Before` / `## After` 헤더 또는 alt text 로 라벨 추론. existing.screenshots 가 비어있을 때만 import (본인 dropzone 박은 거 보존). path 가 vault 에 이미 있으면 redundant 다운로드 skip. 실패해도 best-effort (다음 sync 가 재시도).
+- **날짜 input 2026-01-01 min** — `src/lib/dates.ts` 에 `MIN_DATE_ISO` + `isBeforeMinDate()` export. `composeIso` 가 2026 미만 ISO 를 null 반환 (parseLooseDate 의 모든 분기 통합 차단). 앱 전체 `<input type="date">` 에 `min` 속성 + onChange silent reject. LooseDateInput 은 parseLooseDate 통해 자동 적용.
+- **lint 34 errors + 3 warnings → 0** — `_err`/`_url`/`PR_CATEGORIES` 미사용 제거, `no-useless-escape` 8건, `\x00-\x1f` 정상화 (binary control char regex → escape form), 의도된 패턴은 inline disable (useStateHistory race-fix refs, react-refresh, set-state-in-effect 외부 value sync).
+- **Vercel disconnect 는 drop** — 모바일 PWA 다시 살릴 가능성 보고 안전망 유지.
+- commit `1609ca4`
+
+### PR #23 — 테마 전환 radial wipe
+
+- **View Transitions API 폐기 + 직접 구현** — macOS Ventura WKWebView (Safari 16) 가 미지원이라 fallback 으로 즉시 toggle 됐었음. fixed overlay + clip-path circle 로 직접 구현.
+- **overlay 색 hardcode (`#ffffff` / `#1a1a1a`)** — `--bg-base` light/dark 값을 JS 상수로. CSS variable 평가하면 overlay 가 새 테마 cascade 못 받아 잘못된 색.
+- **wipe 끝 처리** — `transitionend` → `flushSync(setThemeState)` 동기 commit 강제 + 250ms 더 overlay 유지. rAF 한 번만으론 큰 DOM paint 가 한 프레임 넘겨 "overlay 사라진 뒤 컴포넌트 늦게 따라옴" 보였음.
+- **반지름 = 4 모서리 중 가장 먼 거리** — 어디서 눌러도 화면 끝까지 wipe.
+- **`prefers-reduced-motion` / origin 없는 호출 → 즉시 toggle fallback**.
+- **350ms ease-out + 250ms post-hold** — 처음 800ms 였는데 끝나고 멈춘 느낌이라 단축. post-hold 덕에 컨텐츠 paint 변화 안 보임.
+- commit `638008a` (merge `2acccb7`)
+
+### PR #22 — 보기 모드 마크다운 옵시디안 수준 정비 + 편집기 nest 정합
+
+- **체크박스 (`- [ ]`) 렌더링 + 클릭 토글** — task-list-item 안 default `<input>` 트리 walk 로 찾아 null + 직후 공백 1칸 strip (remark-gfm loose-list `<p>` 한 번 더 감싸는 케이스 대응). 토글은 mdast `checked` 가 아니라 source 의 `[ ]`/`[x]` 위치 (li `position.start.offset`) 기준 직접 수정 — React Query optimistic update 와 자연스럽게 합쳐짐.
+- **4-space indented code block** — `code` 의 inline vs block 구분에 className 만 보면 language class 없는 indented case 누락. `<pre>` ancestry 를 React Context 로 추적해 inline/block 정확히 분기.
+- **h4~h6 시각 위계** — 본문 글자와 구별 안 되던 거 단계별 정리.
+- **ordered list nest** — Tab 으로 들여쓰기 시 leading 숫자를 무조건 "1" 로 rewrite (CommonMark: 1 이외 숫자 ordered list 는 paragraph interrupt 못 함 → source `2.` 면 nest 실패). 시각 번호는 CommonMark 가 position 으로 다시 매김.
+- **gutter ↔ parse 일치** — 비-1 ordered marker 가 들여쓰여 있어도 직전 sibling 없으면 ContinuationGlyph (점선 vertical) 로 표시.
+- **`<br>` null 처리** — `<p>` 의 `whitespace-pre-wrap` 가 `\n` 시각 줄바꿈 처리하는데 hard break (`  \n`) 가 `<br>` + `\n` 둘 다 박혀 줄 두 번 끊김 → `<br>` 자체 null. Soft/hard 둘 다 한 줄.
+- **이미지 (`![](path)`)** — vault 안 로컬 경로 / URL 둘 다 정상 렌더.
+- **편집 단축키 도움말 정리** — ⌘B/I/E, ⌘⇧D, Alt+↑↓ 설정 → 단축키 cheatsheet 에 한꺼번에.
+- commit `79e1bb7` (merge)
 
 ### PR #21 — 메모/할일 데이터 도메인 정리 + 메모→할일 ⌘⏎
 

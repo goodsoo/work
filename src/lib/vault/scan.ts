@@ -279,9 +279,10 @@ export function patchMeetingFrontmatter(
 // Filename helpers
 
 // 파일시스템 금지 문자 (`/ \ : * ? " < > |`) + 옵시디안 link syntax 와 충돌하는
-// 문자 (`# ^ [ ] |`) 는 `-` 로 치환. NUL/제어문자도 제거.
+// 문자 (`# ^ [ ] |`) 는 `-` 로 치환. NUL/제어문자 (\x00-\x1f) 도 제거.
 // 빈 결과 → "untitled" fallback. 100자 cap.
-const UNSAFE_FILENAME_RE = /[ -/\\:*?"<>|#\^\[\]]/g;
+// eslint-disable-next-line no-control-regex
+const UNSAFE_FILENAME_RE = /[\x00-\x1f/\\:*?"<>|#^[\]]/g;
 
 export function slugify(title: string): string {
   let s = title.replace(UNSAFE_FILENAME_RE, "-");

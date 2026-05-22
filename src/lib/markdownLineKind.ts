@@ -39,6 +39,41 @@ function getPrevLine(full: string, lineStart: number): string | null {
   return full.slice(prevStart, prevEnd);
 }
 
+// 현재 줄 (indent=N, 비-1 ordered marker) 의 직전 위로 거슬러 같은 indent 의
+// ordered list sibling 이 존재하는지 검사. 존재하면 paragraph interrupt 가 아니라
+// 기존 sublist 의 sibling 이므로 ordered 로 인식해도 됨.
+// - 같은 indent 의 다른 marker (bullet/checkbox) → 다른 list type, 없음.
+// - 더 낮은 indent 의 list marker → 우리 level 의 sublist 시작점 못 찾았으니 없음.
+// - 더 높은 indent → 계속 위로.
+// - blank line → 계속 위로 (loose list 허용).
+function hasOrderedSiblingAt(full: string, lineStart: number, indent: number): boolean {
+  let scanEnd = lineStart - 1;
+  while (scanEnd > 0) {
+    const scanStart = full.lastIndexOf("\n", scanEnd - 1) + 1;
+    const ln = full.slice(scanStart, scanEnd);
+    if (ln.trim() === "") {
+      scanEnd = scanStart - 1;
+      continue;
+    }
+    const lnIndent = ln.match(/^( *)/)?.[1].length ?? 0;
+    const lnTrimmed = ln.slice(lnIndent);
+    if (lnIndent === indent) {
+      if (/^\d+\.\s/.test(lnTrimmed)) return true;
+      if (/^[-*+]\s/.test(lnTrimmed)) return false;
+      // 같은 indent 인데 list marker 아님 → 우리 level 의 list block 아님.
+      return false;
+    }
+    if (lnIndent < indent) {
+      // 더 낮은 indent — 부모 list 영역 진입. 우리 level 의 sibling 없음.
+      return false;
+    }
+    // 더 높은 indent — 우리 sublist 의 깊은 줄. 계속 위로.
+    if (scanStart === 0) return false;
+    scanEnd = scanStart - 1;
+  }
+  return false;
+}
+
 // 빈 줄 만나기 전까지 위로 거슬러 가장 가까운 명시적 패턴을 찾아 continuation 반환.
 // 일반 단락의 soft break는 paragraph (gutter 비움).
 function findContinuationKind(full: string, lineStart: number): LineKind {
@@ -105,7 +140,12 @@ export function inferLineKind(full: string, pos: number): LineKind {
   const indentMatch = line.match(/^( +)/);
   const indent = indentMatch ? indentMatch[1].length : 0;
   const trimmed = line.slice(indent);
+  // bullet/checkbox 는 2-space nest, ordered 는 marker 폭 (1. = 3, 10. = 4) nest.
+  // depth 계산도 그에 맞춰 — 안 그러면 gutter 가 실제 parse 와 어긋남.
   const depth = Math.floor(indent / 2);
+  const orderedMarker = trimmed.match(/^(\d+)\.\s/);
+  const orderedUnit = orderedMarker ? orderedMarker[1].length + 2 : 3;
+  const orderedDepth = Math.floor(indent / orderedUnit);
 
   if (
     indent >= 4 &&
@@ -118,7 +158,16 @@ export function inferLineKind(full: string, pos: number): LineKind {
 
   if (/^[-*+] \[[ xX]\] /.test(trimmed)) return { type: "checkbox", depth };
   if (/^[-*+]\s/.test(trimmed)) return { type: "bullet", depth };
-  if (/^\d+\.\s/.test(trimmed)) return { type: "ordered", depth };
+  if (orderedMarker) {
+    const num = parseInt(orderedMarker[1], 10);
+    // 비-1 marker 는 paragraph 를 interrupt 못 함. top-level (indent=0) 이거나
+    // 같은 indent 의 직전 ordered sibling 이 있을 때만 ordered 로 인식. 그 외엔
+    // CommonMark 가 continuation 텍스트로 처리.
+    if (num === 1 || indent === 0 || hasOrderedSiblingAt(full, lineStart, indent)) {
+      return { type: "ordered", depth: orderedDepth };
+    }
+    return findContinuationKind(full, lineStart);
+  }
 
   if (/^>\s?/.test(line)) return { type: "quote" };
   if (/^---+$|^\*\*\*+$|^___+$/.test(line)) return { type: "hr" };

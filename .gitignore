@@ -39,3 +39,6 @@ dist-ssr
 
 # Claude Code (project shared config OK, local user config gitignored)
 .claude/settings.local.json
+
+# /start skill — worktree 별 PR intent (worktree 안에서만 의미 있음)
+.pr-intent.md

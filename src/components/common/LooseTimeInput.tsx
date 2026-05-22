@@ -19,6 +19,8 @@ export function LooseTimeInput({
   const [draft, setDraft] = useState(value);
   const skipCommitRef = useRef(false);
   useEffect(() => {
+    // 외부에서 value 바뀌면 draft 동기화. 의도된 sync 패턴.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setDraft(value);
   }, [value]);
 

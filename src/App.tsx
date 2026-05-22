@@ -150,6 +150,8 @@ function AppContent() {
     if (!selectedMeetingId) return;
     const exists = meetings.data?.some((m) => m.uid === selectedMeetingId);
     if (exists) return;
+    // 의도: list cache 가 도착했는데 hash 의 uid 가 사라진 케이스 — 즉시 정리.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSelectedMeetingId(null);
     if (window.location.hash.startsWith("#meeting-")) {
       window.history.replaceState(null, "", window.location.pathname);
@@ -207,6 +209,8 @@ function AppContent() {
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
+    // switchTab 은 의도적으로 dep 제외 — 매 렌더 새 ref 라 listener re-register 폭주 회피.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedMeetingId]);
 
   // 메모장 단축키 (Tauri only):
