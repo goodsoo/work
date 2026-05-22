@@ -1,16 +1,12 @@
-import { AlertCircle } from "lucide-react";
+import { useState } from "react";
+import { AlertCircle, BookOpen } from "lucide-react";
 import {
   usePortfolioProjects,
   usePortfolioWorks,
   type GhSyncProgress,
 } from "../../hooks/usePortfolio";
-import {
-  buildLegacyCardPrompt,
-  buildPRGuidePrompt,
-} from "../../lib/clipboardPrompt";
-import { useVault } from "../../lib/vault/useVault";
-import { ClipPromptButton } from "../common/ClipPromptButton";
 import { PortfolioProjectList, type ProjectFilter } from "./PortfolioProjectList";
+import { PortfolioGuideModal } from "./PortfolioGuideModal";
 import { SyncButton } from "./SyncButton";
 
 type Props = {
@@ -18,6 +14,7 @@ type Props = {
   onFilterChange: (next: ProjectFilter) => void;
   syncState: GhSyncProgress;
   onSyncRun: () => void;
+  onFullSyncRun: () => void;
 };
 
 export function PortfolioSidePanel({
@@ -25,36 +22,45 @@ export function PortfolioSidePanel({
   onFilterChange,
   syncState,
   onSyncRun,
+  onFullSyncRun,
 }: Props) {
   const works = usePortfolioWorks();
   const projects = usePortfolioProjects();
-  const { vaultRoot } = useVault();
+  const [guideOpen, setGuideOpen] = useState(false);
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="relative flex h-full flex-col">
+      {/* 헤더 — 메모장과 통일 (h2 font-serif text-sm + 우측 아이콘 row) */}
       <div
-        className="flex flex-col gap-2 px-3 pt-4 pb-3"
+        className="flex shrink-0 items-center justify-between px-4 py-3"
         style={{ borderBottom: "1px solid var(--border-default)" }}
       >
         <h2
-          className="text-lg font-semibold"
+          className="font-serif text-sm font-medium"
           style={{ color: "var(--text-primary)" }}
         >
           내 작업
         </h2>
+        <div className="flex items-center gap-0.5">
+          <button
+            type="button"
+            onClick={() => setGuideOpen(true)}
+            title="가이드북"
+            aria-label="가이드북"
+            className="flex h-7 w-7 items-center justify-center rounded-md transition"
+            style={{ color: "var(--text-secondary)", minHeight: 0 }}
+          >
+            <BookOpen className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+
+      {/* 동기화 + 상태 — 헤더 아래 별도 영역. 프롬프트 도구는 가이드북 모달 안으로 이동. */}
+      <div
+        className="flex shrink-0 flex-col gap-2 px-3 pt-3 pb-3"
+        style={{ borderBottom: "1px solid var(--border-default)" }}
+      >
         <SyncButton state={syncState} onRun={onSyncRun} />
-        <ClipPromptButton
-          buildPrompt={() => buildPRGuidePrompt()}
-          label="PR 가이드 프롬프트"
-          title="다른 repo 의 Claude Code 에게 '앞으로 PR 만들 땐 포트폴리오 호환 양식 따라라' 라고 시킬 프롬프트 복사"
-          variant="compact"
-        />
-        <ClipPromptButton
-          buildPrompt={() => buildLegacyCardPrompt(vaultRoot)}
-          label="Legacy 카드 프롬프트"
-          title="PR 없이 직접 push 한 repo 에서 카드 만들도록 Claude 에게 시킬 프롬프트 복사"
-          variant="compact"
-        />
         {syncState.error ? (
           <SyncError message={syncState.error.message} />
         ) : null}
@@ -81,6 +87,13 @@ export function PortfolioSidePanel({
           onFilterChange={onFilterChange}
         />
       </div>
+
+      <PortfolioGuideModal
+        isOpen={guideOpen}
+        onClose={() => setGuideOpen(false)}
+        onFullSyncRun={onFullSyncRun}
+        fullSyncRunning={syncState.running}
+      />
     </div>
   );
 }

@@ -5,9 +5,11 @@ import { GlobalTooltip } from "./components/Tooltip";
 import type { Tab } from "./components/nav/BottomTabs";
 import { MeetingForm } from "./components/meetings/MeetingForm";
 import { TrashModal } from "./components/meetings/TrashModal";
+import { PortfolioTrashModal } from "./components/portfolio/PortfolioTrashModal";
 import {
   MeetingsSidePanel,
   MeetingsSidePanelFooter,
+  PortfolioSidePanelFooter,
   CalendarDayPanel,
   TodosSidePanel,
   TodosSidePanelFooter,
@@ -22,7 +24,6 @@ import { PortfolioPage } from "./pages/PortfolioPage";
 import { PortfolioSidePanel } from "./components/portfolio/PortfolioSidePanel";
 import type { ProjectFilter } from "./components/portfolio/PortfolioProjectList";
 import { useGhSync } from "./hooks/usePortfolio";
-import { readSyncState } from "./api/portfolio";
 import { useMeetings, useCreateMeeting, useDeleteMeeting } from "./hooks/useMeetings";
 import { useVault } from "./lib/vault/useVault";
 import { maybeAutoBackup } from "./lib/backup";
@@ -78,7 +79,25 @@ function AppContent() {
   // 메모 + todo 휴지통 별도 — 데이터 영역 다름.
   const [trashOpen, setTrashOpen] = useState(false);
   const [todoTrashOpen, setTodoTrashOpen] = useState(false);
+  const [portfolioTrashOpen, setPortfolioTrashOpen] = useState(false);
   const portfolioSync = useGhSync();
+
+  // last_sync - 1일 buffer 의 YYYY-MM-DD. 첫 sync (last_sync 없음) 면 undefined → 전체.
+  // gh search 의 `merged:>=YYYY-MM-DD` 가 날짜 단위라 1일 buffer 충분.
+  const portfolioRunIncrementalSync = async () => {
+    try {
+      await portfolioSync.run({ incremental: true });
+    } catch (err) {
+      console.error("[portfolio] incremental sync failed:", err);
+    }
+  };
+  const portfolioRunFullSync = async () => {
+    try {
+      await portfolioSync.run({});
+    } catch (err) {
+      console.error("[portfolio] full sync failed:", err);
+    }
+  };
   const { adapter, isReady } = useVault();
   const meetings = useMeetings();
   const createMeetingMutation = useCreateMeeting();
@@ -87,24 +106,10 @@ function AppContent() {
   const autoBackupDone = useRef(false);
   const autoSelectedRef = useRef(didAutoSelectThisSession);
 
-  // V0.7 design step 3 (1B): vault ready 후 5초 background sync 1회 (since=last_sync).
-  // 본인 매일 앱 켜면 silent fetch — 의식 0 으로 카드 누적. Tauri 만 (gh 호출 필요).
-  useEffect(() => {
-    if (!isTauri || !isReady || autoSyncDone.current) return;
-    autoSyncDone.current = true;
-    const t = setTimeout(async () => {
-      try {
-        const state = await readSyncState(adapter);
-        await portfolioSync.run(
-          state.last_sync ? { since: state.last_sync.slice(0, 10) } : {},
-        );
-      } catch {
-        // useGhSync state.error 에 반영 — sidebar 가 표시
-      }
-    }, 5000);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isReady]);
+  // 5초 background auto-sync 임시 비활성 — Tauri callback 손실로 hook 의 runningRef
+  // 가 stuck 되는 케이스 발견 (portfolio-card-redesign PR). 사용자 명시 [동기화]
+  // 클릭만으로도 본인 사용에 충분. 안정화 후 재활성 검토.
+  void autoSyncDone;
 
   // 자동 백업 — vault ready 후 10초 뒤 1회. interval/keepCount 설정에 따라 실행.
   useEffect(() => {
@@ -383,20 +388,21 @@ function AppContent() {
         activeFilter={portfolioFilter}
         onFilterChange={setPortfolioFilter}
         syncState={portfolioSync.state}
-        onSyncRun={() => {
-          portfolioSync.run({}).catch(() => {
-            // error 는 portfolioSync.state.error 에 반영, sidebar 가 표시
-          });
-        }}
+        onSyncRun={portfolioRunIncrementalSync}
+        onFullSyncRun={portfolioRunFullSync}
       />
     ) : undefined;
 
-  // 메모장 + todos 탭 footer 에 휴지통 entry. 각각 별도 modal.
+  // 탭별 footer slot. 휴지통은 overlay 모달, 도메인별 분리.
   const sidePanelFooter =
     tab === "meetings" ? (
       <MeetingsSidePanelFooter onTrashOpen={() => setTrashOpen(true)} />
     ) : tab === "todos" ? (
       <TodosSidePanelFooter onTrashOpen={() => setTodoTrashOpen(true)} />
+    ) : tab === "portfolio" ? (
+      <PortfolioSidePanelFooter
+        onTrashOpen={() => setPortfolioTrashOpen(true)}
+      />
     ) : undefined;
 
   return (
@@ -439,6 +445,10 @@ function AppContent() {
       <TodoTrashModal
         open={todoTrashOpen}
         onClose={() => setTodoTrashOpen(false)}
+      />
+      <PortfolioTrashModal
+        isOpen={portfolioTrashOpen}
+        onClose={() => setPortfolioTrashOpen(false)}
       />
     </AppShell>
   );

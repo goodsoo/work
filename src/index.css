@@ -50,6 +50,13 @@
     --accent-blue-text: #1d4ed8;
     --accent-green: #16a34a;
 
+    /* Portfolio category dots */
+    --cat-uiux: #2563eb;
+    --cat-backend: #16a34a;
+    --cat-infra: #d97706;
+    --cat-fix: #dc2626;
+    --cat-other: #7c3aed;
+
     /* Interactive */
     --btn-primary: #18181b;
     --btn-primary-text: #ffffff;
@@ -94,6 +101,13 @@
     --accent-blue-bg: rgba(96, 165, 250, 0.1);
     --accent-blue-text: #93c5fd;
     --accent-green: #4ade80;
+
+    /* Portfolio category dots */
+    --cat-uiux: #60a5fa;
+    --cat-backend: #4ade80;
+    --cat-infra: #fbbf24;
+    --cat-fix: #f87171;
+    --cat-other: #a78bfa;
 
     /* Interactive */
     --btn-primary: #e4e4e7;
@@ -145,6 +159,34 @@
     user-select: text;
     -webkit-user-select: text;
   }
+
+  /* 글로벌 placeholder 색 — 다크 테마에서 브라우저 기본은 text-primary 와 너무 가까움.
+     .meta-input::placeholder 등 명시 클래스는 specificity 가 높아 그대로 유지. */
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--text-muted);
+    opacity: 1;
+  }
+
+  /* portfolio 가이드북 본문 — 일반적인 doc-like 스타일 (tailwind reset 가 list 제거하므로 복원) */
+  .guide-body {
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--text-secondary);
+  }
+  .guide-body p { margin: 0 0 0.5rem; }
+  .guide-body p:last-child { margin-bottom: 0; }
+  .guide-body p.muted { color: var(--text-muted); font-size: 11px; }
+  .guide-body strong { color: var(--text-primary); font-weight: 600; }
+  .guide-body em { color: var(--text-primary); font-style: italic; }
+  .guide-body ul, .guide-body ol {
+    margin: 0.5rem 0;
+    padding-left: 1.25rem;
+  }
+  .guide-body ul { list-style: disc; }
+  .guide-body ol { list-style: decimal; }
+  .guide-body li { margin-bottom: 0.25rem; }
+  .guide-body li:last-child { margin-bottom: 0; }
 
   /* Desktop: body scroll 막고 main 안에서만 scroll — viewport 전체 scrollbar 회피 */
   @media (min-width: 640px) {

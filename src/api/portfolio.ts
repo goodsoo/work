@@ -18,6 +18,7 @@ import {
 } from "../lib/portfolio/gh";
 import { downloadImageToVault } from "../lib/portfolio/imageDownload";
 import { extractPRBodyImages, planImagePaths } from "../lib/portfolio/imageImport";
+import { patchFrontmatter } from "../lib/vault/parser";
 
 export const PORTFOLIO_DIR = "portfolio";
 export const PROJECTS_FILE = "portfolio/projects.md";
@@ -336,6 +337,8 @@ const PORTFOLIO_SKIP = new Set<string>([
   "portfolio/.synced.md",
 ]);
 
+export const PORTFOLIO_TRASH_DIR = "portfolio/.trash";
+
 export async function scanPortfolio(
   adapter: VaultAdapter,
 ): Promise<PortfolioWorkMeta[]> {
@@ -344,6 +347,8 @@ export async function scanPortfolio(
   for (const path of files) {
     if (!path.endsWith(".md")) continue;
     if (PORTFOLIO_SKIP.has(path)) continue;
+    // portfolio 도메인 휴지통 (메모장 vault `.trash/` 와 분리)
+    if (path.startsWith(`${PORTFOLIO_TRASH_DIR}/`)) continue;
     try {
       const raw = await adapter.read(path);
       const meta = await adapter.readMeta(path);
@@ -367,6 +372,156 @@ export async function scanPortfolio(
     return b.mtime - a.mtime;
   });
   return results;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Trash — portfolio/.trash/ 안 카드 list / 복원 / 영구삭제 / 비우기.
+// 파일명 stamp prefix: `YYYY-MM-DDTHH-MM-SS-{slug}.md`.
+// attachments 짝: `{stamp}-attachments-{slug}/` (폴더, 안에 이미지).
+
+const TRASH_STAMP_RE =
+  /^portfolio\/\.trash\/(\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2})-(.+)\.md$/;
+
+export type TrashedPortfolioWork = PortfolioWorkMeta & {
+  trashPath: string; // portfolio/.trash/{stamp}-{slug}.md
+  deletedAt: number; // stamp 시각 ms
+  stamp: string;
+  slug: string; // 원본 slug (stamp 제거)
+};
+
+export async function listTrashedPortfolioWorks(
+  adapter: VaultAdapter,
+): Promise<TrashedPortfolioWork[]> {
+  const files = await adapter.list(PORTFOLIO_TRASH_DIR);
+  const results: TrashedPortfolioWork[] = [];
+  for (const path of files) {
+    if (!path.endsWith(".md")) continue;
+    const m = path.match(TRASH_STAMP_RE);
+    if (!m) continue;
+    const [, stamp, slug] = m;
+    try {
+      const raw = await adapter.read(path);
+      const meta = await adapter.readMeta(path);
+      const work = fileToPortfolioWork(path, raw, meta.mtime);
+      if (!work) continue;
+      const deletedAt = parseStampToMs(stamp) || meta.mtime;
+      results.push({
+        prSlug: slug,
+        frontmatter: work.frontmatter,
+        filePath: work.filePath,
+        mtime: deletedAt,
+        trashPath: path,
+        deletedAt,
+        stamp,
+        slug,
+      });
+    } catch {
+      // 손상 skip
+    }
+  }
+  // 최근 삭제 위
+  results.sort((a, b) => b.deletedAt - a.deletedAt);
+  return results;
+}
+
+function parseStampToMs(stamp: string): number {
+  // "2026-05-22T11-24-38" → "2026-05-22T11:24:38" → ms
+  const iso = stamp.replace(
+    /^(\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})-(\d{2})$/,
+    "$1T$2:$3:$4",
+  );
+  const t = Date.parse(iso);
+  return Number.isFinite(t) ? t : 0;
+}
+
+// 복원 — trashCardPath: portfolio/.trash/{stamp}-{slug}.md
+// 원래 위치 portfolio/{slug}.md 로 이동 + 같은 stamp 의 attachments 짝 동행.
+// 복원된 카드는 항상 `included: false` (미사용) 상태로 — 휴지통 = 임시 자리, 복원 = 미사용으로.
+// 충돌 (같은 slug 카드가 다시 sync 된 경우) 시 throw.
+export async function restorePortfolioWork(
+  adapter: VaultAdapter,
+  trashCardPath: string,
+): Promise<string> {
+  const m = trashCardPath.match(TRASH_STAMP_RE);
+  if (!m) throw new Error(`휴지통 경로 형식이 다름: ${trashCardPath}`);
+  const [, stamp, slug] = m;
+  const target = portfolioWorkPath(slug);
+  if (await adapter.exists(target)) {
+    throw new Error(
+      `같은 이름의 카드가 이미 있어요 (${slug}). 그쪽을 먼저 정리하거나 다른 이름으로 복원해주세요.`,
+    );
+  }
+  await adapter.rename(trashCardPath, target);
+  // included: false 로 patch — 휴지통에서 꺼낸 카드는 자동으로 미사용 자리에.
+  try {
+    const raw = await adapter.read(target);
+    const patched = patchFrontmatter(raw, { included: false });
+    if (patched !== raw) {
+      await adapter.write(target, patched);
+    }
+  } catch {
+    // patch 실패 — 카드 자체는 복원됨, included 는 기존 값 유지 (다음 사용 때 수동 조정 가능)
+  }
+  // attachments 짝
+  const trashAttach = `${PORTFOLIO_TRASH_DIR}/${stamp}-attachments-${slug}`;
+  const targetAttach = `${ATTACHMENTS_DIR}/${slug}`;
+  try {
+    if (
+      (await adapter.exists(trashAttach)) &&
+      !(await adapter.exists(targetAttach))
+    ) {
+      await adapter.rename(trashAttach, targetAttach);
+    }
+  } catch {
+    // 디렉토리 rename 실패 — 카드 자체는 복원됨, 첨부는 휴지통에 남음
+  }
+  return target;
+}
+
+// 영구 삭제 — trash 카드 + attachments 폴더 안 파일/폴더 모두.
+export async function purgePortfolioWork(
+  adapter: VaultAdapter,
+  trashCardPath: string,
+): Promise<void> {
+  await adapter.delete(trashCardPath);
+  const m = trashCardPath.match(TRASH_STAMP_RE);
+  if (!m) return;
+  const [, stamp, slug] = m;
+  const trashAttach = `${PORTFOLIO_TRASH_DIR}/${stamp}-attachments-${slug}`;
+  if (await adapter.exists(trashAttach)) {
+    try {
+      const inside = await adapter.list(trashAttach);
+      for (const f of inside) {
+        try {
+          await adapter.delete(f);
+        } catch {
+          // skip
+        }
+      }
+      try {
+        await adapter.delete(trashAttach);
+      } catch {
+        // 빈 디렉 삭제 실패 — Tauri/OS 의존, 다음 휴지통 비우기 때 재시도
+      }
+    } catch {
+      // list 실패 skip
+    }
+  }
+}
+
+// 휴지통 비우기 — portfolio/.trash 안 모든 카드 + attachments 영구 삭제.
+export async function emptyPortfolioTrash(
+  adapter: VaultAdapter,
+): Promise<void> {
+  const files = await adapter.list(PORTFOLIO_TRASH_DIR);
+  const cards = files.filter((p) => p.endsWith(".md"));
+  for (const p of cards) {
+    try {
+      await purgePortfolioWork(adapter, p);
+    } catch {
+      // 한 항목 실패해도 진행
+    }
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -6,7 +6,6 @@ import { parsePRResponse } from "../../lib/clipboardPrompt";
 
 type Props = {
   onParsed: (impact: string, category: string) => void;
-  // 부모가 토스트/에러 표시. 빈 기본값으로 두면 placeholder 만 표시.
   onError?: (message: string) => void;
 };
 
@@ -55,7 +54,7 @@ export function ResponsePasteArea({ onParsed, onError }: Props) {
       />
       {unparsed ? (
         <span
-          className="text-xs"
+          className="text-[11px]"
           style={{ color: "var(--accent-red-text)" }}
         >
           응답 형식 못 알아봄 — 직접 입력

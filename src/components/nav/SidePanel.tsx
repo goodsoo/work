@@ -214,6 +214,28 @@ export function MeetingsSidePanelFooter({
   );
 }
 
+// portfolio 탭에서만 보임. 메모장과 별개 도메인 휴지통 (portfolio/.trash/).
+export function PortfolioSidePanelFooter({
+  onTrashOpen,
+}: {
+  onTrashOpen: () => void;
+}) {
+  return (
+    <div className="flex items-center gap-1">
+      <button
+        type="button"
+        onClick={onTrashOpen}
+        title="포트폴리오 휴지통"
+        aria-label="포트폴리오 휴지통"
+        className="flex h-7 w-7 items-center justify-center rounded-md transition"
+        style={{ color: "var(--text-muted)", minHeight: 0 }}
+      >
+        <Trash2 className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  );
+}
+
 function MarkdownHelp() {
   const [open, setOpen] = useState(false);
   return (

@@ -59,7 +59,7 @@ export function PortfolioPage({ activeFilter, onSync, syncRunning }: Props) {
 
   return (
     <div className="px-6 pt-6">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         {filtered.map((w) => (
           <PortfolioWorkCard
             key={w.prSlug}
@@ -75,7 +75,7 @@ export function PortfolioPage({ activeFilter, onSync, syncRunning }: Props) {
 function SkeletonGrid({ count }: { count: number }) {
   return (
     <div className="px-6 pt-6">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         {Array.from({ length: count }).map((_, i) => (
           <div
             key={i}
