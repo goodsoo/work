@@ -4,7 +4,18 @@
 
 ---
 
-## 2026-05-22
+## 2026-05-23
+
+### PR #36 — 할 일 카테고리 색 시그널
+
+- **한 줄 임팩트**: 카테고리 색으로 할 일 한눈에 구분
+- **단일 lookup** — `lib/todoCategory.ts` `categoryColor(category)` 가 single source. 향후 카테고리 추가/변경 (`todo.md PR — 동적 카테고리`) 시 한 곳만 확장.
+- **색 토큰** — `--cat-work` 주황 (`#ea580c` / `#fb923c`), `--cat-schedule` 틸 (`#0d9488` / `#2dd4bf`), `--cat-other` 보라 (portfolio 와 공유). 처음엔 work=인디고 시안 → 보라(other)와 시각 구분 약해 work 주황으로 교체.
+- **MonthGrid todo chip dot** — 셀 안 todo chip 앞 6px 색 dot. 미분류는 안 그림.
+- **체크박스 디자인** — `rounded-md + 1.5px border + 4% catColor tint`. 기존 `rounded + 2px border` 보다 부드러움. tint 는 `color-mix(in srgb, ${catColor} 4%, transparent)` 로 다크모드 자동 따라감.
+- **사이드바 통일성** — TodosSidePanel 의 status filter (전체/미완료/완료/취소됨) 도 카테고리 dot 패턴과 align. 12px box 안에 미완료 = `Circle` outline, 완료 = filled 원 + 흰 체크 (작은 사이즈에서도 또렷), 취소됨 = `XCircle`. 카테고리 entry 는 8px 색 dot (미분류 = `--text-muted`).
+- **DueChip 정리** — bg 색 제거 (체크박스 카테고리 tint 와 layer 충돌) → outline + 글자색. 오늘 = 빨강 filled bold (액션 강조), 지남 = 빨강 outline (정보), 임박 = 회색 outline. 빨강 한 색으로 통일해 가짓수 절감. 위치도 제목 앞 → 카드 우측 끝 (Linear/Things/Todoist 패턴).
+- **DESIGN.md** — 카테고리 dot 토큰 표 + 단일 lookup 위치 명시.
 
 ### PR #33 — macOS 윈도우 헤더 통합 + sidebar collapse
 
