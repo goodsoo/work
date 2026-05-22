@@ -41,6 +41,13 @@ export interface VaultAdapter {
   getRoot(): string | null;
 
   list(subdir: string): Promise<string[]>;
+  // 재귀 scan — subdir 아래 모든 깊이의 파일 path 를 vault root 기준 상대 path 로
+  // 반환. nested folder 지원하는 sidebar 트리 build 용 (`meetings/{folder}/x.md`).
+  // dot-prefix 폴더/파일은 skip (`.trash/`, `.icloud` placeholder 등).
+  listRecursive(subdir: string): Promise<string[]>;
+  // 폴더만 재귀 scan — subdir 자신 제외, 빈 폴더도 포함. 옵시디안 모델대로 메모
+  // 0개 폴더도 트리에 보이게 하기 위함. dot-prefix 제외.
+  listFoldersRecursive(subdir: string): Promise<string[]>;
   read(relPath: string): Promise<string>;
   readMeta(relPath: string): Promise<FileMeta>;
   // expectedMtime: 마지막으로 읽었을 때의 mtime. 디스크가 더 새 거면 ConflictError throw.
@@ -49,7 +56,9 @@ export interface VaultAdapter {
     content: string,
     expectedMtime?: number,
   ): Promise<FileMeta>;
-  delete(relPath: string): Promise<void>;
+  // recursive=true 면 디렉토리 + 내부 모든 콘텐츠 삭제. 폴더 삭제용.
+  // (메모 본체는 호출자가 먼저 휴지통 이동 후 빈 디렉토리 청소 용도.)
+  delete(relPath: string, options?: { recursive?: boolean }): Promise<void>;
   rename(fromRel: string, toRel: string): Promise<void>;
   exists(relPath: string): Promise<boolean>;
   mkdir(relPath: string): Promise<void>;
@@ -121,6 +130,58 @@ export function createTauriAdapter(): VaultAdapter {
       }
     },
 
+    async listRecursive(subdir: string): Promise<string[]> {
+      const r = requireRoot();
+      const results: string[] = [];
+      async function walk(rel: string): Promise<void> {
+        const abs = joinAbs(r, rel);
+        let entries;
+        try {
+          entries = await readDir(abs);
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          if (msg.includes("No such file") || msg.includes("not found")) return;
+          throw err;
+        }
+        for (const e of entries) {
+          if (!e.name || e.name.startsWith(".")) continue;
+          const childRel = rel === "" ? e.name : `${rel}/${e.name}`;
+          if (e.isFile) {
+            results.push(childRel);
+          } else if (e.isDirectory) {
+            await walk(childRel);
+          }
+        }
+      }
+      await walk(subdir);
+      return results;
+    },
+
+    async listFoldersRecursive(subdir: string): Promise<string[]> {
+      const r = requireRoot();
+      const results: string[] = [];
+      async function walk(rel: string): Promise<void> {
+        const abs = joinAbs(r, rel);
+        let entries;
+        try {
+          entries = await readDir(abs);
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          if (msg.includes("No such file") || msg.includes("not found")) return;
+          throw err;
+        }
+        for (const e of entries) {
+          if (!e.name || e.name.startsWith(".")) continue;
+          if (!e.isDirectory) continue;
+          const childRel = rel === "" ? e.name : `${rel}/${e.name}`;
+          results.push(childRel);
+          await walk(childRel);
+        }
+      }
+      await walk(subdir);
+      return results;
+    },
+
     async read(relPath: string): Promise<string> {
       return readTextFile(joinAbs(requireRoot(), relPath));
     },
@@ -171,8 +232,13 @@ export function createTauriAdapter(): VaultAdapter {
       });
     },
 
-    async delete(relPath: string): Promise<void> {
-      await tauriRemove(joinAbs(requireRoot(), relPath));
+    async delete(
+      relPath: string,
+      options?: { recursive?: boolean },
+    ): Promise<void> {
+      await tauriRemove(joinAbs(requireRoot(), relPath), {
+        recursive: options?.recursive === true,
+      });
     },
 
     async rename(fromRel: string, toRel: string): Promise<void> {
@@ -281,6 +347,50 @@ export function createMemoryAdapter(): VaultAdapter & {
       return result;
     },
 
+    async listRecursive(subdir: string): Promise<string[]> {
+      requireRoot();
+      const prefix = subdir === "" ? "" : subdir + "/";
+      const result: string[] = [];
+      for (const path of files.keys()) {
+        if (subdir !== "" && !path.startsWith(prefix)) continue;
+        const rest = subdir === "" ? path : path.slice(prefix.length);
+        // dot-prefix 가 path 어디든 끼면 skip (`.trash/x.md`, `foo/.x.md`).
+        if (rest.split("/").some((seg) => seg.startsWith("."))) continue;
+        result.push(path);
+      }
+      return result;
+    },
+
+    async listFoldersRecursive(subdir: string): Promise<string[]> {
+      requireRoot();
+      const folders = new Set<string>();
+      const prefix = subdir === "" ? "" : subdir + "/";
+
+      // file path 든 mkdir 된 dir 든 그 path 의 모든 조상 폴더를 set 에 추가.
+      // treatAsFile=true 면 leaf segment 는 폴더 아님 (filename), false 면 leaf 도 폴더.
+      const collect = (fullPath: string, treatAsFile: boolean): void => {
+        if (subdir !== "" && !fullPath.startsWith(prefix)) return;
+        const rest = subdir === "" ? fullPath : fullPath.slice(prefix.length);
+        if (rest === "") return; // subdir 자신
+        const segs = rest.split("/").filter(Boolean);
+        const lastFolderIdx = treatAsFile ? segs.length - 1 : segs.length;
+        for (let i = 1; i <= lastFolderIdx; i++) {
+          const folderSegs = segs.slice(0, i);
+          if (folderSegs.some((s) => s.startsWith("."))) return;
+          const full =
+            subdir === ""
+              ? folderSegs.join("/")
+              : `${subdir}/${folderSegs.join("/")}`;
+          folders.add(full);
+        }
+      };
+
+      for (const fp of files.keys()) collect(fp, true);
+      for (const dp of dirs) collect(dp, false);
+
+      return [...folders];
+    },
+
     async read(relPath: string): Promise<string> {
       requireRoot();
       const f = files.get(relPath);
@@ -314,19 +424,73 @@ export function createMemoryAdapter(): VaultAdapter & {
       return { mtime, size: content.length };
     },
 
-    async delete(relPath: string): Promise<void> {
+    async delete(
+      relPath: string,
+      options?: { recursive?: boolean },
+    ): Promise<void> {
       requireRoot();
+      if (options?.recursive === true) {
+        const prefix = relPath + "/";
+        const removed: string[] = [];
+        for (const p of files.keys()) {
+          if (p === relPath || p.startsWith(prefix)) removed.push(p);
+        }
+        for (const p of removed) {
+          files.delete(p);
+          for (const w of watchers) w({ type: "deleted", path: p });
+        }
+        const removedDirs: string[] = [];
+        for (const d of dirs) {
+          if (d === relPath || d.startsWith(prefix)) removedDirs.push(d);
+        }
+        for (const d of removedDirs) dirs.delete(d);
+        return;
+      }
       files.delete(relPath);
+      dirs.delete(relPath);
       for (const w of watchers) w({ type: "deleted", path: relPath });
     },
 
     async rename(fromRel: string, toRel: string): Promise<void> {
       requireRoot();
-      const f = files.get(fromRel);
-      if (!f) throw new Error(`ENOENT: ${fromRel}`);
-      files.delete(fromRel);
-      files.set(toRel, { ...f, mtime: tick() });
-      for (const w of watchers) w({ type: "renamed", from: fromRel, to: toRel });
+      // 파일 케이스: 1:1 rename.
+      const file = files.get(fromRel);
+      if (file) {
+        files.delete(fromRel);
+        files.set(toRel, { ...file, mtime: tick() });
+        for (const w of watchers) w({ type: "renamed", from: fromRel, to: toRel });
+        return;
+      }
+      // 디렉토리 케이스: prefix 매치하는 모든 file + dir 같이 이동. POSIX `mv` 동등.
+      const prefix = fromRel + "/";
+      let movedAny = false;
+      const fileMoves: Array<[string, string]> = [];
+      for (const p of files.keys()) {
+        if (p.startsWith(prefix)) {
+          fileMoves.push([p, toRel + "/" + p.slice(prefix.length)]);
+        }
+      }
+      for (const [from, to] of fileMoves) {
+        const f = files.get(from)!;
+        files.delete(from);
+        files.set(to, { ...f, mtime: tick() });
+        for (const w of watchers) w({ type: "renamed", from, to });
+        movedAny = true;
+      }
+      // dirs set 도 같이 이동 (mkdir 된 빈 폴더 보존).
+      if (dirs.has(fromRel)) {
+        dirs.delete(fromRel);
+        dirs.add(toRel);
+        movedAny = true;
+      }
+      for (const d of [...dirs]) {
+        if (d.startsWith(prefix)) {
+          dirs.delete(d);
+          dirs.add(toRel + "/" + d.slice(prefix.length));
+          movedAny = true;
+        }
+      }
+      if (!movedAny) throw new Error(`ENOENT: ${fromRel}`);
     },
 
     async exists(relPath: string): Promise<boolean> {

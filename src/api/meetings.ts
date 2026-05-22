@@ -1,19 +1,25 @@
 import type { VaultAdapter } from "../lib/vault/adapter";
 import {
   buildSummaryBody,
+  computeMovedMeetingPath,
   computeRenamedMeetingPath,
   fileToMeeting,
   freshStamp,
   generateMeetingPath,
   isMeetingSidecar,
+  meetingFolder,
   meetingMainPath,
   meetingToMainRaw,
   meetingToSummaryRaw,
   meetingToTranscriptRaw,
+  moveMeetingToFolder,
+  normalizeFolderPath,
   patchMeetingFrontmatter,
   patchMeetingMainBody,
   renameMeetingFiles,
+  renameMeetingFolder as _renameMeetingFolder,
   restoreFromTrash,
+  scanMeetingFolders,
   scanMeetings,
   scanTrash,
   summaryPath,
@@ -380,5 +386,108 @@ export async function emptyTrash(adapter: VaultAdapter): Promise<void> {
   }
 }
 
-// re-export — watcher / 외부 호환
-export { meetingMainPath, isMeetingSidecar };
+// 폴더 이동 — title 유지, 폴더만 swap. newFolder "" 은 root (meetings/{title}.md).
+// 같은 폴더 (no-op) 이면 read-only 로 현재 상태 반환. 충돌 시 TitleConflictError throw —
+// UI 가 toast 띄움 (rename 충돌과 동일 패턴).
+export async function moveMeeting(
+  adapter: VaultAdapter,
+  id: string,
+  newFolder: string,
+): Promise<Meeting> {
+  if (!(await adapter.exists(id))) {
+    throw new Error(`meeting not found: ${id}`);
+  }
+  const newPath = await computeMovedMeetingPath(adapter, id, newFolder);
+  if (newPath !== id) {
+    await moveMeetingToFolder(adapter, id, newPath);
+  }
+  return readFullMeeting(adapter, newPath);
+}
+
+// 빈 폴더 list — 사이드바 트리가 메모 없는 폴더도 보여주도록.
+// vault root 기준 path (e.g. "meetings/work", "meetings/work/2026") 반환.
+export async function listMeetingFolders(
+  adapter: VaultAdapter,
+): Promise<string[]> {
+  return scanMeetingFolders(adapter);
+}
+
+// 폴더 안 메모 개수 (sub-folder 포함). UI 의 confirm 다이얼로그에 "메모 N개" 표시.
+export async function countMeetingsInFolder(
+  adapter: VaultAdapter,
+  folderPath: string,
+): Promise<number> {
+  const normalized = normalizeFolderPath(folderPath);
+  if (normalized === "") return 0;
+  const full = `meetings/${normalized}`;
+  const files = await adapter.listRecursive(full);
+  return files.filter(
+    (p) => p.endsWith(".md") && !isMeetingSidecar(p),
+  ).length;
+}
+
+// 폴더 삭제 — 안 메모 (sub-folder 포함 재귀) 를 휴지통으로 soft delete + 빈 디렉토리
+// 자체는 disk 에서 recursive remove. 메모는 .trash/ 에 같은 stamp 묶음으로 가있어
+// 휴지통 modal 에서 복원 가능 (단, 폴더 구조는 복원 시 root 로 — V0.7.1 trash
+// 모델: 파일명만 보존). 빈 폴더면 즉시 disk 삭제만.
+export async function deleteMeetingFolder(
+  adapter: VaultAdapter,
+  folderPath: string,
+): Promise<{ trashed: number }> {
+  const normalized = normalizeFolderPath(folderPath);
+  if (normalized === "") {
+    throw new Error("root 폴더는 삭제할 수 없습니다");
+  }
+  const full = `meetings/${normalized}`;
+  if (!(await adapter.exists(full))) {
+    return { trashed: 0 };
+  }
+  const inside = await adapter.listRecursive(full);
+  const mains = inside.filter(
+    (p) => p.endsWith(".md") && !isMeetingSidecar(p),
+  );
+  for (const m of mains) {
+    try {
+      await deleteMeeting(adapter, m);
+    } catch (err) {
+      // 한 메모 실패해도 나머지 진행 — 사용자가 정리 후 다시 시도 가능.
+      console.warn(`[deleteMeetingFolder] skip ${m}:`, err);
+    }
+  }
+  // 안에 남아있는 잡파일 (sidecar 잔존, sync 부산물 등) + 빈 폴더 자체 정리.
+  try {
+    await adapter.delete(full, { recursive: true });
+  } catch (err) {
+    console.warn(`[deleteMeetingFolder] rmdir 실패 ${full}:`, err);
+  }
+  return { trashed: mains.length };
+}
+
+// 사용자가 명시적으로 만든 폴더 — disk 에 mkdir. 즉시 사이드바에 보임.
+// 충돌 시 (이미 있는 폴더) 조용히 통과 (mkdir 자체가 idempotent).
+// 빈 segment / path traversal 은 normalizeFolderPath 가 차단.
+export async function createMeetingFolder(
+  adapter: VaultAdapter,
+  folderPath: string,
+): Promise<string> {
+  const normalized = normalizeFolderPath(folderPath);
+  if (normalized === "") {
+    throw new Error("폴더 이름이 비어있습니다");
+  }
+  const full = `meetings/${normalized}`;
+  await adapter.mkdir(full);
+  return full;
+}
+
+// 폴더 이름 변경 — 부모 path 유지, 마지막 segment 만 바꿈. 안 메모는 디스크
+// rename 으로 자동 따라옴. 충돌 시 TitleConflictError throw.
+export async function renameMeetingFolder(
+  adapter: VaultAdapter,
+  oldFolder: string,
+  newName: string,
+): Promise<string> {
+  return _renameMeetingFolder(adapter, oldFolder, newName);
+}
+
+// re-export — watcher / 외부 호환 + sidebar 트리 빌더
+export { meetingMainPath, isMeetingSidecar, meetingFolder };
