@@ -6,6 +6,22 @@
 
 ## 2026-05-22
 
+### PR #33 — macOS 윈도우 헤더 통합 + sidebar collapse
+
+- **한 줄 임팩트**: 윈도우 헤더 통합으로 본문 +56px
+- **`titleBarStyle: Overlay` + `hiddenTitle: true`** — native titlebar bar 제거, traffic lights 만 시스템이 유지. 옆 영역 `data-tauri-drag-region` 으로 윈도우 드래그.
+- **vault badge + 탭 4개 + settings/theme 한 줄 통합** — SidePanel 안 TopTabsRow 56px 사라지고 윈도우 헤더로 흡수. 본문 수직 +56px 확보.
+- **vault column 너비 = SidePanel 너비 line up** — "vault 안에 sidebar + main" 시각 계층. 추후 multi-vault switcher 발판 (vault badge 클릭 = settings vault section, 추후 dropdown).
+- **folder tab pattern** — active 탭이 main 색 (`--bg-base`) 으로 빠져나와 헤더 borderBottom 을 `-1px` 넘어가 가림 → main 영역과 시각 연결. Chrome/옵시디안 탭 strip 패턴.
+- **header height `--page-header-h: 52px` 토큰 통일** — 사이드바 헤더 4곳 (메모장/캘린더/할일/포트폴리오 SidePanel) + 본문 헤더 4곳 (MeetingForm/TodosPage/CalendarPage/PortfolioPage) 같은 줄에 align. 캘린더 month label 도 같이.
+- **내 작업 페이지 sticky 헤더 신설** — 다른 페이지와 동일 패턴 + 동일 높이.
+- **sidebar collapse `Cmd+\`** — 옵시디안 패턴. `useSidebarCollapsed` hook (localStorage `goodsoob:sidebarCollapsed` persist).
+- **`isMacTauri` 판별** — macOS Tauri 만 효과. Windows/Linux Tauri + 웹 = `--titlebar-inset: 0` fallback. mobile drawer 영향 X.
+- **Tauri capability `core:window:allow-start-dragging`** — `data-tauri-drag-region` 동작 위해 추가.
+- 시도하다 거부: vibrancy material (`windowEffects: ["sidebar"]` + `transparent` + `macOSPrivateApi`) — sidebar 가 wallpaper 비쳐 디자인 토큰 무력화. tabs | vault 순서 — mental model "vault > tabs" 시각 mismatch.
+- 14 modified + 2 new + 2 screenshots. 221 tests passing. typecheck clean.
+- commit `055532f`
+
 ### PR #31 — 메모장/일기 단축키 단순화 (Q/W/E 제거 + Opt+Tab cycle)
 
 - **한 줄 임팩트**: 한글 IME 와 안 싸우는 메모장 sub-tab 단축키
