@@ -2,6 +2,7 @@ import { Trash2 } from "lucide-react";
 import { useDeletedMeetings } from "../../hooks/useMeetings";
 import { formatDateLong } from "../../lib/dates";
 import { MarkdownView } from "./MarkdownView";
+import { Text } from "../common/Text";
 
 // 휴지통 파일명 stamp prefix — SidePanel.tsx 와 동일 정규식.
 const STAMP_PREFIX = /^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-/;
@@ -41,30 +42,29 @@ export function TrashPreview({ selectedId }: { selectedId: string | null }) {
   return (
     <article className="h-full overflow-y-auto">
       <div className="mx-auto max-w-3xl px-6 py-10">
-        <div
-          className="mb-4 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs"
-          style={{
-            backgroundColor: "var(--bg-surface)",
-            color: "var(--text-muted)",
-          }}
+        <Text
+          variant="caption"
+          color="muted"
+          as="div"
+          className="mb-4 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1"
+          style={{ backgroundColor: "var(--bg-surface)" }}
         >
           <Trash2 className="h-3 w-3" />
           휴지통 미리보기 · 읽기 전용
-        </div>
-        <h1
-          className="text-2xl font-semibold"
-          style={{ color: "var(--text-primary)" }}
-        >
+        </Text>
+        <Text variant="h1" weight="semibold" as="h1">
           {title}
-        </h1>
-        <div
-          className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm"
-          style={{ color: "var(--text-muted)" }}
+        </Text>
+        <Text
+          variant="body"
+          color="muted"
+          as="div"
+          className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1"
         >
           {meeting.date ? <span>{formatDateLong(meeting.date)}</span> : null}
           {meeting.time ? <span>{meeting.time}</span> : null}
           {attendees ? <span>참석 {attendees}</span> : null}
-        </div>
+        </Text>
 
         <hr
           className="my-6"
@@ -79,12 +79,15 @@ export function TrashPreview({ selectedId }: { selectedId: string | null }) {
 
         {meeting.transcript?.trim() ? (
           <section className="mb-8">
-            <h2
-              className="mb-2 text-sm font-medium"
-              style={{ color: "var(--text-secondary)" }}
+            <Text
+              variant="body"
+              color="secondary"
+              as="h2"
+              weight="medium"
+              className="mb-2"
             >
               회의 내용
-            </h2>
+            </Text>
             <pre
               className="whitespace-pre-wrap rounded-lg px-4 py-3 text-sm"
               style={{
@@ -100,12 +103,14 @@ export function TrashPreview({ selectedId }: { selectedId: string | null }) {
 
         {hasSummary ? (
           <section className="space-y-3">
-            <h2
-              className="text-sm font-medium"
-              style={{ color: "var(--text-secondary)" }}
+            <Text
+              variant="body"
+              color="secondary"
+              as="h2"
+              weight="medium"
             >
               요약
-            </h2>
+            </Text>
             {meeting.discussion_items.length > 0 ? (
               <SummaryCallout
                 title="논의 사항"
@@ -127,12 +132,9 @@ export function TrashPreview({ selectedId }: { selectedId: string | null }) {
         {!meeting.content?.trim() &&
         !meeting.transcript?.trim() &&
         !hasSummary ? (
-          <div
-            className="text-sm italic"
-            style={{ color: "var(--text-muted)" }}
-          >
+          <Text variant="body" color="muted" as="div" className="italic">
             (내용 없음)
-          </div>
+          </Text>
         ) : null}
       </div>
     </article>
@@ -145,12 +147,15 @@ function SummaryCallout({ title, items }: { title: string; items: string[] }) {
       className="rounded-lg px-4 py-3"
       style={{ backgroundColor: "var(--bg-surface)" }}
     >
-      <div
-        className="mb-1.5 text-xs font-medium"
-        style={{ color: "var(--text-secondary)" }}
+      <Text
+        variant="caption"
+        color="secondary"
+        as="div"
+        weight="medium"
+        className="mb-1.5"
       >
         {title}
-      </div>
+      </Text>
       <ul
         className="list-disc space-y-1 pl-5 text-sm"
         style={{ color: "var(--text-primary)" }}
@@ -166,12 +171,9 @@ function SummaryCallout({ title, items }: { title: string; items: string[] }) {
 function Empty({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-full items-center justify-center">
-      <div
-        className="text-center text-sm"
-        style={{ color: "var(--text-muted)" }}
-      >
+      <Text variant="body" color="muted" as="div" className="text-center">
         {children}
-      </div>
+      </Text>
     </div>
   );
 }

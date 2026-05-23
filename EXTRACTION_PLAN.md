@@ -298,12 +298,12 @@ PR #36 (todo cat colors) 가 `--cat-*` 7개 + 카테고리 dot 섹션 + `lib/tod
 - [x] `meetings/AttendeeTagInput.tsx`
 - [x] `meetings/CopyButton.tsx`
 - [x] `meetings/EditableList.tsx`
-- [ ] `meetings/MarkdownView.tsx` (react-markdown 컴포넌트 매핑 — 시맨틱 h1/h2/p raw 유지 검토)
+- [~] `meetings/MarkdownView.tsx` (react-markdown component override — 이미 styled wrapper, Text 흡수 시 double wrap. 가치 미미로 raw 유지)
 - [x] `meetings/MeetingsList.tsx`
 - [x] `meetings/MeetingsTreeView.tsx`
 - [x] `meetings/SlashCommandPopover.tsx`
 - [~] `meetings/SourceBodyEditor.tsx` (textarea + mirror div — raw 유지)
-- [ ] `meetings/TrashPreview.tsx`
+- [x] `meetings/TrashPreview.tsx`
 
 ### 기타
 - [ ] `App.tsx` (모달 caller prop 갱신 이미 됨, raw 자리 마저)
