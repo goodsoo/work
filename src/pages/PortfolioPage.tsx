@@ -9,6 +9,8 @@ import type { ProjectFilter } from "../components/portfolio/PortfolioProjectList
 import type { PortfolioWorkMeta } from "../api/portfolio";
 import { PageHeaderBar } from "../components/common/PageHeaderBar";
 import { Text } from "../components/common/Text";
+import { Button } from "../components/common/Button";
+import { EmptyState } from "../components/common/EmptyState";
 
 type Props = {
   activeFilter: ProjectFilter;
@@ -112,37 +114,28 @@ function EmptyVault({
   running: boolean;
 }) {
   return (
-    <div
-      className="flex h-[calc(100svh-3rem)] flex-col items-center justify-center px-6 text-center"
-      style={{ color: "var(--text-secondary)" }}
-    >
-      <Briefcase
-        className="mb-3 h-12 w-12"
-        strokeWidth={1.25}
-        style={{ color: "var(--text-muted)" }}
-      />
-      <h2
-        className="mb-1 text-lg font-semibold"
-        style={{ color: "var(--text-primary)" }}
-      >
-        아직 PR이 없어요
-      </h2>
-      <p className="mb-4 text-sm">
-        동기화 버튼을 누르면 GitHub에서 PR을 가져옵니다.
-      </p>
-      <button
-        type="button"
-        onClick={onSync}
-        disabled={running}
-        className="rounded-md px-4 py-2 text-sm font-medium transition disabled:opacity-50"
-        style={{
-          backgroundColor: "var(--btn-primary)",
-          color: "var(--btn-primary-text)",
-        }}
-      >
-        {running ? "동기화 중..." : "GitHub에서 가져오기"}
-      </button>
-    </div>
+    <EmptyState
+      className="flex h-[calc(100svh-3rem)] flex-col items-center justify-center gap-3 px-6 text-center"
+      icon={
+        <Briefcase
+          className="h-12 w-12"
+          strokeWidth={1.25}
+          style={{ color: "var(--text-muted)" }}
+        />
+      }
+      title="아직 PR이 없어요"
+      description="동기화 버튼을 누르면 GitHub에서 PR을 가져옵니다."
+      action={
+        <Button
+          variant="primary"
+          onClick={onSync}
+          disabled={running}
+          className="px-4 py-2 disabled:opacity-50"
+        >
+          {running ? "동기화 중..." : "GitHub에서 가져오기"}
+        </Button>
+      }
+    />
   );
 }
 
@@ -154,10 +147,9 @@ function EmptyFilter({ filter }: { filter: ProjectFilter }) {
       ? "미사용으로 표시된 PR이 없습니다"
       : "이 프로젝트에는 PR이 없습니다";
   return (
-    <div className="flex h-[calc(100svh-3rem)] items-center justify-center px-6">
-      <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
-        {message}
-      </p>
-    </div>
+    <EmptyState
+      className="flex h-[calc(100svh-3rem)] flex-col items-center justify-center gap-3 px-6"
+      description={message}
+    />
   );
 }

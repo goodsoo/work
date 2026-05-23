@@ -13,7 +13,7 @@ import {
   FolderInput,
   FolderPlus,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   useMeetings,
   useMeetingFolders,
@@ -40,6 +40,7 @@ import { MeetingsTreeView } from "../meetings/MeetingsTreeView";
 import { MoveFolderModal } from "../meetings/MoveFolderModal";
 import { Button } from "../common/Button";
 import { Text } from "../common/Text";
+import { Popover } from "../common/Popover";
 import { useToast } from "../Toast";
 
 /* ── Meetings Side Panel ── */
@@ -605,80 +606,63 @@ function SortMenu({
   onChange: (next: MeetingSortKey) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const wrapRef = useRef<HTMLDivElement>(null);
-
-  // 바깥 클릭 / ESC 로 닫기.
-  useEffect(() => {
-    if (!open) return;
-    function onDown(e: MouseEvent) {
-      if (!wrapRef.current) return;
-      if (!wrapRef.current.contains(e.target as Node)) setOpen(false);
-    }
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") setOpen(false);
-    }
-    window.addEventListener("mousedown", onDown);
-    window.addEventListener("keydown", onKey);
-    return () => {
-      window.removeEventListener("mousedown", onDown);
-      window.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
 
   return (
-    <div ref={wrapRef} className="relative">
-      <Button
-        variant="icon"
-        onClick={() => setOpen((v) => !v)}
-        title="정렬"
-        aria-label="정렬"
-        aria-haspopup="menu"
-        aria-expanded={open}
-        style={{
-          color: "var(--text-secondary)",
-          backgroundColor: open ? "var(--bg-surface-active)" : undefined,
-        }}
-      >
-        <ArrowUpDown className="h-3.5 w-3.5" />
-      </Button>
-      {open ? (
-        <div
-          role="menu"
-          className="absolute right-0 top-full z-30 mt-1 min-w-[120px] overflow-hidden rounded-md shadow-md"
+    <Popover
+      open={open}
+      onClose={() => setOpen(false)}
+      className="relative"
+      panelClassName="absolute right-0 top-full z-30 mt-1 min-w-[120px] overflow-hidden rounded-md shadow-md"
+      panelStyle={{
+        backgroundColor: "var(--bg-surface)",
+        border: "1px solid var(--border-default)",
+      }}
+      trigger={
+        <Button
+          variant="icon"
+          onClick={() => setOpen((v) => !v)}
+          title="정렬"
+          aria-label="정렬"
+          aria-haspopup="menu"
+          aria-expanded={open}
           style={{
-            backgroundColor: "var(--bg-surface)",
-            border: "1px solid var(--border-default)",
+            color: "var(--text-secondary)",
+            backgroundColor: open ? "var(--bg-surface-active)" : undefined,
           }}
         >
-          {SORT_OPTIONS.map((opt) => {
-            const active = opt.id === value;
-            return (
-              <Button
-                key={opt.id}
-                variant="ghost"
-                size="sm"
-                role="menuitemradio"
-                aria-checked={active}
-                onClick={() => {
-                  onChange(opt.id);
-                  setOpen(false);
-                }}
-                className="w-full justify-between rounded-none px-3 py-1.5"
-                style={{
-                  color: active ? "var(--text-primary)" : "var(--text-secondary)",
-                  backgroundColor: active ? "var(--bg-surface-active)" : undefined,
-                }}
-              >
-                <span>{opt.label}</span>
-                {active ? (
-                  <Check className="h-3 w-3" style={{ color: "var(--text-secondary)" }} />
-                ) : null}
-              </Button>
-            );
-          })}
-        </div>
-      ) : null}
-    </div>
+          <ArrowUpDown className="h-3.5 w-3.5" />
+        </Button>
+      }
+    >
+      <div role="menu">
+        {SORT_OPTIONS.map((opt) => {
+          const active = opt.id === value;
+          return (
+            <Button
+              key={opt.id}
+              variant="ghost"
+              size="sm"
+              role="menuitemradio"
+              aria-checked={active}
+              onClick={() => {
+                onChange(opt.id);
+                setOpen(false);
+              }}
+              className="w-full justify-between rounded-none px-3 py-1.5"
+              style={{
+                color: active ? "var(--text-primary)" : "var(--text-secondary)",
+                backgroundColor: active ? "var(--bg-surface-active)" : undefined,
+              }}
+            >
+              <span>{opt.label}</span>
+              {active ? (
+                <Check className="h-3 w-3" style={{ color: "var(--text-secondary)" }} />
+              ) : null}
+            </Button>
+          );
+        })}
+      </div>
+    </Popover>
   );
 }
 

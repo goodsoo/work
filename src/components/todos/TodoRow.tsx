@@ -22,6 +22,7 @@ import { LooseDateInput } from "../common/LooseDateInput";
 import { LooseTimeInput } from "../common/LooseTimeInput";
 import { Button } from "../common/Button";
 import { Text } from "../common/Text";
+import { Popover } from "../common/Popover";
 import { MeetingPicker } from "../common/MeetingPicker";
 import { CategoryPicker } from "../common/CategoryPicker";
 import { categoryColor } from "../../lib/todoCategory";
@@ -576,7 +577,6 @@ function ReadOnlyMeta({ todo }: { todo: Todo }) {
 // #from-<uid> tag 는 그대로 두고 (자동 정리 X) 사용자가 직접 편집.
 function SourceMeetingLink({ uid, todoId }: { uid: string; todoId: string }) {
   const [open, setOpen] = useState(false);
-  const wrapRef = useRef<HTMLSpanElement>(null);
   const meetingsQ = useMeetings();
   const updateMutation = useUpdateTodo();
   const meeting = meetingsQ.data?.find((m) => m.uid === uid) ?? null;
@@ -591,52 +591,39 @@ function SourceMeetingLink({ uid, todoId }: { uid: string; todoId: string }) {
     setOpen(false);
   }
 
-  useEffect(() => {
-    if (!open) return;
-    function onDown(e: MouseEvent) {
-      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false);
-    }
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") setOpen(false);
-    }
-    window.addEventListener("mousedown", onDown);
-    window.addEventListener("keydown", onKey);
-    return () => {
-      window.removeEventListener("mousedown", onDown);
-      window.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
-
   const chipLabel = disconnected
     ? "(연결 끊김)"
     : meeting?.title?.trim() || "원본 메모";
 
   return (
-    <span ref={wrapRef} className="relative inline-flex">
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={(e) => {
-          e.stopPropagation();
-          setOpen((v) => !v);
-        }}
-        className={`max-w-[12rem] truncate underline-offset-2 px-0 py-0 ${disconnected ? "" : "hover:underline"}`}
-        style={{ color: "var(--text-secondary)" }}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        leftIcon={<FileText className="h-3 w-3 shrink-0 opacity-70" aria-hidden />}
-      >
-        <span className="truncate">{chipLabel}</span>
-      </Button>
-      {open ? (
-        <div
-          className="absolute left-0 top-full z-30 mt-1 w-64 overflow-hidden rounded-md shadow-md"
-          style={{
-            backgroundColor: "var(--bg-base)",
-            border: "1px solid var(--border-default)",
+    <Popover
+      open={open}
+      onClose={() => setOpen(false)}
+      className="relative inline-flex"
+      panelClassName="absolute left-0 top-full z-30 mt-1 w-64 overflow-hidden rounded-md shadow-md"
+      panelStyle={{
+        backgroundColor: "var(--bg-base)",
+        border: "1px solid var(--border-default)",
+      }}
+      trigger={
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={(e) => {
+            e.stopPropagation();
+            setOpen((v) => !v);
           }}
-          onClick={(e) => e.stopPropagation()}
+          className={`max-w-[12rem] truncate underline-offset-2 px-0 py-0 ${disconnected ? "" : "hover:underline"}`}
+          style={{ color: "var(--text-secondary)" }}
+          aria-haspopup="menu"
+          aria-expanded={open}
+          leftIcon={<FileText className="h-3 w-3 shrink-0 opacity-70" aria-hidden />}
         >
+          <span className="truncate">{chipLabel}</span>
+        </Button>
+      }
+    >
+      <div onClick={(e) => e.stopPropagation()}>
           <Text
             variant="caption"
             color="secondary"
@@ -719,8 +706,7 @@ function SourceMeetingLink({ uid, todoId }: { uid: string; todoId: string }) {
               {disconnected ? "연결 해제" : "메모로 이동"}
             </Button>
           </div>
-        </div>
-      ) : null}
-    </span>
+      </div>
+    </Popover>
   );
 }

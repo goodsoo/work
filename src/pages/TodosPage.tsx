@@ -16,6 +16,7 @@ import { TodoRow } from "../components/todos/TodoRow";
 import { PageHeaderBar } from "../components/common/PageHeaderBar";
 import { Button } from "../components/common/Button";
 import { Text } from "../components/common/Text";
+import { EmptyState } from "../components/common/EmptyState";
 import type {
   TodosCategoryFilter,
   TodosStatusFilter,
@@ -219,7 +220,7 @@ export function TodosPage({
       ) : isLoading ? (
         <SkeletonList />
       ) : todos.length === 0 ? (
-        <EmptyState />
+        <TodoEmptyState />
       ) : (
         <ul
           key={`${statusFilter}-${categoryFilter}-${sortKey}`}
@@ -255,18 +256,11 @@ function SkeletonList() {
   );
 }
 
-function EmptyState() {
+function TodoEmptyState() {
   return (
-    <div className="flex flex-col items-center justify-center gap-3 px-4 py-12 text-center">
-      <h3
-        className="text-lg font-semibold"
-        style={{ color: "var(--text-primary)" }}
-      >
-        할 일이 비어있어요
-      </h3>
-      <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
-        오늘 가장 먼저 끝낼 한 가지를 적어보세요.
-      </p>
-    </div>
+    <EmptyState
+      title="할 일이 비어있어요"
+      description="오늘 가장 먼저 끝낼 한 가지를 적어보세요."
+    />
   );
 }

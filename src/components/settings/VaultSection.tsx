@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
-import { FolderOpen, Loader2, Unlink } from "lucide-react";
+import { FolderOpen, Unlink } from "lucide-react";
 import { useVault } from "../../lib/vault/useVault";
 import { Button } from "../common/Button";
 import { Text } from "../common/Text";
 import { Modal } from "../common/Modal";
+import { Spinner } from "../common/Spinner";
 
 type Props = {
   onAfterSwitch?: () => void;
@@ -72,7 +73,7 @@ export function VaultSection({ onAfterSwitch }: Props) {
             onClick={changeVault}
             leftIcon={
               busy ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <Spinner size="md" />
               ) : (
                 <FolderOpen className="h-4 w-4" />
               )

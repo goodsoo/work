@@ -31,6 +31,7 @@ import { ClipPromptButton } from "../common/ClipPromptButton";
 import { Button } from "../common/Button";
 import { Text } from "../common/Text";
 import { PageHeaderBar } from "../common/PageHeaderBar";
+import { Kbd } from "../common/Kbd";
 import { buildClaudePrompt } from "../../lib/clipboardPrompt";
 import { CopyButton } from "./CopyButton";
 import { EditableList } from "./EditableList";
@@ -573,8 +574,9 @@ export function MeetingForm({ meetingId, onBack }: Props) {
   }
 
   return (
-    <div className="min-h-svh lg:flex lg:h-screen lg:min-h-0 lg:flex-col">
+    <div className="min-h-svh lg:flex lg:h-full lg:min-h-0 lg:flex-col">
       <PageHeaderBar
+        sticky={false}
         left={
           <>
             <div
@@ -837,10 +839,14 @@ export function MeetingForm({ meetingId, onBack }: Props) {
             ta.setSelectionRange(end, end);
           }}
         >
-        {/* Tab nav — 헤더 바로 아래에 sticky. 헤더 (3.5rem) 와 시각적으로 연결. */}
+        {/* Tab nav — 헤더 바로 아래에 sticky. 헤더 (3.5rem) 와 시각적으로 연결.
+            position: sticky 인라인 — Tailwind v4 의 utility 충돌 또는 hot reload
+            누락 회피 (시맨틱 토큰 작업 중 발견된 회기 케이스). */}
         <div
-          className="sticky top-14 z-10 flex items-center justify-between backdrop-blur lg:top-0"
+          className="z-10 flex items-center justify-between backdrop-blur"
           style={{
+            position: "sticky",
+            top: 0,
             borderBottom: "1px solid var(--border-subtle)",
             backgroundColor: "var(--bg-overlay)",
           }}
@@ -1257,18 +1263,15 @@ function EmptyBodyCTA({ onStartEdit }: { onStartEdit: () => void }) {
       {isTauri ? (
         <Text variant="caption" as="div" className="flex items-center gap-1.5">
           <span>또는</span>
-          <kbd
-            className="rounded font-mono leading-none"
+          <Kbd
             style={{
-              padding: "2px 6px",
-              fontSize: "11px",
-              border: "1px solid var(--border-subtle)",
+              borderColor: "var(--border-subtle)",
               color: "var(--text-muted)",
               backgroundColor: "var(--bg-surface)",
             }}
           >
             ⌘⇧E
-          </kbd>
+          </Kbd>
         </Text>
       ) : null}
     </Button>

@@ -4,6 +4,7 @@ import { useMeetings } from "../../hooks/useMeetings";
 import { formatDateShortWithDay } from "../../lib/dates";
 import { Button } from "./Button";
 import { Text } from "./Text";
+import { Popover } from "./Popover";
 
 type Props = {
   value: string | null; // selected meeting uid
@@ -16,7 +17,6 @@ export function MeetingPicker({ value, onChange }: Props) {
   const meetingsQ = useMeetings();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const wrapRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const selected = value
@@ -50,49 +50,39 @@ export function MeetingPicker({ value, onChange }: Props) {
     if (!open) return;
     setQuery("");
     requestAnimationFrame(() => inputRef.current?.focus());
-    function onDown(e: MouseEvent) {
-      if (!wrapRef.current) return;
-      if (!wrapRef.current.contains(e.target as Node)) setOpen(false);
-    }
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") setOpen(false);
-    }
-    window.addEventListener("mousedown", onDown);
-    window.addEventListener("keydown", onKey);
-    return () => {
-      window.removeEventListener("mousedown", onDown);
-      window.removeEventListener("keydown", onKey);
-    };
   }, [open]);
 
   return (
-    <div ref={wrapRef} className="relative inline-flex items-center">
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={(e) => {
-          e.stopPropagation();
-          setOpen((v) => !v);
-        }}
-        className="max-w-[12rem] px-2 py-0.5 font-normal"
-        style={{ color: "var(--text-secondary)" }}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        leftIcon={
-          <FileText className="h-3 w-3 shrink-0 opacity-60" aria-hidden />
-        }
-      >
-        <span className="truncate">{buttonLabel}</span>
-      </Button>
-      {open ? (
-        <div
-          className="absolute left-0 top-full z-30 mt-1 w-72 overflow-hidden rounded-md shadow-md"
-          style={{
-            backgroundColor: "var(--bg-base)",
-            border: "1px solid var(--border-default)",
+    <Popover
+      open={open}
+      onClose={() => setOpen(false)}
+      className="relative inline-flex items-center"
+      panelClassName="absolute left-0 top-full z-30 mt-1 w-72 overflow-hidden rounded-md shadow-md"
+      panelStyle={{
+        backgroundColor: "var(--bg-base)",
+        border: "1px solid var(--border-default)",
+      }}
+      trigger={
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={(e) => {
+            e.stopPropagation();
+            setOpen((v) => !v);
           }}
-          onClick={(e) => e.stopPropagation()}
+          className="max-w-[12rem] px-2 py-0.5 font-normal"
+          style={{ color: "var(--text-secondary)" }}
+          aria-haspopup="listbox"
+          aria-expanded={open}
+          leftIcon={
+            <FileText className="h-3 w-3 shrink-0 opacity-60" aria-hidden />
+          }
         >
+          <span className="truncate">{buttonLabel}</span>
+        </Button>
+      }
+    >
+      <div onClick={(e) => e.stopPropagation()}>
           <div
             className="flex items-center gap-1.5 px-2.5 py-1.5"
             style={{ borderBottom: "1px solid var(--border-subtle)" }}
@@ -177,8 +167,7 @@ export function MeetingPicker({ value, onChange }: Props) {
               })
             )}
           </ul>
-        </div>
-      ) : null}
-    </div>
+      </div>
+    </Popover>
   );
 }

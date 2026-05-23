@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import { Archive, Loader2, Trash2 } from "lucide-react";
+import { Archive, Trash2 } from "lucide-react";
 import { useVault } from "../../lib/vault/useVault";
 import { Button } from "../common/Button";
 import { Text } from "../common/Text";
 import { Modal } from "../common/Modal";
+import { Spinner } from "../common/Spinner";
 import {
   runBackup,
   listBackups,
@@ -113,7 +114,7 @@ export function BackupSection() {
           disabled={running}
           leftIcon={
             running ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <Spinner size="md" />
             ) : (
               <Archive className="h-4 w-4" />
             )
@@ -347,7 +348,7 @@ function BackupConfirmModal({
             onClick={onConfirm}
             disabled={running}
             leftIcon={
-              running ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null
+              running ? <Spinner size="sm" /> : null
             }
             className="px-3 py-1.5"
           >

@@ -1,5 +1,6 @@
 import { isTauri } from "../../lib/isTauri";
 import { Text } from "../common/Text";
+import { Kbd } from "../common/Kbd";
 
 type Shortcut = {
   keys: string[];
@@ -125,18 +126,16 @@ export function ShortcutsSection() {
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
                   {s.keys.map((k, i) => (
-                    <kbd
+                    <Kbd
                       key={i}
-                      className="inline-flex h-6 min-w-[1.5rem] items-center justify-center rounded px-1.5 text-xs font-medium"
+                      className="h-6 min-w-[1.5rem] px-1.5 text-xs"
                       style={{
-                        background: "var(--bg-base)",
-                        border: "1px solid var(--border-default)",
+                        backgroundColor: "var(--bg-base)",
                         color: "var(--text-secondary)",
-                        fontFamily: "ui-monospace, SFMono-Regular, monospace",
                       }}
                     >
                       {k}
-                    </kbd>
+                    </Kbd>
                   ))}
                 </div>
               </li>

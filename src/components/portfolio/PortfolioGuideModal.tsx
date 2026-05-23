@@ -1,6 +1,5 @@
 import {
   BookOpen,
-  Loader2,
   RefreshCcw,
   Sparkles,
   Wand2,
@@ -10,6 +9,8 @@ import { ClipPromptButton } from "../common/ClipPromptButton";
 import { Modal } from "../common/Modal";
 import { Button } from "../common/Button";
 import { Text } from "../common/Text";
+import { Kbd as KbdCommon } from "../common/Kbd";
+import { Spinner } from "../common/Spinner";
 import {
   buildLegacyCardPrompt,
   buildPRGuidePrompt,
@@ -102,7 +103,7 @@ export function PortfolioGuideModal({
                   disabled={fullSyncRunning}
                   leftIcon={
                     fullSyncRunning ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      <Spinner size="sm" />
                     ) : (
                       <RefreshCcw className="h-3.5 w-3.5" />
                     )
@@ -282,16 +283,9 @@ function PromptRow({
 
 function Kbd({ children }: { children: React.ReactNode }) {
   return (
-    <kbd
-      className="rounded px-1 py-px font-mono text-[11px]"
-      style={{
-        backgroundColor: "var(--bg-surface-hover)",
-        color: "var(--text-primary)",
-        border: "1px solid var(--border-default)",
-      }}
-    >
+    <KbdCommon className="h-auto rounded px-1 py-px">
       {children}
-    </kbd>
+    </KbdCommon>
   );
 }
 

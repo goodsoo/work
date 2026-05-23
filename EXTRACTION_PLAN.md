@@ -328,3 +328,88 @@ PR #36 (todo cat colors) 가 `--cat-*` 7개 + 카테고리 dot 섹션 + `lib/tod
 - [x] §9 Interaction primitives (hover/active/focus)
 - [x] §10 Icon vocabulary
 - [x] §11 Components — Button + Text 노트 추가 + 11.4~11.10 정리
+
+---
+
+## 8. Post-1차 추출 진단 (재실행 — 2026-05-23 갱신)
+
+ds-extract 스킬 갱신본 (9 카테고리 inventory + canonical 비교 모드 + ralph guard 추가) 으로 *1차 추출 후* 현재 상태 재진단.
+
+### 8.1 Discovery 변화
+
+| 항목 | 1차 전 | 1차 후 |
+|------|--------|--------|
+| Unique CSS vars | ~30 | **78** |
+| Tailwind 자리 사용 강도 top | text(270) / button(141) | w(320) / h(255) / px(186) / gap(170) / py(163) / rounded(140) — layout 중심 |
+| raw hex | 단 3건 | **4건** (대부분 useTheme.ts JS 상수, 의도된 케이스) |
+| var(--*) 사용 | hex 직접 우세 | **var() 토큰 우세** — border-default(101) / text-secondary(97) / text-primary(87) / text-muted(82) / bg-surface(63) |
+
+### 8.2 토큰 11 dimension 잔여
+
+| dim | 1차 후 상태 | 잔여 작업 |
+|-----|-----------|----------|
+| Color | ✓ 토큰화 완료 | — |
+| Typography | text-sm 46 / text-xs 21 / font-semibold 25 / font-mono 21 / font-serif 19 | input/textarea/container 자리 그대로 OK. Text wrap 가능 자리는 다 흡수됨 |
+| Spacing | px/py/gap utility 일관 | 시맨틱 spacing 토큰 추가는 ROI 낮음 (Tailwind utility 가 design system) |
+| Radius | rounded-md 56 / lg 34 / none 20 / full 20 | 분포 일관 — 토큰 추가 X |
+| Effects | shadow 17 / opacity 45 (50/60/80/40 등 분포) / blur 34 | `--opacity-{disabled,hover,...}` 박힘. raw 자리 className 갈아엎기는 점진 migration (선택) |
+| Motion | raw `transition` 147 / ease-out 1 | `--motion-fast/base/slow` 박힘. 자리 갈아엎기 X |
+| Z-index | z-30(9) / z-50(6) / z-10(4) / z-40(3) / z-20(3) | `--z-{dropdown,sticky,...}` 박힘. raw 자리 점진 migration 가능 |
+| Layout | --app-header-h / --page-header-h / --titlebar-* | 충분 |
+| Interaction | hover:bg-* / hover:opacity-* — Button 흡수 | focus-visible:ring-2 통일 (현재 3자리만, micro-interaction primitive 박을 가치 미미) |
+| Icon | lucide-react 일관 (Trash2/Check/Loader2/Plus/Pencil/Eye/BookOpen) | 중복 의미 0 — 표준화 0 작업 |
+
+### 8.3 9 카테고리 cover 진단
+
+| # | 카테고리 | 현 cover | 갭 |
+|---|---------|---------|----|
+| 1 | Form / Input | Button + common/LooseDate/Time/Meeting/CategoryPicker — 5/22 | Input/Textarea/Select/Combobox/Checkbox/Radio/Switch/Slider 등 17개 미정의 (도메인 필요 시 신규 구축) |
+| 2 | Feedback / Status | Toast + Tooltip — 2/20 | Badge/Chip/Tag/Pill/Progress/Spinner/Skeleton/EmptyState/StatusBox 18개 갭. **EmptyState 패턴 4 자리 산재** — 추출 후보 |
+| 3 | Data display | Card 패턴 (PortfolioWorkCard, MeetingsList) + MarkdownView (code/table/tree) — 2/22 | List/Stat/Avatar 등 미정의 (필요 시) |
+| 4 | Navigation | PageHeaderBar + SidePanel + AppShell + BottomTabs + PageHeader — 5/19 | 충분 (1인 dogfood 한정) |
+| 5 | Overlay | **Modal** (common) — 1/12. ConfirmDialog/10 modal 모두 Modal 흡수 ✓ | Popover (Sort menu / dropdown 패턴 산재) **추출 후보**, Drawer/Sheet 미정의 |
+| 6 | Layout | PageHeaderBar / AppShell / Modal — 3/21 | Container/Stack/Divider 미정의 (Tailwind utility 가 대체) |
+| 7 | Disclosure | — 0/6 | **명백한 갭** — accordion/collapsible 미사용 (현재 도메인 필요성 X) |
+| 8 | Media | — 0/5 | **명백한 갭** (consumer 가 media 안 다룸, 의도된 누락) |
+| 9 | Utility / Primitive | **Text** (common) — 1/10 | Kbd (MeetingForm/JournalOverlay 인라인 4자리 — **추출 후보**), Icon wrapper 미정의 (lucide-react 직접) |
+
+### 8.4 prop API audit
+
+- variant prop: Button(primary/secondary/danger/info/ghost/icon), Text(display/h1/h2/h3/h4/body/caption/label) — 일관 enum
+- size prop: Button(sm/md), Text variant 안 흡수
+- cva 사용: **0** — 자체 변형 시스템 (variant 내부 분기)
+- clsx/tailwind-merge: **0** — 자체 className 합치기
+- Radix / Headless / Aria: **0** — Tailwind + raw HTML
+
+진단: variant/size 일관. variant 시스템 cva 도입은 1인 dogfood 차원 ROI 낮음.
+
+### 8.5 2차 추출 후보 (선택)
+
+1차에서 빠진 것 + 진단 결과 신규 후보:
+
+| 컴포넌트 | 자리 | ROI |
+|---------|------|-----|
+| **`<EmptyState>`** | App.tsx MeetingsEmpty / PortfolioPage EmptyVault·EmptyFilter / TodosPage EmptyState / 4 자리 패턴 동일 (큰 안내 + 아이콘 + 옵션 button) | 중 (4 자리, 미래 페이지 추가 시 재사용) |
+| **`<Popover>`** | SidePanel Sort menu / FolderContextMenu / MeetingContextMenu / TodoRow 연결 메모 dropdown / MeetingPicker / CategoryPicker — 6 자리 패턴 (외부 클릭 닫기 + ESC + ref tracking) | 큼 (6 자리, 큰 boilerplate 흡수) |
+| **`<Kbd>`** | PortfolioGuideModal Kbd helper + MeetingForm EmptyBodyCTA + ShortcutsSection kbd row — 일관 styling | 작음 (3-4 자리, 짧은 작업) |
+| **`<Spinner>`** | Loader2 + animate-spin 5 자리 일관 | 작음 (4-5 자리, wrap 가치 미미) |
+| **`<Badge>`** / **`<Chip>`** | TaskAddModal CategoryChip / portfolio chip / DueChip / meeting chip — 8+ 자리 chip 패턴 산재 | 큼 (8+ 자리, variant 통일 가치) |
+
+### 8.6 PR 순서 plan (2차)
+
+위험도 + 자리 수 + dogfood 의존성 기준:
+
+- **PR 2a — `<Popover>` 추출** (6 자리, 가장 큰 boilerplate)
+- **PR 2b — `<EmptyState>` 추출** (4 자리, 미래 페이지 보호)
+- **PR 2c — `<Badge>` / `<Chip>` 추출** (8+ 자리, variant 통일)
+- **PR 2d — `<Kbd>` / `<Spinner>` 작은 추출** (선택, 묶음 가능)
+
+각 PR 별로 단일 PR (포트폴리오 카드 1장 임팩트). 시각 회귀 위험 dogfood 검증.
+
+### 8.7 변경 사항 (1차 작업 통계)
+
+- commit: 18개 (Modal/Button/Text/PageHeaderBar 정의 + 모달 10 + 비-모달 + 시맨틱 토큰 + DESIGN.md + 회기 fix)
+- 파일 변경: 80+ 파일
+- typecheck + test pass
+- raw `<button>` 자리 11개 (Button 정의 2개 제외 9개 — wrap 불가 케이스)
+- DESIGN.md 11 dimension 갱신 + Button/Text/Modal/PageHeaderBar 노트

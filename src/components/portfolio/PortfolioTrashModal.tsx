@@ -15,6 +15,7 @@ import { ConfirmDialog } from "../ConfirmDialog";
 import { Modal } from "../common/Modal";
 import { Button } from "../common/Button";
 import { Text } from "../common/Text";
+import { Chip } from "../common/Chip";
 
 const CATEGORY_LABEL: Record<string, string> = {
   ui_ux: "UI/UX",
@@ -324,19 +325,9 @@ function TrashListItem({
           {title}
         </Text>
         <div className="flex items-center gap-2">
-          <Text
-            variant="caption"
-            color="secondary"
-            as="span"
-            className="inline-flex items-center gap-1 rounded px-1 py-0.5 text-[10px]"
-            style={{ backgroundColor: "var(--bg-surface-hover)" }}
-          >
-            <span
-              className="h-1.5 w-1.5 rounded-full"
-              style={{ backgroundColor: categoryColor }}
-            />
+          <Chip size="sm" dot={categoryColor}>
             {categoryLabel}
-          </Text>
+          </Chip>
           <Text
             variant="caption"
             color="muted"

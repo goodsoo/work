@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Eye, GitBranch, Trash2 } from "lucide-react";
 import { Button } from "../common/Button";
 import { Text } from "../common/Text";
+import { Chip } from "../common/Chip";
 import type { PortfolioProject, PortfolioWorkMeta } from "../../api/portfolio";
 import { formatDateShort } from "../../lib/dates";
 import { useVault } from "../../lib/vault/useVault";
@@ -137,53 +138,22 @@ export function PortfolioWorkCard({ work, projects }: Props) {
           </Text>
           <div className="mt-auto flex flex-nowrap items-center gap-x-1.5 overflow-hidden pt-1">
             {dateLabel ? (
-              <span
-                className="inline-flex shrink-0 items-center whitespace-nowrap rounded-md px-1.5 py-0.5 text-[11px]"
-                style={{
-                  backgroundColor: "var(--bg-surface-hover)",
-                  color: "var(--text-secondary)",
-                }}
-                title={`병합일: ${fm.github_merged_at?.slice(0, 10) ?? ""}`}
-              >
+              <Chip title={`병합일: ${fm.github_merged_at?.slice(0, 10) ?? ""}`}>
                 {dateLabel}
-              </span>
+              </Chip>
             ) : null}
             {projectLabel ? (
-              <span
-                className="inline-flex shrink-0 items-center whitespace-nowrap rounded-md px-1.5 py-0.5 text-[11px]"
-                style={{
-                  backgroundColor: "var(--bg-surface-hover)",
-                  color: "var(--text-secondary)",
-                }}
-                title={fullProjectName ?? ""}
-              >
-                {projectLabel}
-              </span>
+              <Chip title={fullProjectName ?? ""}>{projectLabel}</Chip>
             ) : null}
-            <span
-              className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-1.5 py-0.5 text-[11px]"
-              style={{
-                backgroundColor: "var(--bg-surface-hover)",
-                color: "var(--text-secondary)",
-              }}
-              title={`카테고리: ${categoryLabel}`}
-            >
-              <span
-                className="h-1.5 w-1.5 shrink-0 rounded-full"
-                style={{ backgroundColor: categoryColor }}
-              />
+            <Chip dot={categoryColor} title={`카테고리: ${categoryLabel}`}>
               {categoryLabel}
-            </span>
-            <span
-              className="inline-flex shrink-0 items-center whitespace-nowrap rounded-md px-1.5 py-0.5 text-[11px]"
-              style={{
-                backgroundColor: "var(--bg-surface-hover)",
-                color: "var(--text-muted)",
-              }}
+            </Chip>
+            <Chip
+              style={{ color: "var(--text-muted)" }}
               title={`변경: +${fm.github_additions} −${fm.github_deletions} · ${fm.github_changed_files} files`}
             >
               +{fm.github_additions} −{fm.github_deletions}
-            </span>
+            </Chip>
           </div>
           <div className="flex items-center justify-end gap-1.5 pt-1.5">
             <Button
@@ -290,53 +260,22 @@ export function PortfolioWorkCard({ work, projects }: Props) {
           </Text>
           <div className="mt-auto flex flex-nowrap items-center gap-x-1.5 overflow-hidden pt-1">
             {dateLabel ? (
-              <span
-                className="inline-flex shrink-0 items-center whitespace-nowrap rounded-md px-1.5 py-0.5 text-[11px]"
-                style={{
-                  backgroundColor: "var(--bg-surface-hover)",
-                  color: "var(--text-secondary)",
-                }}
-                title={`병합일: ${fm.github_merged_at?.slice(0, 10) ?? ""}`}
-              >
+              <Chip title={`병합일: ${fm.github_merged_at?.slice(0, 10) ?? ""}`}>
                 {dateLabel}
-              </span>
+              </Chip>
             ) : null}
             {projectLabel ? (
-              <span
-                className="inline-flex shrink-0 items-center whitespace-nowrap rounded-md px-1.5 py-0.5 text-[11px]"
-                style={{
-                  backgroundColor: "var(--bg-surface-hover)",
-                  color: "var(--text-secondary)",
-                }}
-                title={fullProjectName ?? ""}
-              >
-                {projectLabel}
-              </span>
+              <Chip title={fullProjectName ?? ""}>{projectLabel}</Chip>
             ) : null}
-            <span
-              className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-1.5 py-0.5 text-[11px]"
-              style={{
-                backgroundColor: "var(--bg-surface-hover)",
-                color: "var(--text-secondary)",
-              }}
-              title={`카테고리: ${categoryLabel}`}
-            >
-              <span
-                className="h-1.5 w-1.5 shrink-0 rounded-full"
-                style={{ backgroundColor: categoryColor }}
-              />
+            <Chip dot={categoryColor} title={`카테고리: ${categoryLabel}`}>
               {categoryLabel}
-            </span>
-            <span
-              className="inline-flex shrink-0 items-center whitespace-nowrap rounded-md px-1.5 py-0.5 text-[11px]"
-              style={{
-                backgroundColor: "var(--bg-surface-hover)",
-                color: "var(--text-muted)",
-              }}
+            </Chip>
+            <Chip
+              style={{ color: "var(--text-muted)" }}
               title={`변경: +${fm.github_additions} −${fm.github_deletions} · ${fm.github_changed_files} files`}
             >
               +{fm.github_additions} −{fm.github_deletions}
-            </span>
+            </Chip>
           </div>
         </div>
 

@@ -10,7 +10,6 @@ import {
   GitBranch,
   Sparkles,
   Check,
-  Loader2,
   Pencil,
 } from "lucide-react";
 import type {
@@ -33,6 +32,8 @@ import { ScreenshotDropzone } from "./ScreenshotDropzone";
 import { Modal } from "../common/Modal";
 import { Button } from "../common/Button";
 import { Text } from "../common/Text";
+import { Chip } from "../common/Chip";
+import { Spinner } from "../common/Spinner";
 
 const CATEGORY_LABEL: Record<PortfolioCategory, string> = {
   ui_ux: "UI/UX",
@@ -599,7 +600,7 @@ export function PortfolioDetailModal({ work, projects, onClose }: Props) {
                   disabled={requesting || fullWork.isLoading}
                   leftIcon={
                     requesting || fullWork.isLoading ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <Spinner size="md" />
                     ) : (
                       <Sparkles className="h-4 w-4" />
                     )
@@ -659,23 +660,15 @@ export function PortfolioDetailModal({ work, projects, onClose }: Props) {
                       {suggestion.impact}
                     </Text>
                     <div className="flex items-center gap-2">
-                      <Text
-                        variant="caption"
-                        color="secondary"
-                        as="span"
-                        className="inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 text-[11px]"
+                      <Chip
+                        dot={
+                          CATEGORY_COLOR[suggestion.category] ??
+                          "var(--cat-other)"
+                        }
                         style={{ backgroundColor: "var(--bg-surface)" }}
                       >
-                        <span
-                          className="h-1.5 w-1.5 rounded-full"
-                          style={{
-                            backgroundColor:
-                              CATEGORY_COLOR[suggestion.category] ??
-                              "var(--cat-other)",
-                          }}
-                        />
                         {CATEGORY_LABEL[suggestion.category] ?? suggestion.category}
-                      </Text>
+                      </Chip>
                     </div>
                     <div className="flex items-center gap-2 pt-1">
                       <Button
