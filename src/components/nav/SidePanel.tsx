@@ -38,6 +38,8 @@ import { TaskAddModal } from "../tasks/TaskAddModal";
 import { JournalOverlay } from "../calendar/JournalOverlay";
 import { MeetingsTreeView } from "../meetings/MeetingsTreeView";
 import { MoveFolderModal } from "../meetings/MoveFolderModal";
+import { Button } from "../common/Button";
+import { Text } from "../common/Text";
 import { useToast } from "../Toast";
 
 /* ── Meetings Side Panel ── */
@@ -271,26 +273,26 @@ export function MeetingsSidePanel({
         </h2>
         <div className="flex items-center gap-0.5">
           <SortMenu value={sortKey} onChange={setSortKey} />
-          <button
-            type="button"
+          <Button
+            variant="icon"
             onClick={() => void handleCreateFolder()}
             disabled={createFolderMutation.isPending}
             title="새 폴더"
-            className="flex h-7 w-7 items-center justify-center rounded-md transition disabled:opacity-50"
-            style={{ color: "var(--text-secondary)", minHeight: 0 }}
+            className="disabled:opacity-50"
+            style={{ color: "var(--text-secondary)" }}
           >
             <FolderPlus className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            variant="icon"
             onClick={handleCreate}
             disabled={createMutation.isPending}
             title="새 메모장"
-            className="flex h-7 w-7 items-center justify-center rounded-md transition disabled:opacity-50"
-            style={{ color: "var(--text-secondary)", minHeight: 0 }}
+            className="disabled:opacity-50"
+            style={{ color: "var(--text-secondary)" }}
           >
             <Plus className="h-4 w-4" />
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -306,12 +308,14 @@ export function MeetingsSidePanel({
             ))}
           </div>
         ) : (!data || data.length === 0) && (!folders || folders.length === 0) ? (
-          <div
-            className="px-4 py-8 text-center text-sm"
-            style={{ color: "var(--text-muted)" }}
+          <Text
+            variant="body"
+            color="muted"
+            as="div"
+            className="px-4 py-8 text-center"
           >
             아직 메모장이 없어요
-          </div>
+          </Text>
         ) : (
           <MeetingsTreeView
             meetings={data ?? []}
@@ -403,33 +407,37 @@ function FolderContextMenu({
       }}
       onMouseDown={(e) => e.stopPropagation()}
     >
-      <div
+      <Text
+        variant="caption"
+        color="muted"
+        as="div"
         className="truncate px-3 pt-2 pb-1 text-[10px] uppercase tracking-wider"
-        style={{ color: "var(--text-muted)" }}
       >
         {folder}
-      </div>
-      <button
-        type="button"
+      </Text>
+      <Button
+        variant="ghost"
         onClick={onRename}
-        className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition"
-        style={{ color: "var(--text-primary)", minHeight: 0 }}
+        className="w-full justify-start gap-2 rounded-none px-3 py-2"
+        leftIcon={
+          <Pencil
+            className="h-3.5 w-3.5 shrink-0"
+            style={{ color: "var(--text-muted)" }}
+          />
+        }
+        style={{ color: "var(--text-primary)" }}
       >
-        <Pencil
-          className="h-3.5 w-3.5 shrink-0"
-          style={{ color: "var(--text-muted)" }}
-        />
-        <span>이름 변경...</span>
-      </button>
-      <button
-        type="button"
+        이름 변경...
+      </Button>
+      <Button
+        variant="ghost"
         onClick={onDelete}
-        className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition"
-        style={{ color: "var(--accent-red)", minHeight: 0 }}
+        className="w-full justify-start gap-2 rounded-none px-3 py-2"
+        leftIcon={<Trash2 className="h-3.5 w-3.5 shrink-0" />}
+        style={{ color: "var(--accent-red)" }}
       >
-        <Trash2 className="h-3.5 w-3.5 shrink-0" />
-        <span>폴더 삭제...</span>
-      </button>
+        폴더 삭제...
+      </Button>
     </div>
   );
 }
@@ -463,18 +471,20 @@ function MeetingContextMenu({
       // mousedown 으로 메뉴 자체 클릭이 outside-close trigger 되지 않도록 막음
       onMouseDown={(e) => e.stopPropagation()}
     >
-      <button
-        type="button"
+      <Button
+        variant="ghost"
         onClick={onMove}
-        className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition"
-        style={{ color: "var(--text-primary)", minHeight: 0 }}
+        className="w-full justify-start gap-2 rounded-none px-3 py-2"
+        leftIcon={
+          <FolderInput
+            className="h-3.5 w-3.5 shrink-0"
+            style={{ color: "var(--text-muted)" }}
+          />
+        }
+        style={{ color: "var(--text-primary)" }}
       >
-        <FolderInput
-          className="h-3.5 w-3.5 shrink-0"
-          style={{ color: "var(--text-muted)" }}
-        />
-        <span>폴더로 이동...</span>
-      </button>
+        폴더로 이동...
+      </Button>
     </div>
   );
 }
@@ -488,16 +498,15 @@ export function MeetingsSidePanelFooter({
   return (
     <div className="flex items-center gap-1">
       <MarkdownHelp />
-      <button
-        type="button"
+      <Button
+        variant="icon"
         onClick={onTrashOpen}
         title="휴지통"
         aria-label="휴지통"
-        className="flex h-7 w-7 items-center justify-center rounded-md transition"
-        style={{ color: "var(--text-muted)", minHeight: 0 }}
+        style={{ color: "var(--text-muted)" }}
       >
         <Trash2 className="h-3.5 w-3.5" />
-      </button>
+      </Button>
     </div>
   );
 }
@@ -510,16 +519,15 @@ export function PortfolioSidePanelFooter({
 }) {
   return (
     <div className="flex items-center gap-1">
-      <button
-        type="button"
+      <Button
+        variant="icon"
         onClick={onTrashOpen}
         title="포트폴리오 휴지통"
         aria-label="포트폴리오 휴지통"
-        className="flex h-7 w-7 items-center justify-center rounded-md transition"
-        style={{ color: "var(--text-muted)", minHeight: 0 }}
+        style={{ color: "var(--text-muted)" }}
       >
         <Trash2 className="h-3.5 w-3.5" />
-      </button>
+      </Button>
     </div>
   );
 }
@@ -528,30 +536,31 @@ function MarkdownHelp() {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <button
-        type="button"
+      <Button
+        variant="icon"
         onClick={() => setOpen(true)}
         title="마크다운 도움말"
         aria-label="마크다운 도움말"
-        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition"
-        style={{ color: "var(--text-muted)", minHeight: 0 }}
+        style={{ color: "var(--text-muted)" }}
       >
         <HelpCircle className="h-3.5 w-3.5" />
-      </button>
+      </Button>
       {open ? (
         <div
           className="absolute inset-0 z-30 flex flex-col overflow-y-auto"
           style={{ backgroundColor: "var(--bg-surface)" }}
         >
           <div className="flex items-center justify-between px-4" style={{ height: "var(--page-header-h)", borderBottom: "1px solid var(--border-default)" }}>
-            <span className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>마크다운 문법</span>
-            <button
-              type="button"
+            <Text variant="body" weight="semibold" as="span">
+              마크다운 문법
+            </Text>
+            <Button
+              variant="icon"
               onClick={() => setOpen(false)}
-              style={{ color: "var(--text-muted)", minHeight: 0 }}
+              style={{ color: "var(--text-muted)" }}
             >
               <X className="h-4 w-4" />
-            </button>
+            </Button>
           </div>
           <div className="space-y-1.5 px-4 py-4 text-sm" style={{ color: "var(--text-primary)" }}>
             {MARKDOWN_HINTS.map((h, i) => (
@@ -571,7 +580,7 @@ function MarkdownHelp() {
                   >
                     {h.syntax}
                   </code>
-                  <span className="text-xs" style={{ color: "var(--text-muted)" }}>{h.desc}</span>
+                  <Text variant="caption" color="muted" as="span">{h.desc}</Text>
                 </div>
               </div>
             ))}
@@ -618,22 +627,20 @@ function SortMenu({
 
   return (
     <div ref={wrapRef} className="relative">
-      <button
-        type="button"
+      <Button
+        variant="icon"
         onClick={() => setOpen((v) => !v)}
         title="정렬"
         aria-label="정렬"
         aria-haspopup="menu"
         aria-expanded={open}
-        className="flex h-7 w-7 items-center justify-center rounded-md transition"
         style={{
           color: "var(--text-secondary)",
           backgroundColor: open ? "var(--bg-surface-active)" : undefined,
-          minHeight: 0,
         }}
       >
         <ArrowUpDown className="h-3.5 w-3.5" />
-      </button>
+      </Button>
       {open ? (
         <div
           role="menu"
@@ -646,27 +653,27 @@ function SortMenu({
           {SORT_OPTIONS.map((opt) => {
             const active = opt.id === value;
             return (
-              <button
+              <Button
                 key={opt.id}
-                type="button"
+                variant="ghost"
+                size="sm"
                 role="menuitemradio"
                 aria-checked={active}
                 onClick={() => {
                   onChange(opt.id);
                   setOpen(false);
                 }}
-                className="flex w-full items-center justify-between px-3 py-1.5 text-left text-xs transition"
+                className="w-full justify-between rounded-none px-3 py-1.5"
                 style={{
                   color: active ? "var(--text-primary)" : "var(--text-secondary)",
                   backgroundColor: active ? "var(--bg-surface-active)" : undefined,
-                  minHeight: 0,
                 }}
               >
                 <span>{opt.label}</span>
                 {active ? (
                   <Check className="h-3 w-3" style={{ color: "var(--text-secondary)" }} />
                 ) : null}
-              </button>
+              </Button>
             );
           })}
         </div>
@@ -820,16 +827,15 @@ export function CalendarDayPanel({
             {formatDateLong(selectedDate)}
           </h2>
         </div>
-        <button
-          type="button"
+        <Button
+          variant="icon"
           onClick={() => setShowAddModal(true)}
           title="할 일 추가"
           aria-label="할 일 추가"
-          className="flex h-7 w-7 items-center justify-center rounded-md transition"
-          style={{ color: "var(--text-secondary)", minHeight: 0 }}
+          style={{ color: "var(--text-secondary)" }}
         >
           <Plus className="h-4 w-4" />
-        </button>
+        </Button>
       </div>
 
       {/* Journal CTA — 일기 빠른 진입. 없는 날은 dashed border + 펜 + 한 줄, 있는 날은
@@ -839,93 +845,104 @@ export function CalendarDayPanel({
         style={{ borderBottom: "1px solid var(--border-subtle)" }}
       >
         {journal ? (
-          <button
-            type="button"
+          <Button
+            variant="ghost"
             onClick={() => setShowJournalOverlay(true)}
-            className="group flex w-full items-start gap-2 rounded-md px-3 py-2 text-left transition hover:bg-[var(--bg-surface-hover)]"
-            style={{ minHeight: 0 }}
+            className="group w-full justify-start items-start gap-2 px-3 py-2"
+            leftIcon={
+              <BookOpen
+                className="mt-0.5 h-3.5 w-3.5 shrink-0"
+                style={{ color: "var(--text-muted)" }}
+              />
+            }
           >
-            <BookOpen
-              className="mt-0.5 h-3.5 w-3.5 shrink-0"
-              style={{ color: "var(--text-muted)" }}
-            />
             <div className="min-w-0 flex-1">
-              <div
-                className="flex items-center justify-between gap-2 text-xs font-medium"
-                style={{ color: "var(--text-secondary)" }}
+              <Text
+                variant="caption"
+                color="secondary"
+                as="div"
+                weight="medium"
+                className="flex items-center justify-between gap-2"
               >
                 <span>일기</span>
                 <Pencil
                   className="h-3 w-3 opacity-0 transition group-hover:opacity-100"
                   style={{ color: "var(--text-muted)" }}
                 />
-              </div>
-              <div
-                className="mt-0.5 line-clamp-3 whitespace-pre-wrap font-serif text-sm leading-snug"
-                style={{ color: "var(--text-secondary)" }}
+              </Text>
+              <Text
+                variant="body"
+                color="secondary"
+                as="div"
+                className="mt-0.5 line-clamp-3 whitespace-pre-wrap font-serif leading-snug"
               >
                 {journal.content?.trim() || "(내용 없음)"}
-              </div>
+              </Text>
             </div>
-          </button>
+          </Button>
         ) : (
-          <button
-            type="button"
+          <Button
+            variant="ghost"
             onClick={() => setShowJournalOverlay(true)}
-            className="flex w-full items-center gap-2 rounded-md border border-dashed px-3 py-2 text-left text-sm transition hover:bg-[var(--bg-surface-hover)]"
+            className="w-full justify-start gap-2 border border-dashed px-3 py-2"
+            leftIcon={<Plus className="h-3.5 w-3.5 shrink-0" />}
             style={{
               borderColor: "var(--border-default)",
               color: "var(--text-muted)",
-              minHeight: 0,
             }}
             aria-label="일기 쓰기"
           >
-            <Plus className="h-3.5 w-3.5 shrink-0" />
             <span>일기 쓰기</span>
-          </button>
+          </Button>
         )}
       </div>
 
       {/* Items */}
       <div className="flex-1 overflow-y-auto">
         {!hasItems ? (
-          <div
-            className="px-4 py-8 text-center text-sm"
-            style={{ color: "var(--text-muted)" }}
+          <Text
+            variant="body"
+            color="muted"
+            as="div"
+            className="px-4 py-8 text-center"
           >
             이날의 일정 / 할 일이 없어요
-          </div>
+          </Text>
         ) : (
           <div className="space-y-1 p-3">
             {/* Meetings */}
             {meetings.map((m) => (
-              <button
+              <Button
                 key={m.uid}
-                type="button"
+                variant="ghost"
                 onClick={() => onOpenMeeting(m.uid)}
-                className="flex w-full items-start gap-2 rounded-md px-3 py-2 text-left transition"
-                style={{ minHeight: 0 }}
+                className="w-full justify-start items-start gap-2 px-3 py-2"
+                leftIcon={
+                  <ClipboardList className="mt-0.5 h-3.5 w-3.5 shrink-0 text-blue-500" />
+                }
               >
-                <ClipboardList className="mt-0.5 h-3.5 w-3.5 shrink-0 text-blue-500" />
                 <div className="min-w-0 flex-1">
-                  <div className="text-sm" style={{ color: "var(--text-primary)" }}>
+                  <Text variant="body" as="div">
                     {m.time ? (
-                      <span style={{ color: "var(--text-muted)" }}>
+                      <Text variant="body" color="muted" as="span">
                         {m.time}
-                      </span>
+                      </Text>
                     ) : null}{" "}
                     {m.title?.trim() || "(제목 없음)"}
-                  </div>
+                  </Text>
                   {m.attendees ? (
-                    <div
-                      className="mt-0.5 truncate text-xs"
-                      style={{ color: "var(--text-secondary)" }}
+                    <Text
+                      variant="caption"
+                      color="secondary"
+                      as="div"
+                      truncate
+                      className="mt-0.5"
                     >
                       {m.attendees}
-                    </div>
+                    </Text>
                   ) : null}
                 </div>
-              </button>
+              </Button>
             ))}
 
             {/* Todos — due_time 있으면 시각 prefix */}
@@ -964,19 +981,21 @@ export function CalendarDayPanel({
                     </svg>
                   ) : null}
                 </button>
-                <span
-                  className={`flex-1 text-sm ${t.done ? "line-through" : ""}`}
+                <Text
+                  variant="body"
+                  as="span"
+                  className={`flex-1 ${t.done ? "line-through" : ""}`}
                   style={{
                     color: t.done ? "var(--text-muted)" : "var(--text-primary)",
                   }}
                 >
                   {t.due_time ? (
-                    <span style={{ color: "var(--text-muted)" }}>
+                    <Text variant="body" color="muted" as="span">
                       {t.due_time}{" "}
-                    </span>
+                    </Text>
                   ) : null}
                   {t.title}
-                </span>
+                </Text>
               </div>
               );
             })}
@@ -991,7 +1010,7 @@ export function CalendarDayPanel({
         prefill={{ due_date: selectedDate, category: "schedule" }}
       />
       <JournalOverlay
-        isOpen={showJournalOverlay}
+        open={showJournalOverlay}
         date={selectedDate}
         onClose={() => setShowJournalOverlay(false)}
       />
@@ -1148,15 +1167,14 @@ export function TodosSidePanel({
         </h2>
         <div className="flex items-center gap-0.5">
           <SortMenu value={sortKey} onChange={onSortKeyChange} />
-          <button
-            type="button"
+          <Button
+            variant="icon"
             onClick={() => window.dispatchEvent(new Event("todos:add-request"))}
             title="새 할 일"
-            className="flex h-7 w-7 items-center justify-center rounded-md transition"
-            style={{ color: "var(--text-secondary)", minHeight: 0 }}
+            style={{ color: "var(--text-secondary)" }}
           >
             <Plus className="h-4 w-4" />
-          </button>
+          </Button>
         </div>
       </div>
       <nav className="flex min-h-0 flex-1 flex-col p-2" aria-label="필터">
@@ -1237,16 +1255,15 @@ function TodosFilterItem({
   leading?: ReactNode;
 }) {
   return (
-    <button
-      type="button"
+    <Button
+      variant="ghost"
       onClick={onClick}
-      className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-sm transition ${
+      className={`w-full justify-between px-3 py-2 ${
         active ? "font-medium" : ""
       }`}
       style={{
         backgroundColor: active ? "var(--bg-surface-active)" : undefined,
         color: active ? "var(--text-primary)" : "var(--text-secondary)",
-        minHeight: 0,
       }}
     >
       <span className="inline-flex items-center gap-2">
@@ -1259,15 +1276,17 @@ function TodosFilterItem({
         </span>
         {item.label}
       </span>
-      <span
-        className="font-mono text-xs"
+      <Text
+        variant="caption"
+        as="span"
+        className="font-mono"
         style={{
           color: active ? "var(--text-secondary)" : "var(--text-muted)",
         }}
       >
         {item.count}
-      </span>
-    </button>
+      </Text>
+    </Button>
   );
 }
 
@@ -1280,16 +1299,15 @@ export function TodosSidePanelFooter({
 }) {
   return (
     <div className="flex items-center gap-1">
-      <button
-        type="button"
+      <Button
+        variant="icon"
         onClick={onTrashOpen}
         title="휴지통"
         aria-label="휴지통"
-        className="flex h-7 w-7 items-center justify-center rounded-md transition"
-        style={{ color: "var(--text-muted)", minHeight: 0 }}
+        style={{ color: "var(--text-muted)" }}
       >
         <Trash2 className="h-3.5 w-3.5" />
-      </button>
+      </Button>
     </div>
   );
 }
