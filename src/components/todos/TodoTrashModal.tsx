@@ -12,6 +12,9 @@ import {
 } from "../../lib/dates";
 import { TODO_CATEGORIES, type Todo } from "../../api/todos";
 import { ConfirmDialog } from "../ConfirmDialog";
+import { Modal } from "../common/Modal";
+import { Button } from "../common/Button";
+import { Text } from "../common/Text";
 
 type Props = {
   open: boolean;
@@ -32,16 +35,6 @@ export function TodoTrashModal({ open, onClose }: Props) {
   }, [data]);
 
   const confirmOpen = purgeTarget !== null || emptyConfirm;
-
-  useEffect(() => {
-    if (!open) return;
-    function onKey(e: KeyboardEvent) {
-      // ConfirmDialog 가 열려있으면 그쪽이 ESC 잡음.
-      if (e.key === "Escape" && !confirmOpen) onClose();
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose, confirmOpen]);
 
   // 모달 닫힐 때 confirm state 리셋
   useEffect(() => {
@@ -64,19 +57,15 @@ export function TodoTrashModal({ open, onClose }: Props) {
     setPurgeTarget(null);
   }
 
-  if (!open) return null;
-
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="todo-trash-title"
-      onClick={onClose}
-      className="fixed inset-0 z-50 flex items-center justify-center p-6"
-      style={{ backgroundColor: "rgba(0,0,0,0.4)" }}
+    <Modal
+      open={open}
+      onClose={onClose}
+      ariaLabelledBy="todo-trash-title"
+      dismissOnEscape={!confirmOpen}
+      dismissOnBackdrop={!confirmOpen}
     >
       <div
-        onClick={(e) => e.stopPropagation()}
         className="flex h-full max-h-[36rem] w-full max-w-md flex-col overflow-hidden rounded-lg shadow-xl"
         style={{
           backgroundColor: "var(--bg-base)",
@@ -96,34 +85,35 @@ export function TodoTrashModal({ open, onClose }: Props) {
           </h2>
           <div className="flex items-center gap-1">
             {deleted.length > 0 ? (
-              <button
-                type="button"
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => setEmptyConfirm(true)}
-                className="rounded-md px-2 py-1 text-xs transition hover:bg-[var(--bg-surface-hover)]"
-                style={{ color: "var(--accent-red)", minHeight: 0 }}
+                style={{ color: "var(--accent-red)" }}
               >
                 비우기
-              </button>
+              </Button>
             ) : null}
-            <button
-              type="button"
+            <Button
+              variant="icon"
               onClick={onClose}
               aria-label="닫기"
-              className="rounded p-1 transition hover:bg-[var(--bg-surface-hover)]"
-              style={{ color: "var(--text-muted)", minHeight: 0 }}
+              style={{ color: "var(--text-muted)" }}
             >
               <X className="h-4 w-4" />
-            </button>
+            </Button>
           </div>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto">
           {deleted.length === 0 ? (
-            <div
-              className="px-4 py-12 text-center text-sm"
-              style={{ color: "var(--text-muted)" }}
+            <Text
+              variant="body"
+              color="muted"
+              as="div"
+              className="px-4 py-12 text-center"
             >
               휴지통이 비어있어요
-            </div>
+            </Text>
           ) : (
             <ul className="p-2">
               {deleted.map((t) => (
@@ -133,21 +123,18 @@ export function TodoTrashModal({ open, onClose }: Props) {
                 >
                   <div className="flex items-start gap-2">
                     <div className="min-w-0 flex-1">
-                      <div
-                        className="break-words text-sm"
-                        style={{ color: "var(--text-primary)" }}
-                      >
+                      <Text variant="body" as="div" className="break-words">
                         {t.title || (
-                          <span style={{ color: "var(--text-muted)" }}>
+                          <Text variant="body" color="muted" as="span">
                             (제목 없음)
-                          </span>
+                          </Text>
                         )}
-                      </div>
+                      </Text>
                       <TrashedMeta todo={t} />
                     </div>
                     <div className="flex shrink-0 items-center gap-1">
-                      <button
-                        type="button"
+                      <Button
+                        variant="icon"
                         onClick={() =>
                           updateMutation.mutate({
                             id: t.id,
@@ -156,21 +143,18 @@ export function TodoTrashModal({ open, onClose }: Props) {
                         }
                         title="복원"
                         aria-label="복원"
-                        className="rounded p-1.5 transition hover:bg-[var(--bg-surface-hover)]"
-                        style={{ color: "var(--text-secondary)", minHeight: 0 }}
                       >
                         <RotateCcw className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        type="button"
+                      </Button>
+                      <Button
+                        variant="icon"
                         onClick={() => setPurgeTarget(t)}
                         title="영구 삭제"
                         aria-label="영구 삭제"
-                        className="rounded p-1.5 transition hover:bg-[var(--bg-surface-hover)]"
-                        style={{ color: "var(--accent-red)", minHeight: 0 }}
+                        style={{ color: "var(--accent-red)" }}
                       >
                         <Trash2 className="h-3.5 w-3.5" />
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 </li>
@@ -201,7 +185,7 @@ export function TodoTrashModal({ open, onClose }: Props) {
         onConfirm={handleEmpty}
         onCancel={() => setEmptyConfirm(false)}
       />
-    </div>
+    </Modal>
   );
 }
 

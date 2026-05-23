@@ -4,9 +4,12 @@ import { useUpsertJournal, useDeleteJournal, useJournals } from "../../hooks/use
 import { useDebouncedSave, type SaveStatus } from "../../hooks/useDebouncedSave";
 import { formatDateLong } from "../../lib/dates";
 import { MarkdownView } from "../meetings/MarkdownView";
+import { Modal } from "../common/Modal";
+import { Button } from "../common/Button";
+import { Text } from "../common/Text";
 
 type Props = {
-  isOpen: boolean;
+  open: boolean;
   date: string;
   onClose: () => void;
 };
@@ -15,7 +18,7 @@ type Props = {
 // 새로고침 시 reset.
 const DRAFT_CACHE = new Map<string, string>();
 
-export function JournalOverlay({ isOpen, date, onClose }: Props) {
+export function JournalOverlay({ open, date, onClose }: Props) {
   const journalsQ = useJournals();
   const upsertMutation = useUpsertJournal();
   const deleteMutation = useDeleteJournal();
@@ -23,7 +26,7 @@ export function JournalOverlay({ isOpen, date, onClose }: Props) {
   const existing = (journalsQ.data ?? []).find((j) => j.date === date) ?? null;
 
   // 초기값: 서버 데이터 > draft cache > 빈 문자열. open 될 때 한 번 결정.
-  // open 중에 외부 데이터 바뀌어도 사용자 입력 덮어쓰지 않게 isOpen 분리.
+  // open 중에 외부 데이터 바뀌어도 사용자 입력 덮어쓰지 않게 open 분리.
   const [content, setContent] = useState<string>("");
   // view/edit 토글 — 일기는 매번 편집 모드로 시작 (방금 쓴 거 이어 쓰기 자연스러움).
   // 회의록 useViewMode 와 의도적으로 분리: persist 안 함, 오버레이 닫으면 reset.
@@ -50,18 +53,18 @@ export function JournalOverlay({ isOpen, date, onClose }: Props) {
 
   // open 시 초기값 세팅 + draft cache 비움 + 편집 모드로 리셋. 이미 열려있는 채로
   // date prop 만 바뀌면 동일.
-  // 의도: isOpen 트리거의 1회 reset — 외부 데이터가 바뀌어도 사용자 입력을 덮어쓰지
+  // 의도: open 트리거의 1회 reset — 외부 데이터가 바뀌어도 사용자 입력을 덮어쓰지
   // 않도록 effect 안에서 setContent. effect-set-state warning 은 의도된 패턴이라 무시.
   useEffect(() => {
-    if (!isOpen) return;
+    if (!open) return;
     const initial = DRAFT_CACHE.get(date) ?? existing?.content ?? "";
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setContent(initial);
     setViewMode("edit");
     DRAFT_CACHE.delete(date);
-    // existing 이 늦게 도착해도 placeholder 가 유지되도록 isOpen + date 만 dep.
+    // existing 이 늦게 도착해도 placeholder 가 유지되도록 open + date 만 dep.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, date]);
+  }, [open, date]);
 
   // 닫힐 때 pending flush. unmount 시 draft cache 저장 (저장 실패 케이스 보존용).
   useEffect(() => {
@@ -72,7 +75,7 @@ export function JournalOverlay({ isOpen, date, onClose }: Props) {
 
   // open 시 자동 focus + 끝으로 caret. view 모드 진입 시엔 focus 안 함.
   useEffect(() => {
-    if (!isOpen) return;
+    if (!open) return;
     if (viewMode !== "edit") return;
     const id = requestAnimationFrame(() => {
       const el = taRef.current;
@@ -82,20 +85,14 @@ export function JournalOverlay({ isOpen, date, onClose }: Props) {
       el.setSelectionRange(end, end);
     });
     return () => cancelAnimationFrame(id);
-  }, [isOpen, viewMode]);
+  }, [open, viewMode]);
 
-  // 모달 단축키:
-  //   ESC — 닫기
+  // 모달 단축키 (Escape 는 Modal 컴포넌트가 onClose=handleClose 로 처리):
   //   Cmd/Ctrl+Enter — 저장&닫기
   //   Cmd/Ctrl+Shift+E — 편집/보기 토글 (content 비어있으면 무효). 메모장 단축키와 통일.
   useEffect(() => {
-    if (!isOpen) return;
+    if (!open) return;
     function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        handleClose();
-        return;
-      }
       const cmd = e.metaKey || e.ctrlKey;
       if (!cmd || e.altKey) return;
       if (!e.shiftKey && e.key === "Enter") {
@@ -114,7 +111,7 @@ export function JournalOverlay({ isOpen, date, onClose }: Props) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, content]);
+  }, [open, content]);
 
   function handleChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
     const next = e.target.value;
@@ -127,21 +124,8 @@ export function JournalOverlay({ isOpen, date, onClose }: Props) {
     onClose();
   }
 
-  if (!isOpen) return null;
-
   return (
-    <div
-      // backdrop close: mousedown 시작점이 backdrop 자체일 때만. textarea 안에서 시작한
-      // 드래그가 바깥에서 mouseup 되어 click 이 backdrop 으로 발사되는 케이스 차단.
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) handleClose();
-      }}
-      className="fixed inset-0 z-50 flex items-center justify-center p-6"
-      style={{ backgroundColor: "rgba(0,0,0,0.4)" }}
-      role="dialog"
-      aria-modal="true"
-      aria-label="일기 작성"
-    >
+    <Modal open={open} onClose={handleClose} ariaLabel="일기 작성">
       <div
         // 설정창과 동일 사이즈 spec — max-w-3xl + min(560px, 80vh) 고정.
         className="flex w-full max-w-3xl flex-col overflow-hidden rounded-xl"
@@ -174,16 +158,15 @@ export function JournalOverlay({ isOpen, date, onClose }: Props) {
                 }
               />
             ) : null}
-            <button
-              type="button"
+            <Button
+              variant="icon"
               onClick={handleClose}
               aria-label="닫기"
               title="닫기  ESC"
-              className="flex h-7 w-7 items-center justify-center rounded-md transition hover:bg-[var(--bg-surface-hover)]"
               style={{ color: "var(--text-muted)" }}
             >
               <X className="h-4 w-4" />
-            </button>
+            </Button>
           </div>
         </header>
         {/* edit: textarea 가 컨테이너 100% 채우고 자체 스크롤. view: 컨테이너 스크롤. */}
@@ -203,7 +186,7 @@ export function JournalOverlay({ isOpen, date, onClose }: Props) {
           </div>
         )}
       </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -219,49 +202,53 @@ function ModeChip({
   const isEdit = viewMode === "edit";
   const title = `${isEdit ? "보기" : "편집"} 모드로  ⌘⇧E`;
   return (
-    <button
-      type="button"
+    <Button
+      variant="ghost"
+      size="sm"
       onClick={onToggle}
       title={title}
       aria-label={title}
-      className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs transition"
+      leftIcon={
+        isEdit ? <Pencil className="h-3 w-3" /> : <Eye className="h-3 w-3" />
+      }
+      className="px-1.5 py-0.5"
       style={{
         border: "1px solid var(--border-subtle)",
         color: isEdit ? "var(--accent-blue-text)" : "var(--text-secondary)",
         backgroundColor: isEdit ? "var(--accent-blue-bg)" : "var(--bg-surface)",
-        minHeight: 0,
       }}
     >
-      {isEdit ? <Pencil className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
-      <span>{isEdit ? "편집" : "보기"}</span>
-    </button>
+      {isEdit ? "편집" : "보기"}
+    </Button>
   );
 }
 
 function SaveBadge({ status, error }: { status: SaveStatus; error: Error | null }) {
   if (status === "saving" || status === "pending") {
     return (
-      <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>
+      <Text variant="caption" color="muted" as="span" className="text-[11px]">
         저장 중…
-      </span>
+      </Text>
     );
   }
   if (status === "saved") {
     return (
-      <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>
+      <Text variant="caption" color="muted" as="span" className="text-[11px]">
         저장됨
-      </span>
+      </Text>
     );
   }
   if (status === "error") {
     return (
-      <span
+      <Text
+        variant="caption"
+        as="span"
         className="text-[11px]"
         style={{ color: "var(--accent-red)" }}
         title={error?.message ?? undefined}
       >
         저장 실패
-      </span>
+      </Text>
     );
   }
   return null;

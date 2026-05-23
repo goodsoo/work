@@ -6,6 +6,9 @@ import {
 } from "../../lib/meetingsTree";
 import { useMeetingFolders, useMeetings } from "../../hooks/useMeetings";
 import { meetingFolder } from "../../api/meetings";
+import { Modal } from "../common/Modal";
+import { Button } from "../common/Button";
+import { Text } from "../common/Text";
 
 type Props = {
   open: boolean;
@@ -46,16 +49,7 @@ export function MoveFolderModal({
     }
   }, [open]);
 
-  useEffect(() => {
-    if (!open) return;
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
-
-  if (!open || !meetingId) return null;
+  if (!meetingId) return null;
 
   async function commitMove(target: string) {
     if (submitting) return;
@@ -81,10 +75,11 @@ export function MoveFolderModal({
   }
 
   return (
-    <div
+    <Modal
+      open={open}
+      onClose={onClose}
+      ariaLabel="폴더로 이동"
       className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ backgroundColor: "rgba(0,0,0,0.4)" }}
-      onClick={onClose}
     >
       <div
         className="w-full max-w-sm rounded-lg shadow-xl"
@@ -92,53 +87,50 @@ export function MoveFolderModal({
           backgroundColor: "var(--bg-surface)",
           border: "1px solid var(--border-default)",
         }}
-        onClick={(e) => e.stopPropagation()}
       >
         <div
           className="flex items-center justify-between px-4 py-3"
           style={{ borderBottom: "1px solid var(--border-subtle)" }}
         >
           <div className="min-w-0">
-            <div
-              className="text-sm font-semibold"
-              style={{ color: "var(--text-primary)" }}
-            >
+            <Text variant="body" weight="semibold" as="div">
               폴더로 이동
-            </div>
-            <div
-              className="mt-0.5 truncate text-xs"
-              style={{ color: "var(--text-muted)" }}
+            </Text>
+            <Text
+              variant="caption"
+              color="muted"
+              as="div"
+              truncate
+              className="mt-0.5"
             >
               {meetingTitle || "(제목 없음)"}
-            </div>
+            </Text>
           </div>
-          <button
-            type="button"
+          <Button
+            variant="icon"
             onClick={onClose}
             aria-label="닫기"
-            className="flex h-7 w-7 items-center justify-center rounded-md transition"
-            style={{ color: "var(--text-muted)", minHeight: 0 }}
+            style={{ color: "var(--text-muted)" }}
           >
             <X className="h-4 w-4" />
-          </button>
+          </Button>
         </div>
 
         <div className="max-h-[40vh] overflow-y-auto px-2 py-2">
           {folders.map((f) => {
             const isCurrent = f === currentFolder;
             return (
-              <button
+              <Button
                 key={f || "__root__"}
-                type="button"
+                variant="ghost"
                 onClick={() => void commitMove(f)}
                 disabled={isCurrent || submitting}
-                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition disabled:opacity-50"
+                className="w-full justify-start gap-2 px-3 py-2 disabled:opacity-50"
                 style={{
                   color: "var(--text-primary)",
                   backgroundColor: isCurrent
                     ? "var(--bg-surface-active)"
                     : undefined,
-                  minHeight: 0,
                 }}
               >
                 {f === "" ? (
@@ -156,14 +148,16 @@ export function MoveFolderModal({
                   {f === "" ? "최상위" : f}
                 </span>
                 {isCurrent ? (
-                  <span
-                    className="ml-auto text-xs"
-                    style={{ color: "var(--text-muted)" }}
+                  <Text
+                    variant="caption"
+                    color="muted"
+                    as="span"
+                    className="ml-auto"
                   >
                     현재
-                  </span>
+                  </Text>
                 ) : null}
-              </button>
+              </Button>
             );
           })}
         </div>
@@ -197,23 +191,21 @@ export function MoveFolderModal({
                 color: "var(--text-primary)",
               }}
             />
-            <button
-              type="button"
+            <Button
+              variant="primary"
+              size="sm"
               onClick={() => void handleCreateAndMove()}
               disabled={submitting || newFolderInput.trim() === ""}
-              className="rounded-md px-3 py-1.5 text-xs font-medium transition disabled:opacity-50"
-              style={{
-                backgroundColor: "var(--btn-primary)",
-                color: "var(--btn-primary-text)",
-                minHeight: 0,
-              }}
+              className="disabled:opacity-50"
             >
               이동
-            </button>
+            </Button>
           </div>
           {error ? (
-            <div
-              className="rounded px-2 py-1 text-xs"
+            <Text
+              variant="caption"
+              as="div"
+              className="rounded px-2 py-1"
               style={{
                 borderLeft: "2px solid var(--accent-red)",
                 backgroundColor: "var(--accent-red-bg)",
@@ -221,10 +213,10 @@ export function MoveFolderModal({
               }}
             >
               {error}
-            </div>
+            </Text>
           ) : null}
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }

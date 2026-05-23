@@ -7,6 +7,9 @@ import {
 } from "../../api/todos";
 import { LooseDateInput } from "../common/LooseDateInput";
 import { LooseTimeInput } from "../common/LooseTimeInput";
+import { Modal } from "../common/Modal";
+import { Button } from "../common/Button";
+import { Text } from "../common/Text";
 
 type Props = {
   open: boolean;
@@ -42,20 +45,6 @@ export function TaskAddModal({ open, onClose, prefill }: Props) {
   }, [open, prefill]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        onClose();
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
-
-  if (!open) return null;
-
   const canSubmit = title.trim().length > 0;
 
   function handleSubmit(e: React.FormEvent) {
@@ -75,20 +64,8 @@ export function TaskAddModal({ open, onClose, prefill }: Props) {
   }
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="task-add-title"
-      // backdrop close: mousedown 시작점이 backdrop 자체일 때만. inner 안에서 시작한
-      // 드래그가 바깥에서 mouseup 되어 click 이 backdrop 으로 발사되는 케이스 차단.
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-      className="fixed inset-0 z-50 flex items-center justify-center p-6"
-      style={{ backgroundColor: "rgba(0,0,0,0.4)" }}
-    >
+    <Modal open={open} onClose={onClose} ariaLabelledBy="task-add-title">
       <form
-        onClick={(e) => e.stopPropagation()}
         onSubmit={handleSubmit}
         className="w-full max-w-sm rounded-lg p-5 shadow-xl"
         style={{
@@ -96,21 +73,19 @@ export function TaskAddModal({ open, onClose, prefill }: Props) {
           border: "1px solid var(--border-default)",
         }}
       >
-        <h2
-          id="task-add-title"
-          className="text-base font-semibold"
-          style={{ color: "var(--text-primary)" }}
-        >
+        <Text id="task-add-title" variant="h4" as="h2">
           할 일 추가
-        </h2>
+        </Text>
 
         <label className="mt-4 block">
-          <span
-            className="text-xs font-medium"
-            style={{ color: "var(--text-secondary)" }}
+          <Text
+            variant="caption"
+            color="secondary"
+            as="span"
+            weight="medium"
           >
             제목 <span style={{ color: "var(--accent-red)" }}>*</span>
-          </span>
+          </Text>
           <input
             ref={titleRef}
             type="text"
@@ -133,12 +108,14 @@ export function TaskAddModal({ open, onClose, prefill }: Props) {
           style={{ gridTemplateColumns: "2fr 1fr" }}
         >
           <label className="block">
-            <span
-              className="text-xs font-medium"
-              style={{ color: "var(--text-secondary)" }}
+            <Text
+              variant="caption"
+              color="secondary"
+              as="span"
+              weight="medium"
             >
               날짜
-            </span>
+            </Text>
             <div
               className="mt-1 rounded-md px-2 py-1.5"
               style={{
@@ -150,12 +127,14 @@ export function TaskAddModal({ open, onClose, prefill }: Props) {
             </div>
           </label>
           <label className="block">
-            <span
-              className="text-xs font-medium"
-              style={{ color: "var(--text-secondary)" }}
+            <Text
+              variant="caption"
+              color="secondary"
+              as="span"
+              weight="medium"
             >
               시간
-            </span>
+            </Text>
             <div
               className="mt-1 rounded-md px-2 py-1.5"
               style={{
@@ -169,12 +148,14 @@ export function TaskAddModal({ open, onClose, prefill }: Props) {
         </div>
 
         <div className="mt-3">
-          <span
-            className="text-xs font-medium"
-            style={{ color: "var(--text-secondary)" }}
+          <Text
+            variant="caption"
+            color="secondary"
+            as="span"
+            weight="medium"
           >
             카테고리
-          </span>
+          </Text>
           <div className="mt-1 flex flex-wrap gap-1.5">
             <CategoryChip
               label="미분류"
@@ -198,46 +179,40 @@ export function TaskAddModal({ open, onClose, prefill }: Props) {
             checked={done}
             onChange={(e) => setDone(e.target.checked)}
           />
-          <span style={{ color: "var(--text-secondary)" }}>
+          <Text variant="caption" color="secondary" as="span">
             완료된 항목으로 추가
-          </span>
+          </Text>
         </label>
 
         {createMutation.isError ? (
-          <p className="mt-3 text-xs" style={{ color: "var(--accent-red)" }}>
+          <Text
+            variant="caption"
+            as="p"
+            className="mt-3"
+            style={{ color: "var(--accent-red)" }}
+          >
             저장에 실패했어요. 다시 시도해주세요.
-          </p>
+          </Text>
         ) : null}
 
         <div className="mt-5 flex justify-end gap-2">
-          <button
-            type="button"
+          <Button
+            variant="secondary"
             onClick={onClose}
             disabled={createMutation.isPending}
-            className="rounded-md px-3 py-1.5 text-sm transition disabled:opacity-40"
-            style={{
-              border: "1px solid var(--border-default)",
-              color: "var(--text-secondary)",
-              minHeight: 0,
-            }}
           >
             취소
-          </button>
-          <button
+          </Button>
+          <Button
             type="submit"
+            variant="info"
             disabled={!canSubmit || createMutation.isPending}
-            className="rounded-md px-3 py-1.5 text-sm font-medium transition disabled:opacity-40"
-            style={{
-              backgroundColor: "var(--accent-blue)",
-              color: "white",
-              minHeight: 0,
-            }}
           >
             {createMutation.isPending ? "저장 중…" : "저장"}
-          </button>
+          </Button>
         </div>
       </form>
-    </div>
+    </Modal>
   );
 }
 
@@ -251,18 +226,18 @@ function CategoryChip({
   onClick: () => void;
 }) {
   return (
-    <button
-      type="button"
+    <Button
+      variant="ghost"
+      size="sm"
       onClick={onClick}
-      className="rounded-full px-3 py-1 text-xs transition"
+      className="rounded-full px-3 py-1"
       style={{
         backgroundColor: active ? "var(--btn-primary)" : "var(--bg-surface)",
         color: active ? "var(--btn-primary-text)" : "var(--text-secondary)",
         border: `1px solid ${active ? "var(--btn-primary)" : "var(--border-default)"}`,
-        minHeight: 0,
       }}
     >
       {label}
-    </button>
+    </Button>
   );
 }

@@ -463,7 +463,7 @@ function AppContent() {
         />
       )}
       <TrashModal
-        isOpen={trashOpen}
+        open={trashOpen}
         onClose={() => setTrashOpen(false)}
       />
       <TodoTrashModal
@@ -471,7 +471,7 @@ function AppContent() {
         onClose={() => setTodoTrashOpen(false)}
       />
       <PortfolioTrashModal
-        isOpen={portfolioTrashOpen}
+        open={portfolioTrashOpen}
         onClose={() => setPortfolioTrashOpen(false)}
       />
     </AppShell>
