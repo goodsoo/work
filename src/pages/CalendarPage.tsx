@@ -8,6 +8,8 @@ import {
 } from "react";
 import { addDays, startOfWeek } from "date-fns";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Button } from "../components/common/Button";
+import { Text } from "../components/common/Text";
 import { useMeetings } from "../hooks/useMeetings";
 import { useJournals } from "../hooks/useJournals";
 import { useTodos } from "../hooks/useTodos";
@@ -390,54 +392,54 @@ export function CalendarPage({ targetDate, onSelectedDateChange }: Props) {
           }}
         >
           <div />
-          <h3
-            className="justify-self-center text-base font-semibold"
-            style={{ color: "var(--text-primary)" }}
+          <Text
+            variant="h4"
+            as="h3"
+            className="justify-self-center"
           >
             {currentMonthYM.year}년 {currentMonthYM.month}월
-          </h3>
+          </Text>
           <div className="justify-self-end flex items-center gap-2">
             <div
               className="inline-flex overflow-hidden rounded-md"
               style={{ border: "1px solid var(--border-subtle)" }}
             >
-            <button
-              type="button"
+            <Button
+              variant="ghost"
               onClick={() => jumpToMonth(-1)}
               title="이전 달"
               aria-label="이전 달"
-              className="px-1.5 py-1 transition"
-              style={{ color: "var(--text-secondary)", minHeight: 0 }}
+              className="rounded-none px-1.5 py-1"
+              style={{ color: "var(--text-secondary)" }}
             >
               <ChevronLeft className="h-3.5 w-3.5" />
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={jumpToToday}
               title="오늘"
-              className="px-2 py-1 text-xs font-medium transition"
+              className="rounded-none px-2 py-1"
               style={{
                 color: "var(--text-secondary)",
                 borderLeft: "1px solid var(--border-subtle)",
-                minHeight: 0,
               }}
             >
               오늘
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              variant="ghost"
               onClick={() => jumpToMonth(1)}
               title="다음 달"
               aria-label="다음 달"
-              className="px-1.5 py-1 transition"
+              className="rounded-none px-1.5 py-1"
               style={{
                 color: "var(--text-secondary)",
                 borderLeft: "1px solid var(--border-subtle)",
-                minHeight: 0,
               }}
             >
               <ChevronRight className="h-3.5 w-3.5" />
-            </button>
+            </Button>
             </div>
           </div>
         </div>
