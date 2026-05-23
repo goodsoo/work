@@ -306,8 +306,9 @@ PR #36 (todo cat colors) 가 `--cat-*` 7개 + 카테고리 dot 섹션 + `lib/tod
 - [x] `meetings/TrashPreview.tsx`
 
 ### 기타
-- [ ] `App.tsx` (모달 caller prop 갱신 이미 됨, raw 자리 마저)
-- [ ] `Tooltip.tsx` / `Toast.tsx` (글로벌 단일 인스턴스 — wrap 안 해도 됨, 검토)
+- [x] `App.tsx` (MeetingsEmpty 의 p Text 흡수)
+- [x] `Tooltip.tsx` (raw 자리 0)
+- [x] `Toast.tsx` (close X icon button + 본문 Text)
 
 ### 시맨틱 토큰 (`src/index.css` `@theme`)
 - [ ] `--opacity-{disabled,hover,active,secondary}` + raw `opacity-*` 자리 갈아엎기
