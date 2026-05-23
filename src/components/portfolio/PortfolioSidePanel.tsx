@@ -95,7 +95,7 @@ export function PortfolioSidePanel({
       </div>
 
       <PortfolioGuideModal
-        isOpen={guideOpen}
+        open={guideOpen}
         onClose={() => setGuideOpen(false)}
         onFullSyncRun={onFullSyncRun}
         fullSyncRunning={syncState.running}

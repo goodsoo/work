@@ -13,6 +13,13 @@
   /* desktop 3-pane layout trigger. 기본 lg=1024px 보다 일찍 들어가도록 640px 로
      낮춤. 코드의 `lg:` 유틸리티 + raw @media (min-width: ...) 모두 이 값 기준. */
   --breakpoint-lg: 640px;
+
+  /* ── 시맨틱 토큰 ──
+     opacity / z-index / shadow / motion 시맨틱은 `:root` (아래 base layer) 로
+     이동. @theme 안에 박으면 Tailwind v4 가 default `z-10/20/50` / `opacity-50`
+     등 utility scale 을 사용자 정의로 교체해 raw 자리 utility 가 사라짐. 시맨틱
+     명시는 var() 인라인으로 (`style={{ zIndex: "var(--z-modal)" }}`). 본문 자리
+     migration 가능. */
 }
 
 @layer base {
@@ -77,6 +84,37 @@
     --titlebar-traffic-inset: 0px;
     /* 사이드바 + 본문 헤더 공통 높이 (52px) — 모든 row 가 같은 줄에 align. */
     --page-header-h: 3.25rem;
+
+    /* ── 시맨틱 토큰 (raw 자리 var() 참조용) ──
+       @theme 안에 박으면 Tailwind v4 가 default `z-50` / `opacity-50` utility
+       scale 을 교체해 raw 자리 깨짐. :root 로 옮겨 default utility 보존 + 시맨틱
+       의미는 인라인 style 로 (예: style={{ zIndex: "var(--z-modal)" }}). */
+
+    /* opacity */
+    --opacity-disabled: 0.4;
+    --opacity-secondary: 0.6;
+    --opacity-hover: 0.9;
+    --opacity-active: 0.8;
+    --opacity-overlay: 0.5;
+
+    /* z-index: dropdown < sticky < overlay < modal < popover < tooltip < toast */
+    --z-dropdown: 10;
+    --z-sticky: 20;
+    --z-overlay: 30;
+    --z-modal: 50;
+    --z-popover: 55;
+    --z-tooltip: 60;
+    --z-toast: 70;
+
+    /* shadow */
+    --shadow-card: 0 1px 3px 0 rgba(0, 0, 0, 0.06), 0 1px 2px -1px rgba(0, 0, 0, 0.06);
+    --shadow-modal: 0 24px 48px -12px rgba(0, 0, 0, 0.22), 0 8px 16px -4px rgba(0, 0, 0, 0.1);
+    --shadow-popover: 0 8px 16px -4px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.08);
+
+    /* motion */
+    --motion-fast: 120ms;
+    --motion-base: 150ms;
+    --motion-slow: 250ms;
   }
 
   :root.is-mac-tauri {

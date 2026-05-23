@@ -3,6 +3,8 @@ import type {
   PortfolioProject,
   PortfolioWorkMeta,
 } from "../../api/portfolio";
+import { Button } from "../common/Button";
+import { Text } from "../common/Text";
 
 export type ProjectFilter =
   | { kind: "all" }
@@ -30,12 +32,14 @@ function renderProjectName(name: string): ReactNode {
   const repo = name.slice(slashIdx + 1);
   return (
     <span className="flex flex-col leading-tight">
-      <span
+      <Text
+        variant="caption"
+        color="muted"
+        as="span"
         className="text-[10px]"
-        style={{ color: "var(--text-muted)" }}
       >
         {owner}
-      </span>
+      </Text>
       <span className="truncate">{repo}</span>
     </span>
   );
@@ -148,10 +152,10 @@ function FilterItem({
   onClick: () => void;
 }) {
   return (
-    <button
-      type="button"
+    <Button
+      variant="ghost"
       onClick={onClick}
-      className="flex items-center justify-between rounded-md px-3 py-2 text-left transition"
+      className="justify-between px-3 py-2 font-normal"
       style={{
         backgroundColor: active ? "var(--bg-surface-active)" : undefined,
         color: muted ? "var(--text-secondary)" : "var(--text-primary)",
@@ -166,9 +170,9 @@ function FilterItem({
         ) : null}
         <span className="truncate">{label}</span>
       </span>
-      <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+      <Text variant="caption" color="muted" as="span">
         {count}
-      </span>
-    </button>
+      </Text>
+    </Button>
   );
 }

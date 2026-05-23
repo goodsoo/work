@@ -1,5 +1,7 @@
 import { RefreshCw, X } from "lucide-react";
 import type { GhSyncProgress } from "../../hooks/usePortfolio";
+import { Button } from "../common/Button";
+import { Text } from "../common/Text";
 
 type Props = {
   state: GhSyncProgress;
@@ -14,12 +16,12 @@ export function SyncButton({ state, onRun, onCancel }: Props) {
     const pct =
       state.total > 0 ? Math.round((state.current / state.total) * 100) : 0;
     return (
-      <div
-        className="flex flex-col gap-1.5 rounded-md px-3 py-2 text-xs"
-        style={{
-          backgroundColor: "var(--bg-surface-active)",
-          color: "var(--text-secondary)",
-        }}
+      <Text
+        variant="caption"
+        color="secondary"
+        as="div"
+        className="flex flex-col gap-1.5 rounded-md px-3 py-2"
+        style={{ backgroundColor: "var(--bg-surface-active)" }}
       >
         <div className="flex items-center justify-between">
           <span>동기화 중...</span>
@@ -27,16 +29,16 @@ export function SyncButton({ state, onRun, onCancel }: Props) {
             <span>
               {state.current}/{state.total || "?"}
             </span>
-            <button
-              type="button"
+            <Button
+              variant="icon"
               onClick={onCancel}
               title="취소"
               aria-label="동기화 취소"
-              className="flex h-4 w-4 items-center justify-center rounded-sm transition"
+              className="h-4 w-4 rounded-sm p-0"
               style={{ color: "var(--text-secondary)" }}
             >
               <X className="h-3 w-3" />
-            </button>
+            </Button>
           </div>
         </div>
         <div
@@ -51,22 +53,18 @@ export function SyncButton({ state, onRun, onCancel }: Props) {
             }}
           />
         </div>
-      </div>
+      </Text>
     );
   }
 
   return (
-    <button
-      type="button"
+    <Button
+      variant="primary"
       onClick={onRun}
-      className="flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition"
-      style={{
-        backgroundColor: "var(--btn-primary)",
-        color: "var(--btn-primary-text)",
-      }}
+      leftIcon={<RefreshCw className="h-3.5 w-3.5" />}
+      className="px-3 py-2"
     >
-      <RefreshCw className="h-3.5 w-3.5" />
       동기화
-    </button>
+    </Button>
   );
 }

@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { formatAttendees, parseAttendees } from "../../lib/attendees";
+import { Button } from "../common/Button";
 
 type Props = {
   value: string;
@@ -105,18 +106,18 @@ export function AttendeeTagInput({
             style={{ color: "var(--text-primary)" }}
           >
             {tag}
-            <button
-              type="button"
+            <Button
+              variant="ghost"
               onClick={(e) => {
                 e.stopPropagation();
                 removeAt(i);
               }}
               aria-label={`${tag} 제거`}
-              className="rounded transition"
-              style={{ color: "var(--text-muted)", minHeight: 14, minWidth: 14 }}
+              className="p-0"
+              style={{ color: "var(--text-muted)", minWidth: 14 }}
             >
               <X className="h-3 w-3" />
-            </button>
+            </Button>
           </span>
         ))}
         <input
@@ -154,22 +155,21 @@ export function AttendeeTagInput({
         >
           {filtered.map((s, i) => (
             <li key={s}>
-              <button
-                type="button"
+              <Button
+                variant="ghost"
                 onMouseDown={(e) => {
                   e.preventDefault();
                   addTag(s);
                 }}
                 onMouseEnter={() => setHighlight(i)}
-                className="w-full px-3 py-1.5 text-left text-sm transition"
+                className="w-full justify-start rounded-none px-3 py-1.5 font-normal"
                 style={{
                   backgroundColor: i === highlight ? "var(--bg-surface)" : undefined,
                   color: i === highlight ? "var(--text-primary)" : "var(--text-secondary)",
-                  minHeight: 32,
                 }}
               >
                 {s}
-              </button>
+              </Button>
             </li>
           ))}
         </ul>

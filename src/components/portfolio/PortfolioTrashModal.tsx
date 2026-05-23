@@ -12,6 +12,10 @@ import { vaultAssetSrc } from "../../lib/portfolio/assetUrl";
 import { formatDateTimeKo } from "../../lib/dates";
 import { formatError } from "../../lib/errors";
 import { ConfirmDialog } from "../ConfirmDialog";
+import { Modal } from "../common/Modal";
+import { Button } from "../common/Button";
+import { Text } from "../common/Text";
+import { Chip } from "../common/Chip";
 
 const CATEGORY_LABEL: Record<string, string> = {
   ui_ux: "UI/UX",
@@ -31,11 +35,11 @@ const CATEGORY_COLOR: Record<string, string> = {
 // stamp → 표시용 ISO ms (TrashedPortfolioWork.deletedAt 에 이미 ms 변환되어 있음).
 
 type Props = {
-  isOpen: boolean;
+  open: boolean;
   onClose: () => void;
 };
 
-export function PortfolioTrashModal({ isOpen, onClose }: Props) {
+export function PortfolioTrashModal({ open, onClose }: Props) {
   const { data, isLoading } = useTrashedPortfolioWorks();
   const restore = useRestorePortfolioWork();
   const purge = usePurgePortfolioWork();
@@ -51,23 +55,12 @@ export function PortfolioTrashModal({ isOpen, onClose }: Props) {
   const confirmOpen = purgeTarget !== null || emptyConfirm;
 
   useEffect(() => {
-    if (!isOpen) return;
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape" && !confirmOpen) onClose();
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [isOpen, onClose, confirmOpen]);
-
-  useEffect(() => {
-    if (!isOpen) {
+    if (!open) {
       setError(null);
       setPurgeTarget(null);
       setEmptyConfirm(false);
     }
-  }, [isOpen]);
-
-  if (!isOpen) return null;
+  }, [open]);
 
   async function handleRestore(trashPath: string) {
     setError(null);
@@ -100,16 +93,14 @@ export function PortfolioTrashModal({ isOpen, onClose }: Props) {
   }
 
   return (
-    <div
-      onClick={onClose}
-      className="fixed inset-0 z-50 flex items-center justify-center p-6"
-      style={{ backgroundColor: "rgba(0,0,0,0.4)" }}
-      role="dialog"
-      aria-modal="true"
-      aria-label="휴지통"
+    <Modal
+      open={open}
+      onClose={onClose}
+      ariaLabel="휴지통"
+      dismissOnEscape={!confirmOpen}
+      dismissOnBackdrop={!confirmOpen}
     >
       <div
-        onClick={(e) => e.stopPropagation()}
         className="flex w-full max-w-2xl flex-col overflow-hidden rounded-xl"
         style={{
           background: "var(--bg-surface)",
@@ -131,50 +122,53 @@ export function PortfolioTrashModal({ isOpen, onClose }: Props) {
             <Trash2 className="h-4 w-4" style={{ color: "var(--text-secondary)" }} />
             휴지통
             {data && data.length > 0 ? (
-              <span
-                className="text-xs font-normal"
-                style={{ color: "var(--text-muted)" }}
+              <Text
+                variant="caption"
+                color="muted"
+                as="span"
+                weight="normal"
               >
                 {data.length}
-              </span>
+              </Text>
             ) : null}
             <div className="ml-auto flex items-center gap-1">
               {data && data.length > 0 ? (
-                <button
-                  type="button"
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={() => {
                     setError(null);
                     setEmptyConfirm(true);
                   }}
                   disabled={empty.isPending}
                   title="휴지통 비우기"
-                  className="rounded-md px-2 py-1 text-xs font-normal transition disabled:opacity-40"
+                  className="font-normal"
                   style={{
                     backgroundColor: "var(--accent-red-bg)",
                     color: "var(--accent-red-text)",
                     border: "1px solid var(--accent-red)",
-                    minHeight: 0,
                   }}
                 >
                   비우기
-                </button>
+                </Button>
               ) : null}
-              <button
-                type="button"
+              <Button
+                variant="icon"
                 onClick={onClose}
                 title="닫기  ESC"
                 aria-label="닫기"
-                className="flex h-7 w-7 items-center justify-center rounded-md transition"
                 style={{ color: "var(--text-muted)" }}
               >
                 <X className="h-4 w-4" />
-              </button>
+              </Button>
             </div>
           </div>
 
           {error ? (
-            <div
-              className="mx-3 mt-2 rounded px-2 py-1 text-xs"
+            <Text
+              variant="caption"
+              as="div"
+              className="mx-3 mt-2 rounded px-2 py-1"
               style={{
                 borderLeft: "2px solid var(--accent-red)",
                 backgroundColor: "var(--accent-red-bg)",
@@ -182,11 +176,13 @@ export function PortfolioTrashModal({ isOpen, onClose }: Props) {
               }}
             >
               {error}
-            </div>
+            </Text>
           ) : null}
 
           {data && data.length > 0 ? (
-            <div
+            <Text
+              variant="caption"
+              as="div"
               className="mx-3 mt-2 rounded-md px-2 py-1.5 text-[11px] leading-relaxed"
               style={{
                 backgroundColor: "var(--accent-blue-bg)",
@@ -198,7 +194,7 @@ export function PortfolioTrashModal({ isOpen, onClose }: Props) {
               생성됩니다. 부활 없이 안 보이게만 두려면 <strong>미사용</strong>
               으로 옮겨주세요. <strong>복원</strong> 누르면 자동으로 미사용
               자리로 돌아갑니다.
-            </div>
+            </Text>
           ) : null}
 
           <div className="min-h-0 flex-1 overflow-y-auto">
@@ -213,12 +209,14 @@ export function PortfolioTrashModal({ isOpen, onClose }: Props) {
                 ))}
               </div>
             ) : !data || data.length === 0 ? (
-              <div
-                className="px-4 py-8 text-center text-sm"
-                style={{ color: "var(--text-muted)" }}
+              <Text
+                variant="body"
+                color="muted"
+                as="div"
+                className="px-4 py-8 text-center"
               >
                 휴지통이 비어 있어요
-              </div>
+              </Text>
             ) : (
               <ul className="flex flex-col gap-2 p-3">
                 {data.map((t) => (
@@ -264,7 +262,7 @@ export function PortfolioTrashModal({ isOpen, onClose }: Props) {
         onConfirm={confirmEmpty}
         onCancel={() => setEmptyConfirm(false)}
       />
-    </div>
+    </Modal>
   );
 }
 
@@ -317,67 +315,61 @@ function TrashListItem({
         )}
       </div>
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <div
-          className="truncate text-sm font-semibold"
-          style={{ color: "var(--text-primary)" }}
+        <Text
+          variant="body"
+          weight="semibold"
+          as="div"
+          truncate
           title={title}
         >
           {title}
-        </div>
+        </Text>
         <div className="flex items-center gap-2">
-          <span
-            className="inline-flex items-center gap-1 rounded px-1 py-0.5 text-[10px]"
-            style={{
-              backgroundColor: "var(--bg-surface-hover)",
-              color: "var(--text-secondary)",
-            }}
-          >
-            <span
-              className="h-1.5 w-1.5 rounded-full"
-              style={{ backgroundColor: categoryColor }}
-            />
+          <Chip size="sm" dot={categoryColor}>
             {categoryLabel}
-          </span>
-          <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>
+          </Chip>
+          <Text
+            variant="caption"
+            color="muted"
+            as="span"
+            className="text-[11px]"
+          >
             {work.deletedAt
               ? `${formatDateTimeKo(new Date(work.deletedAt).toISOString())} 삭제`
               : ""}
-          </span>
+          </Text>
         </div>
       </div>
       <div className="flex shrink-0 items-center gap-1.5">
-        <button
-          type="button"
+        <Button
+          variant="secondary"
+          size="sm"
           onClick={onRestore}
           disabled={busy}
-          className="inline-flex h-7 items-center gap-1 rounded-md px-2 text-xs font-medium transition disabled:opacity-40"
+          leftIcon={<RotateCcw className="h-3.5 w-3.5" />}
           style={{
             backgroundColor: "var(--bg-surface-hover)",
             color: "var(--text-primary)",
-            border: "1px solid var(--border-default)",
-            minHeight: 0,
           }}
           title="미사용 자리로 복원 (평가 자료에는 포함 안 됨)"
         >
-          <RotateCcw className="h-3.5 w-3.5" />
           미사용 복원
-        </button>
-        <button
-          type="button"
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={onPurge}
           disabled={busy}
-          className="inline-flex h-7 items-center gap-1 rounded-md px-2 text-xs font-medium transition disabled:opacity-40"
+          leftIcon={<Trash2 className="h-3.5 w-3.5" />}
           style={{
             backgroundColor: "var(--accent-red-bg)",
             color: "var(--accent-red-text)",
             border: "1px solid var(--accent-red)",
-            minHeight: 0,
           }}
           title="영구 삭제"
         >
-          <Trash2 className="h-3.5 w-3.5" />
           삭제
-        </button>
+        </Button>
       </div>
     </li>
   );

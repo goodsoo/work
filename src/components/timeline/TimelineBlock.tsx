@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Text } from "../common/Text";
 
 type Props = {
   letter: "M" | "J" | "T" | "S";
@@ -19,13 +20,15 @@ export function TimelineBlock({ letter, children, onClick }: Props) {
       }`}
       style={onClick ? { minHeight: 0, padding: "0.25rem 0" } : undefined}
     >
-      <span
+      <Text
+        variant="caption"
+        color="muted"
+        as="span"
         aria-hidden
-        className="w-5 shrink-0 select-none pt-0.5 text-center font-mono text-xs"
-        style={{ color: "var(--text-muted)" }}
+        className="w-5 shrink-0 select-none pt-0.5 text-center font-mono"
       >
         {letter}
-      </span>
+      </Text>
       <div className="min-w-0 flex-1">{children}</div>
     </Wrapper>
   );

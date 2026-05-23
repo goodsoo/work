@@ -10,6 +10,9 @@ import type { Meeting } from "../../api/meetings";
 import { formatDateTimeKo } from "../../lib/dates";
 import { formatError } from "../../lib/errors";
 import { ConfirmDialog } from "../ConfirmDialog";
+import { Modal } from "../common/Modal";
+import { Button } from "../common/Button";
+import { Text } from "../common/Text";
 import { TrashPreview } from "./TrashPreview";
 
 // 휴지통 파일명 stamp prefix (`YYYY-MM-DDTHH-MM-SS-`) 는 디스크 표현이지 표시명이
@@ -20,11 +23,11 @@ function stripTrashStamp(title: string | null | undefined): string {
 }
 
 type Props = {
-  isOpen: boolean;
+  open: boolean;
   onClose: () => void;
 };
 
-export function TrashModal({ isOpen, onClose }: Props) {
+export function TrashModal({ open, onClose }: Props) {
   const { data, isLoading } = useDeletedMeetings();
   const restore = useRestoreMeeting();
   const purge = usePurgeMeeting();
@@ -36,37 +39,27 @@ export function TrashModal({ isOpen, onClose }: Props) {
 
   const confirmOpen = purgeTarget !== null || emptyConfirm;
 
-  // ESC 닫기 — confirm 열려있을 땐 ConfirmDialog 가 ESC 처리
-  useEffect(() => {
-    if (!isOpen) return;
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape" && !confirmOpen) onClose();
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [isOpen, onClose, confirmOpen]);
-
   // 모달 닫힐 때 state 리셋. 의도된 effect → state sync.
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
-    if (!isOpen) {
+    if (!open) {
       setSelectedId(null);
       setError(null);
       setPurgeTarget(null);
       setEmptyConfirm(false);
     }
-  }, [isOpen]);
+  }, [open]);
 
   // 첫 항목 auto-select + invalid selection fallback
   useEffect(() => {
-    if (!isOpen || !data) return;
+    if (!open || !data) return;
     if (data.length === 0) {
       if (selectedId !== null) setSelectedId(null);
       return;
     }
     const inList = selectedId && data.some((m) => m.id === selectedId);
     if (!inList) setSelectedId(data[0].id);
-  }, [isOpen, data, selectedId]);
+  }, [open, data, selectedId]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   async function handleRestore(id: string) {
@@ -105,8 +98,6 @@ export function TrashModal({ isOpen, onClose }: Props) {
     }
   }
 
-  if (!isOpen) return null;
-
   const selected = selectedId
     ? data?.find((m) => m.id === selectedId) ?? null
     : null;
@@ -116,20 +107,14 @@ export function TrashModal({ isOpen, onClose }: Props) {
     : false;
 
   return (
-    <div
-      // backdrop close: mousedown 시작점이 backdrop 자체일 때만. inner 안에서 시작한
-      // 드래그가 바깥에서 mouseup 되어 click 이 backdrop 으로 발사되는 케이스 차단.
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-      className="fixed inset-0 z-50 flex items-center justify-center p-6"
-      style={{ backgroundColor: "rgba(0,0,0,0.4)" }}
-      role="dialog"
-      aria-modal="true"
-      aria-label="휴지통"
+    <Modal
+      open={open}
+      onClose={onClose}
+      ariaLabel="휴지통"
+      dismissOnEscape={!confirmOpen}
+      dismissOnBackdrop={!confirmOpen}
     >
       <div
-        onClick={(e) => e.stopPropagation()}
         className="flex w-full max-w-5xl overflow-hidden rounded-xl"
         style={{
           background: "var(--bg-surface)",
@@ -156,36 +141,41 @@ export function TrashModal({ isOpen, onClose }: Props) {
             휴지통
             {data && data.length > 0 ? (
               <>
-                <span
-                  className="ml-auto text-xs font-normal"
-                  style={{ color: "var(--text-muted)" }}
+                <Text
+                  variant="caption"
+                  color="muted"
+                  as="span"
+                  weight="normal"
+                  className="ml-auto"
                 >
                   {data.length}
-                </span>
-                <button
-                  type="button"
+                </Text>
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={() => {
                     setError(null);
                     setEmptyConfirm(true);
                   }}
                   disabled={empty.isPending}
                   title="휴지통 비우기"
-                  className="rounded-md px-2 py-1 text-xs font-normal transition disabled:opacity-40"
+                  className="font-normal"
                   style={{
                     color: "var(--accent-red)",
                     border: "1px solid var(--border-default)",
-                    minHeight: 0,
                   }}
                 >
                   비우기
-                </button>
+                </Button>
               </>
             ) : null}
           </div>
 
           {error ? (
-            <div
-              className="mx-3 mt-2 rounded px-2 py-1 text-xs"
+            <Text
+              variant="caption"
+              as="div"
+              className="mx-3 mt-2 rounded px-2 py-1"
               style={{
                 borderLeft: "2px solid var(--accent-red)",
                 backgroundColor: "var(--accent-red-bg)",
@@ -193,7 +183,7 @@ export function TrashModal({ isOpen, onClose }: Props) {
               }}
             >
               {error}
-            </div>
+            </Text>
           ) : null}
 
           <div className="min-h-0 flex-1 overflow-y-auto">
@@ -208,12 +198,14 @@ export function TrashModal({ isOpen, onClose }: Props) {
                 ))}
               </div>
             ) : !data || data.length === 0 ? (
-              <div
-                className="px-4 py-8 text-center text-sm"
-                style={{ color: "var(--text-muted)" }}
+              <Text
+                variant="body"
+                color="muted"
+                as="div"
+                className="px-4 py-8 text-center"
               >
                 휴지통이 비어 있어요
-              </div>
+              </Text>
             ) : (
               <ul className="p-2">
                 {data.map((m) => (
@@ -235,61 +227,48 @@ export function TrashModal({ isOpen, onClose }: Props) {
             className="flex h-12 shrink-0 items-center justify-between gap-2 px-5"
             style={{ borderBottom: "1px solid var(--border-default)" }}
           >
-            <h2
-              className="truncate text-sm font-semibold"
-              style={{ color: "var(--text-primary)" }}
-            >
+            <Text variant="body" weight="semibold" as="h2" truncate>
               {selected
                 ? stripTrashStamp(selected.title).trim() || "(제목 없음)"
                 : "휴지통"}
-            </h2>
+            </Text>
             <div className="flex shrink-0 items-center gap-1">
               {selected ? (
                 <>
-                  <button
-                    type="button"
+                  <Button
+                    variant="secondary"
+                    size="sm"
                     onClick={() => handleRestore(selected.id)}
                     disabled={selectedBusy}
                     title="복원"
                     aria-label="복원"
-                    className="flex h-7 items-center gap-1 rounded-md px-2 text-xs transition disabled:opacity-40"
-                    style={{
-                      color: "var(--text-secondary)",
-                      border: "1px solid var(--border-default)",
-                      minHeight: 0,
-                    }}
+                    leftIcon={<RotateCcw className="h-3.5 w-3.5" />}
                   >
-                    <RotateCcw className="h-3.5 w-3.5" />
                     복원
-                  </button>
-                  <button
-                    type="button"
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
                     onClick={() => handlePurge(selected)}
                     disabled={selectedBusy}
                     title="영구 삭제"
                     aria-label="영구 삭제"
-                    className="flex h-7 items-center gap-1 rounded-md px-2 text-xs transition disabled:opacity-40"
-                    style={{
-                      color: "var(--accent-red)",
-                      border: "1px solid var(--border-default)",
-                      minHeight: 0,
-                    }}
+                    leftIcon={<Trash2 className="h-3.5 w-3.5" />}
+                    style={{ color: "var(--accent-red)" }}
                   >
-                    <Trash2 className="h-3.5 w-3.5" />
                     영구 삭제
-                  </button>
+                  </Button>
                 </>
               ) : null}
-              <button
-                type="button"
+              <Button
+                variant="icon"
                 onClick={onClose}
                 aria-label="닫기"
                 title="닫기  ESC"
-                className="flex h-7 w-7 items-center justify-center rounded-md transition"
                 style={{ color: "var(--text-muted)" }}
               >
                 <X className="h-4 w-4" />
-              </button>
+              </Button>
             </div>
           </header>
           <div className="min-h-0 flex-1 overflow-hidden">
@@ -322,7 +301,7 @@ export function TrashModal({ isOpen, onClose }: Props) {
         onConfirm={confirmEmpty}
         onCancel={() => setEmptyConfirm(false)}
       />
-    </div>
+    </Modal>
   );
 }
 
@@ -338,31 +317,30 @@ function DeletedMeetingItem({
   const displayTitle = stripTrashStamp(meeting.title).trim() || "(제목 없음)";
   return (
     <li className="list-none">
-      <button
-        type="button"
+      <Button
+        variant="ghost"
         onClick={onSelect}
-        className="w-full rounded-md px-3 py-2 text-left transition"
+        className="w-full flex-col items-start gap-0 px-3 py-2 text-left"
         style={{
           backgroundColor: selected ? "var(--bg-surface-active)" : undefined,
           color: selected ? "var(--text-primary)" : "var(--text-secondary)",
-          minHeight: 0,
         }}
       >
-        <div
-          className="truncate text-sm font-medium"
-          style={{ color: "var(--text-primary)" }}
-        >
+        <Text variant="body" weight="medium" as="div" truncate className="w-full">
           {displayTitle}
-        </div>
-        <div
-          className="mt-0.5 truncate text-xs"
-          style={{ color: "var(--text-muted)" }}
+        </Text>
+        <Text
+          variant="caption"
+          color="muted"
+          as="div"
+          truncate
+          className="mt-0.5 w-full"
         >
           {meeting.deleted_at
             ? `${formatDateTimeKo(meeting.deleted_at)} 삭제`
             : ""}
-        </div>
-      </button>
+        </Text>
+      </Button>
     </li>
   );
 }

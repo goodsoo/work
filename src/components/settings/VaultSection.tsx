@@ -1,7 +1,11 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
-import { FolderOpen, Loader2, Unlink } from "lucide-react";
+import { FolderOpen, Unlink } from "lucide-react";
 import { useVault } from "../../lib/vault/useVault";
+import { Button } from "../common/Button";
+import { Text } from "../common/Text";
+import { Modal } from "../common/Modal";
+import { Spinner } from "../common/Spinner";
 
 type Props = {
   onAfterSwitch?: () => void;
@@ -37,14 +41,19 @@ export function VaultSection({ onAfterSwitch }: Props) {
   return (
     <div className="space-y-4">
       <section>
-        <h3
-          className="mb-2 text-xs font-semibold uppercase tracking-wide"
-          style={{ color: "var(--text-muted)" }}
+        <Text
+          variant="caption"
+          color="muted"
+          as="h3"
+          weight="semibold"
+          className="mb-2 uppercase tracking-wide"
         >
           현재 vault
-        </h3>
-        <div
-          className="break-all rounded px-3 py-2 text-xs"
+        </Text>
+        <Text
+          variant="caption"
+          as="div"
+          className="break-all rounded px-3 py-2"
           style={{
             background: "var(--bg-base)",
             color: "var(--text-primary)",
@@ -53,50 +62,46 @@ export function VaultSection({ onAfterSwitch }: Props) {
           }}
         >
           {vaultRoot ?? "(없음)"}
-        </div>
+        </Text>
       </section>
 
       <section className="space-y-2">
         <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
+          <Button
+            variant="primary"
             disabled={busy}
             onClick={changeVault}
-            className="inline-flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition hover:opacity-90 active:opacity-80 disabled:cursor-not-allowed disabled:opacity-50"
-            style={{
-              background: "var(--btn-primary)",
-              color: "var(--btn-primary-text)",
-            }}
+            leftIcon={
+              busy ? (
+                <Spinner size="md" />
+              ) : (
+                <FolderOpen className="h-4 w-4" />
+              )
+            }
+            className="rounded-lg px-3 py-2 active:opacity-80 disabled:opacity-50"
           >
-            {busy ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <FolderOpen className="h-4 w-4" />
-            )}
             {busy ? "전환 중…" : "다른 폴더로 변경"}
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            variant="secondary"
             disabled={busy}
             onClick={() => setConfirmDisconnect(true)}
-            className="inline-flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition hover:opacity-90 active:opacity-80 disabled:cursor-not-allowed disabled:opacity-50"
-            style={{
-              background: "var(--bg-base)",
-              color: "var(--text-secondary)",
-              border: "1px solid var(--border-default)",
-            }}
+            leftIcon={<Unlink className="h-4 w-4" />}
+            className="rounded-lg px-3 py-2 active:opacity-80 disabled:opacity-50"
+            style={{ background: "var(--bg-base)" }}
           >
-            <Unlink className="h-4 w-4" />
             연결 해제
-          </button>
+          </Button>
         </div>
-        <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+        <Text variant="caption" color="muted" as="p">
           새 폴더에 메모/일기/할 일 구조를 자동 생성. 옛 vault 의 파일은 그대로 남아있어요 (이동 X).
-        </p>
+        </Text>
 
         {error && (
-          <div
-            className="rounded px-3 py-2 text-sm"
+          <Text
+            variant="body"
+            as="div"
+            className="rounded px-3 py-2"
             style={{
               color: "var(--accent-red)",
               background: "var(--bg-base)",
@@ -104,7 +109,7 @@ export function VaultSection({ onAfterSwitch }: Props) {
             }}
           >
             {error}
-          </div>
+          </Text>
         )}
       </section>
 
@@ -128,58 +133,44 @@ function DisconnectConfirmModal({
   onConfirm: () => void;
   onCancel: () => void;
 }) {
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onCancel();
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onCancel]);
-
   return (
-    <div
-      onClick={onCancel}
+    <Modal
+      open
+      onClose={onCancel}
+      ariaLabel="vault 연결 해제"
       className="fixed inset-0 z-[60] flex items-center justify-center p-6"
-      style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
-      role="dialog"
-      aria-modal="true"
     >
       <div
-        onClick={(e) => e.stopPropagation()}
         className="w-full max-w-md rounded-xl p-5"
         style={{
           background: "var(--bg-surface)",
           border: "1px solid var(--border-default)",
         }}
       >
-        <h3
-          className="mb-2 text-sm font-semibold"
-          style={{ color: "var(--text-primary)" }}
-        >
+        <Text variant="body" weight="semibold" as="h3" className="mb-2">
           vault 연결 해제할까요?
-        </h3>
-        <p className="mb-4 text-sm" style={{ color: "var(--text-secondary)" }}>
+        </Text>
+        <Text variant="body" color="secondary" as="p" className="mb-4">
           폴더 안 파일은 그대로 남아있어요. 다시 사용하려면 vault 폴더를 다시 골라야 합니다.
-        </p>
+        </Text>
         <div className="flex items-center justify-end gap-2">
-          <button
-            type="button"
+          <Button
+            variant="ghost"
             onClick={onCancel}
-            className="cursor-pointer rounded px-3 py-1.5 text-sm transition hover:opacity-90 active:opacity-80"
+            className="px-3 py-1.5"
             style={{ color: "var(--text-secondary)" }}
           >
             취소
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            variant="danger"
             onClick={onConfirm}
-            className="inline-flex cursor-pointer items-center gap-1.5 rounded px-3 py-1.5 text-sm font-medium transition hover:opacity-90 active:opacity-80"
-            style={{ background: "var(--accent-red)", color: "white" }}
+            className="px-3 py-1.5"
           >
             해제
-          </button>
+          </Button>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }

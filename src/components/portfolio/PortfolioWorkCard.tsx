@@ -1,5 +1,8 @@
 import { useState } from "react";
 import { Eye, GitBranch, Trash2 } from "lucide-react";
+import { Button } from "../common/Button";
+import { Text } from "../common/Text";
+import { Chip } from "../common/Chip";
 import type { PortfolioProject, PortfolioWorkMeta } from "../../api/portfolio";
 import { formatDateShort } from "../../lib/dates";
 import { useVault } from "../../lib/vault/useVault";
@@ -110,8 +113,10 @@ export function PortfolioWorkCard({ work, projects }: Props) {
           )}
         </div>
         <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <span
-            className="line-clamp-2 text-sm leading-snug"
+          <Text
+            variant="body"
+            as="span"
+            className="line-clamp-2 leading-snug"
             style={{
               color: isEmpty ? "var(--text-muted)" : "var(--text-primary)",
               fontStyle: isEmpty ? "italic" : "normal",
@@ -120,95 +125,66 @@ export function PortfolioWorkCard({ work, projects }: Props) {
             title={fm.impact_summary || "한 줄 임팩트 추가 필요"}
           >
             {fm.impact_summary || "한 줄 임팩트 추가 필요"}
-          </span>
-          <span
-            className="truncate font-mono text-[11px]"
-            style={{ color: "var(--text-secondary)" }}
+          </Text>
+          <Text
+            variant="caption"
+            color="secondary"
+            as="span"
+            truncate
+            className="font-mono text-[11px]"
             title={fm.github_title}
           >
             {fm.github_title}
-          </span>
+          </Text>
           <div className="mt-auto flex flex-nowrap items-center gap-x-1.5 overflow-hidden pt-1">
             {dateLabel ? (
-              <span
-                className="inline-flex shrink-0 items-center whitespace-nowrap rounded-md px-1.5 py-0.5 text-[11px]"
-                style={{
-                  backgroundColor: "var(--bg-surface-hover)",
-                  color: "var(--text-secondary)",
-                }}
-                title={`병합일: ${fm.github_merged_at?.slice(0, 10) ?? ""}`}
-              >
+              <Chip title={`병합일: ${fm.github_merged_at?.slice(0, 10) ?? ""}`}>
                 {dateLabel}
-              </span>
+              </Chip>
             ) : null}
             {projectLabel ? (
-              <span
-                className="inline-flex shrink-0 items-center whitespace-nowrap rounded-md px-1.5 py-0.5 text-[11px]"
-                style={{
-                  backgroundColor: "var(--bg-surface-hover)",
-                  color: "var(--text-secondary)",
-                }}
-                title={fullProjectName ?? ""}
-              >
-                {projectLabel}
-              </span>
+              <Chip title={fullProjectName ?? ""}>{projectLabel}</Chip>
             ) : null}
-            <span
-              className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-1.5 py-0.5 text-[11px]"
-              style={{
-                backgroundColor: "var(--bg-surface-hover)",
-                color: "var(--text-secondary)",
-              }}
-              title={`카테고리: ${categoryLabel}`}
-            >
-              <span
-                className="h-1.5 w-1.5 shrink-0 rounded-full"
-                style={{ backgroundColor: categoryColor }}
-              />
+            <Chip dot={categoryColor} title={`카테고리: ${categoryLabel}`}>
               {categoryLabel}
-            </span>
-            <span
-              className="inline-flex shrink-0 items-center whitespace-nowrap rounded-md px-1.5 py-0.5 text-[11px]"
-              style={{
-                backgroundColor: "var(--bg-surface-hover)",
-                color: "var(--text-muted)",
-              }}
+            </Chip>
+            <Chip
+              style={{ color: "var(--text-muted)" }}
               title={`변경: +${fm.github_additions} −${fm.github_deletions} · ${fm.github_changed_files} files`}
             >
               +{fm.github_additions} −{fm.github_deletions}
-            </span>
+            </Chip>
           </div>
           <div className="flex items-center justify-end gap-1.5 pt-1.5">
-            <button
-              type="button"
+            <Button
+              variant="secondary"
+              size="sm"
               onClick={handleRestore}
-              className="inline-flex h-7 items-center gap-1 whitespace-nowrap rounded-md px-2 text-xs font-medium transition"
+              leftIcon={<Eye className="h-3.5 w-3.5" />}
+              className="whitespace-nowrap"
               style={{
                 backgroundColor: "var(--bg-surface-hover)",
                 color: "var(--text-primary)",
-                border: "1px solid var(--border-default)",
-                minHeight: 0,
               }}
               title="평가 자료에 포함"
             >
-              <Eye className="h-3.5 w-3.5" />
               복원
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={handleDelete}
-              className="inline-flex h-7 items-center gap-1 whitespace-nowrap rounded-md px-2 text-xs font-medium transition"
+              leftIcon={<Trash2 className="h-3.5 w-3.5" />}
+              className="whitespace-nowrap"
               style={{
                 backgroundColor: "var(--accent-red-bg)",
                 color: "var(--accent-red-text)",
                 border: "1px solid var(--accent-red)",
-                minHeight: 0,
               }}
               title="휴지통으로 보내기"
             >
-              <Trash2 className="h-3.5 w-3.5" />
               삭제
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -259,8 +235,10 @@ export function PortfolioWorkCard({ work, projects }: Props) {
         </div>
 
         <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <span
-            className="line-clamp-2 text-sm leading-snug"
+          <Text
+            variant="body"
+            as="span"
+            className="line-clamp-2 leading-snug"
             style={{
               color: isEmpty ? "var(--text-muted)" : "var(--text-primary)",
               fontStyle: isEmpty ? "italic" : "normal",
@@ -269,63 +247,35 @@ export function PortfolioWorkCard({ work, projects }: Props) {
             title={fm.impact_summary || "한 줄 임팩트 추가 필요"}
           >
             {fm.impact_summary || "한 줄 임팩트 추가 필요"}
-          </span>
-          <span
-            className="truncate font-mono text-[11px]"
-            style={{ color: "var(--text-secondary)" }}
+          </Text>
+          <Text
+            variant="caption"
+            color="secondary"
+            as="span"
+            truncate
+            className="font-mono text-[11px]"
             title={fm.github_title}
           >
             {fm.github_title}
-          </span>
+          </Text>
           <div className="mt-auto flex flex-nowrap items-center gap-x-1.5 overflow-hidden pt-1">
             {dateLabel ? (
-              <span
-                className="inline-flex shrink-0 items-center whitespace-nowrap rounded-md px-1.5 py-0.5 text-[11px]"
-                style={{
-                  backgroundColor: "var(--bg-surface-hover)",
-                  color: "var(--text-secondary)",
-                }}
-                title={`병합일: ${fm.github_merged_at?.slice(0, 10) ?? ""}`}
-              >
+              <Chip title={`병합일: ${fm.github_merged_at?.slice(0, 10) ?? ""}`}>
                 {dateLabel}
-              </span>
+              </Chip>
             ) : null}
             {projectLabel ? (
-              <span
-                className="inline-flex shrink-0 items-center whitespace-nowrap rounded-md px-1.5 py-0.5 text-[11px]"
-                style={{
-                  backgroundColor: "var(--bg-surface-hover)",
-                  color: "var(--text-secondary)",
-                }}
-                title={fullProjectName ?? ""}
-              >
-                {projectLabel}
-              </span>
+              <Chip title={fullProjectName ?? ""}>{projectLabel}</Chip>
             ) : null}
-            <span
-              className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-1.5 py-0.5 text-[11px]"
-              style={{
-                backgroundColor: "var(--bg-surface-hover)",
-                color: "var(--text-secondary)",
-              }}
-              title={`카테고리: ${categoryLabel}`}
-            >
-              <span
-                className="h-1.5 w-1.5 shrink-0 rounded-full"
-                style={{ backgroundColor: categoryColor }}
-              />
+            <Chip dot={categoryColor} title={`카테고리: ${categoryLabel}`}>
               {categoryLabel}
-            </span>
-            <span
-              className="inline-flex shrink-0 items-center whitespace-nowrap rounded-md px-1.5 py-0.5 text-[11px]"
-              style={{
-                backgroundColor: "var(--bg-surface-hover)",
-                color: "var(--text-muted)",
-              }}
+            </Chip>
+            <Chip
+              style={{ color: "var(--text-muted)" }}
               title={`변경: +${fm.github_additions} −${fm.github_deletions} · ${fm.github_changed_files} files`}
             >
               +{fm.github_additions} −{fm.github_deletions}
-            </span>
+            </Chip>
           </div>
         </div>
 

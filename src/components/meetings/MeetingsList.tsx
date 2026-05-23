@@ -2,6 +2,8 @@ import { Plus } from "lucide-react";
 import { useMeetings } from "../../hooks/useMeetings";
 import type { Meeting } from "../../api/meetings";
 import { PageHeader } from "../nav/PageHeader";
+import { Button } from "../common/Button";
+import { Text } from "../common/Text";
 
 type Props = {
   onSelect: (id: string) => void;
@@ -36,27 +38,20 @@ export function MeetingsList({ onSelect, onCreate, creating }: Props) {
     <>
       <PageHeader
         left={
-          <h2
-            className="text-lg font-semibold"
-            style={{ color: "var(--text-primary)" }}
-          >
+          <Text variant="h3" as="h2">
             메모장
-          </h2>
+          </Text>
         }
         right={
-          <button
-            type="button"
+          <Button
+            variant="primary"
             onClick={onCreate}
             disabled={creating}
-            className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition disabled:opacity-50"
-            style={{
-              backgroundColor: "var(--btn-primary)",
-              color: "var(--btn-primary-text)",
-            }}
+            leftIcon={<Plus className="h-4 w-4" />}
+            className="rounded-lg gap-1.5 px-3 py-1.5 disabled:opacity-50"
           >
-            <Plus className="h-4 w-4" />
             새 메모장
-          </button>
+          </Button>
         }
       />
       <div className="mx-auto w-full max-w-2xl px-5 pb-16 pt-5 lg:max-w-4xl">
@@ -79,12 +74,14 @@ export function MeetingsList({ onSelect, onCreate, creating }: Props) {
               />
             ))}
             {isFetching ? (
-              <li
-                className="pt-2 text-center text-xs"
-                style={{ color: "var(--text-muted)" }}
+              <Text
+                variant="caption"
+                color="muted"
+                as="li"
+                className="pt-2 text-center"
               >
                 새로고침 중...
-              </li>
+              </Text>
             ) : null}
           </ul>
         )}
@@ -96,36 +93,43 @@ export function MeetingsList({ onSelect, onCreate, creating }: Props) {
 function MeetingCard({ meeting, onClick }: { meeting: Meeting; onClick: () => void }) {
   return (
     <li>
-      <button
-        type="button"
+      <Button
+        variant="ghost"
         onClick={onClick}
-        className="block w-full rounded-lg p-4 text-left transition"
+        className="block w-full rounded-lg p-4 text-left font-normal"
         style={{
           border: "1px solid var(--border-default)",
           backgroundColor: "var(--bg-base)",
         }}
       >
         <div className="flex items-baseline justify-between gap-3">
-          <span
-            className="truncate text-base font-medium"
-            style={{ color: "var(--text-primary)" }}
+          <Text
+            variant="h4"
+            weight="medium"
+            as="span"
+            truncate
           >
             {meeting.title?.trim() || "(제목 없음)"}
-          </span>
-          <span
-            className="shrink-0 font-mono text-xs"
-            style={{ color: "var(--text-secondary)" }}
+          </Text>
+          <Text
+            variant="caption"
+            color="secondary"
+            as="span"
+            className="shrink-0 font-mono"
           >
             {formatDate(meeting.date)}
-          </span>
+          </Text>
         </div>
         {meeting.attendees ? (
-          <div
-            className="mt-1 truncate text-xs"
-            style={{ color: "var(--text-secondary)" }}
+          <Text
+            variant="caption"
+            color="secondary"
+            as="div"
+            truncate
+            className="mt-1"
           >
             {meeting.attendees}
-          </div>
+          </Text>
         ) : null}
         {(() => {
           const first =
@@ -135,15 +139,17 @@ function MeetingCard({ meeting, onClick }: { meeting: Meeting; onClick: () => vo
             meeting.content ??
             null;
           return first ? (
-            <p
-              className="mt-2 line-clamp-2 text-sm"
-              style={{ color: "var(--text-secondary)" }}
+            <Text
+              variant="body"
+              color="secondary"
+              as="p"
+              className="mt-2 line-clamp-2"
             >
               {snippet(first, 140)}
-            </p>
+            </Text>
           ) : null;
         })()}
-      </button>
+      </Button>
     </li>
   );
 }
@@ -165,26 +171,20 @@ function SkeletonList() {
 function EmptyState({ onCreate }: { onCreate: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center gap-4 px-4 py-16 text-center">
-      <h3
-        className="text-lg font-semibold"
-        style={{ color: "var(--text-primary)" }}
-      >
+      <Text variant="h3" as="h3">
         아직 메모장이 없어요
-      </h3>
-      <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+      </Text>
+      <Text variant="body" color="secondary" as="p">
         첫 회의를 기록해볼까요?
-      </p>
-      <button
-        type="button"
+      </Text>
+      <Button
+        variant="primary"
         onClick={onCreate}
-        className="mt-2 inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition"
-        style={{
-          backgroundColor: "var(--btn-primary)",
-          color: "var(--btn-primary-text)",
-        }}
+        leftIcon={<Plus className="h-4 w-4" />}
+        className="mt-2 rounded-lg gap-1.5 px-3 py-1.5"
       >
-        <Plus className="h-4 w-4" />새 메모장
-      </button>
+        새 메모장
+      </Button>
     </div>
   );
 }
@@ -197,23 +197,30 @@ function ErrorState({
   onRetry: () => void;
 }) {
   return (
-    <div
-      className="rounded-lg p-4 text-sm"
+    <Text
+      variant="body"
+      as="div"
+      className="rounded-lg p-4"
       style={{
         borderLeft: "4px solid var(--accent-red)",
         backgroundColor: "var(--accent-red-bg)",
         color: "var(--accent-red-text)",
       }}
     >
-      <div className="font-medium">목록을 불러오지 못했어요</div>
-      <div className="mt-1 font-mono text-xs opacity-80">{message}</div>
-      <button
-        type="button"
+      <Text variant="body" weight="medium" as="div">
+        목록을 불러오지 못했어요
+      </Text>
+      <Text variant="caption" as="div" className="mt-1 font-mono opacity-80">
+        {message}
+      </Text>
+      <Button
+        variant="ghost"
+        size="sm"
         onClick={onRetry}
-        className="mt-3 text-xs underline underline-offset-2"
+        className="mt-3 px-0 py-0 underline underline-offset-2 font-normal"
       >
         다시 시도
-      </button>
-    </div>
+      </Button>
+    </Text>
   );
 }

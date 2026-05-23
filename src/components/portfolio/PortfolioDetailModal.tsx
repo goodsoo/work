@@ -10,7 +10,6 @@ import {
   GitBranch,
   Sparkles,
   Check,
-  Loader2,
   Pencil,
 } from "lucide-react";
 import type {
@@ -30,6 +29,11 @@ import { buildPRPrompt, parsePRResponse } from "../../lib/clipboardPrompt";
 import { runClaude } from "../../lib/portfolio/claude";
 import { ResponsePasteArea } from "./ResponsePasteArea";
 import { ScreenshotDropzone } from "./ScreenshotDropzone";
+import { Modal } from "../common/Modal";
+import { Button } from "../common/Button";
+import { Text } from "../common/Text";
+import { Chip } from "../common/Chip";
+import { Spinner } from "../common/Spinner";
 
 const CATEGORY_LABEL: Record<PortfolioCategory, string> = {
   ui_ux: "UI/UX",
@@ -232,13 +236,14 @@ export function PortfolioDetailModal({ work, projects, onClose }: Props) {
   const currentShot = fm.screenshots[activeShot];
 
   return (
-    <div
-      onClick={handleClose}
-      className="fixed inset-0 z-50 flex items-center justify-center p-6"
-      style={{ backgroundColor: "var(--bg-overlay)" }}
+    <Modal
+      open
+      onClose={handleClose}
+      backdrop="overlay"
+      dismissOnEscape={false}
+      ariaLabel={fm.github_title}
     >
       <div
-        onClick={(e) => e.stopPropagation()}
         className="flex w-full max-w-5xl flex-col overflow-hidden rounded-xl"
         style={{
           backgroundColor: "var(--bg-base)",
@@ -251,82 +256,72 @@ export function PortfolioDetailModal({ work, projects, onClose }: Props) {
           className="flex items-center gap-3 border-b px-5 py-3"
           style={{ borderColor: "var(--border-subtle)" }}
         >
-          <span
-            className="inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs"
-            style={{
-              backgroundColor: "var(--bg-surface-hover)",
-              color: "var(--text-secondary)",
-            }}
+          <Text
+            variant="caption"
+            color="secondary"
+            as="span"
+            className="inline-flex items-center gap-1.5 rounded-md px-2 py-0.5"
+            style={{ backgroundColor: "var(--bg-surface-hover)" }}
           >
             <span
               className="h-1.5 w-1.5 rounded-full"
               style={{ backgroundColor: categoryColor }}
             />
             {categoryLabel}
-          </span>
-          <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+          </Text>
+          <Text variant="caption" color="muted" as="span">
             {fm.github_owner}/{fm.github_repo}
             {fm.github_pr_number > 0 ? ` · PR #${fm.github_pr_number}` : ""}
             {relTime ? ` · ${relTime}` : ""}
-          </span>
+          </Text>
           <div className="ml-auto flex items-center gap-1">
             {editing ? (
               <>
-                <button
-                  type="button"
+                <Button
+                  variant="primary"
+                  size="sm"
                   onClick={handleSaveEdit}
-                  className="inline-flex h-7 items-center gap-1 rounded-md px-2 text-xs font-medium transition"
-                  style={{
-                    backgroundColor: "var(--btn-primary)",
-                    color: "var(--btn-primary-text)",
-                    minHeight: 0,
-                  }}
+                  leftIcon={<Check className="h-3.5 w-3.5" />}
                   title="변경 저장"
                 >
-                  <Check className="h-3.5 w-3.5" />
                   수정 완료
-                </button>
-                <button
-                  type="button"
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
                   onClick={handleCancelEdit}
-                  className="inline-flex h-7 items-center gap-1 rounded-md px-2 text-xs font-medium transition"
                   style={{
                     backgroundColor: "var(--bg-surface-hover)",
                     color: "var(--text-primary)",
-                    border: "1px solid var(--border-default)",
-                    minHeight: 0,
                   }}
                   title="변경 버리기 (ESC)"
                 >
                   취소
-                </button>
+                </Button>
               </>
             ) : (
-              <button
-                type="button"
+              <Button
+                variant="secondary"
+                size="sm"
                 onClick={handleEnterEdit}
-                className="inline-flex h-7 items-center gap-1 rounded-md px-2 text-xs font-medium transition"
+                leftIcon={<Pencil className="h-3.5 w-3.5" />}
                 style={{
                   backgroundColor: "var(--bg-surface-hover)",
                   color: "var(--text-primary)",
-                  border: "1px solid var(--border-default)",
-                  minHeight: 0,
                 }}
                 title="편집 모드 진입"
               >
-                <Pencil className="h-3.5 w-3.5" />
                 편집
-              </button>
+              </Button>
             )}
-            <button
-              type="button"
+            <Button
+              variant="icon"
               onClick={handleClose}
               title="닫기 (ESC)"
-              className="flex h-8 w-8 items-center justify-center rounded-md transition"
               style={{ color: "var(--text-secondary)" }}
             >
               <X className="h-4 w-4" />
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -352,10 +347,10 @@ export function PortfolioDetailModal({ work, projects, onClose }: Props) {
                   {fm.screenshots.length > 1 ? (
                     <>
                       {activeShot > 0 ? (
-                        <button
-                          type="button"
+                        <Button
+                          variant="icon"
                           onClick={() => setActiveShot((i) => i - 1)}
-                          className="absolute left-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full transition"
+                          className="absolute left-2 top-1/2 h-8 w-8 -translate-y-1/2 rounded-full"
                           style={{
                             backgroundColor: "var(--bg-overlay)",
                             color: "var(--text-primary)",
@@ -363,13 +358,13 @@ export function PortfolioDetailModal({ work, projects, onClose }: Props) {
                           title="이전 (←)"
                         >
                           <ChevronLeft className="h-4 w-4" />
-                        </button>
+                        </Button>
                       ) : null}
                       {activeShot < fm.screenshots.length - 1 ? (
-                        <button
-                          type="button"
+                        <Button
+                          variant="icon"
                           onClick={() => setActiveShot((i) => i + 1)}
-                          className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full transition"
+                          className="absolute right-2 top-1/2 h-8 w-8 -translate-y-1/2 rounded-full"
                           style={{
                             backgroundColor: "var(--bg-overlay)",
                             color: "var(--text-primary)",
@@ -377,29 +372,29 @@ export function PortfolioDetailModal({ work, projects, onClose }: Props) {
                           title="다음 (→)"
                         >
                           <ChevronRight className="h-4 w-4" />
-                        </button>
+                        </Button>
                       ) : null}
-                      <div
+                      <Text
+                        variant="caption"
+                        color="secondary"
+                        as="div"
                         className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-md px-2 py-0.5 text-[11px]"
-                        style={{
-                          backgroundColor: "var(--bg-overlay)",
-                          color: "var(--text-secondary)",
-                        }}
+                        style={{ backgroundColor: "var(--bg-overlay)" }}
                       >
                         {activeShot + 1} / {fm.screenshots.length}
                         {currentShot.label ? ` · ${currentShot.label}` : ""}
-                      </div>
+                      </Text>
                     </>
                   ) : currentShot.label ? (
-                    <div
+                    <Text
+                      variant="caption"
+                      color="secondary"
+                      as="div"
                       className="absolute bottom-2 left-2 rounded-md px-2 py-0.5 text-[11px]"
-                      style={{
-                        backgroundColor: "var(--bg-overlay)",
-                        color: "var(--text-secondary)",
-                      }}
+                      style={{ backgroundColor: "var(--bg-overlay)" }}
                     >
                       {currentShot.label}
-                    </div>
+                    </Text>
                   ) : null}
                 </>
               ) : (
@@ -408,7 +403,9 @@ export function PortfolioDetailModal({ work, projects, onClose }: Props) {
                   style={{ color: "var(--text-muted)" }}
                 >
                   <GitBranch className="h-6 w-6" strokeWidth={1.5} />
-                  <span className="text-xs">스크린샷 없음 — 아래에서 드롭/클릭</span>
+                  <Text variant="caption" as="span">
+                    스크린샷 없음 — 아래에서 드롭/클릭
+                  </Text>
                 </div>
               )}
             </div>
@@ -417,11 +414,11 @@ export function PortfolioDetailModal({ work, projects, onClose }: Props) {
             {fm.screenshots.length > 1 ? (
               <div className="flex gap-2 overflow-x-auto">
                 {fm.screenshots.map((s, i) => (
-                  <button
+                  <Button
                     key={s.path + i}
-                    type="button"
+                    variant="ghost"
                     onClick={() => setActiveShot(i)}
-                    className="relative h-12 w-16 shrink-0 overflow-hidden rounded-md transition"
+                    className="relative h-12 w-16 shrink-0 overflow-hidden p-0"
                     style={{
                       border:
                         i === activeShot
@@ -435,7 +432,7 @@ export function PortfolioDetailModal({ work, projects, onClose }: Props) {
                       alt=""
                       className="h-full w-full object-cover"
                     />
-                  </button>
+                  </Button>
                 ))}
               </div>
             ) : null}
@@ -483,8 +480,11 @@ export function PortfolioDetailModal({ work, projects, onClose }: Props) {
                   }}
                 />
               ) : (
-                <div
-                  className="break-words text-sm font-semibold"
+                <Text
+                  variant="body"
+                  weight="semibold"
+                  as="div"
+                  className="break-words"
                   style={{
                     color: fm.impact_summary
                       ? "var(--text-primary)"
@@ -493,18 +493,19 @@ export function PortfolioDetailModal({ work, projects, onClose }: Props) {
                   }}
                 >
                   {fm.impact_summary || "한 줄 임팩트 추가 필요"}
-                </div>
+                </Text>
               )}
             </Field>
 
             <Field label="PR 제목">
               <div className="flex items-start gap-2">
-                <div
-                  className="min-w-0 flex-1 break-words text-sm"
-                  style={{ color: "var(--text-primary)" }}
+                <Text
+                  variant="body"
+                  as="div"
+                  className="min-w-0 flex-1 break-words"
                 >
                   {fm.github_title}
-                </div>
+                </Text>
                 {fm.github_pr_url ? (
                   <a
                     href={fm.github_pr_url}
@@ -542,19 +543,18 @@ export function PortfolioDetailModal({ work, projects, onClose }: Props) {
                   <option value="other">기타</option>
                 </select>
               ) : (
-                <div
-                  className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-sm"
-                  style={{
-                    backgroundColor: "var(--bg-surface-hover)",
-                    color: "var(--text-primary)",
-                  }}
+                <Text
+                  variant="body"
+                  as="div"
+                  className="inline-flex items-center gap-1.5 rounded-md px-2 py-1"
+                  style={{ backgroundColor: "var(--bg-surface-hover)" }}
                 >
                   <span
                     className="h-1.5 w-1.5 rounded-full"
                     style={{ backgroundColor: categoryColor }}
                   />
                   {categoryLabel}
-                </div>
+                </Text>
               )}
             </Field>
 
@@ -578,60 +578,53 @@ export function PortfolioDetailModal({ work, projects, onClose }: Props) {
                   ))}
                 </select>
               ) : (
-                <div
-                  className="text-sm"
-                  style={{
-                    color: fm.project
-                      ? "var(--text-primary)"
-                      : "var(--text-muted)",
-                  }}
+                <Text
+                  variant="body"
+                  as="div"
+                  color={fm.project ? "primary" : "muted"}
                 >
                   {fm.project
                     ? projects.find((p) => p.slug === fm.project)?.name ??
                       fm.project
                     : "분류안됨"}
-                </div>
+                </Text>
               )}
             </Field>
 
             {editing ? (
             <Field label="Claude 로 자동 채움">
               <div className="flex flex-col gap-2">
-                <button
-                  type="button"
+                <Button
+                  variant="primary"
                   onClick={handleClaudeRequest}
                   disabled={requesting || fullWork.isLoading}
-                  className="inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition disabled:opacity-60"
-                  style={{
-                    backgroundColor: "var(--btn-primary)",
-                    color: "var(--btn-primary-text)",
-                  }}
-                >
-                  {requesting ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Claude 에게 묻는 중…
-                    </>
-                  ) : fullWork.isLoading ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      PR 본문 로딩…
-                    </>
-                  ) : (
-                    <>
+                  leftIcon={
+                    requesting || fullWork.isLoading ? (
+                      <Spinner size="md" />
+                    ) : (
                       <Sparkles className="h-4 w-4" />
-                      Claude 한테 요청
-                    </>
-                  )}
-                </button>
-                <span
+                    )
+                  }
+                  className="px-3 py-2 disabled:opacity-60"
+                >
+                  {requesting
+                    ? "Claude 에게 묻는 중…"
+                    : fullWork.isLoading
+                      ? "PR 본문 로딩…"
+                      : "Claude 한테 요청"}
+                </Button>
+                <Text
+                  variant="caption"
+                  color="muted"
+                  as="span"
                   className="text-[11px]"
-                  style={{ color: "var(--text-muted)" }}
                 >
                   구독 사용량으로 호출. 본인 머신의 <code>claude</code> CLI 가 필요.
-                </span>
+                </Text>
                 {requestError ? (
-                  <div
+                  <Text
+                    variant="caption"
+                    as="div"
                     className="rounded-md px-2.5 py-1.5 text-[11px]"
                     style={{
                       backgroundColor: "var(--accent-red-bg)",
@@ -639,7 +632,7 @@ export function PortfolioDetailModal({ work, projects, onClose }: Props) {
                     }}
                   >
                     {requestError}
-                  </div>
+                  </Text>
                 ) : null}
 
                 {suggestion ? (
@@ -650,102 +643,96 @@ export function PortfolioDetailModal({ work, projects, onClose }: Props) {
                       border: "1px solid var(--border-default)",
                     }}
                   >
-                    <span
+                    <Text
+                      variant="caption"
+                      color="muted"
+                      as="span"
                       className="text-[10px] uppercase tracking-wider"
-                      style={{ color: "var(--text-muted)" }}
                     >
                       Claude 제안
-                    </span>
-                    <div
-                      className="text-sm font-semibold leading-snug"
-                      style={{ color: "var(--text-primary)" }}
+                    </Text>
+                    <Text
+                      variant="body"
+                      weight="semibold"
+                      as="div"
+                      className="leading-snug"
                     >
                       {suggestion.impact}
-                    </div>
+                    </Text>
                     <div className="flex items-center gap-2">
-                      <span
-                        className="inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 text-[11px]"
-                        style={{
-                          backgroundColor: "var(--bg-surface)",
-                          color: "var(--text-secondary)",
-                        }}
+                      <Chip
+                        dot={
+                          CATEGORY_COLOR[suggestion.category] ??
+                          "var(--cat-other)"
+                        }
+                        style={{ backgroundColor: "var(--bg-surface)" }}
                       >
-                        <span
-                          className="h-1.5 w-1.5 rounded-full"
-                          style={{
-                            backgroundColor:
-                              CATEGORY_COLOR[suggestion.category] ??
-                              "var(--cat-other)",
-                          }}
-                        />
                         {CATEGORY_LABEL[suggestion.category] ?? suggestion.category}
-                      </span>
+                      </Chip>
                     </div>
                     <div className="flex items-center gap-2 pt-1">
-                      <button
-                        type="button"
+                      <Button
+                        variant="primary"
+                        size="sm"
                         onClick={applySuggestion}
-                        className="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition"
-                        style={{
-                          backgroundColor: "var(--btn-primary)",
-                          color: "var(--btn-primary-text)",
-                        }}
+                        leftIcon={<Check className="h-3.5 w-3.5" />}
+                        className="px-2.5 py-1"
                       >
-                        <Check className="h-3.5 w-3.5" />
                         적용
-                      </button>
-                      <button
-                        type="button"
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        size="sm"
                         onClick={handleClaudeRequest}
                         disabled={requesting}
-                        className="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs transition disabled:opacity-50"
-                        style={{
-                          color: "var(--text-secondary)",
-                          border: "1px solid var(--border-default)",
-                        }}
+                        leftIcon={<Sparkles className="h-3.5 w-3.5" />}
+                        className="px-2.5 py-1 disabled:opacity-50"
                       >
-                        <Sparkles className="h-3.5 w-3.5" />
                         다시 요청
-                      </button>
-                      <button
-                        type="button"
+                      </Button>
+                      <Button
+                        variant="icon"
                         onClick={() => setSuggestion(null)}
-                        className="ml-auto flex h-7 w-7 items-center justify-center rounded-md transition"
+                        className="ml-auto"
                         style={{ color: "var(--text-muted)" }}
                         title="제안 닫기"
                       >
                         <X className="h-3.5 w-3.5" />
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 ) : null}
 
                 <details className="mt-1">
-                  <summary
+                  <Text
+                    variant="caption"
+                    color="muted"
+                    as="summary"
                     className="cursor-pointer text-[11px]"
-                    style={{ color: "var(--text-muted)" }}
                   >
                     직접 입력 (수동 paste)
-                  </summary>
+                  </Text>
                   <div className="mt-2 flex flex-col gap-2">
-                    <button
-                      type="button"
+                    <Button
+                      variant="secondary"
+                      size="sm"
                       onClick={handleCopyPrompt}
                       disabled={fullWork.isLoading}
-                      className="inline-flex items-center gap-1.5 self-start rounded-md px-2.5 py-1 text-xs font-medium transition disabled:opacity-50"
+                      leftIcon={
+                        promptCopied ? (
+                          <Check className="h-3.5 w-3.5" />
+                        ) : (
+                          <Sparkles className="h-3.5 w-3.5" />
+                        )
+                      }
+                      className="self-start px-2.5 py-1 disabled:opacity-50"
                       style={{
                         backgroundColor: "var(--bg-surface-hover)",
                         color: "var(--text-primary)",
-                        border: "1px solid var(--border-default)",
                       }}
                     >
-                      {promptCopied ? (
-                        <Check className="h-3.5 w-3.5" />
-                      ) : (
-                        <Sparkles className="h-3.5 w-3.5" />
-                      )}
                       {promptCopied ? "복사됨" : "프롬프트 복사"}
-                    </button>
+                    </Button>
                     <ResponsePasteArea
                       onParsed={(impact, category) => {
                         setImpactDraft(impact);
@@ -758,12 +745,12 @@ export function PortfolioDetailModal({ work, projects, onClose }: Props) {
             </Field>
             ) : null}
 
-            <div
+            <Text
+              variant="caption"
+              color="muted"
+              as="div"
               className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 border-t pt-3 text-[11px]"
-              style={{
-                borderColor: "var(--border-subtle)",
-                color: "var(--text-muted)",
-              }}
+              style={{ borderColor: "var(--border-subtle)" }}
             >
               <span>변경:</span>
               <span>
@@ -776,7 +763,7 @@ export function PortfolioDetailModal({ work, projects, onClose }: Props) {
                   <span>{fm.github_merged_at.slice(0, 10)}</span>
                 </>
               ) : null}
-            </div>
+            </Text>
 
           </div>
           {/* footer — scroll 밖, 항상 보임. solid 스타일 (Claude 요청 버튼 계열과 통일). */}
@@ -784,45 +771,44 @@ export function PortfolioDetailModal({ work, projects, onClose }: Props) {
             className="flex shrink-0 items-center justify-end gap-2 border-t px-4 py-3"
             style={{ borderColor: "var(--border-subtle)" }}
           >
-            <button
-              type="button"
+            <Button
+              variant="secondary"
+              size="sm"
               onClick={handleIncludedToggle}
-              className="inline-flex h-7 items-center gap-1 rounded-md px-2 text-xs font-medium transition"
+              leftIcon={
+                fm.included ? (
+                  <EyeOff className="h-3.5 w-3.5" />
+                ) : (
+                  <Eye className="h-3.5 w-3.5" />
+                )
+              }
               style={{
                 backgroundColor: "var(--bg-surface-hover)",
                 color: "var(--text-primary)",
-                border: "1px solid var(--border-default)",
-                minHeight: 0,
               }}
               title={fm.included ? "평가 자료에서 제외" : "평가 자료에 포함"}
             >
-              {fm.included ? (
-                <EyeOff className="h-3.5 w-3.5" />
-              ) : (
-                <Eye className="h-3.5 w-3.5" />
-              )}
               {fm.included ? "미사용" : "포함"}
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={handleDelete}
-              className="inline-flex h-7 items-center gap-1 rounded-md px-2 text-xs font-medium transition"
+              leftIcon={<Trash2 className="h-3.5 w-3.5" />}
               style={{
                 backgroundColor: "var(--accent-red-bg)",
                 color: "var(--accent-red-text)",
                 border: "1px solid var(--accent-red)",
-                minHeight: 0,
               }}
               title="휴지통으로 보내기"
             >
-              <Trash2 className="h-3.5 w-3.5" />
               삭제
-            </button>
+            </Button>
           </div>
           </div>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -835,12 +821,14 @@ function Field({
 }) {
   return (
     <div className="flex flex-col gap-1">
-      <span
+      <Text
+        variant="caption"
+        color="muted"
+        as="span"
         className="text-[11px] uppercase tracking-wider"
-        style={{ color: "var(--text-muted)" }}
       >
         {label}
-      </span>
+      </Text>
       {children}
     </div>
   );

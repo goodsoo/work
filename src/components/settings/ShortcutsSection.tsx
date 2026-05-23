@@ -1,4 +1,6 @@
 import { isTauri } from "../../lib/isTauri";
+import { Text } from "../common/Text";
+import { Kbd } from "../common/Kbd";
 
 type Shortcut = {
   keys: string[];
@@ -76,25 +78,30 @@ export function ShortcutsSection() {
   return (
     <div className="space-y-5">
       {!isTauri && (
-        <p
-          className="text-xs px-3 py-2 rounded"
+        <Text
+          variant="caption"
+          color="secondary"
+          as="p"
+          className="rounded px-3 py-2"
           style={{
-            color: "var(--text-secondary)",
             background: "var(--bg-base)",
             border: "1px solid var(--border-subtle)",
           }}
         >
           단축키는 데스크탑 앱 (Tauri) 전용. 브라우저에선 시스템 단축키와 충돌해 동작하지 않아요.
-        </p>
+        </Text>
       )}
       {GROUPS.map((group) => (
         <section key={group.title}>
-          <h3
-            className="mb-2 text-xs font-semibold uppercase tracking-wide"
-            style={{ color: "var(--text-muted)" }}
+          <Text
+            variant="caption"
+            color="muted"
+            as="h3"
+            weight="semibold"
+            className="mb-2 uppercase tracking-wide"
           >
             {group.title}
-          </h3>
+          </Text>
           <ul className="grid grid-cols-[repeat(auto-fit,minmax(240px,1fr))] gap-x-6">
             {group.items.map((s) => (
               <li
@@ -103,35 +110,32 @@ export function ShortcutsSection() {
                 style={{ borderBottom: "1px solid var(--border-default)" }}
               >
                 <div className="min-w-0 flex-1">
-                  <span
-                    className="text-sm"
-                    style={{ color: "var(--text-primary)" }}
-                  >
+                  <Text variant="body" as="span">
                     {s.label}
-                  </span>
+                  </Text>
                   {s.note && (
-                    <span
-                      className="ml-2 text-xs"
-                      style={{ color: "var(--text-muted)" }}
+                    <Text
+                      variant="caption"
+                      color="muted"
+                      as="span"
+                      className="ml-2"
                     >
                       {s.note}
-                    </span>
+                    </Text>
                   )}
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
                   {s.keys.map((k, i) => (
-                    <kbd
+                    <Kbd
                       key={i}
-                      className="inline-flex h-6 min-w-[1.5rem] items-center justify-center rounded px-1.5 text-xs font-medium"
+                      className="h-6 min-w-[1.5rem] px-1.5 text-xs"
                       style={{
-                        background: "var(--bg-base)",
-                        border: "1px solid var(--border-default)",
+                        backgroundColor: "var(--bg-base)",
                         color: "var(--text-secondary)",
-                        fontFamily: "ui-monospace, SFMono-Regular, monospace",
                       }}
                     >
                       {k}
-                    </kbd>
+                    </Kbd>
                   ))}
                 </div>
               </li>

@@ -1,6 +1,10 @@
 import { useEffect, useState } from "react";
-import { Archive, Loader2, Trash2 } from "lucide-react";
+import { Archive, Trash2 } from "lucide-react";
 import { useVault } from "../../lib/vault/useVault";
+import { Button } from "../common/Button";
+import { Text } from "../common/Text";
+import { Modal } from "../common/Modal";
+import { Spinner } from "../common/Spinner";
 import {
   runBackup,
   listBackups,
@@ -104,35 +108,36 @@ export function BackupSection() {
   return (
     <div className="space-y-6">
       <section className="space-y-2">
-        <button
-          type="button"
+        <Button
+          variant="primary"
           onClick={handleManualBackup}
           disabled={running}
-          className="inline-flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition hover:opacity-90 active:opacity-80 disabled:cursor-not-allowed disabled:opacity-50"
-          style={{
-            background: "var(--btn-primary)",
-            color: "var(--btn-primary-text)",
-          }}
+          leftIcon={
+            running ? (
+              <Spinner size="md" />
+            ) : (
+              <Archive className="h-4 w-4" />
+            )
+          }
+          className="rounded-lg px-3 py-2 active:opacity-80 disabled:opacity-50"
         >
-          {running ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Archive className="h-4 w-4" />
-          )}
           {running ? "백업 중…" : "지금 백업"}
-        </button>
-        <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+        </Button>
+        <Text variant="caption" color="muted" as="p">
           vault 안 <code>.backups/</code> 폴더에 zip 으로 저장됩니다.
-        </p>
+        </Text>
       </section>
 
       <section className="space-y-2">
-        <h3
-          className="text-xs font-semibold uppercase tracking-wide"
-          style={{ color: "var(--text-muted)" }}
+        <Text
+          variant="caption"
+          color="muted"
+          as="h3"
+          weight="semibold"
+          className="uppercase tracking-wide"
         >
           자동 백업
-        </h3>
+        </Text>
         <label className="flex cursor-pointer items-center gap-2 text-sm" style={{ color: "var(--text-primary)" }}>
           <input
             type="checkbox"
@@ -143,7 +148,11 @@ export function BackupSection() {
         </label>
         {cfg.enabled && (
           <div className="flex items-end gap-4 pl-6 pt-1">
-            <label className="text-xs" style={{ color: "var(--text-secondary)" }}>
+            <Text
+              variant="caption"
+              color="secondary"
+              as="label"
+            >
               <span className="mb-1 block">주기</span>
               <select
                 value={cfg.intervalDays}
@@ -160,10 +169,15 @@ export function BackupSection() {
                 <option value={3}>3일</option>
                 <option value={7}>7일</option>
               </select>
-            </label>
-            <p className="pb-1.5 text-xs" style={{ color: "var(--text-muted)" }}>
+            </Text>
+            <Text
+              variant="caption"
+              color="muted"
+              as="p"
+              className="pb-1.5"
+            >
               최근 {BACKUP_KEEP_COUNT}개까지 보관
-            </p>
+            </Text>
           </div>
         )}
       </section>
@@ -179,20 +193,23 @@ export function BackupSection() {
       )}
 
       <section>
-        <h3
-          className="mb-2 text-xs font-semibold uppercase tracking-wide"
-          style={{ color: "var(--text-muted)" }}
+        <Text
+          variant="caption"
+          color="muted"
+          as="h3"
+          weight="semibold"
+          className="mb-2 uppercase tracking-wide"
         >
           최근 백업{entries.length > 0 ? ` (${entries.length})` : ""}
-        </h3>
+        </Text>
         {loading ? (
-          <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+          <Text variant="body" color="muted" as="p">
             불러오는 중…
-          </p>
+          </Text>
         ) : entries.length === 0 ? (
-          <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+          <Text variant="body" color="muted" as="p">
             백업 없음. 위 버튼으로 시작하세요.
-          </p>
+          </Text>
         ) : (
           <ul className="space-y-0.5">
             {entries.map((e) => (
@@ -201,29 +218,23 @@ export function BackupSection() {
                 className="flex items-center justify-between gap-3 rounded px-2 py-1.5"
               >
                 <div className="min-w-0">
-                  <div
-                    className="text-sm"
-                    style={{ color: "var(--text-primary)" }}
-                  >
+                  <Text variant="body" as="div">
                     {formatBackupDate(e.mtime)}
-                  </div>
-                  <div
-                    className="text-xs"
-                    style={{ color: "var(--text-muted)" }}
-                  >
+                  </Text>
+                  <Text variant="caption" color="muted" as="div">
                     {formatSize(e.size)}
-                  </div>
+                  </Text>
                 </div>
-                <button
-                  type="button"
+                <Button
+                  variant="icon"
                   onClick={() => handleDelete(e.path)}
                   aria-label="삭제"
                   title="삭제"
-                  className="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded transition hover:opacity-90"
+                  className="shrink-0"
                   style={{ color: "var(--text-muted)" }}
                 >
                   <Trash2 className="h-3.5 w-3.5" />
-                </button>
+                </Button>
               </li>
             ))}
           </ul>
@@ -231,8 +242,10 @@ export function BackupSection() {
       </section>
 
       {error && (
-        <div
-          className="rounded px-3 py-2 text-sm"
+        <Text
+          variant="body"
+          as="div"
+          className="rounded px-3 py-2"
           style={{
             color: "var(--accent-red)",
             background: "var(--bg-base)",
@@ -240,7 +253,7 @@ export function BackupSection() {
           }}
         >
           {error}
-        </div>
+        </Text>
       )}
     </div>
   );
@@ -285,64 +298,64 @@ function BackupConfirmModal({
   const confirmLabel = "삭제 후 백업";
 
   return (
-    <div
-      onClick={() => !running && onCancel()}
+    <Modal
+      open
+      onClose={() => !running && onCancel()}
+      ariaLabel={title}
       className="fixed inset-0 z-[60] flex items-center justify-center p-6"
-      style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
-      role="dialog"
-      aria-modal="true"
+      dismissOnEscape={!running}
+      dismissOnBackdrop={!running}
     >
       <div
-        onClick={(e) => e.stopPropagation()}
         className="w-full max-w-md rounded-xl p-5"
         style={{
           background: "var(--bg-surface)",
           border: "1px solid var(--border-default)",
         }}
       >
-        <h3
-          className="mb-2 text-sm font-semibold"
-          style={{ color: "var(--text-primary)" }}
-        >
+        <Text variant="body" weight="semibold" as="h3" className="mb-2">
           {title}
-        </h3>
-        <p className="mb-3 text-sm" style={{ color: "var(--text-secondary)" }}>
+        </Text>
+        <Text variant="body" color="secondary" as="p" className="mb-3">
           {desc}
-        </p>
-        <ul
-          className="mb-4 max-h-40 space-y-0.5 overflow-y-auto rounded px-3 py-2 text-xs"
+        </Text>
+        <Text
+          variant="caption"
+          color="muted"
+          as="ul"
+          className="mb-4 max-h-40 space-y-0.5 overflow-y-auto rounded px-3 py-2"
           style={{
             background: "var(--bg-base)",
-            color: "var(--text-muted)",
             border: "1px solid var(--border-subtle)",
           }}
         >
           {candidates.map((c) => (
             <li key={c.path}>{c.filename}</li>
           ))}
-        </ul>
+        </Text>
         <div className="flex items-center justify-end gap-2">
-          <button
-            type="button"
+          <Button
+            variant="ghost"
             onClick={onCancel}
             disabled={running}
-            className="cursor-pointer rounded px-3 py-1.5 text-sm transition hover:opacity-90 active:opacity-80 disabled:cursor-not-allowed disabled:opacity-50"
+            className="px-3 py-1.5"
             style={{ color: "var(--text-secondary)" }}
           >
             취소
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            variant="danger"
             onClick={onConfirm}
             disabled={running}
-            className="inline-flex cursor-pointer items-center gap-1.5 rounded px-3 py-1.5 text-sm font-medium transition hover:opacity-90 active:opacity-80 disabled:cursor-not-allowed disabled:opacity-50"
-            style={{ background: "var(--accent-red)", color: "white" }}
+            leftIcon={
+              running ? <Spinner size="sm" /> : null
+            }
+            className="px-3 py-1.5"
           >
-            {running && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
             {confirmLabel}
-          </button>
+          </Button>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }

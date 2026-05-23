@@ -1,5 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { Ban, X } from "lucide-react";
+import { Button } from "./common/Button";
+import { Text } from "./common/Text";
 
 // 글로벌 toast — 어느 컴포넌트에서나 `useToast().show("...")` 로 우측하단 frost
 // 카드 띄움. MeetingForm 의 자체 actionError toast 와 같은 디자인 (var(--surface-frost)).
@@ -82,23 +84,25 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 <span className="min-w-0 flex-1 truncate font-semibold">
                   ERROR
                 </span>
-                <button
-                  type="button"
+                <Button
+                  variant="icon"
                   onClick={() => dismiss(t.id)}
                   title="닫기"
                   aria-label="닫기"
-                  className="shrink-0 rounded p-0.5 transition"
-                  style={{ color: "var(--text-muted)", minHeight: 0 }}
+                  className="shrink-0 p-0.5"
+                  style={{ color: "var(--text-muted)" }}
                 >
                   <X className="h-3.5 w-3.5" />
-                </button>
+                </Button>
               </div>
-              <div
-                className="text-xs break-all wrap-anywhere"
-                style={{ color: "var(--text-secondary)" }}
+              <Text
+                variant="caption"
+                color="secondary"
+                as="div"
+                className="break-all wrap-anywhere"
               >
                 {t.message}
-              </div>
+              </Text>
             </div>
           ))}
         </div>

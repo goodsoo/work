@@ -3,6 +3,8 @@ import { addDays } from "date-fns";
 import { BookOpen } from "lucide-react";
 import { todayIso, isToday } from "../../lib/dates";
 import { categoryColor } from "../../lib/todoCategory";
+import { Button } from "../common/Button";
+import { Text } from "../common/Text";
 import type { Meeting } from "../../api/meetings";
 import type { Journal } from "../../api/journals";
 import type { Todo, TodoCategory } from "../../api/todos";
@@ -86,44 +88,51 @@ export function MonthGrid({
         const inCurrentMonth = year === currentYear && month === currentMonth;
 
         return (
-          <button
+          <Button
             key={date}
-            type="button"
+            variant="ghost"
             onClick={() => onDayClick(date)}
-            className="relative flex flex-col overflow-hidden px-1 py-0.5 text-left transition"
+            className="relative flex-col items-start overflow-hidden rounded-none px-1 py-0.5"
             style={{
               borderBottom: "1px solid var(--border-subtle)",
               borderRight: "1px solid var(--border-subtle)",
               backgroundColor: selected ? "var(--bg-surface)" : undefined,
               opacity: inCurrentMonth ? 1 : 0.35,
-              minHeight: 0,
               scrollSnapAlign: snapHere ? "start" : undefined,
             }}
           >
             {/* Date number (with month label on day 1) */}
             <div className="flex shrink-0 items-baseline gap-1">
               {today ? (
-                <span
-                  className="flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-bold"
+                <Text
+                  variant="caption"
+                  as="span"
+                  weight="bold"
+                  className="flex h-5 w-5 items-center justify-center rounded-full text-[11px]"
                   style={{
                     backgroundColor: "var(--accent-red)",
                     color: "var(--text-inverse)",
                   }}
                 >
                   {dayNum}
-                </span>
+                </Text>
               ) : (
                 <>
                   {isFirstOfMonth ? (
-                    <span
-                      className="text-[10px] font-semibold"
-                      style={{ color: "var(--text-secondary)" }}
+                    <Text
+                      variant="caption"
+                      color="secondary"
+                      as="span"
+                      weight="semibold"
+                      className="text-[10px]"
                     >
                       {month}월
-                    </span>
+                    </Text>
                   ) : null}
-                  <span
-                    className={`px-0.5 text-xs ${weekday === 0 ? "text-red-500" : ""}`}
+                  <Text
+                    variant="caption"
+                    as="span"
+                    className={`px-0.5 ${weekday === 0 ? "text-red-500" : ""}`}
                     style={
                       weekday === 0
                         ? undefined
@@ -131,7 +140,7 @@ export function MonthGrid({
                     }
                   >
                     {dayNum}
-                  </span>
+                  </Text>
                 </>
               )}
             </div>
@@ -195,7 +204,7 @@ export function MonthGrid({
                 </div>
               ) : null}
             </div>
-          </button>
+          </Button>
         );
       })}
     </div>

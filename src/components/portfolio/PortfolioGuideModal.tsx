@@ -1,13 +1,16 @@
-import { useEffect } from "react";
 import {
   BookOpen,
-  Loader2,
   RefreshCcw,
   Sparkles,
   Wand2,
   X,
 } from "lucide-react";
 import { ClipPromptButton } from "../common/ClipPromptButton";
+import { Modal } from "../common/Modal";
+import { Button } from "../common/Button";
+import { Text } from "../common/Text";
+import { Kbd as KbdCommon } from "../common/Kbd";
+import { Spinner } from "../common/Spinner";
 import {
   buildLegacyCardPrompt,
   buildPRGuidePrompt,
@@ -15,7 +18,7 @@ import {
 import { useVault } from "../../lib/vault/useVault";
 
 type Props = {
-  isOpen: boolean;
+  open: boolean;
   onClose: () => void;
   onFullSyncRun: () => void;
   fullSyncRunning: boolean;
@@ -24,35 +27,16 @@ type Props = {
 // "내 작업" 탭의 가이드북 — 동기화 방식, Claude 자동 채움, 프롬프트 도구.
 // 사이드바 헤더의 BookOpen 아이콘 버튼이 열어줌. 메모장 TrashModal 패턴 동일.
 export function PortfolioGuideModal({
-  isOpen,
+  open,
   onClose,
   onFullSyncRun,
   fullSyncRunning,
 }: Props) {
   const { vaultRoot } = useVault();
 
-  useEffect(() => {
-    if (!isOpen) return;
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [isOpen, onClose]);
-
-  if (!isOpen) return null;
-
   return (
-    <div
-      onClick={onClose}
-      className="fixed inset-0 z-50 flex items-center justify-center p-6"
-      style={{ backgroundColor: "rgba(0,0,0,0.4)" }}
-      role="dialog"
-      aria-modal="true"
-      aria-label="내 작업 가이드북"
-    >
+    <Modal open={open} onClose={onClose} ariaLabel="내 작업 가이드북">
       <div
-        onClick={(e) => e.stopPropagation()}
         className="flex w-full max-w-2xl flex-col overflow-hidden rounded-xl"
         style={{
           background: "var(--bg-surface)",
@@ -69,22 +53,19 @@ export function PortfolioGuideModal({
             className="h-4 w-4"
             style={{ color: "var(--text-secondary)" }}
           />
-          <h2
-            className="text-sm font-semibold"
-            style={{ color: "var(--text-primary)" }}
-          >
+          <Text variant="body" weight="semibold" as="h2">
             내 작업 가이드북
-          </h2>
-          <button
-            type="button"
+          </Text>
+          <Button
+            variant="icon"
             onClick={onClose}
             title="닫기  ESC"
             aria-label="닫기"
-            className="ml-auto flex h-7 w-7 items-center justify-center rounded-md transition"
+            className="ml-auto"
             style={{ color: "var(--text-muted)" }}
           >
             <X className="h-4 w-4" />
-          </button>
+          </Button>
         </div>
 
         {/* 본문 — 스크롤 */}
@@ -115,50 +96,49 @@ export function PortfolioGuideModal({
               }}
             >
               <div className="flex items-center gap-2">
-                <button
-                  type="button"
+                <Button
+                  variant="primary"
+                  size="sm"
                   onClick={onFullSyncRun}
                   disabled={fullSyncRunning}
-                  className="inline-flex h-7 items-center gap-1 rounded-md px-2 text-xs font-medium transition disabled:opacity-50"
-                  style={{
-                    backgroundColor: "var(--btn-primary)",
-                    color: "var(--btn-primary-text)",
-                    minHeight: 0,
-                  }}
-                >
-                  {fullSyncRunning ? (
-                    <>
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      동기화 중…
-                    </>
-                  ) : (
-                    <>
+                  leftIcon={
+                    fullSyncRunning ? (
+                      <Spinner size="sm" />
+                    ) : (
                       <RefreshCcw className="h-3.5 w-3.5" />
-                      전체 다시 훑기
-                    </>
-                  )}
-                </button>
-                <span
+                    )
+                  }
+                  className="disabled:opacity-50"
+                >
+                  {fullSyncRunning ? "동기화 중…" : "전체 다시 훑기"}
+                </Button>
+                <Text
+                  variant="caption"
+                  color="muted"
+                  as="span"
                   className="text-[11px]"
-                  style={{ color: "var(--text-muted)" }}
                 >
                   옛 PR 메타 갱신 / 카드 살리기용
-                </span>
+                </Text>
               </div>
-              <p
+              <Text
+                variant="caption"
+                color="muted"
+                as="p"
                 className="text-[11px] leading-relaxed"
-                style={{ color: "var(--text-muted)" }}
               >
                 평소엔 안 누름. 이런 때 가끔 사용:
-              </p>
-              <ul
+              </Text>
+              <Text
+                variant="caption"
+                color="muted"
+                as="ul"
                 className="ml-4 list-disc text-[11px] leading-relaxed"
-                style={{ color: "var(--text-muted)" }}
               >
                 <li>본인이 GitHub 에서 repo 이름 / owner 옮긴 직후 — 옛 PR 의 owner/repo 갱신을 따라가기 위해.</li>
                 <li>옛 PR 의 제목 / body / +N −M 변경 반영.</li>
                 <li>vault 의 카드 파일을 실수로 옮기거나 삭제했을 때 다시 만들기.</li>
-              </ul>
+              </Text>
             </div>
 
             <div
@@ -244,7 +224,7 @@ export function PortfolioGuideModal({
           </Section>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -259,13 +239,15 @@ function Section({
 }) {
   return (
     <section className="mb-6 last:mb-0">
-      <h3
-        className="mb-2 flex items-center gap-1.5 text-sm font-semibold"
-        style={{ color: "var(--text-primary)" }}
+      <Text
+        variant="body"
+        weight="semibold"
+        as="h3"
+        className="mb-2 flex items-center gap-1.5"
       >
         {icon}
         {title}
-      </h3>
+      </Text>
       <div className="guide-body">{children}</div>
     </section>
   );
@@ -287,28 +269,23 @@ function PromptRow({
         label={label}
         title={description}
       />
-      <p
+      <Text
+        variant="caption"
+        color="muted"
+        as="p"
         className="text-[11px] leading-relaxed"
-        style={{ color: "var(--text-muted)" }}
       >
         {description}
-      </p>
+      </Text>
     </div>
   );
 }
 
 function Kbd({ children }: { children: React.ReactNode }) {
   return (
-    <kbd
-      className="rounded px-1 py-px font-mono text-[11px]"
-      style={{
-        backgroundColor: "var(--bg-surface-hover)",
-        color: "var(--text-primary)",
-        border: "1px solid var(--border-default)",
-      }}
-    >
+    <KbdCommon className="h-auto rounded px-1 py-px">
       {children}
-    </kbd>
+    </KbdCommon>
   );
 }
 

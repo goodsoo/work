@@ -20,6 +20,9 @@ import {
 } from "../../lib/dates";
 import { LooseDateInput } from "../common/LooseDateInput";
 import { LooseTimeInput } from "../common/LooseTimeInput";
+import { Button } from "../common/Button";
+import { Text } from "../common/Text";
+import { Popover } from "../common/Popover";
 import { MeetingPicker } from "../common/MeetingPicker";
 import { CategoryPicker } from "../common/CategoryPicker";
 import { categoryColor } from "../../lib/todoCategory";
@@ -287,8 +290,9 @@ export function TodoRow({ todo, onToggle, onUpdate, onDelete }: Props) {
               />
             </div>
             <div className="flex shrink-0 items-center gap-1">
-              <button
-                type="button"
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() =>
                   updateDraft({
                     cancelled: !draft.cancelled,
@@ -297,44 +301,36 @@ export function TodoRow({ todo, onToggle, onUpdate, onDelete }: Props) {
                   })
                 }
                 title={draft.cancelled ? "취소 해제" : "할일 취소"}
-                className="rounded-md px-2 py-1 text-xs transition hover:bg-[var(--bg-surface-hover)]"
                 style={{
                   color: draft.cancelled
                     ? "var(--text-primary)"
                     : "var(--text-secondary)",
                   border: `1px solid ${draft.cancelled ? "var(--text-muted)" : "var(--border-subtle)"}`,
-                  minHeight: 0,
                 }}
               >
                 {draft.cancelled ? "✗ 취소됨" : "취소"}
-              </button>
-              <button
-                type="button"
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={handleDeleteWithFade}
                 title="할일 삭제"
-                className="rounded-md px-2 py-1 text-xs transition hover:bg-[var(--bg-surface-hover)]"
                 style={{
                   color: "var(--text-secondary)",
                   border: "1px solid var(--border-subtle)",
-                  minHeight: 0,
                 }}
               >
                 삭제
-              </button>
-              <button
-                type="button"
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
                 onClick={commitAndClose}
                 title="완료 (변경 저장)"
-                className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition"
-                style={{
-                  backgroundColor: "var(--btn-primary)",
-                  color: "var(--btn-primary-text)",
-                  minHeight: 0,
-                }}
+                leftIcon={<Check className="h-3 w-3" />}
               >
-                <Check className="h-3 w-3" />
                 완료
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -348,8 +344,11 @@ export function TodoRow({ todo, onToggle, onUpdate, onDelete }: Props) {
             onClick={() => onToggle(todo)}
           />
           <div className="min-w-0 flex-1">
-            <div
-              className={`min-w-0 break-words text-base ${todo.done || todo.cancelled ? "line-through" : ""}`}
+            <Text
+              variant="h4"
+              weight="normal"
+              as="div"
+              className={`min-w-0 break-words ${todo.done || todo.cancelled ? "line-through" : ""}`}
               style={{
                 color:
                   todo.done || todo.cancelled
@@ -358,9 +357,11 @@ export function TodoRow({ todo, onToggle, onUpdate, onDelete }: Props) {
               }}
             >
               {todo.title || (
-                <span style={{ color: "var(--text-muted)" }}>(제목 없음)</span>
+                <Text variant="body" color="muted" as="span">
+                  (제목 없음)
+                </Text>
               )}
-            </div>
+            </Text>
             <ReadOnlyMeta todo={todo} />
           </div>
           {/* DueChip — 카드 우측 끝. items-center 라 vertical 가운데 align. */}
@@ -576,7 +577,6 @@ function ReadOnlyMeta({ todo }: { todo: Todo }) {
 // #from-<uid> tag 는 그대로 두고 (자동 정리 X) 사용자가 직접 편집.
 function SourceMeetingLink({ uid, todoId }: { uid: string; todoId: string }) {
   const [open, setOpen] = useState(false);
-  const wrapRef = useRef<HTMLSpanElement>(null);
   const meetingsQ = useMeetings();
   const updateMutation = useUpdateTodo();
   const meeting = meetingsQ.data?.find((m) => m.uid === uid) ?? null;
@@ -591,104 +591,99 @@ function SourceMeetingLink({ uid, todoId }: { uid: string; todoId: string }) {
     setOpen(false);
   }
 
-  useEffect(() => {
-    if (!open) return;
-    function onDown(e: MouseEvent) {
-      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false);
-    }
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") setOpen(false);
-    }
-    window.addEventListener("mousedown", onDown);
-    window.addEventListener("keydown", onKey);
-    return () => {
-      window.removeEventListener("mousedown", onDown);
-      window.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
-
   const chipLabel = disconnected
     ? "(연결 끊김)"
     : meeting?.title?.trim() || "원본 메모";
 
   return (
-    <span ref={wrapRef} className="relative inline-flex">
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          setOpen((v) => !v);
-        }}
-        className={`inline-flex max-w-[12rem] items-center gap-1 truncate underline-offset-2 ${disconnected ? "" : "hover:underline"}`}
-        style={{ color: "var(--text-secondary)", minHeight: 0 }}
-        aria-haspopup="menu"
-        aria-expanded={open}
-      >
-        <FileText className="h-3 w-3 shrink-0 opacity-70" aria-hidden />
-        <span className="truncate">{chipLabel}</span>
-      </button>
-      {open ? (
-        <div
-          className="absolute left-0 top-full z-30 mt-1 w-64 overflow-hidden rounded-md shadow-md"
-          style={{
-            backgroundColor: "var(--bg-base)",
-            border: "1px solid var(--border-default)",
+    <Popover
+      open={open}
+      onClose={() => setOpen(false)}
+      className="relative inline-flex"
+      panelClassName="absolute left-0 top-full z-30 mt-1 w-64 overflow-hidden rounded-md shadow-md"
+      panelStyle={{
+        backgroundColor: "var(--bg-base)",
+        border: "1px solid var(--border-default)",
+      }}
+      trigger={
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={(e) => {
+            e.stopPropagation();
+            setOpen((v) => !v);
           }}
-          onClick={(e) => e.stopPropagation()}
+          className={`max-w-[12rem] truncate underline-offset-2 px-0 py-0 ${disconnected ? "" : "hover:underline"}`}
+          style={{ color: "var(--text-secondary)" }}
+          aria-haspopup="menu"
+          aria-expanded={open}
+          leftIcon={<FileText className="h-3 w-3 shrink-0 opacity-70" aria-hidden />}
         >
-          <div
-            className="px-3 py-2 text-xs"
-            style={{
-              borderBottom: "1px solid var(--border-subtle)",
-              color: "var(--text-secondary)",
-            }}
+          <span className="truncate">{chipLabel}</span>
+        </Button>
+      }
+    >
+      <div onClick={(e) => e.stopPropagation()}>
+          <Text
+            variant="caption"
+            color="secondary"
+            as="div"
+            className="px-3 py-2"
+            style={{ borderBottom: "1px solid var(--border-subtle)" }}
           >
-            <div style={{ color: "var(--text-muted)" }}>연결된 메모</div>
+            <Text variant="caption" color="muted" as="div">
+              연결된 메모
+            </Text>
             {disconnected ? (
-              <div
+              <Text
+                variant="caption"
+                color="muted"
+                as="div"
                 className="mt-0.5 text-[11px]"
-                style={{ color: "var(--text-muted)" }}
               >
                 메모를 찾을 수 없어요. (md 안 연결 id 는 그대로 보존)
-              </div>
+              </Text>
             ) : (
               <>
-                <div
-                  className="mt-0.5 truncate font-medium"
-                  style={{ color: "var(--text-primary)" }}
+                <Text
+                  variant="body"
+                  weight="medium"
+                  as="div"
+                  truncate
+                  className="mt-0.5"
                 >
                   {meeting?.title?.trim() || "(제목 없음)"}
-                </div>
+                </Text>
                 {meeting?.date || meeting?.time || meeting?.attendees?.length ? (
-                  <div
-                    className="mt-1 truncate text-[11px]"
-                    style={{ color: "var(--text-muted)" }}
+                  <Text
+                    variant="caption"
+                    color="muted"
+                    as="div"
+                    truncate
+                    className="mt-1 text-[11px]"
                   >
                     {meeting.date ? formatDateShortWithDay(meeting.date) : null}
                     {meeting.time ? ` · ${meeting.time}` : null}
                     {meeting.attendees && meeting.attendees.length > 0
                       ? ` · ${meeting.attendees.join(", ")}`
                       : null}
-                  </div>
+                  </Text>
                 ) : null}
               </>
             )}
-          </div>
+          </Text>
           <div className="flex justify-end gap-2 px-3 py-2">
-            <button
-              type="button"
+            <Button
+              variant="secondary"
+              size="sm"
               onClick={() => setOpen(false)}
-              className="rounded-md px-3 py-1.5 text-xs transition"
-              style={{
-                border: "1px solid var(--border-default)",
-                color: "var(--text-secondary)",
-                minHeight: 0,
-              }}
+              className="px-3 py-1.5"
             >
               취소
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              variant={disconnected ? "secondary" : "info"}
+              size="sm"
               onClick={() => {
                 if (disconnected) {
                   disconnect();
@@ -697,27 +692,21 @@ function SourceMeetingLink({ uid, todoId }: { uid: string; todoId: string }) {
                 setOpen(false);
                 window.location.hash = `#meeting-${uid}`;
               }}
-              className="rounded-md px-3 py-1.5 text-xs font-medium transition"
+              className="px-3 py-1.5"
               style={
                 disconnected
                   ? {
                       backgroundColor: "transparent",
                       color: "var(--accent-red)",
                       border: "1px solid var(--accent-red)",
-                      minHeight: 0,
                     }
-                  : {
-                      backgroundColor: "var(--accent-blue)",
-                      color: "white",
-                      minHeight: 0,
-                    }
+                  : undefined
               }
             >
               {disconnected ? "연결 해제" : "메모로 이동"}
-            </button>
+            </Button>
           </div>
-        </div>
-      ) : null}
-    </span>
+      </div>
+    </Popover>
   );
 }

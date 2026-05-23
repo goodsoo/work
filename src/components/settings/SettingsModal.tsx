@@ -1,14 +1,17 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { X, Keyboard, FolderOpen, Archive, HelpCircle } from "lucide-react";
 import { ShortcutsSection } from "./ShortcutsSection";
 import { HelpSection } from "./HelpSection";
 import { VaultSection } from "./VaultSection";
 import { BackupSection } from "./BackupSection";
+import { Modal } from "../common/Modal";
+import { Button } from "../common/Button";
+import { Text } from "../common/Text";
 
 export type SettingsSection = "vault" | "backup" | "shortcuts" | "help";
 
 type Props = {
-  isOpen: boolean;
+  open: boolean;
   onClose: () => void;
   initialSection?: SettingsSection;
 };
@@ -20,35 +23,12 @@ const SECTIONS: Array<{ id: SettingsSection; label: string; icon: typeof Keyboar
   { id: "help", label: "도움말", icon: HelpCircle },
 ];
 
-export function SettingsModal({ isOpen, onClose, initialSection = "vault" }: Props) {
+export function SettingsModal({ open, onClose, initialSection = "vault" }: Props) {
   const [section, setSection] = useState<SettingsSection>(initialSection);
 
-  useEffect(() => {
-    if (!isOpen) return;
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [isOpen, onClose]);
-
-  if (!isOpen) return null;
-
   return (
-    <div
-      // backdrop close: mousedown 시작점이 backdrop 자체일 때만. inner 안에서 시작한
-      // 드래그가 바깥에서 mouseup 되어 click 이 backdrop 으로 발사되는 케이스 차단.
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-      className="fixed inset-0 z-50 flex items-center justify-center p-6"
-      style={{ backgroundColor: "rgba(0,0,0,0.4)" }}
-      role="dialog"
-      aria-modal="true"
-      aria-label="설정"
-    >
+    <Modal open={open} onClose={onClose} ariaLabel="설정">
       <div
-        onClick={(e) => e.stopPropagation()}
         className="flex w-full max-w-3xl overflow-hidden rounded-xl"
         style={{
           background: "var(--bg-surface)",
@@ -63,25 +43,25 @@ export function SettingsModal({ isOpen, onClose, initialSection = "vault" }: Pro
             borderRight: "1px solid var(--border-default)",
           }}
         >
-          <div
-            className="flex h-12 shrink-0 items-center px-4 text-sm font-semibold"
-            style={{
-              color: "var(--text-primary)",
-              borderBottom: "1px solid var(--border-default)",
-            }}
+          <Text
+            variant="body"
+            weight="semibold"
+            as="div"
+            className="flex h-12 shrink-0 items-center px-4"
+            style={{ borderBottom: "1px solid var(--border-default)" }}
           >
             설정
-          </div>
+          </Text>
           <nav className="flex-1 overflow-y-auto py-2">
             {SECTIONS.map(({ id, label, icon: Icon }) => {
               const active = id === section;
               return (
-                <button
+                <Button
                   key={id}
-                  type="button"
+                  variant="ghost"
                   onClick={() => setSection(id)}
                   aria-current={active ? "page" : undefined}
-                  className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm transition"
+                  className="w-full justify-start gap-2 rounded-none px-4 py-2"
                   style={{
                     background: active ? "var(--bg-surface)" : "transparent",
                     color: active ? "var(--text-primary)" : "var(--text-secondary)",
@@ -90,7 +70,7 @@ export function SettingsModal({ isOpen, onClose, initialSection = "vault" }: Pro
                 >
                   <Icon className="h-4 w-4" strokeWidth={active ? 2 : 1.5} />
                   {label}
-                </button>
+                </Button>
               );
             })}
           </nav>
@@ -101,22 +81,18 @@ export function SettingsModal({ isOpen, onClose, initialSection = "vault" }: Pro
             className="flex h-12 shrink-0 items-center justify-between px-5"
             style={{ borderBottom: "1px solid var(--border-default)" }}
           >
-            <h2
-              className="text-sm font-semibold"
-              style={{ color: "var(--text-primary)" }}
-            >
+            <Text variant="body" weight="semibold" as="h2">
               {SECTIONS.find((s) => s.id === section)?.label}
-            </h2>
-            <button
-              type="button"
+            </Text>
+            <Button
+              variant="icon"
               onClick={onClose}
               aria-label="닫기"
               title="닫기  ESC"
-              className="flex h-7 w-7 items-center justify-center rounded-md transition"
               style={{ color: "var(--text-muted)" }}
             >
               <X className="h-4 w-4" />
-            </button>
+            </Button>
           </header>
           <div className="flex-1 overflow-y-auto px-5 py-4">
             {section === "vault" ? (
@@ -131,6 +107,6 @@ export function SettingsModal({ isOpen, onClose, initialSection = "vault" }: Pro
           </div>
         </section>
       </div>
-    </div>
+    </Modal>
   );
 }

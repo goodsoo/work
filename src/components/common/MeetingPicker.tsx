@@ -2,6 +2,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { FileText, Search } from "lucide-react";
 import { useMeetings } from "../../hooks/useMeetings";
 import { formatDateShortWithDay } from "../../lib/dates";
+import { Button } from "./Button";
+import { Text } from "./Text";
+import { Popover } from "./Popover";
 
 type Props = {
   value: string | null; // selected meeting uid
@@ -14,7 +17,6 @@ export function MeetingPicker({ value, onChange }: Props) {
   const meetingsQ = useMeetings();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const wrapRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const selected = value
@@ -48,46 +50,39 @@ export function MeetingPicker({ value, onChange }: Props) {
     if (!open) return;
     setQuery("");
     requestAnimationFrame(() => inputRef.current?.focus());
-    function onDown(e: MouseEvent) {
-      if (!wrapRef.current) return;
-      if (!wrapRef.current.contains(e.target as Node)) setOpen(false);
-    }
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") setOpen(false);
-    }
-    window.addEventListener("mousedown", onDown);
-    window.addEventListener("keydown", onKey);
-    return () => {
-      window.removeEventListener("mousedown", onDown);
-      window.removeEventListener("keydown", onKey);
-    };
   }, [open]);
 
   return (
-    <div ref={wrapRef} className="relative inline-flex items-center">
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          setOpen((v) => !v);
-        }}
-        className="inline-flex max-w-[12rem] items-center gap-1 rounded-md px-2 py-0.5 text-xs transition hover:bg-[var(--bg-surface-hover)]"
-        style={{ color: "var(--text-secondary)", minHeight: 0 }}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-      >
-        <FileText className="h-3 w-3 shrink-0 opacity-60" aria-hidden />
-        <span className="truncate">{buttonLabel}</span>
-      </button>
-      {open ? (
-        <div
-          className="absolute left-0 top-full z-30 mt-1 w-72 overflow-hidden rounded-md shadow-md"
-          style={{
-            backgroundColor: "var(--bg-base)",
-            border: "1px solid var(--border-default)",
+    <Popover
+      open={open}
+      onClose={() => setOpen(false)}
+      className="relative inline-flex items-center"
+      panelClassName="absolute left-0 top-full z-30 mt-1 w-72 overflow-hidden rounded-md shadow-md"
+      panelStyle={{
+        backgroundColor: "var(--bg-base)",
+        border: "1px solid var(--border-default)",
+      }}
+      trigger={
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={(e) => {
+            e.stopPropagation();
+            setOpen((v) => !v);
           }}
-          onClick={(e) => e.stopPropagation()}
+          className="max-w-[12rem] px-2 py-0.5 font-normal"
+          style={{ color: "var(--text-secondary)" }}
+          aria-haspopup="listbox"
+          aria-expanded={open}
+          leftIcon={
+            <FileText className="h-3 w-3 shrink-0 opacity-60" aria-hidden />
+          }
         >
+          <span className="truncate">{buttonLabel}</span>
+        </Button>
+      }
+    >
+      <div onClick={(e) => e.stopPropagation()}>
           <div
             className="flex items-center gap-1.5 px-2.5 py-1.5"
             style={{ borderBottom: "1px solid var(--border-subtle)" }}
@@ -107,39 +102,43 @@ export function MeetingPicker({ value, onChange }: Props) {
               style={{ color: "var(--text-primary)" }}
             />
             {value ? (
-              <button
-                type="button"
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => {
                   onChange(null);
                   setOpen(false);
                 }}
-                className="shrink-0 rounded px-1.5 py-0.5 text-[11px] transition hover:bg-[var(--bg-surface-hover)]"
-                style={{ color: "var(--text-muted)", minHeight: 0 }}
+                className="shrink-0 px-1.5 py-0.5 text-[11px] font-normal"
+                style={{ color: "var(--text-muted)" }}
               >
                 연결 해제
-              </button>
+              </Button>
             ) : null}
           </div>
           <ul className="max-h-64 overflow-y-auto py-1">
             {filtered.length === 0 ? (
-              <li
-                className="px-3 py-2 text-center text-xs"
-                style={{ color: "var(--text-muted)" }}
+              <Text
+                variant="caption"
+                color="muted"
+                as="li"
+                className="px-3 py-2 text-center"
               >
                 일치하는 메모 없음
-              </li>
+              </Text>
             ) : (
               filtered.map((m) => {
                 const active = m.uid === value;
                 return (
                   <li key={m.uid}>
-                    <button
-                      type="button"
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       onClick={() => {
                         onChange(m.uid);
                         setOpen(false);
                       }}
-                      className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs transition"
+                      className="w-full justify-start gap-2 rounded-none px-3 py-1.5 font-normal"
                       style={{
                         backgroundColor: active
                           ? "var(--bg-surface-active)"
@@ -147,28 +146,28 @@ export function MeetingPicker({ value, onChange }: Props) {
                         color: active
                           ? "var(--text-primary)"
                           : "var(--text-secondary)",
-                        minHeight: 0,
                       }}
                     >
                       <span className="min-w-0 flex-1 truncate">
                         {m.title?.trim() || "(제목 없음)"}
                       </span>
                       {m.date ? (
-                        <span
+                        <Text
+                          variant="caption"
+                          color="muted"
+                          as="span"
                           className="shrink-0 font-mono text-[10px]"
-                          style={{ color: "var(--text-muted)" }}
                         >
                           {formatDateShortWithDay(m.date)}
-                        </span>
+                        </Text>
                       ) : null}
-                    </button>
+                    </Button>
                   </li>
                 );
               })
             )}
           </ul>
-        </div>
-      ) : null}
-    </div>
+      </div>
+    </Popover>
   );
 }

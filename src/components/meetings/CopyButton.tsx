@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Check, ClipboardCopy } from "lucide-react";
 import { meetingToMarkdown, type MeetingMarkdownInput } from "../../lib/markdown";
+import { Button } from "../common/Button";
 
 type Props = {
   meeting: MeetingMarkdownInput;
@@ -49,14 +50,13 @@ export function CopyButton({ meeting, onError, compact }: Props) {
 
   if (compact) {
     return (
-      <button
-        type="button"
+      <Button
+        variant="ghost"
         onClick={handleClick}
-        className="rounded-md px-1.5 py-1 transition"
+        className="px-1.5 py-1"
         style={{
           border: "1px solid var(--border-subtle)",
           color: copied ? "var(--accent-red)" : "var(--text-secondary)",
-          minHeight: 0,
         }}
         title={copied ? "복사됨" : "마크다운 복사"}
         aria-label="마크다운 복사"
@@ -66,32 +66,28 @@ export function CopyButton({ meeting, onError, compact }: Props) {
         ) : (
           <ClipboardCopy className="h-3.5 w-3.5" />
         )}
-      </button>
+      </Button>
     );
   }
 
   return (
-    <button
-      type="button"
+    <Button
+      variant="secondary"
       onClick={handleClick}
-      className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition"
-      style={{
-        border: "1px solid var(--border-default)",
-        color: "var(--text-secondary)",
-      }}
+      className="rounded-lg gap-2 px-3 py-2 font-normal"
+      leftIcon={
+        copied ? (
+          <Check className="h-4 w-4" style={{ color: "var(--accent-red)" }} />
+        ) : (
+          <ClipboardCopy
+            className="h-4 w-4"
+            style={{ color: "var(--text-secondary)" }}
+          />
+        )
+      }
       aria-label="마크다운 복사"
     >
-      {copied ? (
-        <>
-          <Check className="h-4 w-4" style={{ color: "var(--accent-red)" }} />
-          <span>복사됨</span>
-        </>
-      ) : (
-        <>
-          <ClipboardCopy className="h-4 w-4" style={{ color: "var(--text-secondary)" }} />
-          <span>마크다운 복사</span>
-        </>
-      )}
-    </button>
+      {copied ? "복사됨" : "마크다운 복사"}
+    </Button>
   );
 }

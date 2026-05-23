@@ -19,6 +19,8 @@ import {
 } from "./components/nav/SidePanel";
 import { useTodoSort } from "./hooks/useTodoSort";
 import { TodoTrashModal } from "./components/todos/TodoTrashModal";
+import { Text } from "./components/common/Text";
+import { EmptyState } from "./components/common/EmptyState";
 import { CalendarPage } from "./pages/CalendarPage";
 import { TodosPage } from "./pages/TodosPage";
 import { PortfolioPage } from "./pages/PortfolioPage";
@@ -463,7 +465,7 @@ function AppContent() {
         />
       )}
       <TrashModal
-        isOpen={trashOpen}
+        open={trashOpen}
         onClose={() => setTrashOpen(false)}
       />
       <TodoTrashModal
@@ -471,7 +473,7 @@ function AppContent() {
         onClose={() => setTodoTrashOpen(false)}
       />
       <PortfolioTrashModal
-        isOpen={portfolioTrashOpen}
+        open={portfolioTrashOpen}
         onClose={() => setPortfolioTrashOpen(false)}
       />
     </AppShell>
@@ -485,10 +487,9 @@ function MeetingsEmpty({ count, loading }: { count: number; loading: boolean }) 
       ? "아직 메모가 없어요. 메뉴에서 + 를 눌러 새 메모를 만드세요."
       : "메뉴에서 메모를 선택하세요.";
   return (
-    <div className="flex h-[calc(100svh-3rem)] items-center justify-center px-6 text-center">
-      <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-        {message}
-      </p>
-    </div>
+    <EmptyState
+      className="flex h-[calc(100svh-3rem)] flex-col items-center justify-center gap-3 px-6 text-center"
+      description={<Text variant="body" color="muted" as="span">{message}</Text>}
+    />
   );
 }
