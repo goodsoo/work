@@ -6,6 +6,18 @@
 
 ## 2026-05-23
 
+### PR #37 — 디자인 시스템 정식화
+
+- **한 줄 임팩트**: 9 공통 컴포넌트 + 시맨틱 토큰 + DESIGN.md 11 dimension
+- **컴포넌트 추출 9개** — `src/components/common/` 에 `Modal` / `Button` / `Text` / `PageHeaderBar` / `Popover` / `EmptyState` / `Chip` / `Kbd` / `Spinner`. wrap 가능한 모든 자리 흡수 — raw `<button>` 자리 9개만 남김 (input/textarea/특수 자리만).
+- **시맨틱 토큰** — `:root` 안 `--opacity-{disabled,hover,active,secondary,overlay}` / `--z-{dropdown,sticky,overlay,modal,popover,tooltip,toast}` / `--shadow-{card,modal,popover}` / `--motion-{fast,base,slow}`. `@theme` 안 박으면 Tailwind v4 default scale (z-50 / opacity-40 등) 무력화되는 케이스 발견 → `:root` 분리.
+- **DESIGN.md 11 dimension** — ds-extract skill 의 표준 11 dimension (Color / Typography / Spacing / Radius / Effects / Motion / Z-index / Layout / Interaction / Icon vocabulary / Components) 다 갱신. 빠진 5 섹션 신규.
+- **회기 fix 묶음** — Button base 의 `justify-center` 제거 + `text-left` 박음 (사이드바 폴더명/메모제목/할일제목 가운데 정렬되던 케이스 차단), 본문 헤더의 `lg:relative lg:top-auto` 제거 (데스크탑 sticky 무력화), MeetingForm outer `lg:h-screen` → `lg:h-full` (main padding-top 만큼 overflow scroll 차단), sub-tab 인라인 sticky 보장.
+- **PageHeaderBar 추출** — 4 페이지 같은 헤더 패턴 (3-col grid + sticky + lg:shrink-0 + bg-overlay backdrop) 추출. MeetingForm 만 `sticky={false}` — flex-col 부모 안에서 shrink-0 가 자동 고정.
+- **2차 추출 26 자리** — Popover (4) / EmptyState (4) / Chip (10) / Kbd (3) / Spinner (5) 자리 흡수. ds-extract 재진단 § 8 추가.
+- **`--ralph` flag + ralph-loop guard** — ds-extract skill 에 `--ralph` 인자 추가 (EXTRACTION_PLAN.md 의 §7 자동 실행 섹션 추가). 사용자 개입 없이 끝까지 진행하는 큰 마이그레이션 작업의 표준 패턴 박음.
+- **21 commit** — 작업 단위 (컴포넌트 정의 / 모달 클러스터 / SidePanel / MeetingForm / TodoRow / AppShell / Settings / pages / timeline / common / vault / portfolio extras / meetings extras / App+Toast / 시맨틱 토큰 / DESIGN.md / 회기 fix / 2차 추출).
+
 ### PR #36 — 할 일 카테고리 색 시그널
 
 - **한 줄 임팩트**: 카테고리 색으로 할 일 한눈에 구분

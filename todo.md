@@ -70,23 +70,9 @@ PR 단위로 묶음. 각 PR 의 **한 줄 임팩트** 는 카드 frontmatter `im
 - [ ] **vault 별 상태 분리** — localStorage key 에 vault id 네임스페이스. 최근 메모 / 필터 / sort / sidebar collapse 등 vault 별 보존.
 - [ ] **첫 진입 / path missing** — vault list 비었거나 선택 vault path 가 없을 때 진입 모달 (새 vault 또는 폴더 선택).
 
-### PR — 디자인 시스템 정식화 `other`
-한 줄 임팩트: DESIGN.md 토큰 / 컴포넌트 / 패턴을 정식 시스템으로
-
-- [ ] 의도 명확화 (진입 전 office-hours 한 사이클 — 토큰 정리 / 컴포넌트 라이브러리 / 시각 정의서 / 본인용 vs 외부 공개 중 어디).
-- [ ] DESIGN.md 토큰 정렬 + 누락분 보강 (현재 18개 시맨틱 토큰 → 그룹화 / 사용처 명시).
-- [ ] 공통 컴포넌트 추출 — 모달 (`PR — 오버레이 컴포넌트 통일`) / 마크다운 에디터 (`PR — 마크다운 에디터 컴포넌트 통일`) 와 합칠 수 있음.
-
 ---
 
 ## 🎨 폴리시
-
-### PR — 오버레이 컴포넌트 통일 `other`
-한 줄 임팩트: 6+ 모달 boilerplate (`backdrop` + ESC + 사이즈 spec) 한 컴포넌트로
-
-- [ ] 공통 `<Modal>` (또는 `<Overlay>`) 추출 — `backdrop onMouseDown` close + `e.target===e.currentTarget` 가드, ESC 닫기, rgba bg, center align, 사이즈 prop (`sm | md | lg` 또는 width/height). SettingsModal / TrashModal / TaskAddModal / ConfirmDialog / ScreenshotLightbox / JournalOverlay 6개가 같은 패턴 반복.
-- [ ] 사이즈 spec: 설정창 표준 = `max-w-3xl` + `min(560px, 80vh)`. 작은 confirm 류는 `max-w-sm`. lightbox 는 full-screen variant.
-- [ ] 기존 모달들 마이그레이션 — body 만 children prop 으로, 헤더 closure 아이콘 / 사이즈 prop 만 다름.
 
 ### PR — 마크다운 에디터 컴포넌트 통일 `other`
 한 줄 임팩트: `SourceBodyEditor` 의 풀세트 (gutter / wrap / slash / 단축키) 를 prop 으로 토글, 일기 등에서도 재사용
