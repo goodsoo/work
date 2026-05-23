@@ -10,6 +10,8 @@ import { useDrawer } from "../../hooks/useDrawer";
 import { isTauri } from "../../lib/isTauri";
 import { useVault } from "../../lib/vault/useVault";
 import { SettingsModal } from "../settings/SettingsModal";
+import { Button } from "../common/Button";
+import { Text } from "../common/Text";
 import { BottomTabs, TABS, type Tab } from "./BottomTabs";
 
 const MOBILE_DRAWER_WIDTH = 288;
@@ -135,25 +137,23 @@ export function AppShell({
         <div data-tauri-drag-region className="flex-1" />
         {/* 우측: settings + theme. button 자체는 click, 사이 gap 은 drag region. */}
         <div data-tauri-drag-region className="flex items-center gap-0.5 pr-2">
-          <button
-            type="button"
+          <Button
+            variant="icon"
             onClick={() => setSettingsOpen(true)}
             title="설정"
             aria-label="설정"
-            className="flex h-7 w-7 items-center justify-center rounded-md transition hover:bg-[var(--bg-surface-hover)]"
-            style={{ color: "var(--text-secondary)", minHeight: 0 }}
+            style={{ color: "var(--text-secondary)" }}
           >
             <Settings className="h-3.5 w-3.5" />
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            variant="icon"
             onClick={(e) => toggle({ origin: { x: e.clientX, y: e.clientY } })}
             title={theme === "light" ? "다크 모드로" : "라이트 모드로"}
-            className="flex h-7 w-7 items-center justify-center rounded-md transition hover:bg-[var(--bg-surface-hover)]"
-            style={{ color: "var(--text-secondary)", minHeight: 0 }}
+            style={{ color: "var(--text-secondary)" }}
           >
             <ThemeIcon className="h-3.5 w-3.5" />
-          </button>
+          </Button>
         </div>
       </header>
 
@@ -195,39 +195,44 @@ export function AppShell({
         <div className="mx-auto flex w-full max-w-2xl items-center justify-between px-4 py-2.5">
           <div className="flex items-center gap-1">
             {hasSidePanel ? (
-              <button
-                type="button"
+              <Button
+                variant="icon"
                 onClick={drawer.toggle}
                 aria-label="메뉴 열기"
                 aria-expanded={drawer.isOpen}
-                className="flex h-8 w-8 items-center justify-center rounded-md transition"
-                style={{ color: "var(--text-secondary)", minHeight: 0 }}
+                className="h-8 w-8"
+                style={{ color: "var(--text-secondary)" }}
               >
                 <Menu className="h-4 w-4" />
-              </button>
+              </Button>
             ) : null}
-            <h1 className="text-sm font-semibold tracking-tight" style={{ color: "var(--text-primary)" }}>
+            <Text
+              variant="body"
+              weight="semibold"
+              as="h1"
+              className="tracking-tight"
+            >
               goodsoob
-            </h1>
+            </Text>
           </div>
           <div className="flex items-center gap-0.5">
-            <button
-              type="button"
+            <Button
+              variant="icon"
               onClick={() => setSettingsOpen(true)}
               aria-label="설정"
-              className="flex h-8 w-8 items-center justify-center rounded-md transition"
-              style={{ color: "var(--text-muted)", minHeight: 0 }}
+              className="h-8 w-8"
+              style={{ color: "var(--text-muted)" }}
             >
               <Settings className="h-4 w-4" />
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              variant="icon"
               onClick={(e) => toggle({ origin: { x: e.clientX, y: e.clientY } })}
-              className="flex h-8 w-8 items-center justify-center rounded-md transition"
-              style={{ color: "var(--text-muted)", minHeight: 0 }}
+              className="h-8 w-8"
+              style={{ color: "var(--text-muted)" }}
             >
               <ThemeIcon className="h-4 w-4" />
-            </button>
+            </Button>
           </div>
         </div>
       </header>
@@ -283,7 +288,7 @@ export function AppShell({
       <BottomTabs activeTab={activeTab} onTabChange={handleTabChange} />
 
       <SettingsModal
-        isOpen={settingsOpen}
+        open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
       />
     </div>
@@ -372,20 +377,18 @@ function HeaderTabs({
         const active = id === activeTab;
         const title = isTauri ? `${label}  ⌘${i + 1}` : label;
         return (
-          <button
+          <Button
             key={id}
-            type="button"
+            variant="ghost"
             onClick={() => onTabChange(id)}
             aria-current={active ? "page" : undefined}
             title={title}
             aria-label={label}
-            className="flex h-7 items-center justify-center gap-1.5 px-2 transition hover:bg-[var(--bg-surface-hover)]"
+            className="h-7 gap-1.5 px-2 rounded-none"
             style={{
               backgroundColor: active ? "var(--bg-base)" : "transparent",
               color: active ? "var(--text-primary)" : "var(--text-secondary)",
               marginBottom: active ? "-1px" : 0,
-              // 폴더 탭 — active 의 상/좌/우 border 가 헤더 borderBottom 과 같은 선으로 이어짐.
-              // bottom 은 transparent 로 height 일관성 유지 + main 영역과 시각 연결.
               borderTop: active
                 ? "1px solid var(--border-default)"
                 : "1px solid transparent",
@@ -400,12 +403,11 @@ function HeaderTabs({
               borderTopRightRadius: active ? 6 : 4,
               borderBottomLeftRadius: active ? 0 : 4,
               borderBottomRightRadius: active ? 0 : 4,
-              minHeight: 0,
               boxSizing: "border-box",
             }}
           >
             <Icon className="h-4 w-4" strokeWidth={active ? 2 : 1.5} />
-          </button>
+          </Button>
         );
       })}
     </nav>
@@ -420,19 +422,16 @@ function VaultBadge({ onClick }: { onClick: () => void }) {
   if (!vaultRoot) return null;
   const name = vaultRoot.split("/").filter(Boolean).pop() ?? vaultRoot;
   return (
-    <button
-      type="button"
+    <Button
+      variant="ghost"
       onClick={onClick}
       title={vaultRoot}
       aria-label={`vault: ${name}`}
-      className="flex h-7 max-w-full items-center gap-1 rounded-md px-2 text-[13px] font-medium transition hover:bg-[var(--bg-surface-hover)]"
-      style={{
-        color: "var(--text-primary)",
-        minHeight: 0,
-      }}
+      className="h-7 max-w-full gap-1 px-2 text-[13px]"
+      style={{ color: "var(--text-primary)" }}
     >
       <span className="truncate">{name}</span>
       <ChevronDown className="h-3 w-3 shrink-0 opacity-60" />
-    </button>
+    </Button>
   );
 }
