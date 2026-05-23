@@ -295,14 +295,14 @@ PR #36 (todo cat colors) 가 `--cat-*` 7개 + 카테고리 dot 섹션 + `lib/tod
 - [x] `portfolio/SyncButton.tsx`
 
 ### meetings (extras)
-- [ ] `meetings/AttendeeTagInput.tsx`
-- [ ] `meetings/CopyButton.tsx`
-- [ ] `meetings/EditableList.tsx`
-- [ ] `meetings/MarkdownView.tsx`
-- [ ] `meetings/MeetingsList.tsx`
-- [ ] `meetings/MeetingsTreeView.tsx`
-- [ ] `meetings/SlashCommandPopover.tsx`
-- [ ] `meetings/SourceBodyEditor.tsx`
+- [x] `meetings/AttendeeTagInput.tsx`
+- [x] `meetings/CopyButton.tsx`
+- [x] `meetings/EditableList.tsx`
+- [ ] `meetings/MarkdownView.tsx` (react-markdown 컴포넌트 매핑 — 시맨틱 h1/h2/p raw 유지 검토)
+- [x] `meetings/MeetingsList.tsx`
+- [x] `meetings/MeetingsTreeView.tsx`
+- [x] `meetings/SlashCommandPopover.tsx`
+- [~] `meetings/SourceBodyEditor.tsx` (textarea + mirror div — raw 유지)
 - [ ] `meetings/TrashPreview.tsx`
 
 ### 기타

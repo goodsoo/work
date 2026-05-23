@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Plus, X } from "lucide-react";
+import { Button } from "../common/Button";
+import { Text } from "../common/Text";
 
 type BulletKind = "dot" | "redCheckbox";
 
@@ -80,16 +82,19 @@ export function EditableList({
 
   return (
     <div>
-      <h4
-        className="mb-2 text-sm font-medium"
-        style={{ color: "var(--text-secondary)" }}
+      <Text
+        variant="body"
+        color="secondary"
+        as="h4"
+        weight="medium"
+        className="mb-2"
       >
         {title}
-      </h4>
+      </Text>
       {items.length === 0 && !adding ? (
-        <p className="mb-2 pl-6 text-sm" style={{ color: "var(--text-muted)" }}>
+        <Text variant="body" color="muted" as="p" className="mb-2 pl-6">
           {placeholder ?? "(없음)"}
-        </p>
+        </Text>
       ) : (
         <ul
           className="space-y-1.5 text-sm"
@@ -106,27 +111,26 @@ export function EditableList({
                   onCancel={cancelEdit}
                 />
               ) : (
-                <button
-                  type="button"
+                <Button
+                  variant="ghost"
                   onClick={() => startEdit(i)}
-                  className="flex-1 cursor-text rounded text-left whitespace-pre-wrap leading-relaxed transition"
-                  style={{ minHeight: 0 }}
+                  className="flex-1 cursor-text rounded text-left whitespace-pre-wrap leading-relaxed font-normal px-0 py-0"
                 >
                   {item}
-                </button>
+                </Button>
               )}
               {editingIndex === i ? null : (
                 <>
                   {itemActions ? itemActions(i, item) : null}
-                  <button
-                    type="button"
+                  <Button
+                    variant="icon"
                     onClick={() => deleteAt(i)}
                     aria-label="삭제"
-                    className="rounded p-1 transition"
-                    style={{ color: "var(--text-muted)", minHeight: 24, minWidth: 24 }}
+                    className="p-1"
+                    style={{ color: "var(--text-muted)" }}
                   >
                     <X className="h-3 w-3" />
-                  </button>
+                  </Button>
                 </>
               )}
             </li>
@@ -146,15 +150,16 @@ export function EditableList({
           />
         </div>
       ) : (
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={startAdd}
-          className="mt-2 inline-flex items-center gap-1 pl-6 text-xs transition"
-          style={{ color: "var(--text-muted)", minHeight: 0 }}
+          leftIcon={<Plus className="h-3 w-3" />}
+          className="mt-2 pl-6 font-normal"
+          style={{ color: "var(--text-muted)" }}
         >
-          <Plus className="h-3 w-3" />
           항목 추가
-        </button>
+        </Button>
       )}
     </div>
   );

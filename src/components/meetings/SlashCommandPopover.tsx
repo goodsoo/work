@@ -12,6 +12,8 @@ import {
   Table,
 } from "lucide-react";
 import type { SlashTargetKind } from "../../lib/markdownTyping";
+import { Button } from "../common/Button";
+import { Text } from "../common/Text";
 
 export type SlashOption = {
   id: string;
@@ -152,19 +154,21 @@ export function SlashCommandPopover({
   if (options.length === 0) {
     // 필터가 아무것도 안 맞으면 안내만 — 닫지는 않음 (사용자가 backspace 하면 다시 보일 수 있게).
     return (
-      <div
+      <Text
+        variant="caption"
+        color="secondary"
+        as="div"
         role="listbox"
-        className="absolute z-40 min-w-[200px] rounded-md p-2 text-xs shadow-md"
+        className="absolute z-40 min-w-[200px] rounded-md p-2 shadow-md"
         style={{
           top: anchorTop,
           left: anchorLeft,
           backgroundColor: "var(--bg-surface)",
           border: "1px solid var(--border-default)",
-          color: "var(--text-secondary)",
         }}
       >
         일치하는 명령이 없음
-      </div>
+      </Text>
     );
   }
 
@@ -184,9 +188,10 @@ export function SlashCommandPopover({
       {options.map((o, i) => {
         const active = i === selectedIndex;
         return (
-          <button
+          <Button
             key={o.id}
-            type="button"
+            variant="ghost"
+            size="sm"
             role="option"
             aria-selected={active}
             data-index={i}
@@ -196,22 +201,23 @@ export function SlashCommandPopover({
               e.preventDefault();
               onSelect(o);
             }}
-            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs transition"
+            className="w-full justify-start gap-2 rounded-none px-3 py-1.5 font-normal"
             style={{
               color: active ? "var(--text-primary)" : "var(--text-secondary)",
               backgroundColor: active ? "var(--bg-surface-active)" : undefined,
-              minHeight: 0,
             }}
           >
             <o.Icon className="h-3.5 w-3.5 flex-shrink-0" />
             <span className="flex-1">{o.label}</span>
-            <span
+            <Text
+              variant="caption"
+              color="muted"
+              as="span"
               className="font-mono text-[10px] tabular-nums"
-              style={{ color: "var(--text-muted)" }}
             >
               {o.hint}
-            </span>
-          </button>
+            </Text>
+          </Button>
         );
       })}
     </div>

@@ -6,6 +6,8 @@ import {
   type MeetingComparator,
   type MeetingsFolderNode,
 } from "../../lib/meetingsTree";
+import { Button } from "../common/Button";
+import { Text } from "../common/Text";
 
 const FOLDER_EXPAND_KEY = "goodsoob:meetingFolderExpand";
 // 트리 collapsed 상태를 localStorage 에 저장. "expanded" set 보다 "collapsed" set 으로
@@ -292,8 +294,8 @@ function FolderItem({
           onCancel={onEditingFolderCancel}
         />
       ) : (
-        <button
-          type="button"
+        <Button
+          variant="ghost"
           onClick={() => onToggle(node.path)}
           onContextMenu={(e) => {
             e.preventDefault();
@@ -302,7 +304,7 @@ function FolderItem({
           onDragOver={(e) => onDragOverFolder(e, node.path)}
           onDragLeave={() => onDragLeaveFolder(node.path)}
           onDrop={(e) => onDropFolder(e, node.path)}
-          className="flex w-full items-center gap-1.5 rounded py-1 pr-2 text-left text-[13px] transition"
+          className="w-full justify-start gap-1.5 rounded py-1 pr-2 text-[13px] font-normal"
           style={{
             paddingLeft: `${ROW_BASE_PAD_LEFT}px`,
             color: "var(--text-secondary)",
@@ -313,7 +315,6 @@ function FolderItem({
               ? "1px dashed var(--btn-primary)"
               : undefined,
             outlineOffset: "-2px",
-            minHeight: 0,
           }}
         >
           {isCollapsed ? (
@@ -328,7 +329,7 @@ function FolderItem({
             />
           )}
           <span className="min-w-0 flex-1 truncate">{node.name}</span>
-        </button>
+        </Button>
       )}
       {!isCollapsed ? (
         <div
@@ -508,8 +509,8 @@ function MeetingRow({
   // depth 별 indent 는 부모 폴더의 children wrapper paddingLeft 가 누적.
   const meta = formatMeetingMeta(meeting);
   return (
-    <button
-      type="button"
+    <Button
+      variant="ghost"
       draggable
       onClick={onClick}
       onContextMenu={(e) => {
@@ -518,20 +519,13 @@ function MeetingRow({
       }}
       onDragStart={(e) => onDragStart(e, meeting.uid)}
       onDragEnd={onDragEnd}
-      className="flex w-full items-center gap-1.5 rounded py-1 pr-2 text-left text-[13px] transition"
+      className="w-full justify-start gap-1.5 rounded py-1 pr-2 text-[13px] font-normal"
       style={
         {
-          // 폴더 행의 chevron + gap 자리만큼 추가 indent 해서 같은 column 에 정렬
-          // (옵시디안 패턴). 폴더 이름 left 와 메모 이름 left 가 일치.
           paddingLeft: `${ROW_BASE_PAD_LEFT + TITLE_OFFSET}px`,
           backgroundColor: selected ? "var(--bg-surface-active)" : undefined,
-          // 메모가 폴더보다 진함 — 메모는 콘텐츠 (leaf), 폴더는 organizational.
           color: "var(--text-primary)",
           opacity: isDragging ? 0.5 : 1,
-          minHeight: 0,
-          // macOS WKWebView / Safari 는 draggable=true 만으로는 button drag 가
-          // 시작 안 됨. -webkit-user-drag: element + user-select: none 명시 필요.
-          // text selection 와 drag 가 경쟁하지 않도록.
           WebkitUserDrag: "element",
           userSelect: "none",
         } as React.CSSProperties
@@ -541,13 +535,15 @@ function MeetingRow({
         {meeting.title?.trim() || "(제목 없음)"}
       </span>
       {meta ? (
-        <span
+        <Text
+          variant="caption"
+          color="muted"
+          as="span"
           className="shrink-0 pl-2 text-[11px] tabular-nums"
-          style={{ color: "var(--text-muted)" }}
         >
           {meta}
-        </span>
+        </Text>
       ) : null}
-    </button>
+    </Button>
   );
 }
