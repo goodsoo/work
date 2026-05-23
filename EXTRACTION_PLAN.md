@@ -317,14 +317,14 @@ PR #36 (todo cat colors) 가 `--cat-*` 7개 + 카테고리 dot 섹션 + `lib/tod
 - [x] `--motion-{fast,base,slow}` (Tailwind default `duration-150` 등과 호환)
 
 ### DESIGN.md 11 dimension
-- [x] §1 Color (이미 갱신됨)
+- [x] §1 Color
 - [x] §2 Typography
 - [x] §3 Spacing
-- [ ] §4 Radius — 토큰 매핑 + Button/Modal 의 radius 사용처
-- [ ] §5 Effects (shadow / blur / opacity)
-- [ ] §6 Motion (transition / duration)
-- [ ] §7 Z-index (layer scale)
-- [x] §8 Layout (이미 부분 갱신)
-- [ ] §9 Interaction primitives (hover/active/focus)
-- [ ] §10 Icon vocabulary
-- [ ] §11 Components — Button + Text 노트 추가 (Modal 만 있음)
+- [x] §4 Radius — 사용처 분포 + Tailwind default 유지 근거
+- [x] §5 Effects (5.1 Shadow / 5.2 Opacity / 5.3 Blur)
+- [x] §6 Motion (motion-fast/base/slow 토큰 + keyframes)
+- [x] §7 Z-index (layer scale)
+- [x] §8 Layout (renumbered from §5)
+- [x] §9 Interaction primitives (hover/active/focus)
+- [x] §10 Icon vocabulary
+- [x] §11 Components — Button + Text 노트 추가 + 11.4~11.10 정리
