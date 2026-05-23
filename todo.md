@@ -43,17 +43,6 @@ PR 단위로 묶음. 각 PR 의 **한 줄 임팩트** 는 카드 frontmatter `im
 - [ ] **사이드바 list 순서** — `CalendarDayPanel` (`SidePanel.tsx:455`) 안: 헤더 → 일기 CTA(기존) → 할일 → 메모. 현재는 일기 CTA → 메모 → 할일 이라 meeting/todo 렌더 블록 swap. 완료 todo 포함은 이미 동작 (`SidePanel.tsx:475-483` filter 가 done 도 잡음).
 - [ ] **셀 안 메모 압축** — `MonthGrid` cell 에서 meeting chip 제거 + 우상단 일기 BookOpen 아이콘 옆에 `ClipboardList + N` 아이콘+숫자 한 줄. `buildCellEvents` 가 meeting 안 push 하게 + 우상단 corner 영역에 메모 count 노출. 0건이면 안 보임.
 - [ ] **선택된 날 강조 (accent-blue ring)** — `MonthGrid.tsx:95` 의 `bg-surface` 대체 → `box-shadow: inset 0 0 0 2px var(--accent-blue)` (cell border 안 침범). 오늘 (red dot) 과 selection (blue ring) 두 차원 분리. 라이트/다크 모두 검증.
-- [ ] **할일 카테고리 dot** — todo chip 텍스트 앞에 4px colored dot (아래 "카테고리 색 시스템" PR 의 토큰 사용). 텍스트 색은 기존 유지.
-
-### PR — 할 일 카테고리 색 시스템 `ui_ux`
-한 줄 임팩트: 업무/일정/기타 한눈에 색 구분 — 캘린더 셀·사이드바·할일 페이지 공통
-
-- [ ] **색 토큰 정의** — `TodoCategory` 별 token (예: `--cat-work` / `--cat-schedule` / `--cat-other` + 미분류 fallback). 라이트/다크 모두. `DESIGN.md` 갱신.
-- [ ] **단일 lookup 함수** — `lib/todoCategory.ts` 같은 곳에 `categoryColor(category): string` → 모든 호출처 (캘린더 셀 dot, 사이드바 체크박스, todos 페이지 체크박스) 가 같은 source 사용. 동적 카테고리 PR (`PR — 동적 카테고리`) 진입 시 lookup 함수만 확장.
-- [ ] **캘린더 셀 dot** — `MonthGrid` todo chip 앞 4px dot (위 PR 의 chunk).
-- [ ] **캘린더 사이드바 체크박스** — `CalendarDayPanel` (`SidePanel.tsx:660-682`) todo row 체크박스 border/배경 색을 카테고리 색으로. 텍스트 색 X.
-- [ ] **할 일 페이지 체크박스 (`TodoRow`)** — 동일 패턴 체크박스 색만 카테고리 색.
-- [ ] **미분류 / legacy** — `category=null` 일 땐 dot 안 그리고 체크박스 회색 (기존). 라이트/다크 둘 다 시각 ok 확인.
 
 ---
 
