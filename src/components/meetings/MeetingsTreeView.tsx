@@ -352,45 +352,48 @@ function FolderItem({
               backgroundColor: "var(--border-default)",
             }}
           />
-          {/* 정렬과 무관하게 sub-folder 가 항상 먼저, 그 다음 메모. 옵시디안과 동일. */}
-          {node.children.map((c) => (
-            <FolderItem
-              key={c.path}
-              node={c}
-              depth={depth + 1}
-              selectedUid={selectedUid}
-              collapsed={collapsed}
-              dropTarget={dropTarget}
-              dragUid={dragUid}
-              editingFolder={editingFolder}
-              editingFolderPending={editingFolderPending}
-              onEditingFolderChange={onEditingFolderChange}
-              onEditingFolderCommit={onEditingFolderCommit}
-              onEditingFolderCancel={onEditingFolderCancel}
-              onToggle={onToggle}
-              onSelect={onSelect}
-              onContextMenu={onContextMenu}
-              onFolderContextMenu={onFolderContextMenu}
-              onDragStart={onDragStart}
-              onDragEnd={onDragEnd}
-              onDragOverFolder={onDragOverFolder}
-              onDragLeaveFolder={onDragLeaveFolder}
-              onDropFolder={onDropFolder}
-            />
-          ))}
-          {node.meetings.map((m) => (
-            <MeetingRow
-              key={m.uid}
-              meeting={m}
-              depth={depth + 1}
-              selected={m.uid === selectedUid}
-              isDragging={dragUid === m.uid}
-              onClick={() => onSelect(m.uid)}
-              onContextMenu={onContextMenu}
-              onDragStart={onDragStart}
-              onDragEnd={onDragEnd}
-            />
-          ))}
+          {/* 정렬과 무관하게 sub-folder 가 항상 먼저, 그 다음 메모. 옵시디안과 동일.
+              li 의 직속 자식은 ul/ol 로 감싸야 valid HTML (li-in-li nesting 회피). */}
+          <ul className="list-none">
+            {node.children.map((c) => (
+              <FolderItem
+                key={c.path}
+                node={c}
+                depth={depth + 1}
+                selectedUid={selectedUid}
+                collapsed={collapsed}
+                dropTarget={dropTarget}
+                dragUid={dragUid}
+                editingFolder={editingFolder}
+                editingFolderPending={editingFolderPending}
+                onEditingFolderChange={onEditingFolderChange}
+                onEditingFolderCommit={onEditingFolderCommit}
+                onEditingFolderCancel={onEditingFolderCancel}
+                onToggle={onToggle}
+                onSelect={onSelect}
+                onContextMenu={onContextMenu}
+                onFolderContextMenu={onFolderContextMenu}
+                onDragStart={onDragStart}
+                onDragEnd={onDragEnd}
+                onDragOverFolder={onDragOverFolder}
+                onDragLeaveFolder={onDragLeaveFolder}
+                onDropFolder={onDropFolder}
+              />
+            ))}
+            {node.meetings.map((m) => (
+              <MeetingRow
+                key={m.uid}
+                meeting={m}
+                depth={depth + 1}
+                selected={m.uid === selectedUid}
+                isDragging={dragUid === m.uid}
+                onClick={() => onSelect(m.uid)}
+                onContextMenu={onContextMenu}
+                onDragStart={onDragStart}
+                onDragEnd={onDragEnd}
+              />
+            ))}
+          </ul>
         </div>
       ) : null}
     </li>
@@ -509,41 +512,43 @@ function MeetingRow({
   // depth 별 indent 는 부모 폴더의 children wrapper paddingLeft 가 누적.
   const meta = formatMeetingMeta(meeting);
   return (
-    <Button
-      variant="ghost"
-      draggable
-      onClick={onClick}
-      onContextMenu={(e) => {
-        e.preventDefault();
-        onContextMenu(meeting.id, e.clientX, e.clientY);
-      }}
-      onDragStart={(e) => onDragStart(e, meeting.uid)}
-      onDragEnd={onDragEnd}
-      className="w-full justify-start gap-1.5 rounded py-1 pr-2 text-[13px] font-normal"
-      style={
-        {
-          paddingLeft: `${ROW_BASE_PAD_LEFT + TITLE_OFFSET}px`,
-          backgroundColor: selected ? "var(--bg-surface-active)" : undefined,
-          color: "var(--text-primary)",
-          opacity: isDragging ? 0.5 : 1,
-          WebkitUserDrag: "element",
-          userSelect: "none",
-        } as React.CSSProperties
-      }
-    >
-      <span className="min-w-0 flex-1 truncate">
-        {meeting.title?.trim() || "(제목 없음)"}
-      </span>
-      {meta ? (
-        <Text
-          variant="caption"
-          color="muted"
-          as="span"
-          className="shrink-0 pl-2 text-[11px] tabular-nums"
-        >
-          {meta}
-        </Text>
-      ) : null}
-    </Button>
+    <li className="list-none">
+      <Button
+        variant="ghost"
+        draggable
+        onClick={onClick}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          onContextMenu(meeting.id, e.clientX, e.clientY);
+        }}
+        onDragStart={(e) => onDragStart(e, meeting.uid)}
+        onDragEnd={onDragEnd}
+        className="w-full justify-start gap-1.5 rounded py-1 pr-2 text-[13px] font-normal"
+        style={
+          {
+            paddingLeft: `${ROW_BASE_PAD_LEFT + TITLE_OFFSET}px`,
+            backgroundColor: selected ? "var(--bg-surface-active)" : undefined,
+            color: "var(--text-primary)",
+            opacity: isDragging ? 0.5 : 1,
+            WebkitUserDrag: "element",
+            userSelect: "none",
+          } as React.CSSProperties
+        }
+      >
+        <span className="min-w-0 flex-1 truncate">
+          {meeting.title?.trim() || "(제목 없음)"}
+        </span>
+        {meta ? (
+          <Text
+            variant="caption"
+            color="muted"
+            as="span"
+            className="shrink-0 pl-2 text-[11px] tabular-nums"
+          >
+            {meta}
+          </Text>
+        ) : null}
+      </Button>
+    </li>
   );
 }
