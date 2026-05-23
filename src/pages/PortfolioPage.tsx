@@ -7,6 +7,8 @@ import {
 import { PortfolioWorkCard } from "../components/portfolio/PortfolioWorkCard";
 import type { ProjectFilter } from "../components/portfolio/PortfolioProjectList";
 import type { PortfolioWorkMeta } from "../api/portfolio";
+import { PageHeaderBar } from "../components/common/PageHeaderBar";
+import { Text } from "../components/common/Text";
 
 type Props = {
   activeFilter: ProjectFilter;
@@ -71,28 +73,15 @@ export function PortfolioPage({ activeFilter, onSync, syncRunning }: Props) {
   );
 }
 
-// 메모장 / 할일 본문 헤더와 동일 패턴 (py-3 → 자연 52px = 사이드바 헤더와 통일).
-// 좌/우 액션은 일단 비움 — 추후 sync 트리거 등 추가 가능.
 function PortfolioHeader() {
   return (
-    <div
-      className="sticky top-0 z-20 grid items-center gap-2 overflow-hidden px-3 backdrop-blur lg:relative lg:top-auto lg:shrink-0"
-      style={{
-        height: "var(--page-header-h)",
-        gridTemplateColumns: "minmax(0, 1fr) minmax(0, auto) minmax(0, 1fr)",
-        backgroundColor: "var(--bg-overlay)",
-        borderBottom: "1px solid var(--border-subtle)",
-      }}
-    >
-      <div />
-      <h1
-        className="justify-self-center text-base font-semibold"
-        style={{ color: "var(--text-primary)" }}
-      >
-        내 작업
-      </h1>
-      <div />
-    </div>
+    <PageHeaderBar
+      center={
+        <Text variant="h4" as="h1">
+          내 작업
+        </Text>
+      }
+    />
   );
 }
 

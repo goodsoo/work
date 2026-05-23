@@ -30,6 +30,7 @@ import type { MeetingUpdate } from "../../api/meetings";
 import { ClipPromptButton } from "../common/ClipPromptButton";
 import { Button } from "../common/Button";
 import { Text } from "../common/Text";
+import { PageHeaderBar } from "../common/PageHeaderBar";
 import { buildClaudePrompt } from "../../lib/clipboardPrompt";
 import { CopyButton } from "./CopyButton";
 import { EditableList } from "./EditableList";
@@ -573,113 +574,100 @@ export function MeetingForm({ meetingId, onBack }: Props) {
 
   return (
     <div className="min-h-svh lg:flex lg:h-screen lg:min-h-0 lg:flex-col">
-      {/* Header — 사이드바 헤더와 동일 패턴 (px-3 py-3 + h-7 button → 자연 52px).
-          desktop 에선 flex item (top fixed), mobile 은 sticky. grid 로 좌/우 그룹 width
-          변화 무관 제목 viewport-center. */}
-      <div
-        className="sticky top-0 z-20 grid items-center gap-2 overflow-hidden px-3 backdrop-blur lg:shrink-0 lg:relative lg:top-auto"
-        style={{
-          height: "var(--page-header-h)",
-          gridTemplateColumns: "minmax(0, 1fr) minmax(0, auto) minmax(0, 1fr)",
-          backgroundColor: "var(--bg-overlay)",
-          borderBottom: "1px solid var(--border-subtle)",
-        }}
-      >
-        {/* Left: undo/redo + save indicator */}
-        <div className="flex shrink-0 items-center gap-2 justify-self-start">
-          <div
-            className="inline-flex overflow-hidden rounded-md"
-            style={{ border: "1px solid var(--border-subtle)" }}
-          >
-            <Button
-              variant="ghost"
-              onClick={() => {
-                const t = docHistory.undo();
-                if (t) routeToSource((t.from as DocSnapshot).__source);
-              }}
-              disabled={!docHistory.canUndo}
-              title={`실행 취소 (${activeTab === "body" ? "메모" : activeTab === "transcript" ? "음성 기록" : "요약"})`}
-              className="rounded-none px-1.5 py-1 disabled:opacity-20"
-              style={{ color: "var(--text-secondary)" }}
+      <PageHeaderBar
+        left={
+          <>
+            <div
+              className="inline-flex overflow-hidden rounded-md"
+              style={{ border: "1px solid var(--border-subtle)" }}
             >
-              <Undo2 className="h-3.5 w-3.5" />
-            </Button>
-            <Button
-              variant="ghost"
-              onClick={() => {
-                const t = docHistory.redo();
-                if (t) routeToSource((t.to as DocSnapshot).__source);
-              }}
-              disabled={!docHistory.canRedo}
-              title={`다시 실행 (${activeTab === "body" ? "메모" : activeTab === "transcript" ? "음성 기록" : "요약"})`}
-              className="rounded-none px-1.5 py-1 disabled:opacity-20"
-              style={{ color: "var(--text-secondary)", borderLeft: "1px solid var(--border-subtle)" }}
-            >
-              <Redo2 className="h-3.5 w-3.5" />
-            </Button>
-          </div>
-          <SaveIndicator
-            isPending={updateMutation.isPending || hasUnsavedChange}
-            isError={updateMutation.isError}
-            onRetry={retrySave}
-          />
-        </div>
-
-        {/* Center: title — grid auto col 안 dead-center, max-width 로 좌/우 그룹과 겹침 방지.
-            typing 중엔 mutation X — onBlur / Enter 만 commit (매번 rename 회피) */}
-        <input
-          ref={titleInputRef}
-          type="text"
-          value={titleDraft}
-          onChange={(e) => setTitleDraft(e.target.value)}
-          onBlur={commitTitle}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              // blur 만 — onBlur 가 commitTitle 발사. 직접 호출하면 commit 2번 → mutation race.
-              (e.target as HTMLInputElement).blur();
-            } else if (e.key === "Escape") {
-              e.preventDefault();
-              // 원래 제목으로 revert + blur. 다음 onBlur 의 commitTitle 는 skip.
-              setTitleDraft(initialTitle);
-              skipNextTitleCommit.current = true;
-              setActionError(null);
-              (e.target as HTMLInputElement).blur();
-            }
-          }}
-          placeholder="untitled"
-          autoFocus={!data.title}
-          className="min-w-0 justify-self-center bg-transparent text-center text-base font-semibold outline-none"
-          style={{
-            color: "var(--text-primary)",
-            // field-sizing: input width 가 자동으로 content 길이 따라감 (한글/영문 정확).
-            // max-width 28rem 또는 grid track 안 100% 로 cap, 초과 시 native ellipsis.
-            fieldSizing: "content",
-            maxWidth: "min(100%, 28rem)",
-            textOverflow: "ellipsis",
-            overflow: "hidden",
-          } as React.CSSProperties}
-        />
-
-        {/* Right: copy / delete (편집/보기 토글은 서브 헤더 ModeChip 으로 이전) */}
-        <div className="flex shrink-0 items-center gap-1 justify-self-end">
-          <CopyButton meeting={meetingForCopy} onError={setActionError} compact />
-          <Button
-            variant="ghost"
-            onClick={handleDelete}
-            disabled={deleteMutation.isPending}
-            title="메모 삭제"
-            aria-label="메모 삭제"
-            className="px-1.5 py-1 disabled:opacity-40"
-            style={{
-              border: "1px solid var(--border-subtle)",
-              color: "var(--text-muted)",
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  const t = docHistory.undo();
+                  if (t) routeToSource((t.from as DocSnapshot).__source);
+                }}
+                disabled={!docHistory.canUndo}
+                title={`실행 취소 (${activeTab === "body" ? "메모" : activeTab === "transcript" ? "음성 기록" : "요약"})`}
+                className="rounded-none px-1.5 py-1 disabled:opacity-20"
+                style={{ color: "var(--text-secondary)" }}
+              >
+                <Undo2 className="h-3.5 w-3.5" />
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  const t = docHistory.redo();
+                  if (t) routeToSource((t.to as DocSnapshot).__source);
+                }}
+                disabled={!docHistory.canRedo}
+                title={`다시 실행 (${activeTab === "body" ? "메모" : activeTab === "transcript" ? "음성 기록" : "요약"})`}
+                className="rounded-none px-1.5 py-1 disabled:opacity-20"
+                style={{ color: "var(--text-secondary)", borderLeft: "1px solid var(--border-subtle)" }}
+              >
+                <Redo2 className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+            <SaveIndicator
+              isPending={updateMutation.isPending || hasUnsavedChange}
+              isError={updateMutation.isError}
+              onRetry={retrySave}
+            />
+          </>
+        }
+        center={
+          // typing 중엔 mutation X — onBlur / Enter 만 commit (매번 rename 회피).
+          // field-sizing: input width 가 자동으로 content 길이 따라감.
+          <input
+            ref={titleInputRef}
+            type="text"
+            value={titleDraft}
+            onChange={(e) => setTitleDraft(e.target.value)}
+            onBlur={commitTitle}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                (e.target as HTMLInputElement).blur();
+              } else if (e.key === "Escape") {
+                e.preventDefault();
+                setTitleDraft(initialTitle);
+                skipNextTitleCommit.current = true;
+                setActionError(null);
+                (e.target as HTMLInputElement).blur();
+              }
             }}
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </Button>
-        </div>
-      </div>
+            placeholder="untitled"
+            autoFocus={!data.title}
+            className="min-w-0 bg-transparent text-center text-base font-semibold outline-none"
+            style={{
+              color: "var(--text-primary)",
+              fieldSizing: "content",
+              maxWidth: "min(100%, 28rem)",
+              textOverflow: "ellipsis",
+              overflow: "hidden",
+            } as React.CSSProperties}
+          />
+        }
+        right={
+          <>
+            <CopyButton meeting={meetingForCopy} onError={setActionError} compact />
+            <Button
+              variant="ghost"
+              onClick={handleDelete}
+              disabled={deleteMutation.isPending}
+              title="메모 삭제"
+              aria-label="메모 삭제"
+              className="px-1.5 py-1 disabled:opacity-40"
+              style={{
+                border: "1px solid var(--border-subtle)",
+                color: "var(--text-muted)",
+              }}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          </>
+        }
+      />
 
       {/* Error toasts — fixed bottom-right, 본문 레이아웃에 영향 없음 */}
       {updateMutation.isError || actionError ? (

@@ -13,6 +13,9 @@ import {
 import type { Todo, TodoPriority, TodoCategory } from "../api/todos";
 import { TaskAddModal } from "../components/tasks/TaskAddModal";
 import { TodoRow } from "../components/todos/TodoRow";
+import { PageHeaderBar } from "../components/common/PageHeaderBar";
+import { Button } from "../components/common/Button";
+import { Text } from "../components/common/Text";
 import type {
   TodosCategoryFilter,
   TodosStatusFilter,
@@ -141,57 +144,43 @@ export function TodosPage({
 
   return (
     <>
-      {/* 메모장 MeetingForm 헤더와 동일 markup — 3-col grid (left/center/right),
-          py-3 sticky (사이드바 헤더와 자연 52px 통일). left: undo/redo,
-          center: 제목 (text-base font-semibold). */}
-      <div
-        className="sticky top-0 z-20 grid items-center gap-2 overflow-hidden px-3 backdrop-blur lg:relative lg:top-auto lg:shrink-0"
-        style={{
-          height: "var(--page-header-h)",
-          gridTemplateColumns: "minmax(0, 1fr) minmax(0, auto) minmax(0, 1fr)",
-          backgroundColor: "var(--bg-overlay)",
-          borderBottom: "1px solid var(--border-subtle)",
-        }}
-      >
-        <div className="flex shrink-0 items-center gap-2 justify-self-start">
+      <PageHeaderBar
+        left={
           <div
             className="inline-flex overflow-hidden rounded-md"
             style={{ border: "1px solid var(--border-subtle)" }}
           >
-            <button
-              type="button"
+            <Button
+              variant="ghost"
               onClick={undo}
               disabled={!canUndo}
               title="실행 취소 (⌘Z)"
-              className="px-1.5 py-1 transition disabled:opacity-20"
-              style={{ color: "var(--text-secondary)", minHeight: 0 }}
+              className="rounded-none px-1.5 py-1 disabled:opacity-20"
+              style={{ color: "var(--text-secondary)" }}
             >
               <Undo2 className="h-3.5 w-3.5" />
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              variant="ghost"
               onClick={redo}
               disabled={!canRedo}
               title="다시 실행 (⌘⇧Z)"
-              className="px-1.5 py-1 transition disabled:opacity-20"
+              className="rounded-none px-1.5 py-1 disabled:opacity-20"
               style={{
                 color: "var(--text-secondary)",
                 borderLeft: "1px solid var(--border-subtle)",
-                minHeight: 0,
               }}
             >
               <Redo2 className="h-3.5 w-3.5" />
-            </button>
+            </Button>
           </div>
-        </div>
-        <h2
-          className="justify-self-center text-center text-base font-semibold"
-          style={{ color: "var(--text-primary)" }}
-        >
-          할 일
-        </h2>
-        <div className="justify-self-end" />
-      </div>
+        }
+        center={
+          <Text variant="h4" as="h2" className="text-center">
+            할 일
+          </Text>
+        }
+      />
       <TaskAddModal
         open={adding}
         onClose={() => setAdding(false)}
