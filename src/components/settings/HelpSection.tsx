@@ -1,3 +1,5 @@
+import { Text } from "../common/Text";
+
 type Example = { inputs: string[]; output: string };
 
 const DATE_EXAMPLES: Example[] = [
@@ -40,12 +42,15 @@ export function HelpSection() {
 function Block({ title, examples }: { title: string; examples: Example[] }) {
   return (
     <section>
-      <h3
-        className="mb-2 text-xs font-semibold uppercase tracking-wide"
-        style={{ color: "var(--text-muted)" }}
+      <Text
+        variant="caption"
+        color="muted"
+        as="h3"
+        weight="semibold"
+        className="mb-2 uppercase tracking-wide"
       >
         {title}
-      </h3>
+      </Text>
       <ul className="grid grid-cols-[repeat(auto-fit,minmax(260px,1fr))] gap-x-6">
         {examples.map((e, i) => (
           <li
@@ -69,9 +74,9 @@ function Block({ title, examples }: { title: string; examples: Example[] }) {
                 </code>
               ))}
             </div>
-            <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+            <Text variant="caption" color="muted" as="span">
               {e.output}
-            </span>
+            </Text>
           </li>
         ))}
       </ul>
