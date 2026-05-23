@@ -13,6 +13,39 @@
   /* desktop 3-pane layout trigger. 기본 lg=1024px 보다 일찍 들어가도록 640px 로
      낮춤. 코드의 `lg:` 유틸리티 + raw @media (min-width: ...) 모두 이 값 기준. */
   --breakpoint-lg: 640px;
+
+  /* ── 시맨틱 opacity 토큰 ──
+     자리에서 시맨틱 의미 표시 (opacity-40 → opacity-disabled 등). raw 숫자
+     opacity 자리는 의미 보존 후 점진 migration. Tailwind v4 가 `opacity-{name}`
+     utility 자동 생성. */
+  --opacity-disabled: 0.4;
+  --opacity-secondary: 0.6;
+  --opacity-hover: 0.9;
+  --opacity-active: 0.8;
+  --opacity-overlay: 0.5;
+
+  /* ── 시맨틱 z-index 토큰 ──
+     layer scale: dropdown < sticky < overlay < modal < popover < tooltip < toast.
+     기존 z-10/20/30/40/50 자리는 의미별로 갈아엎기 (점진). */
+  --z-dropdown: 10;
+  --z-sticky: 20;
+  --z-overlay: 30;
+  --z-modal: 50;
+  --z-popover: 55;
+  --z-tooltip: 60;
+  --z-toast: 70;
+
+  /* ── 시맨틱 shadow 토큰 ──
+     surface-frost-shadow (이미 정의) 외 카드 / 모달 / 팝오버 분리. */
+  --shadow-card: 0 1px 3px 0 rgba(0, 0, 0, 0.06), 0 1px 2px -1px rgba(0, 0, 0, 0.06);
+  --shadow-modal: 0 24px 48px -12px rgba(0, 0, 0, 0.22), 0 8px 16px -4px rgba(0, 0, 0, 0.1);
+  --shadow-popover: 0 8px 16px -4px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.08);
+
+  /* ── 시맨틱 motion 토큰 ──
+     duration. easing 은 ease-out (Tailwind default) 그대로 충분. */
+  --motion-fast: 120ms;
+  --motion-base: 150ms;
+  --motion-slow: 250ms;
 }
 
 @layer base {

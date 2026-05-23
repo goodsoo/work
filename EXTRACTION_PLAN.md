@@ -311,10 +311,10 @@ PR #36 (todo cat colors) 가 `--cat-*` 7개 + 카테고리 dot 섹션 + `lib/tod
 - [x] `Toast.tsx` (close X icon button + 본문 Text)
 
 ### 시맨틱 토큰 (`src/index.css` `@theme`)
-- [ ] `--opacity-{disabled,hover,active,secondary}` + raw `opacity-*` 자리 갈아엎기
-- [ ] `--z-{dropdown,sticky,modal,popover,toast,tooltip}` + raw `z-*` 자리
-- [ ] `--shadow-{card,modal,popover}` + raw `shadow-*` 자리
-- [ ] `--motion-{fast,base,slow}` + raw `transition` / `duration-*` 자리 (Tailwind default 충분하면 명시만)
+- [x] `--opacity-{disabled,secondary,hover,active,overlay}` (raw `opacity-40/60/90/80/50` 자리 점진 migration — utility 자동 생성됨)
+- [x] `--z-{dropdown,sticky,overlay,modal,popover,tooltip,toast}` (raw `z-10/20/30/40/50` 자리 점진 migration)
+- [x] `--shadow-{card,modal,popover}` (`--surface-frost-shadow` 와 별개)
+- [x] `--motion-{fast,base,slow}` (Tailwind default `duration-150` 등과 호환)
 
 ### DESIGN.md 11 dimension
 - [x] §1 Color (이미 갱신됨)
