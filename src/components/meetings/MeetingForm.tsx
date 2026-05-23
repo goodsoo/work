@@ -28,6 +28,8 @@ import { useStateHistory } from "../../hooks/useStateHistory";
 import { useCreateTodo } from "../../hooks/useTodos";
 import type { MeetingUpdate } from "../../api/meetings";
 import { ClipPromptButton } from "../common/ClipPromptButton";
+import { Button } from "../common/Button";
+import { Text } from "../common/Text";
 import { buildClaudePrompt } from "../../lib/clipboardPrompt";
 import { CopyButton } from "./CopyButton";
 import { EditableList } from "./EditableList";
@@ -497,8 +499,10 @@ export function MeetingForm({ meetingId, onBack }: Props) {
   if (error) {
     return (
       <div className="mx-auto w-full max-w-3xl px-6 py-16">
-        <div
-          className="rounded-lg p-4 text-sm"
+        <Text
+          variant="body"
+          as="div"
+          className="rounded-lg p-4"
           style={{
             borderLeft: "4px solid var(--accent-red)",
             backgroundColor: "var(--accent-red-bg)",
@@ -506,7 +510,7 @@ export function MeetingForm({ meetingId, onBack }: Props) {
           }}
         >
           불러오지 못했어요. <button type="button" onClick={() => void refetch()} className="underline">재시도</button>
-        </div>
+        </Text>
       </div>
     );
   }
@@ -587,32 +591,32 @@ export function MeetingForm({ meetingId, onBack }: Props) {
             className="inline-flex overflow-hidden rounded-md"
             style={{ border: "1px solid var(--border-subtle)" }}
           >
-            <button
-              type="button"
+            <Button
+              variant="ghost"
               onClick={() => {
                 const t = docHistory.undo();
                 if (t) routeToSource((t.from as DocSnapshot).__source);
               }}
               disabled={!docHistory.canUndo}
               title={`실행 취소 (${activeTab === "body" ? "메모" : activeTab === "transcript" ? "음성 기록" : "요약"})`}
-              className="px-1.5 py-1 transition disabled:opacity-20"
-              style={{ color: "var(--text-secondary)", minHeight: 0 }}
+              className="rounded-none px-1.5 py-1 disabled:opacity-20"
+              style={{ color: "var(--text-secondary)" }}
             >
               <Undo2 className="h-3.5 w-3.5" />
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              variant="ghost"
               onClick={() => {
                 const t = docHistory.redo();
                 if (t) routeToSource((t.to as DocSnapshot).__source);
               }}
               disabled={!docHistory.canRedo}
               title={`다시 실행 (${activeTab === "body" ? "메모" : activeTab === "transcript" ? "음성 기록" : "요약"})`}
-              className="px-1.5 py-1 transition disabled:opacity-20"
-              style={{ color: "var(--text-secondary)", borderLeft: "1px solid var(--border-subtle)", minHeight: 0 }}
+              className="rounded-none px-1.5 py-1 disabled:opacity-20"
+              style={{ color: "var(--text-secondary)", borderLeft: "1px solid var(--border-subtle)" }}
             >
               <Redo2 className="h-3.5 w-3.5" />
-            </button>
+            </Button>
           </div>
           <SaveIndicator
             isPending={updateMutation.isPending || hasUnsavedChange}
@@ -660,21 +664,20 @@ export function MeetingForm({ meetingId, onBack }: Props) {
         {/* Right: copy / delete (편집/보기 토글은 서브 헤더 ModeChip 으로 이전) */}
         <div className="flex shrink-0 items-center gap-1 justify-self-end">
           <CopyButton meeting={meetingForCopy} onError={setActionError} compact />
-          <button
-            type="button"
+          <Button
+            variant="ghost"
             onClick={handleDelete}
             disabled={deleteMutation.isPending}
             title="메모 삭제"
             aria-label="메모 삭제"
-            className="rounded-md px-1.5 py-1 transition disabled:opacity-40"
+            className="px-1.5 py-1 disabled:opacity-40"
             style={{
               border: "1px solid var(--border-subtle)",
               color: "var(--text-muted)",
-              minHeight: 0,
             }}
           >
             <Trash2 className="h-3.5 w-3.5" />
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -705,28 +708,30 @@ export function MeetingForm({ meetingId, onBack }: Props) {
                 <span className="min-w-0 flex-1 truncate font-semibold">
                   자동 저장 실패
                 </span>
-                <button
-                  type="button"
+                <Button
+                  variant="icon"
                   onClick={() => updateMutation.reset()}
                   title="닫기"
                   aria-label="닫기"
-                  className="shrink-0 rounded p-0.5 transition"
-                  style={{ color: "var(--text-muted)", minHeight: 0 }}
+                  className="shrink-0 p-0.5"
+                  style={{ color: "var(--text-muted)" }}
                 >
                   <X className="h-3.5 w-3.5" />
-                </button>
+                </Button>
               </div>
               {updateMutation.error ? (
-                <div
-                  className="text-xs break-all wrap-anywhere"
-                  style={{ color: "var(--text-secondary)" }}
+                <Text
+                  variant="caption"
+                  color="secondary"
+                  as="div"
+                  className="break-all wrap-anywhere"
                 >
                   {formatError(updateMutation.error)}
-                </div>
+                </Text>
               ) : null}
               <div className="flex justify-end gap-1.5">
-                <button
-                  type="button"
+                <Button
+                  variant="ghost"
                   onClick={() =>
                     copyToastMessage(
                       updateMutation.error ? formatError(updateMutation.error) : "자동 저장 실패",
@@ -735,28 +740,24 @@ export function MeetingForm({ meetingId, onBack }: Props) {
                   }
                   title="에러 메시지 복사"
                   aria-label="에러 메시지 복사"
-                  className="rounded-md p-1.5 transition hover:bg-black/5"
-                  style={{ color: "var(--text-muted)", minHeight: 0 }}
+                  className="p-1.5"
+                  style={{ color: "var(--text-muted)" }}
                 >
                   {copiedToast === "update" ? (
                     <Check className="h-3.5 w-3.5" style={{ color: "var(--accent-green)" }} />
                   ) : (
                     <Copy className="h-3.5 w-3.5" />
                   )}
-                </button>
-                <button
-                  type="button"
+                </Button>
+                <Button
+                  variant="danger"
+                  size="sm"
                   onClick={retrySave}
                   disabled={updateMutation.isPending}
-                  className="rounded-md px-2.5 py-1 text-xs font-medium transition hover:opacity-90 disabled:opacity-40"
-                  style={{
-                    backgroundColor: "var(--accent-red)",
-                    color: "#fff",
-                    minHeight: 0,
-                  }}
+                  className="disabled:opacity-40"
                 >
                   {updateMutation.isPending ? "재시도 중..." : "재시도"}
-                </button>
+                </Button>
               </div>
             </div>
           ) : null}
@@ -778,38 +779,40 @@ export function MeetingForm({ meetingId, onBack }: Props) {
                 <span className="min-w-0 flex-1 truncate font-semibold">
                   ERROR
                 </span>
-                <button
-                  type="button"
+                <Button
+                  variant="icon"
                   onClick={() => setActionError(null)}
                   title="닫기"
                   aria-label="닫기"
-                  className="shrink-0 rounded p-0.5 transition"
-                  style={{ color: "var(--text-muted)", minHeight: 0 }}
+                  className="shrink-0 p-0.5"
+                  style={{ color: "var(--text-muted)" }}
                 >
                   <X className="h-3.5 w-3.5" />
-                </button>
+                </Button>
               </div>
-              <div
-                className="text-xs break-all wrap-anywhere"
-                style={{ color: "var(--text-secondary)" }}
+              <Text
+                variant="caption"
+                color="secondary"
+                as="div"
+                className="break-all wrap-anywhere"
               >
                 {actionError}
-              </div>
+              </Text>
               <div className="flex justify-end gap-1.5">
-                <button
-                  type="button"
+                <Button
+                  variant="ghost"
                   onClick={() => copyToastMessage(actionError, "action")}
                   title="에러 메시지 복사"
                   aria-label="에러 메시지 복사"
-                  className="rounded-md p-1.5 transition hover:bg-black/5"
-                  style={{ color: "var(--text-muted)", minHeight: 0 }}
+                  className="p-1.5"
+                  style={{ color: "var(--text-muted)" }}
                 >
                   {copiedToast === "action" ? (
                     <Check className="h-3.5 w-3.5" style={{ color: "var(--accent-green)" }} />
                   ) : (
                     <Copy className="h-3.5 w-3.5" />
                   )}
-                </button>
+                </Button>
               </div>
             </div>
           ) : null}
@@ -1047,22 +1050,26 @@ export function MeetingForm({ meetingId, onBack }: Props) {
                       onSave={(next) => setSummaryField("action_items", next)}
                       itemActions={(i, text) =>
                         addedTodoIndices.has(i) ? (
-                          <span
-                            className="inline-flex items-center gap-1 text-xs"
-                            style={{ color: "var(--text-muted)", minHeight: 0 }}
+                          <Text
+                            variant="caption"
+                            color="muted"
+                            as="span"
+                            className="inline-flex items-center gap-1"
                           >
                             <Check className="h-3 w-3" /> 추가됨
-                          </span>
+                          </Text>
                         ) : (
-                          <button
-                            type="button"
+                          <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={() => addActionItemAsTodo(i, text)}
                             disabled={createTodoMutation.isPending}
-                            className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs transition disabled:opacity-40"
-                            style={{ color: "var(--text-secondary)", minHeight: 0 }}
+                            className="px-1.5 py-0.5 disabled:opacity-40"
+                            style={{ color: "var(--text-secondary)" }}
+                            leftIcon={<ListPlus className="h-3 w-3" />}
                           >
-                            <ListPlus className="h-3 w-3" /> 할 일로
-                          </button>
+                            할 일로
+                          </Button>
                         )
                       }
                     />
@@ -1070,9 +1077,9 @@ export function MeetingForm({ meetingId, onBack }: Props) {
                 ) : null}
               </div>
             ) : (
-              <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+              <Text variant="body" color="muted" as="p">
                 메모나 음성 기록을 적은 뒤 위 버튼을 눌러 AI 요약을 만들어요.
-              </p>
+              </Text>
             )}
           </div>
         ) : null}
@@ -1132,34 +1139,32 @@ function ModeChip({
   const isEdit = viewMode === "edit";
   const title = `${isEdit ? "보기" : "편집"} 모드로  ⌘⇧E`;
   return (
-    <button
-      type="button"
+    <Button
+      variant="ghost"
+      size="sm"
       onClick={onToggle}
       title={title}
-      className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs transition"
+      leftIcon={
+        isEdit ? <Pencil className="h-3 w-3" /> : <Eye className="h-3 w-3" />
+      }
+      className="px-1.5 py-0.5"
       style={{
         border: "1px solid var(--border-subtle)",
         color: isEdit ? "var(--accent-blue-text)" : "var(--text-secondary)",
         backgroundColor: isEdit ? "var(--accent-blue-bg)" : "var(--bg-surface)",
-        minHeight: 0,
       }}
     >
-      {isEdit ? (
-        <Pencil className="h-3 w-3" />
-      ) : (
-        <Eye className="h-3 w-3" />
-      )}
-      <span>{isEdit ? "편집" : "보기"}</span>
-    </button>
+      {isEdit ? "편집" : "보기"}
+    </Button>
   );
 }
 
 function CharCountBadge({ count }: { count: number }) {
   if (count <= 0) return null;
   return (
-    <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+    <Text variant="caption" color="muted" as="span">
       {count}자
-    </span>
+    </Text>
   );
 }
 
@@ -1211,32 +1216,37 @@ function MetaReadOnly({ meta }: { meta: MetaDoc }) {
   if (meta.attendees) rows.push({ label: "참석자", value: meta.attendees });
   if (rows.length === 0) return null;
   return (
-    <div className="mb-4 text-sm">
+    <Text variant="body" as="div" className="mb-4">
       {rows.map((r) => (
         <div
           key={r.label}
           className="flex items-center gap-3"
           style={{ minHeight: "1.625rem" }}
         >
-          <span
+          <Text
+            variant="body"
+            color="muted"
+            as="span"
             className="shrink-0"
-            style={{ color: "var(--text-muted)", width: "3.5rem" }}
+            style={{ width: "3.5rem" }}
           >
             {r.label}
-          </span>
-          <span style={{ color: "var(--text-primary)" }}>{r.value}</span>
+          </Text>
+          <Text variant="body" as="span">
+            {r.value}
+          </Text>
         </div>
       ))}
-    </div>
+    </Text>
   );
 }
 
 function EmptyBodyCTA({ onStartEdit }: { onStartEdit: () => void }) {
   return (
-    <button
-      type="button"
+    <Button
+      variant="ghost"
       onClick={onStartEdit}
-      className="group flex w-full flex-col items-center justify-center gap-3 rounded-lg text-center transition"
+      className="group flex-col w-full justify-center gap-3 rounded-lg text-center"
       style={{
         minHeight: "60vh",
         border: "1px dashed var(--border-subtle)",
@@ -1253,11 +1263,11 @@ function EmptyBodyCTA({ onStartEdit }: { onStartEdit: () => void }) {
       }}
     >
       <Pencil className="h-6 w-6" />
-      <div className="text-sm">
+      <Text variant="body" as="div">
         편집을 시작하려면 클릭하세요
-      </div>
+      </Text>
       {isTauri ? (
-        <div className="flex items-center gap-1.5 text-xs">
+        <Text variant="caption" as="div" className="flex items-center gap-1.5">
           <span>또는</span>
           <kbd
             className="rounded font-mono leading-none"
@@ -1271,9 +1281,9 @@ function EmptyBodyCTA({ onStartEdit }: { onStartEdit: () => void }) {
           >
             ⌘⇧E
           </kbd>
-        </div>
+        </Text>
       ) : null}
-    </button>
+    </Button>
   );
 }
 
@@ -1295,25 +1305,26 @@ function TabBtn({
   onClick: () => void;
 }) {
   return (
-    <button
-      type="button"
+    <Button
+      variant="ghost"
       onClick={onClick}
       title={label}
       aria-current={active ? "page" : undefined}
-      className="flex items-center gap-1.5 px-3 py-2 text-sm transition"
+      className="rounded-none px-3 py-2"
       style={{
         color: active ? "var(--text-primary)" : "var(--text-secondary)",
         borderBottom: active
           ? "2px solid var(--text-primary)"
           : "2px solid transparent",
         marginBottom: "-1px",
-        minHeight: 0,
         fontWeight: active ? 600 : 400,
       }}
     >
       <span>{label}</span>
       {badge ? (
-        <span
+        <Text
+          variant="caption"
+          as="span"
           role={onBadgeClick ? "button" : undefined}
           tabIndex={onBadgeClick ? 0 : undefined}
           title={badgeTitle}
@@ -1336,7 +1347,7 @@ function TabBtn({
                 }
               : undefined
           }
-          className="rounded-md px-1.5 py-0.5 text-xs"
+          className="rounded-md px-1.5 py-0.5"
           style={{
             backgroundColor: badgeAccent
               ? "var(--accent-blue-bg)"
@@ -1349,9 +1360,9 @@ function TabBtn({
           }}
         >
           {badge}
-        </span>
+        </Text>
       ) : null}
-    </button>
+    </Button>
   );
 }
 
@@ -1423,21 +1434,16 @@ function TranscriptArea({
   return (
     <div>
       <div className="mb-2 flex items-center justify-between gap-2">
-        <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+        <Text variant="caption" color="muted" as="span">
           녹음을 STT로 변환한 텍스트를 붙여넣거나 파일 업로드
-        </span>
-        <button
-          type="button"
+        </Text>
+        <Button
+          variant="secondary"
+          size="sm"
           onClick={() => fileInputRef.current?.click()}
-          className="rounded-md px-2 py-1 text-xs transition"
-          style={{
-            border: "1px solid var(--border-default)",
-            color: "var(--text-secondary)",
-            minHeight: 0,
-          }}
         >
           파일 업로드
-        </button>
+        </Button>
         <input
           ref={fileInputRef}
           type="file"
@@ -1525,16 +1531,15 @@ function SaveIndicator({
 
   if (state === "error") {
     return (
-      <button
-        type="button"
+      <Button
+        variant="icon"
         onClick={onRetry}
         title={title}
         aria-label={title}
         className="rounded p-1"
-        style={{ minHeight: 0 }}
       >
         {inner}
-      </button>
+      </Button>
     );
   }
   return (
