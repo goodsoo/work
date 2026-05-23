@@ -5,6 +5,7 @@ import {
   useDeletePortfolioWork,
   useUpdatePortfolioFrontmatter,
 } from "../../hooks/usePortfolio";
+import { Button } from "../common/Button";
 
 type Props = {
   work: PortfolioWorkMeta;
@@ -72,18 +73,17 @@ export function PortfolioCardMenu({ work }: Props) {
 
   return (
     <div ref={rootRef} className="relative">
-      <button
-        type="button"
+      <Button
+        variant="icon"
         onClick={(e) => {
           e.stopPropagation();
           setOpen((o) => !o);
         }}
         title="카드 메뉴"
-        className="flex h-7 w-7 items-center justify-center rounded-md transition"
         style={{ color: "var(--text-muted)" }}
       >
         <MoreVertical className="h-4 w-4" />
-      </button>
+      </Button>
 
       {open ? (
         <div
@@ -127,18 +127,18 @@ function MenuItem({
   onMouseEnter?: () => void;
 }) {
   return (
-    <button
-      type="button"
+    <Button
+      variant="ghost"
       onClick={onClick}
       onMouseEnter={onMouseEnter}
-      className="flex w-full items-center justify-between px-3 py-1.5 text-left transition"
+      className="w-full justify-between rounded-none px-3 py-1.5 font-normal"
       style={{
         color: danger ? "var(--accent-red-text)" : "var(--text-primary)",
       }}
     >
       <span>{label}</span>
       {trailing ?? null}
-    </button>
+    </Button>
   );
 }
 

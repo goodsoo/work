@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { parsePRResponse } from "../../lib/clipboardPrompt";
+import { Text } from "../common/Text";
 
 // design v2.3 step 8: Claude 응답 paste → H3 split parsing → frontmatter 채움.
 // 파싱 성공 시 onParsed 콜백, 실패 시 raw 텍스트 보존 + "직접 입력" 안내.
@@ -53,12 +54,14 @@ export function ResponsePasteArea({ onParsed, onError }: Props) {
         }}
       />
       {unparsed ? (
-        <span
+        <Text
+          variant="caption"
+          as="span"
           className="text-[11px]"
           style={{ color: "var(--accent-red-text)" }}
         >
           응답 형식 못 알아봄 — 직접 입력
-        </span>
+        </Text>
       ) : null}
     </div>
   );

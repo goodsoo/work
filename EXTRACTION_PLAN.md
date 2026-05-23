@@ -287,12 +287,12 @@ PR #36 (todo cat colors) 가 `--cat-*` 7개 + 카테고리 dot 섹션 + `lib/tod
 - [x] `vault/VaultPicker.tsx`
 
 ### portfolio (extras)
-- [ ] `portfolio/PortfolioCardMenu.tsx`
-- [ ] `portfolio/PortfolioProjectList.tsx`
-- [ ] `portfolio/PortfolioWorkCard.tsx`
-- [ ] `portfolio/ResponsePasteArea.tsx`
-- [ ] `portfolio/ScreenshotDropzone.tsx`
-- [ ] `portfolio/SyncButton.tsx`
+- [x] `portfolio/PortfolioCardMenu.tsx`
+- [x] `portfolio/PortfolioProjectList.tsx`
+- [x] `portfolio/PortfolioWorkCard.tsx` (큰 카드 — 본문 / 부제 + 복원/삭제 button; chip span 들은 일관 패턴이라 raw 유지)
+- [x] `portfolio/ResponsePasteArea.tsx`
+- [~] `portfolio/ScreenshotDropzone.tsx` (label 자체가 dropzone — 내부 inner span 그대로)
+- [x] `portfolio/SyncButton.tsx`
 
 ### meetings (extras)
 - [ ] `meetings/AttendeeTagInput.tsx`
