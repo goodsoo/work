@@ -268,11 +268,11 @@ PR #36 (todo cat colors) 가 `--cat-*` 7개 + 카테고리 dot 섹션 + `lib/tod
 - [~] `pages/MeetingsPage.tsx` (파일 없음 — 컴포넌트 직접 라우팅, skip)
 
 ### timeline
-- [ ] `timeline/JournalBlock.tsx`
-- [ ] `timeline/MeetingBlock.tsx`
-- [ ] `timeline/MonthGrid.tsx`
-- [ ] `timeline/TimelineBlock.tsx`
-- [ ] `timeline/TodoBlock.tsx`
+- [x] `timeline/JournalBlock.tsx` (raw 자리 0)
+- [x] `timeline/MeetingBlock.tsx` (2 text)
+- [x] `timeline/MonthGrid.tsx` (1 button + 3 text)
+- [x] `timeline/TimelineBlock.tsx` (1 text — letter span)
+- [x] `timeline/TodoBlock.tsx` (1 button + 1 text)
 
 ### common
 - [ ] `common/CategoryPicker.tsx`

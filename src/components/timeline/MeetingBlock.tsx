@@ -1,5 +1,6 @@
 import type { Meeting } from "../../api/meetings";
 import { TimelineBlock } from "./TimelineBlock";
+import { Text } from "../common/Text";
 
 type Props = {
   meeting: Meeting;
@@ -16,14 +17,13 @@ export function MeetingBlock({ meeting, onOpen }: Props) {
   return (
     <TimelineBlock letter="M" onClick={onOpen}>
       <div>
-        <div className="text-base" style={{ color: "var(--text-primary)" }}>{title}</div>
+        <Text variant="h4" weight="normal" as="div">
+          {title}
+        </Text>
         {meta.length > 0 ? (
-          <div
-            className="mt-0.5 text-sm"
-            style={{ color: "var(--text-secondary)" }}
-          >
+          <Text variant="body" color="secondary" as="div" className="mt-0.5">
             {meta.join(" · ")}
-          </div>
+          </Text>
         ) : null}
       </div>
     </TimelineBlock>

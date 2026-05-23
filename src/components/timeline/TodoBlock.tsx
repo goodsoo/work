@@ -1,5 +1,7 @@
 import type { Todo } from "../../api/todos";
 import { TimelineBlock } from "./TimelineBlock";
+import { Button } from "../common/Button";
+import { Text } from "../common/Text";
 
 type Props = {
   todo: Todo;
@@ -10,15 +12,14 @@ export function TodoBlock({ todo, onToggle }: Props) {
   return (
     <TimelineBlock letter="T">
       <div className="flex items-start gap-2.5">
-        <button
-          type="button"
+        <Button
+          variant="ghost"
           aria-label={todo.done ? "완료 취소" : "완료"}
           onClick={onToggle}
-          className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border-2 transition"
+          className="mt-0.5 h-4 w-4 shrink-0 rounded border-2 p-0"
           style={{
             borderColor: todo.done ? "var(--border-default)" : "var(--accent-red)",
             backgroundColor: todo.done ? "var(--border-default)" : "var(--bg-base)",
-            minHeight: 16,
             minWidth: 16,
           }}
         >
@@ -39,9 +40,12 @@ export function TodoBlock({ todo, onToggle }: Props) {
               />
             </svg>
           ) : null}
-        </button>
-        <span
-          className={`text-base ${todo.done ? "line-through" : ""}`}
+        </Button>
+        <Text
+          variant="h4"
+          weight="normal"
+          as="span"
+          className={todo.done ? "line-through" : ""}
           style={{
             color: todo.done
               ? "var(--text-muted)"
@@ -54,7 +58,7 @@ export function TodoBlock({ todo, onToggle }: Props) {
           }}
         >
           {todo.title}
-        </span>
+        </Text>
       </div>
     </TimelineBlock>
   );
