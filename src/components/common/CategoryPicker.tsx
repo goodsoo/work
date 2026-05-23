@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Hash } from "lucide-react";
 import { TODO_CATEGORIES, type TodoCategory } from "../../api/todos";
+import { Button } from "./Button";
 
 type Props = {
   value: TodoCategory | null;
@@ -44,22 +45,23 @@ export function CategoryPicker({ value, onChange, fullWidth }: Props) {
       ref={wrapRef}
       className={`relative items-center ${fullWidth ? "flex w-full" : "inline-flex"}`}
     >
-      <button
-        type="button"
+      <Button
+        variant="ghost"
+        size="sm"
         onClick={(e) => {
           e.stopPropagation();
           setOpen((v) => !v);
         }}
-        className={`inline-flex items-center gap-1 overflow-hidden rounded-md px-2 py-0.5 text-xs transition hover:bg-[var(--bg-surface-hover)] ${
+        className={`overflow-hidden px-2 py-0.5 font-normal ${
           fullWidth ? "w-full" : ""
         }`}
-        style={{ color: "var(--text-secondary)", minHeight: 0 }}
+        style={{ color: "var(--text-secondary)" }}
         aria-haspopup="listbox"
         aria-expanded={open}
+        leftIcon={<Hash className="h-3 w-3 shrink-0 opacity-60" aria-hidden />}
       >
-        <Hash className="h-3 w-3 shrink-0 opacity-60" aria-hidden />
         <span className="truncate">{label}</span>
-      </button>
+      </Button>
       {open ? (
         <div
           className="absolute left-0 top-full z-30 mt-1 min-w-[8rem] overflow-hidden rounded-md shadow-md"
@@ -74,13 +76,14 @@ export function CategoryPicker({ value, onChange, fullWidth }: Props) {
               const active = opt.id === value;
               return (
                 <li key={opt.id ?? "null"}>
-                  <button
-                    type="button"
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={() => {
                       onChange(opt.id);
                       setOpen(false);
                     }}
-                    className="flex w-full items-center px-3 py-1.5 text-left text-xs transition"
+                    className="w-full justify-start rounded-none px-3 py-1.5 font-normal"
                     style={{
                       backgroundColor: active
                         ? "var(--bg-surface-active)"
@@ -88,11 +91,10 @@ export function CategoryPicker({ value, onChange, fullWidth }: Props) {
                       color: active
                         ? "var(--text-primary)"
                         : "var(--text-secondary)",
-                      minHeight: 0,
                     }}
                   >
                     {opt.label}
-                  </button>
+                  </Button>
                 </li>
               );
             })}

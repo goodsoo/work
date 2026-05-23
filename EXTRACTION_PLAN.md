@@ -275,11 +275,11 @@ PR #36 (todo cat colors) 가 `--cat-*` 7개 + 카테고리 dot 섹션 + `lib/tod
 - [x] `timeline/TodoBlock.tsx` (1 button + 1 text)
 
 ### common
-- [ ] `common/CategoryPicker.tsx`
-- [ ] `common/ClipPromptButton.tsx`
-- [ ] `common/LooseDateInput.tsx`
-- [ ] `common/LooseTimeInput.tsx`
-- [ ] `common/MeetingPicker.tsx`
+- [x] `common/CategoryPicker.tsx`
+- [x] `common/ClipPromptButton.tsx`
+- [~] `common/LooseDateInput.tsx` (input className text-xs/sm — raw 유지, guard 명시)
+- [~] `common/LooseTimeInput.tsx` (input className — raw 유지)
+- [x] `common/MeetingPicker.tsx`
 
 ### vault
 - [ ] `vault/VaultDisconnected.tsx`
