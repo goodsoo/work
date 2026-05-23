@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { useVault } from "../../lib/vault/useVault";
+import { Button } from "../common/Button";
+import { Text } from "../common/Text";
 
 interface Props {
   initialPath?: string | null;
@@ -43,58 +45,55 @@ export function VaultPicker({ initialPath = null, onCancel }: Props) {
           border: "1px solid var(--border-default)",
         }}
       >
-        <h1
-          className="text-xl font-bold mb-2"
-          style={{ color: "var(--text-primary)" }}
-        >
+        <Text variant="h2" weight="bold" as="h1" className="mb-2">
           Vault 폴더 선택
-        </h1>
-        <p className="text-sm mb-6" style={{ color: "var(--text-secondary)" }}>
+        </Text>
+        <Text variant="body" color="secondary" as="p" className="mb-6">
           모든 메모/일기/할 일이 이 폴더 안의 md 파일로 저장됩니다. iCloud Drive 같은
           동기화 폴더 안에 두면 다른 기기에서도 같은 vault를 공유할 수 있어요.
-        </p>
+        </Text>
 
         {initialPath && (
-          <div
-            className="text-xs mb-4 px-3 py-2 rounded"
+          <Text
+            variant="caption"
+            color="secondary"
+            as="div"
+            className="mb-4 rounded px-3 py-2"
             style={{
               background: "var(--bg-base)",
-              color: "var(--text-secondary)",
               border: "1px solid var(--border-default)",
             }}
           >
             현재: <span className="font-mono">{initialPath}</span>
-          </div>
+          </Text>
         )}
 
-        <button
-          type="button"
+        <Button
+          variant="danger"
           disabled={busy}
           onClick={pick}
-          className="w-full px-4 py-2.5 rounded-lg text-sm font-medium transition-opacity"
-          style={{
-            background: "var(--accent-red)",
-            color: "white",
-            opacity: busy ? 0.5 : 1,
-          }}
+          className="w-full rounded-lg px-4 py-2.5 transition-opacity"
+          style={{ opacity: busy ? 0.5 : 1 }}
         >
           {busy ? "준비 중…" : initialPath ? "다른 폴더로 변경" : "폴더 선택하기"}
-        </button>
+        </Button>
 
         {onCancel && initialPath && (
-          <button
-            type="button"
+          <Button
+            variant="ghost"
             onClick={onCancel}
-            className="w-full mt-2 px-4 py-2 text-sm"
+            className="mt-2 w-full px-4 py-2 font-normal"
             style={{ color: "var(--text-secondary)" }}
           >
             취소
-          </button>
+          </Button>
         )}
 
         {error && (
-          <div
-            className="mt-3 text-sm px-3 py-2 rounded"
+          <Text
+            variant="body"
+            as="div"
+            className="mt-3 rounded px-3 py-2"
             style={{
               color: "var(--accent-red)",
               background: "var(--bg-base)",
@@ -102,7 +101,7 @@ export function VaultPicker({ initialPath = null, onCancel }: Props) {
             }}
           >
             {error}
-          </div>
+          </Text>
         )}
       </div>
     </main>

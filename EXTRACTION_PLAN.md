@@ -282,9 +282,9 @@ PR #36 (todo cat colors) 가 `--cat-*` 7개 + 카테고리 dot 섹션 + `lib/tod
 - [x] `common/MeetingPicker.tsx`
 
 ### vault
-- [ ] `vault/VaultDisconnected.tsx`
-- [ ] `vault/VaultGate.tsx`
-- [ ] `vault/VaultPicker.tsx`
+- [x] `vault/VaultDisconnected.tsx`
+- [x] `vault/VaultGate.tsx` (raw 자리 0)
+- [x] `vault/VaultPicker.tsx`
 
 ### portfolio (extras)
 - [ ] `portfolio/PortfolioCardMenu.tsx`
