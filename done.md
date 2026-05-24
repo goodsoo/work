@@ -6,6 +6,24 @@
 
 ## 2026-05-24
 
+### PR #41 — 캘린더 사이드바 정리 + 셀 chip UI + 카테고리 범례
+
+- **한 줄 임팩트**: 캘린더 화면 한눈에 들어오게
+- **사이드바 3섹션 헤더** — 일기 / 할 일 / 메모. 메모장 폴더 패턴 (chevron + 13px secondary 라벨) + click collapse + 항목 count. 일기 블럭이 메모와 동일 패턴 (leftIcon + 한 줄 truncate). ATX heading `# `, `## ` prefix 만 strip — `#안녕` 같은 일반 텍스트는 보존.
+- **todo navigate** — 사이드바 todo 클릭 (체크박스 외) → 할일 탭 + 필터 reset + 해당 row 로 scrollIntoView + 편집모드 자동 진입 (el.click()). `data-todoid` 박고 `scrollToTodoId` 한 번 흐름.
+- **체크박스 토글 깜빡임 fix** — vault md 가 done_at 추적 안 하는데 optimistic 에 done_at=ISO 박혀서 selectedDate 가 due_date 와 다른 날일 때 잠깐 사라졌다가 invalidate 후 due_date fallback 으로 다시 나타나던 race. `useUpdateTodo.mutate` patch 에서 done_at 제거 → onlyDone 분기 (toggleTodo path) 활성, 더 안전.
+- **셀 chip UI** — dot 제거 → 카테고리 색 18% alpha bg tint. 좌 label flex-1 truncate / 우 time shrink-0 (절대 잘리지 않음). text-primary 진하게. 시간 짧게 (정각 `9시`, 한자리 `9:30`). 미분류도 회색 tint visible.
+- **메모 우상단 압축** — 셀 안 chip 에서 meeting 빼고 우상단 BookOpen + ClipboardList N 아이콘으로. 본문 chip area 는 todo 만.
+- **selected 셀 ring** — `inset 0 0 0 2px var(--accent-blue)`. 오늘(red dot) 과 차원 분리.
+- **카테고리 범례** — 헤더 좌측에 swatch (chip bg 와 동일 18% + 40% border) + 한글 라벨 (업무 / 일정 / 기타 / 미분류).
+- **셀 padding inline style** — Button common sizeClass override 보정. 좌우 4px / 상하 2px.
+- **외곽 grid padding 제거** — `px-3 lg:px-5` 제거, 셀 viewport 양 끝까지.
+- **셀 + chip width 100%** — Button inline-flex 의 content-fit + items-start cross-axis stretch 비활성 보정. 짧은 todo 도 chip 박스가 셀 가로 폭 100%, 긴 텍스트는 truncate.
+- **오늘 빨간 원 row h-5** — 다른 셀 일자 텍스트와 동일 높이 → 아래 chip 라인 어긋남 fix.
+- **다른 달 opacity 한정** — 셀 전체 → day number row 에만. chip / 주말 bg / 일기 아이콘 등 정상 색.
+- **주말 칸 살짝 다른 배경** — `--text-muted` 6% tint, 평일과 시각 구분.
+- **`CheckboxButton` 컴포넌트 추출** — TodoRow 안 local function → `src/components/todos/CheckboxButton.tsx` 별도 파일. TodoRow + CalendarDayPanel 양쪽 재사용. hover 미리보기 svg + 카테고리 색 border tint + e.stopPropagation 내장.
+
 ### PR #40 — SourceBodyEditor 풀세트 일기 적용 + 보기 모드 일관성
 
 - **한 줄 임팩트**: 일기에서도 마크다운 에디터 풀세트 (gutter/슬래시/단축키)

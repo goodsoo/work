@@ -14,6 +14,8 @@ import { useMeetings } from "../hooks/useMeetings";
 import { useJournals } from "../hooks/useJournals";
 import { useTodos } from "../hooks/useTodos";
 import { todayIso } from "../lib/dates";
+import { TODO_CATEGORIES } from "../api/todos";
+import { categoryColor } from "../lib/todoCategory";
 import {
   MonthGrid,
   WEEKDAYS,
@@ -160,14 +162,14 @@ export function CalendarPage({ targetDate, onSelectedDateChange }: Props) {
         if (ta !== tb) return ta < tb ? -1 : 1;
         return a.created_at < b.created_at ? -1 : 1;
       });
-      // 시간 있는 todo 가 앞 (시간순), 없는 거 뒤 (created_at 순)
+      // 시간 없는 todo 가 앞 (할일 탭과 동일), 시간 있는 것은 시간순 뒤로.
       items.todos.sort((a, b) => {
         if (a.done !== b.done) return a.done ? 1 : -1;
         const ta = a.due_time ?? "";
         const tb = b.due_time ?? "";
         if (ta !== tb) {
-          if (!ta) return 1;
-          if (!tb) return -1;
+          if (!ta) return -1;
+          if (!tb) return 1;
           return ta < tb ? -1 : 1;
         }
         return a.created_at < b.created_at ? -1 : 1;
@@ -391,7 +393,35 @@ export function CalendarPage({ targetDate, onSelectedDateChange }: Props) {
             borderBottom: "1px solid var(--border-subtle)",
           }}
         >
-          <div />
+          {/* 좌측 — 카테고리 색 범례. 셀 chip 의 bg tint 가 어떤 카테고리인지 명시.
+              compact swatch + 한글 라벨 가로 정렬. 미분류는 회색(--text-muted) 으로
+              chip 의 fallback tint 와 동일. */}
+          <div className="justify-self-start flex items-center gap-2.5">
+            {[
+              ...TODO_CATEGORIES.map((c) => ({
+                key: c.id,
+                label: c.label,
+                color: categoryColor(c.id),
+              })),
+              { key: "uncategorized", label: "미분류", color: "var(--text-muted)" },
+            ].map((c) => (
+              <span
+                key={c.key}
+                className="inline-flex items-center gap-1 text-[11px]"
+                style={{ color: "var(--text-secondary)" }}
+              >
+                <span
+                  aria-hidden
+                  className="inline-block h-2.5 w-2.5 rounded-sm"
+                  style={{
+                    backgroundColor: `color-mix(in srgb, ${c.color} 18%, transparent)`,
+                    border: `1px solid color-mix(in srgb, ${c.color} 40%, transparent)`,
+                  }}
+                />
+                {c.label}
+              </span>
+            ))}
+          </div>
           <Text
             variant="h4"
             as="h3"
@@ -443,7 +473,7 @@ export function CalendarPage({ targetDate, onSelectedDateChange }: Props) {
             </div>
           </div>
         </div>
-        <div className="grid grid-cols-7 px-3 lg:px-5">
+        <div className="grid grid-cols-7">
           {WEEKDAYS.map((w, i) => (
             <div
               key={w}

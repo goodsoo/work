@@ -95,6 +95,8 @@ function AppContent() {
   const [portfolioFilter, setPortfolioFilter] = useState<ProjectFilter>({
     kind: "all",
   });
+  // 캘린더 사이드바의 todo 클릭으로 진입 시 TodosPage 가 한 번 scroll 후 clear.
+  const [scrollToTodoId, setScrollToTodoId] = useState<string | null>(null);
   const [portfolioSortKey, setPortfolioSortKey] = usePortfolioSort();
   const portfolioCategoryFilter = usePortfolioCategoryFilter();
   // 휴지통은 overlay — utility 액션이라 SettingsModal 과 같은 패턴.
@@ -397,6 +399,19 @@ function AppContent() {
     window.history.pushState({ meetingId: id }, "", `#meeting-${id}`);
   }
 
+  function openTodo(id: string) {
+    drawer.close();
+    setTab("todos");
+    // 클릭한 todo 가 현재 필터(cancelled view, 특정 카테고리 등) 밖이면 안 보임 →
+    // 필터 reset 후 scroll. 사용자는 "그 todo 로 이동" 의도가 명확.
+    setTodoStatus("all");
+    setTodoCategory("all");
+    setScrollToTodoId(id);
+    if (window.location.hash !== "#todos") {
+      window.history.pushState({ tab: "todos" }, "", "#todos");
+    }
+  }
+
   function closeMeeting() {
     if (window.history.state?.meetingId) {
       window.history.back();
@@ -416,6 +431,7 @@ function AppContent() {
       <CalendarDayPanel
         selectedDate={calendarDate}
         onOpenMeeting={openMeeting}
+        onOpenTodo={openTodo}
       />
     ) : tab === "todos" ? (
       <TodosSidePanel
@@ -488,6 +504,8 @@ function AppContent() {
           statusFilter={todoStatus}
           categoryFilter={todoCategory}
           sortKey={todoSortKey}
+          scrollToTodoId={scrollToTodoId}
+          onScrollHandled={() => setScrollToTodoId(null)}
         />
       )}
       <TrashModal

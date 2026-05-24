@@ -35,17 +35,6 @@ PR 단위로 묶음. 각 PR 의 **한 줄 임팩트** 는 카드 frontmatter `im
 
 ---
 
-## 📅 캘린더
-
-### PR — 사이드바 순서 + 셀 표시 재정비 `ui_ux`
-한 줄 임팩트: 일기·할일·메모 순 사이드바 + 셀은 할일 시간순 + 메모 압축
-
-- [ ] **사이드바 list 순서** — `CalendarDayPanel` (`SidePanel.tsx:455`) 안: 헤더 → 일기 CTA(기존) → 할일 → 메모. 현재는 일기 CTA → 메모 → 할일 이라 meeting/todo 렌더 블록 swap. 완료 todo 포함은 이미 동작 (`SidePanel.tsx:475-483` filter 가 done 도 잡음).
-- [ ] **셀 안 메모 압축** — `MonthGrid` cell 에서 meeting chip 제거 + 우상단 일기 BookOpen 아이콘 옆에 `ClipboardList + N` 아이콘+숫자 한 줄. `buildCellEvents` 가 meeting 안 push 하게 + 우상단 corner 영역에 메모 count 노출. 0건이면 안 보임.
-- [ ] **선택된 날 강조 (accent-blue ring)** — `MonthGrid.tsx:95` 의 `bg-surface` 대체 → `box-shadow: inset 0 0 0 2px var(--accent-blue)` (cell border 안 침범). 오늘 (red dot) 과 selection (blue ring) 두 차원 분리. 라이트/다크 모두 검증.
-
----
-
 ## ✨ 신규 기능
 
 ### PR — 루틴 (매일 하는 할일) `ui_ux`

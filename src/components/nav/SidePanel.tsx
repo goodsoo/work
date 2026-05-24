@@ -12,6 +12,8 @@ import {
   XCircle,
   FolderInput,
   FolderPlus,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
@@ -35,6 +37,7 @@ import { formatDateLong, isToday, todayIso } from "../../lib/dates";
 import { formatError } from "../../lib/errors";
 import { categoryColor } from "../../lib/todoCategory";
 import { TaskAddModal } from "../tasks/TaskAddModal";
+import { CheckboxButton } from "../todos/CheckboxButton";
 import { JournalOverlay } from "../calendar/JournalOverlay";
 import { MeetingsTreeView } from "../meetings/MeetingsTreeView";
 import { MoveFolderModal } from "../meetings/MoveFolderModal";
@@ -711,6 +714,7 @@ const MARKDOWN_HINTS: Array<{ syntax: string; desc: string; section?: string }> 
 type CalendarDayPanelProps = {
   selectedDate: string;
   onOpenMeeting: (id: string) => void;
+  onOpenTodo: (id: string) => void;
 };
 
 function timestampToLocalIso(ts: string): string {
@@ -720,6 +724,7 @@ function timestampToLocalIso(ts: string): string {
 export function CalendarDayPanel({
   selectedDate,
   onOpenMeeting,
+  onOpenTodo,
 }: CalendarDayPanelProps) {
   const meetingsQ = useMeetings();
   const journalsQ = useJournals();
@@ -727,6 +732,18 @@ export function CalendarDayPanel({
   const updateTodo = useUpdateTodo();
   const [showAddModal, setShowAddModal] = useState(false);
   const [showJournalOverlay, setShowJournalOverlay] = useState(false);
+  // 3개 섹션 collapse — 메모장 폴더 패턴 차용. 새로고침 시 모두 펴짐 (session 단위).
+  const [collapsed, setCollapsed] = useState<Set<"journal" | "todos" | "meetings">>(
+    () => new Set(),
+  );
+  function toggleSection(name: "journal" | "todos" | "meetings") {
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+  }
 
   const today = isToday(selectedDate);
 
@@ -753,14 +770,15 @@ export function CalendarDayPanel({
       if (ta !== tb) return ta < tb ? -1 : 1;
       return a.created_at < b.created_at ? -1 : 1;
     });
-    // 시간 있는 todo 가 앞 (시간순), 없는 거 뒤 (created_at 순)
+    // 시간 없는 todo 가 앞 (할일 탭과 동일 — "정해진 시각 없는 작업 먼저"),
+    // 시간 있는 것은 시간순 뒤로.
     todos.sort((a, b) => {
       if (a.done !== b.done) return a.done ? 1 : -1;
       const ta = a.due_time ?? "";
       const tb = b.due_time ?? "";
       if (ta !== tb) {
-        if (!ta) return 1;
-        if (!tb) return -1;
+        if (!ta) return -1;
+        if (!tb) return 1;
         return ta < tb ? -1 : 1;
       }
       return a.created_at < b.created_at ? -1 : 1;
@@ -774,18 +792,11 @@ export function CalendarDayPanel({
   }, [meetingsQ.data, journalsQ.data, todosQ.data, selectedDate]);
 
   function handleToggle(t: Todo) {
-    const nextDone = !t.done;
-    updateTodo.mutate({
-      id: t.id,
-      patch: {
-        done: nextDone,
-        done_at: nextDone ? new Date().toISOString() : null,
-      },
-    });
+    // done 만 patch — vault md 에 done_at 안 저장돼 refetch 후 항상 null 로 돌아옴.
+    // optimistic 시 done_at=ISO 박으면 filter 가 today 로 판정 → 미래·과거 날 사이드바에서
+    // 토글 직후 잠깐 사라졌다 (invalidate 후 due_date fallback 으로) 다시 생기는 깜빡임 발생.
+    updateTodo.mutate({ id: t.id, patch: { done: !t.done } });
   }
-
-  // journal 은 header 바로 아래 별도 section. items list 에는 안 들어감.
-  const hasItems = meetings.length > 0 || todos.length > 0;
 
   return (
     <div className="flex h-full flex-col">
@@ -822,170 +833,180 @@ export function CalendarDayPanel({
         </Button>
       </div>
 
-      {/* Journal CTA — 일기 빠른 진입. 없는 날은 dashed border + 펜 + 한 줄, 있는 날은
-          미리보기 카드 (본문 첫 ~100자) + 펜 아이콘. 클릭 시 overlay 열림. */}
-      <div
-        className="shrink-0 px-3 pt-3 pb-2"
-        style={{ borderBottom: "1px solid var(--border-subtle)" }}
-      >
-        {journal ? (
-          <Button
-            variant="ghost"
-            onClick={() => setShowJournalOverlay(true)}
-            className="group w-full justify-start items-start gap-2 px-3 py-2"
-            leftIcon={
-              <BookOpen
-                className="mt-0.5 h-3.5 w-3.5 shrink-0"
-                style={{ color: "var(--text-muted)" }}
-              />
-            }
-          >
-            <div className="min-w-0 flex-1">
-              <Text
-                variant="caption"
-                color="secondary"
-                as="div"
-                weight="medium"
-                className="flex items-center justify-between gap-2"
-              >
-                <span>일기</span>
-                <Pencil
-                  className="h-3 w-3 opacity-0 transition group-hover:opacity-100"
+      {/* 3개 섹션 — 메모장 폴더 패턴 차용. chevron + 13px secondary 라벨, click 시 collapse.
+          섹션 간 시각 분리는 헤더 자체로 충분 (border 없이). */}
+      <div className="flex-1 overflow-y-auto py-1">
+        {/* 일기 section */}
+        <SidePanelSectionHeader
+          label="일기"
+          collapsed={collapsed.has("journal")}
+          onToggle={() => toggleSection("journal")}
+        />
+        {!collapsed.has("journal") ? (
+          <div className="px-3 pb-2">
+            {/* 메모 블럭과 동일 패턴 — leftIcon (BookOpen) + body Text. journal 있으면
+                내용 미리보기(첫 줄), 없으면 "일기 쓰기" muted. */}
+            <Button
+              variant="ghost"
+              onClick={() => setShowJournalOverlay(true)}
+              className="w-full justify-start items-start gap-2 px-3 py-2"
+              leftIcon={
+                <BookOpen
+                  className="mt-0.5 h-3.5 w-3.5 shrink-0"
                   style={{ color: "var(--text-muted)" }}
                 />
-              </Text>
-              <Text
-                variant="body"
-                color="secondary"
-                as="div"
-                className="mt-0.5 line-clamp-3 whitespace-pre-wrap font-serif leading-snug"
-              >
-                {journal.content?.trim() || "(내용 없음)"}
-              </Text>
-            </div>
-          </Button>
-        ) : (
-          <Button
-            variant="ghost"
-            onClick={() => setShowJournalOverlay(true)}
-            className="w-full justify-start gap-2 border border-dashed px-3 py-2"
-            leftIcon={<Plus className="h-3.5 w-3.5 shrink-0" />}
-            style={{
-              borderColor: "var(--border-default)",
-              color: "var(--text-muted)",
-            }}
-            aria-label="일기 쓰기"
-          >
-            <span>일기 쓰기</span>
-          </Button>
-        )}
-      </div>
-
-      {/* Items */}
-      <div className="flex-1 overflow-y-auto">
-        {!hasItems ? (
-          <Text
-            variant="body"
-            color="muted"
-            as="div"
-            className="px-4 py-8 text-center"
-          >
-            이날의 일정 / 할 일이 없어요
-          </Text>
-        ) : (
-          <div className="space-y-1 p-3">
-            {/* Meetings */}
-            {meetings.map((m) => (
-              <Button
-                key={m.uid}
-                variant="ghost"
-                onClick={() => onOpenMeeting(m.uid)}
-                className="w-full justify-start items-start gap-2 px-3 py-2"
-                leftIcon={
-                  <ClipboardList className="mt-0.5 h-3.5 w-3.5 shrink-0 text-blue-500" />
-                }
-              >
-                <div className="min-w-0 flex-1">
-                  <Text variant="body" as="div">
-                    {m.time ? (
-                      <Text variant="body" color="muted" as="span">
-                        {m.time}
-                      </Text>
-                    ) : null}{" "}
-                    {m.title?.trim() || "(제목 없음)"}
+              }
+              aria-label={journal ? "일기 보기" : "일기 쓰기"}
+            >
+              <div className="min-w-0 flex-1">
+                {journal ? (
+                  <Text variant="body" as="div" truncate>
+                    {(() => {
+                      // 첫 non-empty 줄을 제목처럼 표시. 마크다운 ATX heading prefix
+                      // (`# `, `## `, ...) 만 strip — `#안녕` 처럼 공백 없는 케이스는
+                      // heading 이 아니라 일반 텍스트라 그대로 보존.
+                      const first = journal.content
+                        ?.split("\n")
+                        .map((l) => l.trim())
+                        .find((l) => l.length > 0);
+                      return first?.replace(/^#+\s+/, "") || "(내용 없음)";
+                    })()}
                   </Text>
-                  {m.attendees ? (
-                    <Text
-                      variant="caption"
-                      color="secondary"
-                      as="div"
-                      truncate
-                      className="mt-0.5"
-                    >
-                      {m.attendees}
-                    </Text>
-                  ) : null}
-                </div>
-              </Button>
-            ))}
-
-            {/* Todos — due_time 있으면 시각 prefix */}
-            {todos.map((t) => {
-              const catColor = categoryColor(t.category);
-              const pendingBorder = catColor || "var(--text-muted)";
-              const pendingFill = catColor
-                ? `color-mix(in srgb, ${catColor} 4%, transparent)`
-                : "transparent";
-              return (
-              <div
-                key={t.id}
-                className="flex items-start gap-2 rounded-md px-3 py-2 transition"
-              >
-                <button
-                  type="button"
-                  onClick={() => handleToggle(t)}
-                  className="mt-0.5 flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-md border transition"
-                  style={{
-                    borderColor: t.done ? "var(--text-secondary)" : pendingBorder,
-                    backgroundColor: t.done ? "var(--text-secondary)" : pendingFill,
-                    color: t.done ? "var(--text-inverse)" : "transparent",
-                    borderWidth: t.done ? 1 : 1.5,
-                    minHeight: 0,
-                  }}
-                >
-                  {t.done ? (
-                    <svg className="h-3 w-3" viewBox="0 0 12 12" fill="none">
-                      <path
-                        d="M2 6l3 3 5-5"
-                        stroke="currentColor"
-                        strokeWidth="1.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                  ) : null}
-                </button>
-                <Text
-                  variant="body"
-                  as="span"
-                  className={`flex-1 ${t.done ? "line-through" : ""}`}
-                  style={{
-                    color: t.done ? "var(--text-muted)" : "var(--text-primary)",
-                  }}
-                >
-                  {t.due_time ? (
-                    <Text variant="body" color="muted" as="span">
-                      {t.due_time}{" "}
-                    </Text>
-                  ) : null}
-                  {t.title}
-                </Text>
+                ) : (
+                  <Text variant="body" color="muted" as="div">
+                    일기 쓰기
+                  </Text>
+                )}
               </div>
-              );
-            })}
-
+            </Button>
           </div>
-        )}
+        ) : null}
+
+        {/* 할 일 section */}
+        <SidePanelSectionHeader
+          label="할 일"
+          collapsed={collapsed.has("todos")}
+          onToggle={() => toggleSection("todos")}
+          count={todos.length}
+        />
+        {!collapsed.has("todos") ? (
+          <div className="space-y-1 px-3 pb-2">
+            {todos.length === 0 ? (
+              <Text
+                variant="caption"
+                color="muted"
+                as="div"
+                className="px-3 py-1.5"
+              >
+                할 일이 없어요
+              </Text>
+            ) : (
+              todos.map((t) => {
+                const status = t.cancelled
+                  ? "cancelled"
+                  : t.done
+                    ? "done"
+                    : "pending";
+                return (
+                  <div
+                    key={t.id}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => onOpenTodo(t.id)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        onOpenTodo(t.id);
+                      }
+                    }}
+                    className="flex cursor-pointer items-start gap-2 rounded-md px-3 py-2 transition hover:bg-[var(--bg-surface-hover)]"
+                  >
+                    <span className="mt-0.5">
+                      <CheckboxButton
+                        status={status}
+                        category={t.category}
+                        onClick={() => handleToggle(t)}
+                      />
+                    </span>
+                    <Text
+                      variant="body"
+                      as="span"
+                      className={`flex-1 ${t.done ? "line-through" : ""}`}
+                      style={{
+                        color: t.done
+                          ? "var(--text-muted)"
+                          : "var(--text-primary)",
+                      }}
+                    >
+                      {t.due_time ? (
+                        <Text variant="body" color="muted" as="span">
+                          {t.due_time}{" "}
+                        </Text>
+                      ) : null}
+                      {t.title}
+                    </Text>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        ) : null}
+
+        {/* 메모 section */}
+        <SidePanelSectionHeader
+          label="메모"
+          collapsed={collapsed.has("meetings")}
+          onToggle={() => toggleSection("meetings")}
+          count={meetings.length}
+        />
+        {!collapsed.has("meetings") ? (
+          <div className="space-y-1 px-3 pb-2">
+            {meetings.length === 0 ? (
+              <Text
+                variant="caption"
+                color="muted"
+                as="div"
+                className="px-3 py-1.5"
+              >
+                메모가 없어요
+              </Text>
+            ) : (
+              meetings.map((m) => (
+                <Button
+                  key={m.uid}
+                  variant="ghost"
+                  onClick={() => onOpenMeeting(m.uid)}
+                  className="w-full justify-start items-start gap-2 px-3 py-2"
+                  leftIcon={
+                    <ClipboardList className="mt-0.5 h-3.5 w-3.5 shrink-0 text-blue-500" />
+                  }
+                >
+                  <div className="min-w-0 flex-1">
+                    <Text variant="body" as="div">
+                      {m.time ? (
+                        <Text variant="body" color="muted" as="span">
+                          {m.time}
+                        </Text>
+                      ) : null}{" "}
+                      {m.title?.trim() || "(제목 없음)"}
+                    </Text>
+                    {m.attendees ? (
+                      <Text
+                        variant="caption"
+                        color="secondary"
+                        as="div"
+                        truncate
+                        className="mt-0.5"
+                      >
+                        {m.attendees}
+                      </Text>
+                    ) : null}
+                  </div>
+                </Button>
+              ))
+            )}
+          </div>
+        ) : null}
       </div>
 
       <TaskAddModal
@@ -999,6 +1020,48 @@ export function CalendarDayPanel({
         onClose={() => setShowJournalOverlay(false)}
       />
     </div>
+  );
+}
+
+// 캘린더 day panel 의 섹션 헤더 — 메모장 폴더 패턴 (chevron + 13px secondary 라벨) 차용.
+// 클릭 시 collapse. count 가 있으면 라벨 옆에 mono 숫자.
+function SidePanelSectionHeader({
+  label,
+  collapsed,
+  onToggle,
+  count,
+}: {
+  label: string;
+  collapsed: boolean;
+  onToggle: () => void;
+  count?: number;
+}) {
+  return (
+    <Button
+      variant="ghost"
+      onClick={onToggle}
+      className="w-full justify-between gap-1.5 rounded-none px-3 py-1 text-[13px] font-normal"
+      style={{ color: "var(--text-secondary)" }}
+    >
+      <span className="inline-flex items-center gap-1.5">
+        {collapsed ? (
+          <ChevronRight className="h-3 w-3 shrink-0" />
+        ) : (
+          <ChevronDown className="h-3 w-3 shrink-0" />
+        )}
+        <span>{label}</span>
+      </span>
+      {typeof count === "number" ? (
+        <Text
+          variant="caption"
+          as="span"
+          className="font-mono"
+          style={{ color: "var(--text-muted)" }}
+        >
+          {count}
+        </Text>
+      ) : null}
+    </Button>
   );
 }
 

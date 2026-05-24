@@ -27,12 +27,17 @@ type Props = {
   statusFilter?: TodosStatusFilter;
   categoryFilter?: TodosCategoryFilter;
   sortKey?: TodoSortKey;
+  // 캘린더 사이드바 todo 클릭으로 진입 시 해당 row 로 scroll. 한 번 처리 후 clear.
+  scrollToTodoId?: string | null;
+  onScrollHandled?: () => void;
 };
 
 export function TodosPage({
   statusFilter = "all",
   categoryFilter = "all",
   sortKey = "date_desc",
+  scrollToTodoId = null,
+  onScrollHandled,
 }: Props) {
   const { data, isLoading, error, refetch } = useTodos();
   const updateMutation = useUpdateTodo();
@@ -95,6 +100,22 @@ export function TodosPage({
     }
     return copy;
   }, [data, statusFilter, categoryFilter, sortKey]);
+
+  // 캘린더 사이드바에서 todo 클릭 → 할일 탭 진입 시 해당 row 로 부드럽게 scroll 후
+  // 편집모드 자동 진입 (el.click() 이 TodoRow li 의 onClick → setEditing(true) 트리거).
+  // list 렌더 완료 후 (todos / scrollToTodoId 모두 valid) 한 번만 실행 → onScrollHandled
+  // 로 부모 state 정리. todos.length 의존: filter reset 후 list 가 도착해야 element 가 mount 됨.
+  useEffect(() => {
+    if (!scrollToTodoId || todos.length === 0) return;
+    const el = document.querySelector<HTMLElement>(
+      `[data-todoid="${CSS.escape(scrollToTodoId)}"]`,
+    );
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.click();
+    }
+    onScrollHandled?.();
+  }, [scrollToTodoId, todos, onScrollHandled]);
 
   function handleToggle(todo: Todo) {
     // cancelled todo 의 체크박스 클릭 = 취소 해제 (pending 복원).
