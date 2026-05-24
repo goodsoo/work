@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { AlertCircle, BookOpen } from "lucide-react";
+import { BookOpen } from "lucide-react";
 import {
   usePortfolioProjects,
   usePortfolioWorks,
@@ -67,9 +67,6 @@ export function PortfolioSidePanel({
           onRun={onSyncRun}
           onCancel={onSyncCancel}
         />
-        {syncState.error ? (
-          <SyncError message={syncState.error.message} />
-        ) : null}
         {!syncState.running && syncState.lastResult && !syncState.error ? (
           <div
             className="rounded-md px-3 py-1.5 text-xs"
@@ -104,18 +101,3 @@ export function PortfolioSidePanel({
   );
 }
 
-function SyncError({ message }: { message: string }) {
-  return (
-    <div
-      className="flex items-start gap-2 rounded px-2 py-1 text-xs"
-      style={{
-        backgroundColor: "var(--accent-red-bg)",
-        color: "var(--accent-red-text)",
-        borderLeft: "2px solid var(--accent-red)",
-      }}
-    >
-      <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-      <span className="break-words">{message}</span>
-    </div>
-  );
-}

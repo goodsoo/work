@@ -4,6 +4,19 @@
 
 ---
 
+## 2026-05-24
+
+### PR #38 — 디자인 시스템 카탈로그 페이지
+
+- **한 줄 임팩트**: 디자인 시스템을 브라우저에서 시각 확인
+- **`#styleguide` 라우트** — `src/pages/StyleguidePage.tsx` 신규. VaultGate 우회 단독 페이지. 11 섹션 (Color / Typography / Spacing / Radius / Effects / Motion / Z / Layout / Icons / Components / Writing). macOS Tauri drag region (titlebar-inset) 포함.
+- **좌측 sticky 목차 사이드바** — anchor 클릭은 `scrollIntoView` (hash 변경 X — `#styleguide` 라우팅 유지).
+- **타이틀바 dropdown 진입점** — `VaultBadge` (vault 폴더명) 를 Popover 로 변환. "Vault 설정" (기존 SettingsModal) / "스타일가이드" (#styleguide 진입) 두 항목.
+- **voice/tone 9 카테고리 lock-in** — CLAUDE.md 에 `~합니다` 통일 / 명사형 액션 / 원인+해결 에러 / `YYYY.MM.DD` / `오전·오후 h:mm` / `예: ...` placeholder / heading+body+CTA empty state / `keep-all` wrap / em dash 금지 명시.
+- **inline 빨간 박스 4자리 폐기** — `PortfolioSidePanel SyncError` / `MeetingsList ErrorState` / `MeetingForm error` 분기 / `TodosPage error` 분기. Transient 는 `useToast` (사용자 트리거 sync 만, background auto-sync 는 silent), 영구 load 실패 는 `EmptyState` (icon=AlertCircle accent-red + "다시 시도" Button) 로 통일. DESIGN.md §11.7 "에러 표현" 3 패턴 (Toast / EmptyState / Danger zone) 명시.
+
+---
+
 ## 2026-05-23
 
 ### PR #37 — 디자인 시스템 정식화

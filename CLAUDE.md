@@ -64,6 +64,32 @@
 - 매일 사용 시 신뢰 깨지는 곳 (data loss, 한 번도 발생 안 한 에러 silent fail)은 단단히.
 - 그 외 generic SaaS pattern (multi-user, sharing, analytics, complex permissions) 절대 안 만듦.
 
+## 디자인 시스템 (토큰 + 컴포넌트 + voice/tone)
+
+`DESIGN.md` 가 토큰·컴포넌트 single source. `src/pages/StyleguidePage.tsx` 가 시각 카탈로그 (브라우저 `#styleguide` hash 진입 — VaultGate 우회). 새 컴포넌트는 styleguide 항목 추가 후 production 진입.
+
+### 핵심 룰
+
+- 모든 색은 `var(--*)` 토큰. hex 직접 박지 말 것 (예외: `useTheme.ts` radial-wipe JS 상수).
+- 토큰 정의는 `src/index.css` 만 (`:root` + `.dark`). primitive layer 없이 semantic 단일.
+- 새 컴포넌트는 `src/components/common/` 패턴 — variant + size + color prop, className/style override 통과.
+- Tailwind 는 레이아웃 전용. `dark:` 색상 접두사 사용 금지 (`.dark` class + CSS var 가 처리).
+
+### Voice & Tone — 9 카테고리 (1주차 lock-in)
+
+`StyleguidePage` 의 Writing 섹션이 시각적 ✅/❌ 카탈로그. 코드/카피 작성 시 default.
+
+- **종결어미**: `~합니다` 통일. `~해요` 혼용 X.
+- **액션 라벨**: 명사형 (`삭제`, `저장`, `연결`). `~하기` 형식 X.
+- **에러 메시지**: 원인 + 해결 2단. 사과 X. (예: "저장에 실패했습니다. 네트워크를 확인하고 다시 시도하세요.")
+- **날짜 형식**: 정밀 `YYYY.MM.DD`. 목록은 상대 (`5분 전`, `어제`) 또는 짧은 (`5월 23일`).
+- **시간 형식**: `오전·오후 h:mm` 12시간 (소비자 톤).
+- **숫자 · 단위**: 천 단위 `,`. 단위 한글, 붙임 (`30분`, `1MB`).
+- **placeholder**: 한글 예시형 (`예: 홍길동`). 명령형/영문 X.
+- **empty state**: heading + body + CTA 3단. 어미는 종결어미 정책 따름.
+- **wrap**: `word-break: keep-all` 전역. chip · 날짜는 `whitespace-nowrap`, 영문 URL · 해시는 `break-all`, 한 줄 ellipsis 는 `truncate`.
+- **문장부호**: 한국어 본문 em dash (`—`) 금지. 쉼표 · 괄호 · 마침표 사용 (영문 문맥은 OK).
+
 ## PR 작성 (포트폴리오 호환)
 
 PR body 가 곧 vault `portfolio/` 카드의 본문이 됨. 양식 (한 줄 임팩트 / 문제 / Before / After / 디자인 결정 / 유저가 얻는 것 / 카테고리 7섹션) 은 `src/lib/clipboardPrompt.ts` 의 `buildPRGuidePrompt()` 가 single source. 카테고리 enum: `ui_ux | backend | infra | fix | other`. "PR 만들어줘" 요청 받으면 의도 / 유저 가치 / before-after 스크린샷 / 디자인 결정 / 카테고리 5가지 먼저 확보. 작은 변경(오타·dep bump 등 포트폴리오 가치 없는 것)은 PR 안 만들고 main 직커밋 허용.

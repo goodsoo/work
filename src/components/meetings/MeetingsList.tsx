@@ -1,9 +1,10 @@
-import { Plus } from "lucide-react";
+import { AlertCircle, Plus } from "lucide-react";
 import { useMeetings } from "../../hooks/useMeetings";
 import type { Meeting } from "../../api/meetings";
 import { PageHeader } from "../nav/PageHeader";
 import { Button } from "../common/Button";
 import { Text } from "../common/Text";
+import { EmptyState as ErrorEmpty } from "../common/EmptyState";
 
 type Props = {
   onSelect: (id: string) => void;
@@ -197,30 +198,30 @@ function ErrorState({
   onRetry: () => void;
 }) {
   return (
-    <Text
-      variant="body"
-      as="div"
-      className="rounded-lg p-4"
-      style={{
-        borderLeft: "4px solid var(--accent-red)",
-        backgroundColor: "var(--accent-red-bg)",
-        color: "var(--accent-red-text)",
-      }}
-    >
-      <Text variant="body" weight="medium" as="div">
-        목록을 불러오지 못했어요
-      </Text>
-      <Text variant="caption" as="div" className="mt-1 font-mono opacity-80">
-        {message}
-      </Text>
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={onRetry}
-        className="mt-3 px-0 py-0 underline underline-offset-2 font-normal"
-      >
-        다시 시도
-      </Button>
-    </Text>
+    <ErrorEmpty
+      icon={
+        <AlertCircle
+          className="h-12 w-12"
+          style={{ color: "var(--accent-red)" }}
+          strokeWidth={1.25}
+        />
+      }
+      title="목록을 불러오지 못했습니다"
+      description={
+        <>
+          <Text variant="body" color="secondary" as="p">
+            잠시 후 다시 시도하세요.
+          </Text>
+          <Text variant="caption" color="muted" as="p" className="mt-1 font-mono">
+            {message}
+          </Text>
+        </>
+      }
+      action={
+        <Button variant="primary" onClick={onRetry}>
+          다시 시도
+        </Button>
+      }
+    />
   );
 }

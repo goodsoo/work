@@ -12,6 +12,7 @@ import { useVault } from "../../lib/vault/useVault";
 import { SettingsModal } from "../settings/SettingsModal";
 import { Button } from "../common/Button";
 import { Text } from "../common/Text";
+import { Popover } from "../common/Popover";
 import { BottomTabs, TABS, type Tab } from "./BottomTabs";
 
 const MOBILE_DRAWER_WIDTH = 288;
@@ -127,7 +128,7 @@ export function AppShell({
               paddingRight: "0.5rem",
             }}
           >
-            <VaultBadge onClick={() => setSettingsOpen(true)} />
+            <VaultBadge onOpenSettings={() => setSettingsOpen(true)} />
           </div>
         ) : null}
         <div data-tauri-drag-region className="flex h-full items-stretch">
@@ -408,24 +409,61 @@ function HeaderTabs({
   );
 }
 
-// 윈도우 헤더 좌측의 vault 이름 chip — 추후 vault switcher dropdown 진입점.
-// 지금은 클릭 시 SettingsModal (vault section default) 열림.
+// 윈도우 헤더 좌측의 vault 이름 chip — 클릭 시 dropdown 진입점.
+// 항목: vault 설정 (SettingsModal vault section) / 스타일가이드 (#styleguide hash).
 // vault > tabs 시각 계층 명시 — vault 가 root container 임을 좌→우 순서로 표현.
-function VaultBadge({ onClick }: { onClick: () => void }) {
+function VaultBadge({ onOpenSettings }: { onOpenSettings: () => void }) {
   const { vaultRoot } = useVault();
+  const [open, setOpen] = useState(false);
   if (!vaultRoot) return null;
   const name = vaultRoot.split("/").filter(Boolean).pop() ?? vaultRoot;
   return (
-    <Button
-      variant="ghost"
-      onClick={onClick}
-      title={vaultRoot}
-      aria-label={`vault: ${name}`}
-      className="h-7 max-w-full gap-1 px-2 text-[13px]"
-      style={{ color: "var(--text-primary)" }}
+    <Popover
+      open={open}
+      onClose={() => setOpen(false)}
+      trigger={
+        <Button
+          variant="ghost"
+          onClick={() => setOpen((v) => !v)}
+          title={vaultRoot}
+          aria-label={`vault: ${name}`}
+          className="h-7 max-w-full gap-1 px-2 text-[13px]"
+          style={{ color: "var(--text-primary)" }}
+        >
+          <span className="truncate">{name}</span>
+          <ChevronDown className="h-3 w-3 shrink-0 opacity-60" />
+        </Button>
+      }
+      panelClassName="absolute left-0 top-full mt-1 w-44 rounded-md p-1"
+      panelStyle={{
+        background: "var(--bg-base)",
+        border: "1px solid var(--border-default)",
+        boxShadow: "var(--shadow-popover)",
+        zIndex: 30,
+      }}
     >
-      <span className="truncate">{name}</span>
-      <ChevronDown className="h-3 w-3 shrink-0 opacity-60" />
-    </Button>
+      <button
+        type="button"
+        className="w-full rounded-md px-2 py-1.5 text-left text-sm hover:bg-[var(--bg-surface-hover)]"
+        style={{ color: "var(--text-primary)" }}
+        onClick={() => {
+          setOpen(false);
+          onOpenSettings();
+        }}
+      >
+        Vault 설정
+      </button>
+      <button
+        type="button"
+        className="w-full rounded-md px-2 py-1.5 text-left text-sm hover:bg-[var(--bg-surface-hover)]"
+        style={{ color: "var(--text-primary)" }}
+        onClick={() => {
+          setOpen(false);
+          window.location.hash = "#styleguide";
+        }}
+      >
+        스타일가이드
+      </button>
+    </Popover>
   );
 }
