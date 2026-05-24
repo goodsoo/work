@@ -22,6 +22,9 @@ type ModalProps = {
   dismissOnEscape?: boolean;
   // 기본 true.
   dismissOnBackdrop?: boolean;
+  // 옵션 — size 의 기본 max-width 를 override. 같은 size 토큰의 height/flex 는 유지하고
+  // 가로 폭만 좁혀야 할 때 (예: 일기 lg). Tailwind max-w-* 클래스 문자열.
+  maxWidth?: string;
 };
 
 // 4-tier size 토큰. width 는 max-w 로 캡, height 는 lg/xl 만 viewport-aware 고정값
@@ -61,6 +64,7 @@ export function Modal({
   backdrop = "scrim",
   dismissOnEscape = true,
   dismissOnBackdrop = true,
+  maxWidth,
 }: ModalProps) {
   useEffect(() => {
     if (!open || !dismissOnEscape) return;
@@ -97,7 +101,7 @@ export function Modal({
         aria-modal="true"
         aria-label={ariaLabel}
         aria-labelledby={ariaLabelledBy}
-        className={`w-full overflow-hidden shadow-xl ${cfg.maxW} ${cfg.radius} ${flexClass}`}
+        className={`w-full overflow-hidden shadow-xl ${maxWidth ?? cfg.maxW} ${cfg.radius} ${flexClass}`}
         style={{
           backgroundColor: "var(--bg-surface)",
           border: "1px solid var(--border-default)",

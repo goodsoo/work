@@ -24,6 +24,25 @@
 - **주말 칸 살짝 다른 배경** — `--text-muted` 6% tint, 평일과 시각 구분.
 - **`CheckboxButton` 컴포넌트 추출** — TodoRow 안 local function → `src/components/todos/CheckboxButton.tsx` 별도 파일. TodoRow + CalendarDayPanel 양쪽 재사용. hover 미리보기 svg + 카테고리 색 border tint + e.stopPropagation 내장.
 
+### PR #40 — SourceBodyEditor 풀세트 일기 적용 + 보기 모드 일관성
+
+- **한 줄 임팩트**: 일기에서도 마크다운 에디터 풀세트 (gutter/슬래시/단축키)
+- **`SourceBodyEditor` 4 prop 추가** — `placeholder` / `className` / `textareaRef` / `onBlur`. 회의록 호출부 영향 0, 다른 소비처 재사용 baseline.
+- **폰트 토큰화** — textarea `text-base` 제거 + mirror `fontSize: inherit` → outer wrapper className 의 `font-*` 가 자연스럽게 inherit. 일기 wrapper `font-serif text-[15px]`, 메모장 default.
+- **`.font-serif { font-weight: 600 }` footgun 캡슐화** — `SourceBodyEditor` textarea + `MarkdownView` root 에서 fontWeight 400 가로채기. 새 소비처가 wrapper 에 font-serif 박아도 본문 weight 일관.
+- **`MarkdownView` 보기 모드 일관성** — `text-base` 제거 → wrapper font-size inherit (편집/보기 토글 시 점프 차단), code/pre/table-th 배경 `bg-surface` → `bg-surface-hover` (모달 안에서 가시성).
+- **`SlashCommandPopover` body portal + `position: fixed` + `z-[70]`** — 모달 `overflow-y-auto` clipping 우회 + Modal `z-60` 위로.
+- **popover flip-up** — textarea 의 `closest('[role="dialog"]')` bottom 까지 안 닿게 추정 height (`opts × 28 + 8`) 로 cursor 줄 바로 위에 붙임. 메모장 (dialog 없음) 은 viewport bottom fallback.
+- **`Modal` `maxWidth` prop 추가** — size 토큰의 height/flex 유지하고 가로만 override 가능 (향후 활용 baseline).
+
+### PR #39 — portfolio 사이드바 정렬/카테고리 chip 필터 + 본문 active 배너
+
+- **한 줄 임팩트**: 카드 많아져도 카테고리/정렬로 좁히기
+- **5종 정렬 옵션** — 최신 PR / 오래된 PR / 카테고리 / 프로젝트 / 영향. `usePortfolioSort` localStorage persist (useMeetingSort 패턴 동일). 사이드바 헤더 ⇅ 아이콘 → popover.
+- **카테고리 chip 다중 OR 필터** — `usePortfolioCategoryFilter` Set state. 5 카테고리 chip (UI/UX·Backend·Infra·Fix·기타) flex-wrap. active 시 카테고리 색 ring + tinted bg. fontWeight 토글 X (글자 너비 흔들림 방지).
+- **본문 active filter 배너** — 카드 그리드 위 "필터: [chip] [chip] 전체 해제". 필터 켜둔 걸 까먹어 "왜 카드 적지" 당황 방지. chip 클릭 = 단독 해제, "전체 해제" 한 번에 끔.
+- **사이드바 폴리시** — 카테고리 row 높이 고정 (해제 버튼 토글로 흔들리지 않게). FilterItem px-2 py-1 text-[13px] compact. SyncButton 진행 중 X 버튼 contrast 개선. sync 결과 라벨 풀어쓰기 ("새 카드 / 갱신 / 전체" + title tooltip).
+
 ### 직커밋 — portfolio sync 시 PR body 7섹션 자동 파싱 → frontmatter
 
 - **한 줄 임팩트**: PR body 양식 그대로 적은 임팩트/카테고리가 카드 frontmatter 에 자동 들어감

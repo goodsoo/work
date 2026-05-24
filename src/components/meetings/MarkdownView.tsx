@@ -82,8 +82,13 @@ export function MarkdownView({ content, onChange }: Props) {
   const vaultRoot = vaultCtx?.vaultRoot ?? null;
   return (
     <div
-      className="markdown-view text-base leading-relaxed"
-      style={{ color: "var(--text-primary)" }}
+      // font-size 는 wrapper 에서 inherit — 메모장은 default 1rem, 일기는 15px.
+      // 이전엔 text-base 가 직접 박혀 일기 wrapper 의 15px 가 가려졌음 (편집 15 ↔ 보기 16 점프).
+      className="markdown-view leading-relaxed"
+      // index.css 의 `.font-serif { font-weight: 600 }` base 룰 가로채기 — 일기처럼
+      // wrapper 가 font-serif 일 때 본문도 600 으로 끌려가는 footgun 차단.
+      // h1-h6 / strong / em 자체 weight 는 각 컴포넌트 className 이 덮어씀.
+      style={{ color: "var(--text-primary)", fontWeight: 400 }}
     >
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
@@ -261,7 +266,9 @@ export function MarkdownView({ content, onChange }: Props) {
               <code
                 className="rounded px-1 py-0.5 font-mono text-sm"
                 style={{
-                  backgroundColor: "var(--bg-surface)",
+                  // surface-active — light/dark 모두 surface (모달 배경) 보다 한 단계 진함.
+                  // 모달 안 (bg-surface) 위에서도, 메모장 main (bg-base) 위에서도 가시성.
+                  backgroundColor: "var(--bg-surface-hover)",
                   color: "var(--text-primary)",
                 }}
               >
@@ -273,7 +280,7 @@ export function MarkdownView({ content, onChange }: Props) {
             <InsidePreContext.Provider value={true}>
               <pre
                 className="my-3 overflow-auto rounded p-3 font-mono text-sm whitespace-pre"
-                style={{ backgroundColor: "var(--bg-surface)" }}
+                style={{ backgroundColor: "var(--bg-surface-hover)" }}
               >
                 {children}
               </pre>
@@ -310,7 +317,8 @@ export function MarkdownView({ content, onChange }: Props) {
                 className="px-2 py-1.5 font-semibold"
                 style={{
                   borderBottom: "1px solid var(--border-default)",
-                  backgroundColor: "var(--bg-surface)",
+                  // code/pre 와 같은 톤 — 모달 (surface) 위에서도 base 위에서도 분간.
+                  backgroundColor: "var(--bg-surface-hover)",
                   textAlign: (align as "left" | "center" | "right" | undefined) ?? "left",
                 }}
               >
