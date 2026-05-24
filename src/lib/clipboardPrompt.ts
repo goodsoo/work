@@ -315,20 +315,22 @@ export function buildPRGuidePrompt(): string {
   return PR_GUIDE_PROMPT;
 }
 
-// H3 split: "한 줄 임팩트" 와 "카테고리" 섹션 추출.
+// H2/H3 split: "한 줄 임팩트" 와 "카테고리" 섹션 추출.
+// H3 = Claude 응답 paste (buildPRPrompt 출력 형식).
+// H2 = PR body 자체 (포트폴리오 양식 — buildPRGuidePrompt 의 7섹션).
 // 파싱 실패 시 null — 본인이 raw 텍스트 보고 직접 입력.
-const IMPACT_HEADER = /^###\s+한\s*줄\s*임팩트\s*$/m;
-const CATEGORY_HEADER = /^###\s+카테고리\s*$/m;
+const IMPACT_HEADER = /^#{2,3}\s+한\s*줄\s*임팩트\s*$/m;
+const CATEGORY_HEADER = /^#{2,3}\s+카테고리\s*$/m;
+const NEXT_HEADER = /^#{2,3}\s/m;
 const CATEGORY_ENUM = /^(ui_ux|backend|infra|fix|other)$/i;
 type PRCategory = "ui_ux" | "backend" | "infra" | "fix" | "other";
 
 export function parsePRResponse(
   text: string,
 ): { impact: string; category: PRCategory } | null {
-  // H3 split: 헤더 다음 ~ 다음 H3 사이의 텍스트 추출.
-  const impactSection = text.split(IMPACT_HEADER)[1]?.split(/^###\s/m)[0] ?? "";
+  const impactSection = text.split(IMPACT_HEADER)[1]?.split(NEXT_HEADER)[0] ?? "";
   const categorySection =
-    text.split(CATEGORY_HEADER)[1]?.split(/^###\s/m)[0] ?? "";
+    text.split(CATEGORY_HEADER)[1]?.split(NEXT_HEADER)[0] ?? "";
 
   const impact = impactSection
     .split("\n")

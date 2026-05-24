@@ -347,6 +347,66 @@ describe("portfolioWorkToRaw (step 4)", () => {
     expect(read?.description.length).toBeLessThan(longBody.length);
     expect(read?.description).toContain("...(truncated)");
   });
+
+  it("신규 카드: PR body 의 H2 7섹션 양식 → impact_summary + category 자동 채움", async () => {
+    const adapter = createMemoryAdapter();
+    adapter.setRoot("/vault");
+    const prBody = `## 한 줄 임팩트
+차트 가독성 개선
+
+## 문제 (Why)
+기존 차트 안 보임
+
+## 카테고리
+ui_ux
+`;
+    await upsertPortfolioWork(adapter, {
+      search: mkSearchResult(),
+      detail: mkDetail({ body: prBody }),
+    });
+    const read = await readPortfolioWork(adapter, "owner-repo-42");
+    expect(read?.frontmatter.impact_summary).toBe("차트 가독성 개선");
+    expect(read?.frontmatter.category).toBe("ui_ux");
+  });
+
+  it("기존 카드: PR body 자동 파싱 결과로 본인 수정값 덮어쓰지 않음 (3A)", async () => {
+    const adapter = createMemoryAdapter();
+    adapter.setRoot("/vault");
+    // 1차: 신규 (H2 양식 X) → default
+    await upsertPortfolioWork(adapter, {
+      search: mkSearchResult(),
+      detail: mkDetail({ body: "no H2 sections here" }),
+    });
+    // 본인이 수정
+    const existing = await readPortfolioWork(adapter, "owner-repo-42");
+    await adapter.write(
+      portfolioWorkPath("owner-repo-42"),
+      portfolioWorkToRaw({
+        ...existing!,
+        frontmatter: {
+          ...existing!.frontmatter,
+          impact_summary: "본인이 직접 적은 임팩트",
+          category: "backend",
+        },
+      }),
+    );
+    // 2차 sync: PR body 가 다른 H2 양식 들고 와도 본인 수정 보존
+    const reloaded = await readPortfolioWork(adapter, "owner-repo-42");
+    const prBody = `## 한 줄 임팩트
+sync 가 들고 온 다른 임팩트
+
+## 카테고리
+ui_ux
+`;
+    await upsertPortfolioWork(adapter, {
+      search: mkSearchResult(),
+      detail: mkDetail({ body: prBody }),
+      existing: reloaded!,
+    });
+    const after = await readPortfolioWork(adapter, "owner-repo-42");
+    expect(after?.frontmatter.impact_summary).toBe("본인이 직접 적은 임팩트");
+    expect(after?.frontmatter.category).toBe("backend");
+  });
 });
 
 describe("syncState (step 4)", () => {

@@ -10,6 +10,7 @@
 import yaml from "js-yaml";
 
 import type { VaultAdapter } from "../lib/vault/adapter";
+import { parsePRResponse } from "../lib/clipboardPrompt";
 import {
   ghEnrichPR,
   ghSearchMyPRs,
@@ -636,6 +637,14 @@ export async function upsertPortfolioWork(
       ? existingScreenshots
       : (importedScreenshots ?? []);
 
+  // body 우선순위: detail.body (gh pr view, 더 fresh) > search.body (gh search prs).
+  const rawDescription = detail.body || search.body || "";
+
+  // PR body 의 7섹션 양식에서 한 줄 임팩트 + 카테고리 자동 추출 (신규 카드만).
+  // 본인이 PR body 에 H2 양식 적어둔 거 그대로 frontmatter 로 옮김.
+  // 본인 수정값 보존 (3A) — existing 카드는 절대 건드리지 않음.
+  const parsed = !existing ? parsePRResponse(rawDescription) : null;
+
   const userFields: PortfolioUserFields = existing
     ? {
         // 본인이 명시 분류한 project 는 보존, "분류안됨" (빈) 이면 자동 매핑.
@@ -646,10 +655,14 @@ export async function upsertPortfolioWork(
         impact_summary: existing.frontmatter.impact_summary,
         screenshots,
       }
-    : { ...defaultUserFields(), project: autoProject, screenshots };
-
-  // body 우선순위: detail.body (gh pr view, 더 fresh) > search.body (gh search prs).
-  const rawDescription = detail.body || search.body || "";
+    : {
+        ...defaultUserFields(),
+        project: autoProject,
+        screenshots,
+        ...(parsed
+          ? { impact_summary: parsed.impact, category: parsed.category }
+          : {}),
+      };
 
   const frontmatter: PortfolioWorkFrontmatter = {
     type: "portfolio-work",

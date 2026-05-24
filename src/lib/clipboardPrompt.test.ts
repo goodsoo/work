@@ -121,4 +121,42 @@ describe("parsePRResponse (V0.7 step 8)", () => {
     const r = parsePRResponse(`### 한 줄 임팩트\n${long}\n\n### 카테고리\nui_ux\n`);
     expect(r?.impact.length).toBe(60);
   });
+
+  it("H2 PR body 양식도 동일하게 파싱 (sync 자동 추출)", () => {
+    const body = `## 한 줄 임팩트
+차트 가독성 개선
+
+## 문제 (Why)
+기존 차트 안 보임
+
+## Before
+![before](url)
+
+## After
+![after](url)
+
+## 디자인 결정
+- 토큰 적용
+
+## 유저가 얻는 것
+- 한눈에 들어옴
+
+## 카테고리
+ui_ux
+`;
+    expect(parsePRResponse(body)).toEqual({
+      impact: "차트 가독성 개선",
+      category: "ui_ux",
+    });
+  });
+
+  it("H2 PR body — 카테고리 enum 외 값은 other fallback", () => {
+    const body = `## 한 줄 임팩트
+뭔가 좋아짐
+
+## 카테고리
+무분류
+`;
+    expect(parsePRResponse(body)?.category).toBe("other");
+  });
 });
