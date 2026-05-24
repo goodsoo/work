@@ -933,6 +933,7 @@ export function StyleguidePage() {
             open={modalOpen}
             onClose={() => setModalOpen(false)}
             ariaLabel="예시 모달"
+            size="md"
           >
             <div
               className="w-full max-w-md rounded-xl p-6"

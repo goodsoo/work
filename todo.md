@@ -127,13 +127,17 @@ PR 단위로 묶음. 각 PR 의 **한 줄 임팩트** 는 카드 frontmatter `im
 
 - [ ] portfolio 탭에서 "새 카드" 버튼 → title/date/category/impact_summary 입력 + screenshots dropzone → 저장. frontmatter `github_pr_id` 없거나 0 → sync 가 건드리지 않음 (legacy 카드 schema 그대로 활용). 평가 자료에 PR 외 활동도 포함.
 
-### PR — portfolio 사이드바 정렬/필터 + UI 개선 `ui_ux`
-한 줄 임팩트: 카드 많아져도 사이드바에서 좁히기 — 정렬/카테고리/프로젝트 필터
+### PR — sync 결과 카드 식별 `ui_ux`
+한 줄 임팩트: 어떤 카드가 새로 들어왔는지 한눈에
 
-- [ ] **정렬 옵션** — 최신 PR / 카테고리 / 프로젝트 / 영향 (impact_summary 채워진 것 우선). `useMeetingSort` 패턴 재활용 (localStorage persist).
-- [ ] **카테고리 필터 chip** — ui_ux / backend / infra / fix / other. 다중 선택 = OR. 메모장 태그 필터 PR 과 패턴 통일.
-- [ ] **프로젝트 필터** — `projects.md` 그룹별 좁히기. 다중 선택.
-- [ ] **사이드바 UI 폴리시** — 메모장 사이드바 카드 밀도 / spacing / 색 토큰 통일. 헤더 + 검색 입력 (`PR — 메모 검색` 합쳐 portfolio 카드도 검색).
+- [ ] sync 직후 신규 추가 카드 우상단 "NEW" 배지. 다음 sync 까지 유지. `.synced.md` 에 `last_added_slugs: []` 저장 → 다음 sync 가 덮어씀.
+- [ ] 갱신 카드 표시는 noise — 거의 매번 발생. skip.
+- [ ] (선택) 사이드바 "새 카드 N" 클릭 → 그 N 개만 임시 필터.
+
+### PR — 사이드바 FilterItem 통일 `ui_ux`
+한 줄 임팩트: 메모장/캘린더/할일/포트폴리오 사이드바 공통 컴포넌트화
+
+- [ ] 현재 PortfolioProjectList 의 FilterItem (px-2 py-1 text-[13px]) 과 SidePanel.tsx 의 TodosFilterItem (px-3 py-2 text-sm) 사이즈/패턴 차이. common/FilterItem 으로 추출 + 모든 사이드바 마이그레이트.
 
 ### PR — 가이드북 UIUX 다듬기 `ui_ux`
 한 줄 임팩트: 동기화 진행 표시 + 가독성 정돈

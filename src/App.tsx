@@ -18,6 +18,8 @@ import {
   type TodosCategoryFilter,
 } from "./components/nav/SidePanel";
 import { useTodoSort } from "./hooks/useTodoSort";
+import { usePortfolioSort } from "./hooks/usePortfolioSort";
+import { usePortfolioCategoryFilter } from "./hooks/usePortfolioCategoryFilter";
 import { TodoTrashModal } from "./components/todos/TodoTrashModal";
 import { Text } from "./components/common/Text";
 import { EmptyState } from "./components/common/EmptyState";
@@ -93,6 +95,8 @@ function AppContent() {
   const [portfolioFilter, setPortfolioFilter] = useState<ProjectFilter>({
     kind: "all",
   });
+  const [portfolioSortKey, setPortfolioSortKey] = usePortfolioSort();
+  const portfolioCategoryFilter = usePortfolioCategoryFilter();
   // 휴지통은 overlay — utility 액션이라 SettingsModal 과 같은 패턴.
   // 메모 + todo 휴지통 별도 — 데이터 영역 다름.
   const [trashOpen, setTrashOpen] = useState(false);
@@ -426,6 +430,11 @@ function AppContent() {
       <PortfolioSidePanel
         activeFilter={portfolioFilter}
         onFilterChange={setPortfolioFilter}
+        sortKey={portfolioSortKey}
+        onSortKeyChange={setPortfolioSortKey}
+        selectedCategories={portfolioCategoryFilter.selected}
+        onCategoryToggle={portfolioCategoryFilter.toggle}
+        onCategoryClear={portfolioCategoryFilter.clear}
         syncState={portfolioSync.state}
         onSyncRun={portfolioRunIncrementalSync}
         onSyncCancel={portfolioSync.cancel}
@@ -467,6 +476,10 @@ function AppContent() {
       ) : tab === "portfolio" ? (
         <PortfolioPage
           activeFilter={portfolioFilter}
+          sortKey={portfolioSortKey}
+          selectedCategories={portfolioCategoryFilter.selected}
+          onCategoryToggle={portfolioCategoryFilter.toggle}
+          onCategoryClear={portfolioCategoryFilter.clear}
           onSync={portfolioRunFullSync}
           syncRunning={portfolioSync.state.running}
         />
