@@ -971,6 +971,10 @@ export function MeetingForm({ meetingId, onBack }: Props) {
                   // 합쳐져 undo 가 어색해짐).
                   setDoc("body", { ...doc, body: v }, true);
                 }}
+                onAddTodoFromLine={(lineText) => {
+                  setTaskModalPrefill(lineToTaskPrefill(lineText, meetingId));
+                  setTaskModalOpen(true);
+                }}
               />
             )}
           </div>
