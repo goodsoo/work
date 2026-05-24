@@ -15,6 +15,7 @@ import {
   Users,
   Loader2,
   Circle,
+  AlertCircle,
 } from "lucide-react";
 
 import {
@@ -32,6 +33,7 @@ import { Button } from "../common/Button";
 import { Text } from "../common/Text";
 import { PageHeaderBar } from "../common/PageHeaderBar";
 import { Kbd } from "../common/Kbd";
+import { EmptyState } from "../common/EmptyState";
 import { buildClaudePrompt } from "../../lib/clipboardPrompt";
 import { CopyButton } from "./CopyButton";
 import { EditableList } from "./EditableList";
@@ -501,18 +503,22 @@ export function MeetingForm({ meetingId, onBack }: Props) {
   if (error) {
     return (
       <div className="mx-auto w-full max-w-3xl px-6 py-16">
-        <Text
-          variant="body"
-          as="div"
-          className="rounded-lg p-4"
-          style={{
-            borderLeft: "4px solid var(--accent-red)",
-            backgroundColor: "var(--accent-red-bg)",
-            color: "var(--accent-red-text)",
-          }}
-        >
-          불러오지 못했어요. <button type="button" onClick={() => void refetch()} className="underline">재시도</button>
-        </Text>
+        <EmptyState
+          icon={
+            <AlertCircle
+              className="h-12 w-12"
+              style={{ color: "var(--accent-red)" }}
+              strokeWidth={1.25}
+            />
+          }
+          title="메모를 불러오지 못했습니다"
+          description="잠시 후 다시 시도하세요."
+          action={
+            <Button variant="primary" onClick={() => void refetch()}>
+              다시 시도
+            </Button>
+          }
+        />
       </div>
     );
   }

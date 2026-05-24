@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Undo2, Redo2 } from "lucide-react";
+import { Undo2, Redo2, AlertCircle } from "lucide-react";
 import {
   useDeleteTodo,
   useTodos,
@@ -196,27 +196,31 @@ export function TodosPage({
       />
       <div className="mx-auto w-full max-w-2xl px-5 pb-16 pt-5 lg:max-w-4xl">
       {error ? (
-        <div
-          className="mt-6 rounded-lg p-4 text-sm"
-          style={{
-            borderLeft: "4px solid var(--accent-red)",
-            backgroundColor: "var(--accent-red-bg)",
-            color: "var(--accent-red-text)",
-          }}
-        >
-          <div className="font-medium">목록을 불러오지 못했어요</div>
-          <div className="mt-1 font-mono text-xs opacity-80">
-            {(error as Error).message}
-          </div>
-          <button
-            type="button"
-            onClick={() => void refetch()}
-            className="mt-3 text-xs underline underline-offset-2"
-            style={{ minHeight: 0 }}
-          >
-            다시 시도
-          </button>
-        </div>
+        <EmptyState
+          icon={
+            <AlertCircle
+              className="h-12 w-12"
+              style={{ color: "var(--accent-red)" }}
+              strokeWidth={1.25}
+            />
+          }
+          title="목록을 불러오지 못했습니다"
+          description={
+            <>
+              <Text variant="body" color="secondary" as="p">
+                잠시 후 다시 시도하세요.
+              </Text>
+              <Text variant="caption" color="muted" as="p" className="mt-1 font-mono">
+                {(error as Error).message}
+              </Text>
+            </>
+          }
+          action={
+            <Button variant="primary" onClick={() => void refetch()}>
+              다시 시도
+            </Button>
+          }
+        />
       ) : isLoading ? (
         <SkeletonList />
       ) : todos.length === 0 ? (
