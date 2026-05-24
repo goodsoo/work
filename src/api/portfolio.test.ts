@@ -369,6 +369,72 @@ ui_ux
     expect(read?.frontmatter.category).toBe("ui_ux");
   });
 
+  it("빈 default 카드: sync 가 H2 PR body 에서 impact + category 채움", async () => {
+    const adapter = createMemoryAdapter();
+    adapter.setRoot("/vault");
+    // 1차: H2 양식 없는 body → default (impact="", category="other")
+    await upsertPortfolioWork(adapter, {
+      search: mkSearchResult(),
+      detail: mkDetail({ body: "no H2 sections" }),
+    });
+    const existing = await readPortfolioWork(adapter, "owner-repo-42");
+    expect(existing?.frontmatter.impact_summary).toBe("");
+    expect(existing?.frontmatter.category).toBe("other");
+
+    // 2차 sync: H2 양식 PR body
+    const prBody = `## 한 줄 임팩트
+새 임팩트
+
+## 카테고리
+ui_ux
+`;
+    await upsertPortfolioWork(adapter, {
+      search: mkSearchResult(),
+      detail: mkDetail({ body: prBody }),
+      existing: existing!,
+    });
+    const after = await readPortfolioWork(adapter, "owner-repo-42");
+    expect(after?.frontmatter.impact_summary).toBe("새 임팩트");
+    expect(after?.frontmatter.category).toBe("ui_ux");
+  });
+
+  it("부분 수정 카드: 본인이 채운 impact 는 보존, default 인 category 만 채움", async () => {
+    const adapter = createMemoryAdapter();
+    adapter.setRoot("/vault");
+    await upsertPortfolioWork(adapter, {
+      search: mkSearchResult(),
+      detail: mkDetail({ body: "no H2 sections" }),
+    });
+    const existing = await readPortfolioWork(adapter, "owner-repo-42");
+    // 본인이 impact 만 채우고 category 는 default 둠
+    await adapter.write(
+      portfolioWorkPath("owner-repo-42"),
+      portfolioWorkToRaw({
+        ...existing!,
+        frontmatter: {
+          ...existing!.frontmatter,
+          impact_summary: "본인이 적은 임팩트",
+          // category 는 "other" 그대로
+        },
+      }),
+    );
+    const reloaded = await readPortfolioWork(adapter, "owner-repo-42");
+    const prBody = `## 한 줄 임팩트
+sync 의 다른 임팩트
+
+## 카테고리
+backend
+`;
+    await upsertPortfolioWork(adapter, {
+      search: mkSearchResult(),
+      detail: mkDetail({ body: prBody }),
+      existing: reloaded!,
+    });
+    const after = await readPortfolioWork(adapter, "owner-repo-42");
+    expect(after?.frontmatter.impact_summary).toBe("본인이 적은 임팩트"); // 보존
+    expect(after?.frontmatter.category).toBe("backend"); // 채움
+  });
+
   it("기존 카드: PR body 자동 파싱 결과로 본인 수정값 덮어쓰지 않음 (3A)", async () => {
     const adapter = createMemoryAdapter();
     adapter.setRoot("/vault");

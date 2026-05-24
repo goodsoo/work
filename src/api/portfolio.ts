@@ -640,19 +640,25 @@ export async function upsertPortfolioWork(
   // body 우선순위: detail.body (gh pr view, 더 fresh) > search.body (gh search prs).
   const rawDescription = detail.body || search.body || "";
 
-  // PR body 의 7섹션 양식에서 한 줄 임팩트 + 카테고리 자동 추출 (신규 카드만).
-  // 본인이 PR body 에 H2 양식 적어둔 거 그대로 frontmatter 로 옮김.
-  // 본인 수정값 보존 (3A) — existing 카드는 절대 건드리지 않음.
-  const parsed = !existing ? parsePRResponse(rawDescription) : null;
+  // PR body 의 7섹션 양식에서 한 줄 임팩트 + 카테고리 자동 추출.
+  // 신규 카드 + 빈 default 필드 채움. 본인이 한 번이라도 수정한 필드는 보존 (3A).
+  // - impact_summary 빈 문자열 = 본인 미작성 → parsed.impact 로 채움
+  // - category "other" = default = 본인 미분류 → parsed.category 로 채움
+  const parsed = parsePRResponse(rawDescription);
 
   const userFields: PortfolioUserFields = existing
     ? {
         // 본인이 명시 분류한 project 는 보존, "분류안됨" (빈) 이면 자동 매핑.
-        // included/category/impact 는 무조건 보존 (3A).
         project: existing.frontmatter.project || autoProject,
         included: existing.frontmatter.included,
-        category: existing.frontmatter.category,
-        impact_summary: existing.frontmatter.impact_summary,
+        category:
+          existing.frontmatter.category !== "other"
+            ? existing.frontmatter.category
+            : (parsed?.category ?? "other"),
+        impact_summary:
+          existing.frontmatter.impact_summary !== ""
+            ? existing.frontmatter.impact_summary
+            : (parsed?.impact ?? ""),
         screenshots,
       }
     : {
