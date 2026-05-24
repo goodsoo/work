@@ -811,10 +811,12 @@ export function MeetingForm({ meetingId, onBack }: Props) {
 
       {/* Full-page editor — desktop 에선 자체 scroll container (header 옆 scrollbar 회피).
           outer = full-width scroll, inner = max-w content.
+          flex-col chain (scroll → content wrapper → tab content → mode div → editor) 으로
+          빈 메모일 땐 editor 가 남은 높이 채움 + 스크롤 X, 내용 길어지면 자연 overflow.
           onScroll = 탭별 scroll 위치 매번 cache (탭/메모 전환 시 복원). */}
       <div
         ref={scrollContainerRef}
-        className="lg:flex-1 lg:overflow-y-auto lg:overscroll-none"
+        className="lg:flex lg:flex-1 lg:flex-col lg:overflow-y-auto lg:overscroll-none"
         onScroll={(e) => {
           SCROLL_CACHE.set(
             `${meetingId}:${activeTab}`,
@@ -823,7 +825,7 @@ export function MeetingForm({ meetingId, onBack }: Props) {
         }}
       >
         <div
-          className="mx-auto max-w-3xl px-6 pb-24"
+          className="mx-auto w-full max-w-3xl px-6 pb-24 lg:flex lg:flex-1 lg:flex-col"
           onMouseDown={(e) => {
             // wrapper 의 padding 영역 (특히 pb-24 하단) 클릭 → 활성 textarea 끝으로 focus.
             // 좌우 px-6 (24px) 영역은 제외 — 사용자가 좌우 padding 은 클릭으로 잡지 말라고 했음.
@@ -891,11 +893,13 @@ export function MeetingForm({ meetingId, onBack }: Props) {
           </div>
         </div>
 
-        {/* Tab content wrapper — 빈 메모일 땐 스크롤 없음, 내용 늘면 자연 scroll */}
-        <div className="mt-4">
+        {/* Tab content wrapper — 빈 메모일 땐 스크롤 없음, 내용 늘면 자연 scroll.
+            lg:flex-1 chain 으로 자식 (editor) 가 남은 높이 채움. */}
+        <div className="mt-4 lg:flex lg:flex-1 lg:flex-col">
         {activeTab === "body" ? (
           <div
             key={viewMode}
+            className="lg:flex lg:flex-1 lg:flex-col"
             style={{ animation: "meetingViewFade 140ms ease" }}
           >
             {/* Metadata — 메모탭 안. 편집 모드 = MetaRow (icon + divider + input).

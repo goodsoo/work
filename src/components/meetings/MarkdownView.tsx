@@ -157,10 +157,10 @@ export function MarkdownView({ content, onChange }: Props) {
             return (
               // -ml-6: 부모 ul 의 pl-6 (bullet list 용 marker 공간) 을 task 만 회수.
               //        같은 ul 안의 bullet li 는 그대로 marker 보임.
-              // items-center + [&>span>p]:my-0: loose list 의 <p> wrapper 가 my-2 로
-              //        높이 늘려 체크박스가 텍스트 위로 떠 보이던 거 보정 → 1줄 텍스트
-              //        와 수직 중앙 정렬.
-              <li className="task-list-item -ml-6 flex list-none items-center gap-2 [&>span>p]:my-0">
+              // items-start + [&>span>p]:my-0: 여러 줄 task 도 체크박스가 첫 줄 앞에
+              //        붙도록 top-align. mt-[5px] 가 (line-height 26 - checkbox 16) / 2
+              //        — 첫 줄 텍스트의 vertical center 와 정렬.
+              <li className="task-list-item -ml-6 flex list-none items-start gap-2 [&>span>p]:my-0">
                 <input
                   type="checkbox"
                   checked={checked}
@@ -170,7 +170,7 @@ export function MarkdownView({ content, onChange }: Props) {
                     if (!onChange) return;
                     onChange(toggleTaskCheckboxAt(content, offset));
                   }}
-                  className={`h-4 w-4 flex-shrink-0 ${
+                  className={`mt-[5px] h-4 w-4 flex-shrink-0 ${
                     clickable ? "cursor-pointer" : ""
                   }`}
                   style={{ accentColor: "var(--accent-red)" }}

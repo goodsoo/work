@@ -279,7 +279,7 @@ export function AppShell({
             ["--gs-main-pt" as string]: "var(--titlebar-inset)",
           } as React.CSSProperties
         }
-        className="animate-page-in lg:!pb-0 lg:h-screen lg:overflow-y-auto lg:overscroll-none lg:[padding-left:var(--gs-main-pl)] lg:[padding-top:var(--gs-main-pt)]"
+        className="lg:!pb-0 lg:h-screen lg:overflow-y-auto lg:overscroll-none lg:[padding-left:var(--gs-main-pl)] lg:[padding-top:var(--gs-main-pt)]"
       >
         {children}
       </main>
@@ -389,21 +389,15 @@ function HeaderTabs({
               backgroundColor: active ? "var(--bg-base)" : "transparent",
               color: active ? "var(--text-primary)" : "var(--text-secondary)",
               marginBottom: active ? "-1px" : 0,
-              borderTop: active
-                ? "1px solid var(--border-default)"
-                : "1px solid transparent",
-              borderLeft: active
-                ? "1px solid var(--border-default)"
-                : "1px solid transparent",
-              borderRight: active
-                ? "1px solid var(--border-default)"
-                : "1px solid transparent",
-              borderBottom: "1px solid transparent",
+              border: "1px solid transparent",
               borderTopLeftRadius: active ? 6 : 4,
               borderTopRightRadius: active ? 6 : 4,
               borderBottomLeftRadius: active ? 0 : 4,
               borderBottomRightRadius: active ? 0 : 4,
               boxSizing: "border-box",
+              // tab active 전환은 즉시 — border/bg/radius 150ms 페이드가 "살짝 내려옴"
+              // 처럼 보이던 거 제거.
+              transition: "none",
             }}
           >
             <Icon className="h-4 w-4" strokeWidth={active ? 2 : 1.5} />

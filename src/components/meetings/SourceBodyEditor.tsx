@@ -425,23 +425,30 @@ export function SourceBodyEditor({ content, onChange, onSendLineToInbox }: Props
   }
 
   // textarea 아래/우측 빈 영역 클릭 → textarea focus + caret 끝.
+  // outer 자체 + 그 안 textarea-wrapper (textarea 아래 빈 영역) 둘 다 cover.
+  // textarea / gutter marker / 그 안 자식은 자체 핸들러 (focus / line jump) 양보.
   function onContainerMouseDown(e: React.MouseEvent<HTMLDivElement>) {
-    if (e.target === e.currentTarget) {
-      const el = textareaRef.current;
-      if (!el) return;
-      e.preventDefault();
-      el.focus();
-      const end = el.value.length;
-      el.setSelectionRange(end, end);
-      setCaretLine(el.value.slice(0, end).split("\n").length - 1);
-    }
+    const target = e.target as HTMLElement;
+    if (target instanceof HTMLTextAreaElement) return;
+    if (target.closest("[data-gutter-marker]")) return;
+    const el = textareaRef.current;
+    if (!el) return;
+    e.preventDefault();
+    el.focus();
+    const end = el.value.length;
+    el.setSelectionRange(end, end);
+    setCaretLine(el.value.slice(0, end).split("\n").length - 1);
   }
 
   return (
     <div
       className="flex"
       onMouseDown={onContainerMouseDown}
-      style={{ minHeight: "60vh", alignItems: "stretch", position: "relative" }}
+      // flex 부모 (MeetingForm 의 mode container) 가 column 이면 grow 로 남은 높이 채움
+      // — 빈 메모는 자연스럽게 viewport 끝까지 (스크롤 없음), 내용 길어지면 textarea
+      // autoresize 가 자체 키워서 outer scroll 발생. shrink:0 으로 content 아래로
+      // 줄어들지 X (textarea 클립 회피).
+      style={{ flex: "1 0 auto", alignItems: "stretch", position: "relative" }}
     >
       <div
         className="select-none"
@@ -578,6 +585,7 @@ function GutterMarker({
     <div
       title={label || "이 줄로 이동"}
       onClick={onClick}
+      data-gutter-marker
       className="flex cursor-pointer justify-center"
       style={{
         height: `${heightPx}px`,
