@@ -74,13 +74,6 @@ PR 단위로 묶음. 각 PR 의 **한 줄 임팩트** 는 카드 frontmatter `im
 
 ## 🎨 폴리시
 
-### PR — 마크다운 에디터 컴포넌트 통일 `other`
-한 줄 임팩트: `SourceBodyEditor` 의 풀세트 (gutter / wrap / slash / 단축키) 를 prop 으로 토글, 일기 등에서도 재사용
-
-- [ ] `SourceBodyEditor` 에 `wrap?: "off" | "soft"`, `enableSlashCommand?`, `enableGutter?`, `enableShortcuts?` 같은 prop 추가. 회의록은 기존 동작 (모두 on), 일기는 wrap=soft + gutter/slash off 정도로 가져옴.
-- [ ] 일기 오버레이의 plain textarea → `SourceBodyEditor` (옵션 끄고) 로 교체. 메모장과 동일한 마크다운 편집 UX (자동 들여쓰기, `⌘B/I/E` wrap 등) 일기에도 적용.
-- [ ] 추후 todo description 등 다른 마크다운 입력에도 같은 컴포넌트 쓸 수 있게 baseline.
-
 ### PR — 동적 카테고리 (사용자 정의 분류) `backend`
 한 줄 임팩트: 업무/미팅 외 본인 카테고리 자유 추가
 

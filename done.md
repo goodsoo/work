@@ -6,6 +6,17 @@
 
 ## 2026-05-24
 
+### PR #40 — SourceBodyEditor 풀세트 일기 적용 + 보기 모드 일관성
+
+- **한 줄 임팩트**: 일기에서도 마크다운 에디터 풀세트 (gutter/슬래시/단축키)
+- **`SourceBodyEditor` 4 prop 추가** — `placeholder` / `className` / `textareaRef` / `onBlur`. 회의록 호출부 영향 0, 다른 소비처 재사용 baseline.
+- **폰트 토큰화** — textarea `text-base` 제거 + mirror `fontSize: inherit` → outer wrapper className 의 `font-*` 가 자연스럽게 inherit. 일기 wrapper `font-serif text-[15px]`, 메모장 default.
+- **`.font-serif { font-weight: 600 }` footgun 캡슐화** — `SourceBodyEditor` textarea + `MarkdownView` root 에서 fontWeight 400 가로채기. 새 소비처가 wrapper 에 font-serif 박아도 본문 weight 일관.
+- **`MarkdownView` 보기 모드 일관성** — `text-base` 제거 → wrapper font-size inherit (편집/보기 토글 시 점프 차단), code/pre/table-th 배경 `bg-surface` → `bg-surface-hover` (모달 안에서 가시성).
+- **`SlashCommandPopover` body portal + `position: fixed` + `z-[70]`** — 모달 `overflow-y-auto` clipping 우회 + Modal `z-60` 위로.
+- **popover flip-up** — textarea 의 `closest('[role="dialog"]')` bottom 까지 안 닿게 추정 height (`opts × 28 + 8`) 로 cursor 줄 바로 위에 붙임. 메모장 (dialog 없음) 은 viewport bottom fallback.
+- **`Modal` `maxWidth` prop 추가** — size 토큰의 height/flex 유지하고 가로만 override 가능 (향후 활용 baseline).
+
 ### PR #39 — portfolio 사이드바 정렬/카테고리 chip 필터 + 본문 active 배너
 
 - **한 줄 임팩트**: 카드 많아져도 카테고리/정렬로 좁히기

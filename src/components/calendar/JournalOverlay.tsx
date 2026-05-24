@@ -4,6 +4,7 @@ import { useUpsertJournal, useDeleteJournal, useJournals } from "../../hooks/use
 import { useDebouncedSave, type SaveStatus } from "../../hooks/useDebouncedSave";
 import { formatDateLong } from "../../lib/dates";
 import { MarkdownView } from "../meetings/MarkdownView";
+import { SourceBodyEditor } from "../meetings/SourceBodyEditor";
 import { Modal } from "../common/Modal";
 import { Button } from "../common/Button";
 import { Text } from "../common/Text";
@@ -113,8 +114,7 @@ export function JournalOverlay({ open, date, onClose }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, content]);
 
-  function handleChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
-    const next = e.target.value;
+  function handleChange(next: string) {
     setContent(next);
     schedule(next);
   }
@@ -160,19 +160,20 @@ export function JournalOverlay({ open, date, onClose }: Props) {
             </Button>
           </div>
         </header>
-        {/* edit: textarea 가 컨테이너 100% 채우고 자체 스크롤. view: 컨테이너 스크롤. */}
+        {/* edit: SourceBodyEditor 가 outer scroll 발생시키므로 wrapper 가 min-h-0 + overflow-y-auto.
+            view: 컨테이너 스크롤. 둘 다 px-6 py-5 + font-serif 로 일기 느낌 유지. */}
         {viewMode === "edit" ? (
-          <textarea
-            ref={taRef}
-            value={content}
-            onChange={handleChange}
-            onBlur={() => void flush()}
-            placeholder="오늘 어땠어요?"
-            className="block min-h-0 flex-1 resize-none bg-transparent px-6 py-5 font-serif text-[15px] leading-relaxed outline-none placeholder:not-italic placeholder:text-[var(--text-muted)]"
-            style={{ color: "var(--text-primary)" }}
-          />
+          <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5 font-serif text-[15px]">
+            <SourceBodyEditor
+              content={content}
+              onChange={handleChange}
+              placeholder="오늘 어땠어요?"
+              textareaRef={taRef}
+              onBlur={() => void flush()}
+            />
+          </div>
         ) : (
-          <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5 font-serif">
+          <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5 font-serif text-[15px]">
             <MarkdownView content={content} />
           </div>
         )}
