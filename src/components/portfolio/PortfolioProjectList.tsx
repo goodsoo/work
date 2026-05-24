@@ -67,8 +67,17 @@ export function PortfolioProjectList({
     return { total, uncategorized, excluded, byProject };
   }, [works]);
 
+  // PR 없는 프로젝트는 사이드바에서 숨김 (projects.md 자체엔 유지 — 옵시디안에서 직접 편집 가능).
+  // 단 현재 선택된 프로젝트가 0건이어도 노출 유지 — 사용자가 막 비운 직후에도 그 자리 보임.
+  const visibleProjects = projects.filter((p) => {
+    if ((counts.byProject.get(p.slug) ?? 0) > 0) return true;
+    if (activeFilter.kind === "project" && activeFilter.slug === p.slug)
+      return true;
+    return false;
+  });
+
   return (
-    <nav className="flex flex-col gap-1 p-3 text-sm">
+    <nav className="flex flex-col p-2 text-sm" aria-label="프로젝트 필터">
       <FilterItem
         label="전체"
         count={counts.total}
@@ -82,56 +91,42 @@ export function PortfolioProjectList({
         onClick={() => onFilterChange({ kind: "uncategorized" })}
       />
 
-      {(() => {
-        // PR 없는 프로젝트는 사이드바에서 숨김 (projects.md 자체엔 유지 — 옵시디안에서 직접 편집 가능).
-        // 단 현재 선택된 프로젝트가 0건이어도 노출 유지 — 사용자가 막 비운 직후에도 그 자리 보임.
-        const visible = projects.filter((p) => {
-          if ((counts.byProject.get(p.slug) ?? 0) > 0) return true;
-          if (
-            activeFilter.kind === "project" &&
-            activeFilter.slug === p.slug
-          )
-            return true;
-          return false;
-        });
-        if (visible.length === 0) return null;
-        return (
-          <>
-            <div
-              className="my-2 h-px"
-              style={{ backgroundColor: "var(--border-default)" }}
+      {visibleProjects.length > 0 ? (
+        <>
+          <div
+            className="my-2"
+            style={{ borderTop: "1px solid var(--border-subtle)" }}
+          />
+          {visibleProjects.map((p) => (
+            <FilterItem
+              key={p.slug}
+              label={renderProjectName(p.name)}
+              count={counts.byProject.get(p.slug) ?? 0}
+              active={
+                activeFilter.kind === "project" &&
+                activeFilter.slug === p.slug
+              }
+              colorDot={p.color ? COLOR_DOT[p.color] ?? p.color : undefined}
+              onClick={() =>
+                onFilterChange({ kind: "project", slug: p.slug })
+              }
             />
-            {visible.map((p) => (
-              <FilterItem
-                key={p.slug}
-                label={renderProjectName(p.name)}
-                count={counts.byProject.get(p.slug) ?? 0}
-                active={
-                  activeFilter.kind === "project" &&
-                  activeFilter.slug === p.slug
-                }
-                colorDot={p.color ? COLOR_DOT[p.color] ?? p.color : undefined}
-                onClick={() =>
-                  onFilterChange({ kind: "project", slug: p.slug })
-                }
-              />
-            ))}
-          </>
-        );
-      })()}
+          ))}
+        </>
+      ) : null}
 
       <div
-        className="my-2 h-px"
-        style={{ backgroundColor: "var(--border-default)" }}
-      />
-
-      <FilterItem
-        label="미사용"
-        count={counts.excluded}
-        muted
-        active={activeFilter.kind === "excluded"}
-        onClick={() => onFilterChange({ kind: "excluded" })}
-      />
+        className="mt-2 pt-2"
+        style={{ borderTop: "1px solid var(--border-default)" }}
+      >
+        <FilterItem
+          label="미사용"
+          count={counts.excluded}
+          muted
+          active={activeFilter.kind === "excluded"}
+          onClick={() => onFilterChange({ kind: "excluded" })}
+        />
+      </div>
     </nav>
   );
 }
@@ -155,22 +150,38 @@ function FilterItem({
     <Button
       variant="ghost"
       onClick={onClick}
-      className="justify-between px-3 py-2 font-normal"
+      className={`w-full justify-between gap-2 px-2 py-1 text-[13px] ${active ? "font-medium" : ""}`}
       style={{
         backgroundColor: active ? "var(--bg-surface-active)" : undefined,
-        color: muted ? "var(--text-secondary)" : "var(--text-primary)",
+        color: muted
+          ? "var(--text-muted)"
+          : active
+          ? "var(--text-primary)"
+          : "var(--text-secondary)",
       }}
     >
-      <span className="flex items-center gap-2 truncate">
-        {colorDot ? (
-          <span
-            className="h-2 w-2 shrink-0 rounded-full"
-            style={{ backgroundColor: colorDot }}
-          />
-        ) : null}
+      <span className="inline-flex min-w-0 items-center gap-2">
+        <span
+          aria-hidden
+          className="inline-flex h-2.5 w-2.5 shrink-0 items-center justify-center"
+        >
+          {colorDot ? (
+            <span
+              className="inline-block h-2 w-2 rounded-full"
+              style={{ backgroundColor: colorDot }}
+            />
+          ) : null}
+        </span>
         <span className="truncate">{label}</span>
       </span>
-      <Text variant="caption" color="muted" as="span">
+      <Text
+        variant="caption"
+        as="span"
+        className="font-mono"
+        style={{
+          color: active ? "var(--text-secondary)" : "var(--text-muted)",
+        }}
+      >
         {count}
       </Text>
     </Button>

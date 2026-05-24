@@ -32,12 +32,16 @@ export function SyncButton({ state, onRun, onCancel }: Props) {
             <Button
               variant="icon"
               onClick={onCancel}
-              title="취소"
+              title="동기화 취소"
               aria-label="동기화 취소"
-              className="h-4 w-4 rounded-sm p-0"
-              style={{ color: "var(--text-secondary)" }}
+              className="rounded-sm p-1"
+              style={{
+                color: "var(--text-primary)",
+                backgroundColor: "var(--bg-surface)",
+                minHeight: 0,
+              }}
             >
-              <X className="h-3 w-3" />
+              <X className="h-3.5 w-3.5" />
             </Button>
           </div>
         </div>
