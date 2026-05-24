@@ -6,6 +6,15 @@
 
 ## 2026-05-24
 
+### 직커밋 — portfolio sync 시 PR body 7섹션 자동 파싱 → frontmatter
+
+- **한 줄 임팩트**: PR body 양식 그대로 적은 임팩트/카테고리가 카드 frontmatter 에 자동 들어감
+- **`parsePRBodySections`** — `src/api/portfolio.ts` 에 H2 split 파서 추가. `## 한 줄 임팩트` / `## 카테고리` / `## 문제 (Why)` / `## 디자인 결정` / `## 유저가 얻는 것` / `## Before` / `## After` 7섹션 추출. `clipboardPrompt.ts` 의 `parsePRResponse()` 와 동일한 H2 split 룰.
+- **`upsertPortfolioWork` 통합** — sync 신규 카드 생성 시 PR body 파싱 결과를 frontmatter 초기값으로 사용. impact_summary / category default 빈값 → PR body 양식 적었으면 자동 채움.
+- **카테고리 enum 정규화** — body 의 카테고리 값이 enum (`ui_ux | backend | infra | fix | other`) 아닐 때 fallback 빈값. parsePRResponse 와 동일 규칙.
+- **빈 default 필드만 sync 채우는 룰** — 본인이 모달에서 수정한 값은 sync 가 덮어쓰지 않음. impact_summary / category 가 빈 값일 때만 PR body 재파싱 결과로 갱신. 3A 보존 룰 강화.
+- 직커밋 (백엔드 파싱 로직만, visual diff 0 — 포트폴리오 카드 가치 적음). commit `e3bd3b7` + `a9e36c0`.
+
 ### PR #38 — 디자인 시스템 카탈로그 페이지
 
 - **한 줄 임팩트**: 디자인 시스템을 브라우저에서 시각 확인
