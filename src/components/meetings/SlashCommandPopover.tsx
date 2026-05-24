@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef } from "react";
+import { createPortal } from "react-dom";
 import {
   Heading1,
   Heading2,
@@ -128,7 +129,8 @@ type Props = {
   selectedIndex: number;
   onSelect: (option: SlashOption) => void;
   onClose: () => void;
-  // 부모 (position:relative) 기준 popover 좌상단 — CSS 값 (px 또는 calc).
+  // viewport 좌표 (fixed positioning). body 로 portal 되므로 clipping ancestor 무관.
+  // 호출부 (SourceBodyEditor) 가 옵션 수 + 모달 bottom 기준으로 flip 까지 결정해 넘김.
   anchorTop: string;
   anchorLeft: string;
 };
@@ -153,13 +155,13 @@ export function SlashCommandPopover({
 
   if (options.length === 0) {
     // 필터가 아무것도 안 맞으면 안내만 — 닫지는 않음 (사용자가 backspace 하면 다시 보일 수 있게).
-    return (
+    return createPortal(
       <Text
         variant="caption"
         color="secondary"
         as="div"
         role="listbox"
-        className="absolute z-40 min-w-[200px] rounded-md p-2 shadow-md"
+        className="fixed z-[70] w-[200px] rounded-md p-2 shadow-md"
         style={{
           top: anchorTop,
           left: anchorLeft,
@@ -168,16 +170,17 @@ export function SlashCommandPopover({
         }}
       >
         일치하는 명령이 없음
-      </Text>
+      </Text>,
+      document.body,
     );
   }
 
-  return (
+  return createPortal(
     <div
       ref={listRef}
       role="listbox"
       aria-label="슬래시 커맨드"
-      className="absolute z-40 max-h-[260px] min-w-[220px] overflow-y-auto rounded-md py-1 shadow-md"
+      className="fixed z-[70] max-h-[400px] w-[200px] overflow-y-auto rounded-md py-1 shadow-md"
       style={{
         top: anchorTop,
         left: anchorLeft,
@@ -220,6 +223,7 @@ export function SlashCommandPopover({
           </Button>
         );
       })}
-    </div>
+    </div>,
+    document.body,
   );
 }

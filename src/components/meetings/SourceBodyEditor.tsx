@@ -37,6 +37,14 @@ type Props = {
   // cursor 가 - [ ] 라인 위에서 ⌘⏎ 누르면 그 라인 텍스트를 부모에게 전달.
   // 부모 (MeetingForm) 가 TaskAddModal prefill 로 띄움. 일방향 복제 — 메모 라인은 그대로.
   onSendLineToInbox?: (lineText: string) => void;
+  // 일기/메모/todo description 등 다른 소비처에서 폰트·placeholder·blur 핸들러를
+  // 갈아끼우려고 추가. 기본값 유지 시 MeetingForm 사용감 변함 없음.
+  placeholder?: string;
+  // outer flex container 에 적용. textarea 와 mirror 가 font-family/font-size 를
+  // 부모에서 inherit 하므로 폰트 override 도 여기서 한다.
+  className?: string;
+  textareaRef?: React.Ref<HTMLTextAreaElement>;
+  onBlur?: () => void;
 };
 
 // textarea의 한 줄 높이 (line-height = 1.625rem, text-base 기준).
@@ -54,7 +62,15 @@ type SlashState = {
   slashLine: number; // popover top 계산용 (slash 가 있는 줄 index)
 };
 
-export function SourceBodyEditor({ content, onChange, onSendLineToInbox }: Props) {
+export function SourceBodyEditor({
+  content,
+  onChange,
+  onSendLineToInbox,
+  placeholder = "메모 내용을 적어주세요...",
+  className,
+  textareaRef: externalTextareaRef,
+  onBlur,
+}: Props) {
   const [draft, setDraft] = useState(content);
   const [caretLine, setCaretLine] = useState<number | null>(null);
   const [slashState, setSlashState] = useState<SlashState | null>(null);
@@ -442,7 +458,7 @@ export function SourceBodyEditor({ content, onChange, onSendLineToInbox }: Props
 
   return (
     <div
-      className="flex"
+      className={className ? `flex ${className}` : "flex"}
       onMouseDown={onContainerMouseDown}
       // flex 부모 (MeetingForm 의 mode container) 가 column 이면 grow 로 남은 높이 채움
       // — 빈 메모는 자연스럽게 viewport 끝까지 (스크롤 없음), 내용 길어지면 textarea
@@ -474,7 +490,14 @@ export function SourceBodyEditor({ content, onChange, onSendLineToInbox }: Props
       </div>
       <div className="relative flex-1">
         <textarea
-          ref={textareaRef}
+          ref={(node) => {
+            (textareaRef as React.MutableRefObject<HTMLTextAreaElement | null>).current = node;
+            if (typeof externalTextareaRef === "function") {
+              externalTextareaRef(node);
+            } else if (externalTextareaRef) {
+              (externalTextareaRef as React.MutableRefObject<HTMLTextAreaElement | null>).current = node;
+            }
+          }}
           value={draft}
           onChange={(e) => {
             skipNextValueSyncRef.current = true;
@@ -489,15 +512,24 @@ export function SourceBodyEditor({ content, onChange, onSendLineToInbox }: Props
           onKeyUp={updateCaretLine}
           onClick={updateCaretLine}
           onFocus={updateCaretLine}
-          onBlur={() => setCaretLine(null)}
-          placeholder="메모 내용을 적어주세요..."
-          className="block w-full resize-none bg-transparent text-base outline-none"
+          onBlur={() => {
+            setCaretLine(null);
+            onBlur?.();
+          }}
+          placeholder={placeholder}
+          // text-base 제거 — font-size 도 outer container 의 className 으로 override 할 수
+          // 있게 부모에서 inherit. 기본은 body 의 1rem 이라 MeetingForm 사용감 동일.
+          className="block w-full resize-none bg-transparent outline-none"
           autoCorrect="off"
           autoCapitalize="off"
           spellCheck={false}
           style={{
             color: "var(--text-primary)",
             lineHeight: LINE_HEIGHT,
+            // index.css 의 `.font-serif { font-weight: 600 }` base 룰 가로채기 — 일기처럼
+            // wrapper 가 font-serif 인 경우에도 본문은 regular weight 유지. 메모장 (sans 400)
+            // 과 일기 (serif 400) 본문 무게감 통일.
+            fontWeight: 400,
             padding: 0,
             paddingLeft: TEXTAREA_PADDING_LEFT,
             paddingBottom: TEXTAREA_PADDING_BOTTOM,
@@ -524,7 +556,12 @@ export function SourceBodyEditor({ content, onChange, onSendLineToInbox }: Props
             paddingRight: 0,
             boxSizing: "border-box",
             fontFamily: "inherit",
-            fontSize: "1rem", // text-base
+            // textarea 가 outer container 에서 font-size 를 inherit 하도록 풀었으므로
+            // mirror 도 inherit — 둘이 같은 font-size 여야 wrap measurement 가 맞음.
+            fontSize: "inherit",
+            // textarea 와 동일 weight — 다른 weight 면 같은 글자라도 너비가 달라 wrap 위치
+            // 가 어긋남. textarea fontWeight 400 하드코딩에 맞춤.
+            fontWeight: 400,
             lineHeight: LINE_HEIGHT,
             whiteSpace: "pre-wrap",
             overflowWrap: "break-word",
@@ -540,19 +577,49 @@ export function SourceBodyEditor({ content, onChange, onSendLineToInbox }: Props
           ))}
         </div>
       </div>
-      {slashState ? (
-        <SlashCommandPopover
-          filter={slashState.filter}
-          selectedIndex={slashState.selectedIndex}
-          onSelect={commitSlashOption}
-          onClose={() => setSlashState(null)}
-          // gutter (1.75rem) + textarea paddingLeft (0.5rem) = 2.25rem 안쪽.
-          anchorLeft="2.25rem"
-          // slash 줄 바로 아래. wrap 된 줄이면 그 줄 끝까지의 cumulative height.
-          // 측정 전엔 LINE_HEIGHT_PX 기준 fallback.
-          anchorTop={`${cumulativeHeight(lineHeights, slashState.slashLine + 1)}px`}
-        />
-      ) : null}
+      {slashState ? (() => {
+        // popover 가 body 로 portal + position:fixed 이므로 viewport 좌표 계산 필요.
+        // textarea getBoundingClientRect 기반 — 모달 overflow 등 ancestor clipping 우회.
+        const ta = textareaRef.current;
+        if (!ta) return null;
+        const rect = ta.getBoundingClientRect();
+        // textarea paddingLeft = 0.5rem (8px). 텍스트 원점이 popover 좌측.
+        const desiredLeft = rect.left + 8;
+        const lineBottom =
+          rect.top + cumulativeHeight(lineHeights, slashState.slashLine + 1);
+        const lineTop =
+          rect.top + cumulativeHeight(lineHeights, slashState.slashLine);
+        // popover height 추정 — Button sm + content ≈ 28px/option, py-1 컨테이너 = 8.
+        // max-h-[400px] 가 상한. 실측 vs 추정 ±몇 px 차이만 — flip 시 cursor 줄 바로 위에 닿게.
+        const opts = getSlashOptionsForFilter(slashState.filter);
+        const estimateH = Math.min(400, opts.length * 28 + 8);
+        // flip 기준 = textarea 의 가장 가까운 dialog (모달) bottom. 모달 없으면 viewport.
+        // body portal 이라 popover 자체는 모달 밖 그려지지만 사용자 시야는 모달 안에 들어가야 자연스러움.
+        const dialog = ta.closest('[role="dialog"]') as HTMLElement | null;
+        const containerBottom = dialog
+          ? dialog.getBoundingClientRect().bottom
+          : window.innerHeight;
+        const MARGIN = 8;
+        // flip 결정엔 cushion margin 그대로, 위로 띄울 땐 cursor 줄 바로 위 (gap 0).
+        const flipsUp = lineBottom + estimateH + MARGIN > containerBottom;
+        const top = flipsUp ? lineTop - estimateH : lineBottom;
+        // 좌측 viewport 밖 clamp — popover width 200px 고정.
+        const POPOVER_W = 200;
+        const left = Math.max(
+          MARGIN,
+          Math.min(desiredLeft, window.innerWidth - POPOVER_W - MARGIN),
+        );
+        return (
+          <SlashCommandPopover
+            filter={slashState.filter}
+            selectedIndex={slashState.selectedIndex}
+            onSelect={commitSlashOption}
+            onClose={() => setSlashState(null)}
+            anchorLeft={`${left}px`}
+            anchorTop={`${Math.max(MARGIN, top)}px`}
+          />
+        );
+      })() : null}
     </div>
   );
 }
