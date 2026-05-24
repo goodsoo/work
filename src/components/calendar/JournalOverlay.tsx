@@ -125,17 +125,8 @@ export function JournalOverlay({ open, date, onClose }: Props) {
   }
 
   return (
-    <Modal open={open} onClose={handleClose} ariaLabel="일기 작성">
-      <div
-        // 설정창과 동일 사이즈 spec — max-w-3xl + min(560px, 80vh) 고정.
-        className="flex w-full max-w-3xl flex-col overflow-hidden rounded-xl"
-        style={{
-          background: "var(--bg-surface)",
-          border: "1px solid var(--border-default)",
-          height: "min(560px, 80vh)",
-        }}
-      >
-        <header
+    <Modal open={open} onClose={handleClose} size="lg" ariaLabel="일기 작성">
+      <header
           className="flex shrink-0 items-center justify-between gap-3 px-5"
           style={{
             height: "3rem",
@@ -185,7 +176,6 @@ export function JournalOverlay({ open, date, onClose }: Props) {
             <MarkdownView content={content} />
           </div>
         )}
-      </div>
     </Modal>
   );
 }

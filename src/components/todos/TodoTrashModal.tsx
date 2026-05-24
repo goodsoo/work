@@ -61,19 +61,13 @@ export function TodoTrashModal({ open, onClose }: Props) {
     <Modal
       open={open}
       onClose={onClose}
+      size="md"
       ariaLabelledBy="todo-trash-title"
       dismissOnEscape={!confirmOpen}
       dismissOnBackdrop={!confirmOpen}
     >
-      <div
-        className="flex h-full max-h-[36rem] w-full max-w-md flex-col overflow-hidden rounded-lg shadow-xl"
-        style={{
-          backgroundColor: "var(--bg-base)",
-          border: "1px solid var(--border-default)",
-        }}
-      >
         <div
-          className="flex shrink-0 items-center justify-between px-4 py-3"
+          className="flex items-center justify-between px-4 py-3"
           style={{ borderBottom: "1px solid var(--border-default)" }}
         >
           <h2
@@ -104,7 +98,7 @@ export function TodoTrashModal({ open, onClose }: Props) {
             </Button>
           </div>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="max-h-[60vh] overflow-y-auto">
           {deleted.length === 0 ? (
             <Text
               variant="body"
@@ -162,7 +156,6 @@ export function TodoTrashModal({ open, onClose }: Props) {
             </ul>
           )}
         </div>
-      </div>
       <ConfirmDialog
         open={purgeTarget !== null}
         title="영구 삭제"

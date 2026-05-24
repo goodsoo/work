@@ -35,15 +35,7 @@ export function PortfolioGuideModal({
   const { vaultRoot } = useVault();
 
   return (
-    <Modal open={open} onClose={onClose} ariaLabel="내 작업 가이드북">
-      <div
-        className="flex w-full max-w-2xl flex-col overflow-hidden rounded-xl"
-        style={{
-          background: "var(--bg-surface)",
-          border: "1px solid var(--border-default)",
-          maxHeight: "85vh",
-        }}
-      >
+    <Modal open={open} onClose={onClose} size="lg" ariaLabel="내 작업 가이드북">
         {/* 헤더 */}
         <div
           className="flex shrink-0 items-center gap-2 px-5 py-3"
@@ -223,7 +215,6 @@ export function PortfolioGuideModal({
             </div>
           </Section>
         </div>
-      </div>
     </Modal>
   );
 }

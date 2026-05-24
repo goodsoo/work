@@ -110,18 +110,12 @@ export function TrashModal({ open, onClose }: Props) {
     <Modal
       open={open}
       onClose={onClose}
+      size="xl"
+      orientation="horizontal"
       ariaLabel="휴지통"
       dismissOnEscape={!confirmOpen}
       dismissOnBackdrop={!confirmOpen}
     >
-      <div
-        className="flex w-full max-w-5xl overflow-hidden rounded-xl"
-        style={{
-          background: "var(--bg-surface)",
-          border: "1px solid var(--border-default)",
-          height: "min(640px, 85vh)",
-        }}
-      >
         {/* Left list */}
         <aside
           className="flex w-72 shrink-0 flex-col"
@@ -275,7 +269,6 @@ export function TrashModal({ open, onClose }: Props) {
             <TrashPreview selectedId={selectedId} />
           </div>
         </section>
-      </div>
 
       <ConfirmDialog
         open={purgeTarget !== null}

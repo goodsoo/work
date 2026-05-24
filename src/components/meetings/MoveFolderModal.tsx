@@ -75,23 +75,11 @@ export function MoveFolderModal({
   }
 
   return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      ariaLabel="폴더로 이동"
-      className="fixed inset-0 z-50 flex items-center justify-center"
-    >
+    <Modal open={open} onClose={onClose} size="sm" ariaLabel="폴더로 이동">
       <div
-        className="w-full max-w-sm rounded-lg shadow-xl"
-        style={{
-          backgroundColor: "var(--bg-surface)",
-          border: "1px solid var(--border-default)",
-        }}
+        className="flex items-center justify-between px-4 py-3"
+        style={{ borderBottom: "1px solid var(--border-subtle)" }}
       >
-        <div
-          className="flex items-center justify-between px-4 py-3"
-          style={{ borderBottom: "1px solid var(--border-subtle)" }}
-        >
           <div className="min-w-0">
             <Text variant="body" weight="semibold" as="div">
               폴더로 이동
@@ -216,7 +204,6 @@ export function MoveFolderModal({
             </Text>
           ) : null}
         </div>
-      </div>
     </Modal>
   );
 }

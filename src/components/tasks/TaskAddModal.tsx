@@ -64,15 +64,8 @@ export function TaskAddModal({ open, onClose, prefill }: Props) {
   }
 
   return (
-    <Modal open={open} onClose={onClose} ariaLabelledBy="task-add-title">
-      <form
-        onSubmit={handleSubmit}
-        className="w-full max-w-sm rounded-lg p-5 shadow-xl"
-        style={{
-          backgroundColor: "var(--bg-base)",
-          border: "1px solid var(--border-default)",
-        }}
-      >
+    <Modal open={open} onClose={onClose} size="sm" ariaLabelledBy="task-add-title">
+      <form onSubmit={handleSubmit} className="p-5">
         <Text id="task-add-title" variant="h4" as="h2">
           할 일 추가
         </Text>

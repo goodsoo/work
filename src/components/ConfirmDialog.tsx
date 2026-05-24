@@ -47,15 +47,10 @@ export function ConfirmDialog({
     <Modal
       open={open}
       onClose={onCancel}
+      size="sm"
       ariaLabelledBy="confirm-dialog-title"
     >
-      <div
-        className="w-full max-w-sm rounded-lg p-5 shadow-xl"
-        style={{
-          backgroundColor: "var(--bg-base)",
-          border: "1px solid var(--border-default)",
-        }}
-      >
+      <div className="p-5">
         <Text id="confirm-dialog-title" variant="h4" as="h2">
           {title}
         </Text>

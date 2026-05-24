@@ -27,16 +27,8 @@ export function SettingsModal({ open, onClose, initialSection = "vault" }: Props
   const [section, setSection] = useState<SettingsSection>(initialSection);
 
   return (
-    <Modal open={open} onClose={onClose} ariaLabel="설정">
-      <div
-        className="flex w-full max-w-3xl overflow-hidden rounded-xl"
-        style={{
-          background: "var(--bg-surface)",
-          border: "1px solid var(--border-default)",
-          height: "min(560px, 80vh)",
-        }}
-      >
-        <aside
+    <Modal open={open} onClose={onClose} size="lg" orientation="horizontal" ariaLabel="설정">
+      <aside
           className="flex w-44 shrink-0 flex-col"
           style={{
             background: "var(--bg-base)",
@@ -106,7 +98,6 @@ export function SettingsModal({ open, onClose, initialSection = "vault" }: Props
             )}
           </div>
         </section>
-      </div>
     </Modal>
   );
 }

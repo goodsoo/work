@@ -239,18 +239,10 @@ export function PortfolioDetailModal({ work, projects, onClose }: Props) {
     <Modal
       open
       onClose={handleClose}
-      backdrop="overlay"
+      size="xl"
       dismissOnEscape={false}
       ariaLabel={fm.github_title}
     >
-      <div
-        className="flex w-full max-w-5xl flex-col overflow-hidden rounded-xl"
-        style={{
-          backgroundColor: "var(--bg-base)",
-          border: "1px solid var(--border-default)",
-          maxHeight: "85vh",
-        }}
-      >
         {/* 헤더 */}
         <div
           className="flex items-center gap-3 border-b px-5 py-3"
@@ -807,7 +799,6 @@ export function PortfolioDetailModal({ work, projects, onClose }: Props) {
           </div>
           </div>
         </div>
-      </div>
     </Modal>
   );
 }

@@ -96,19 +96,12 @@ export function PortfolioTrashModal({ open, onClose }: Props) {
     <Modal
       open={open}
       onClose={onClose}
+      size="lg"
       ariaLabel="휴지통"
       dismissOnEscape={!confirmOpen}
       dismissOnBackdrop={!confirmOpen}
     >
-      <div
-        className="flex w-full max-w-2xl flex-col overflow-hidden rounded-xl"
-        style={{
-          background: "var(--bg-surface)",
-          border: "1px solid var(--border-default)",
-          height: "min(640px, 85vh)",
-        }}
-      >
-        <aside
+      <aside
           className="flex min-h-0 flex-1 flex-col"
           style={{ background: "var(--bg-base)" }}
         >
@@ -236,7 +229,6 @@ export function PortfolioTrashModal({ open, onClose }: Props) {
             )}
           </div>
         </aside>
-      </div>
 
       <ConfirmDialog
         open={purgeTarget !== null}

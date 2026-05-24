@@ -301,18 +301,12 @@ function BackupConfirmModal({
     <Modal
       open
       onClose={() => !running && onCancel()}
+      size="md"
       ariaLabel={title}
-      className="fixed inset-0 z-[60] flex items-center justify-center p-6"
       dismissOnEscape={!running}
       dismissOnBackdrop={!running}
     >
-      <div
-        className="w-full max-w-md rounded-xl p-5"
-        style={{
-          background: "var(--bg-surface)",
-          border: "1px solid var(--border-default)",
-        }}
-      >
+      <div className="p-5">
         <Text variant="body" weight="semibold" as="h3" className="mb-2">
           {title}
         </Text>
