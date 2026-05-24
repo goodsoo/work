@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { VaultGate } from "./components/vault/VaultGate";
 import { AppShell } from "./components/nav/AppShell";
 import { GlobalTooltip } from "./components/Tooltip";
-import { ToastProvider } from "./components/Toast";
+import { ToastProvider, useToast } from "./components/Toast";
 import { TABS, type Tab } from "./components/nav/BottomTabs";
 import { MeetingForm } from "./components/meetings/MeetingForm";
 import { TrashModal } from "./components/meetings/TrashModal";
@@ -24,6 +24,7 @@ import { EmptyState } from "./components/common/EmptyState";
 import { CalendarPage } from "./pages/CalendarPage";
 import { TodosPage } from "./pages/TodosPage";
 import { PortfolioPage } from "./pages/PortfolioPage";
+import { StyleguidePage } from "./pages/StyleguidePage";
 import { PortfolioSidePanel } from "./components/portfolio/PortfolioSidePanel";
 import type { ProjectFilter } from "./components/portfolio/PortfolioProjectList";
 import { useGhSync } from "./hooks/usePortfolio";
@@ -58,6 +59,15 @@ function readMeetingFromHash(): string | null {
 let didAutoSelectThisSession = false;
 
 export default function App() {
+  const [hash, setHash] = useState(() => window.location.hash);
+  useEffect(() => {
+    const onChange = () => setHash(window.location.hash);
+    window.addEventListener("hashchange", onChange);
+    return () => window.removeEventListener("hashchange", onChange);
+  }, []);
+
+  if (hash === "#styleguide") return <StyleguidePage />;
+
   return (
     <VaultGate>
       <GlobalTooltip />
@@ -89,14 +99,17 @@ function AppContent() {
   const [todoTrashOpen, setTodoTrashOpen] = useState(false);
   const [portfolioTrashOpen, setPortfolioTrashOpen] = useState(false);
   const portfolioSync = useGhSync();
+  const toast = useToast();
 
   // last_sync - 1일 buffer 의 YYYY-MM-DD. 첫 sync (last_sync 없음) 면 undefined → 전체.
   // gh search 의 `merged:>=YYYY-MM-DD` 가 날짜 단위라 1일 buffer 충분.
+  // 사용자가 직접 트리거한 sync 실패는 toast 발사. background auto-sync 는 silent (5초마다 noise 회피).
   const portfolioRunIncrementalSync = async () => {
     try {
       await portfolioSync.run({ incremental: true });
     } catch (err) {
       console.error("[portfolio] incremental sync failed:", err);
+      toast.show("동기화에 실패했습니다. 네트워크 연결을 확인하세요.");
     }
   };
   const portfolioRunFullSync = async () => {
@@ -104,6 +117,7 @@ function AppContent() {
       await portfolioSync.run({});
     } catch (err) {
       console.error("[portfolio] full sync failed:", err);
+      toast.show("전체 동기화에 실패했습니다. 네트워크 연결을 확인하세요.");
     }
   };
   const { adapter, isReady } = useVault();
@@ -122,8 +136,9 @@ function AppContent() {
     if (!isTauri || !isReady || autoSyncDone.current) return;
     autoSyncDone.current = true;
     const t = setTimeout(() => {
-      portfolioSync.run({ incremental: true }).catch(() => {
-        // 에러는 useGhSync state.error 에 반영됨 — 사이드바가 표시
+      portfolioSync.run({ incremental: true }).catch((err) => {
+        // background — silent. 5초마다 toast 뜨면 noise. 사용자 트리거 sync 만 toast.
+        console.error("[portfolio] background sync failed:", err);
       });
     }, 5000);
     return () => clearTimeout(t);
@@ -452,9 +467,7 @@ function AppContent() {
       ) : tab === "portfolio" ? (
         <PortfolioPage
           activeFilter={portfolioFilter}
-          onSync={() => {
-            portfolioSync.run({}).catch(() => {});
-          }}
+          onSync={portfolioRunFullSync}
           syncRunning={portfolioSync.state.running}
         />
       ) : (
