@@ -14,6 +14,7 @@ import {
   FolderPlus,
   ChevronDown,
   ChevronRight,
+  Star,
 } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
@@ -24,6 +25,7 @@ import {
   useDeleteMeetingFolder,
   useMoveMeeting,
   useRenameMeetingFolder,
+  useTogglePinMeeting,
 } from "../../hooks/useMeetings";
 import { meetingFolder } from "../../api/meetings";
 import { useMeetingSort, type MeetingSortKey } from "../../hooks/useMeetingSort";
@@ -64,6 +66,7 @@ export function MeetingsSidePanel({
   const deleteFolderMutation = useDeleteMeetingFolder();
   const renameFolderMutation = useRenameMeetingFolder();
   const moveMutation = useMoveMeeting();
+  const togglePinMutation = useTogglePinMeeting();
   const toast = useToast();
   const [sortKey, setSortKey] = useMeetingSort();
   const [contextMenu, setContextMenu] = useState<{
@@ -247,6 +250,15 @@ export function MeetingsSidePanel({
     }
   }
 
+  // pinned 토글 — 컨텍스트 메뉴 / 별 아이콘 hover 클릭. uid 기반 (path rename 무관).
+  async function handleTogglePin(uid: string, nextPinned: boolean) {
+    try {
+      await togglePinMutation.mutateAsync({ uid, pinned: nextPinned });
+    } catch (e) {
+      toast.show(formatError(e));
+    }
+  }
+
   // 모달 경유 이동 — modal 안에서 commit 결과 throw 받아서 모달에 toast.
   async function handleMoveFromModal(folder: string) {
     if (!moveModalFor) return;
@@ -259,6 +271,21 @@ export function MeetingsSidePanel({
     if (!moveModalFor || !data) return null;
     return data.find((m) => m.id === moveModalFor) ?? null;
   }, [moveModalFor, data]);
+
+  // 컨텍스트 메뉴가 가리키는 메모 — pinned 라벨/icon 결정용 ("고정" vs "고정 해제").
+  const contextMeeting = useMemo(() => {
+    if (!contextMenu || !data) return null;
+    return data.find((m) => m.id === contextMenu.meetingId) ?? null;
+  }, [contextMenu, data]);
+
+  // pinned 메모는 트리에서 제외 (옵시디안 bookmarks 패턴) — 같은 메모가 두 곳에 보이지 않음.
+  // 정렬은 일반 트리와 동일 comparator 적용 — 사용자가 이름순 바꾸면 pinned 도 따라감.
+  const { pinnedMeetings, unpinnedMeetings } = useMemo(() => {
+    const all = data ?? [];
+    const pinned = all.filter((m) => m.pinned).sort(sortComparator);
+    const unpinned = all.filter((m) => !m.pinned);
+    return { pinnedMeetings: pinned, unpinnedMeetings: unpinned };
+  }, [data, sortComparator]);
 
   return (
     <div className="relative flex h-full flex-col">
@@ -321,23 +348,34 @@ export function MeetingsSidePanel({
             아직 메모장이 없어요
           </Text>
         ) : (
-          <MeetingsTreeView
-            meetings={data ?? []}
-            extraFolders={folders ?? []}
-            selectedUid={selectedId}
-            sortMeetings={sortComparator}
-            editingFolder={editingFolder}
-            editingFolderPending={renameFolderMutation.isPending}
-            onEditingFolderChange={(v) =>
-              setEditingFolder((prev) => (prev ? { ...prev, value: v } : prev))
-            }
-            onEditingFolderCommit={() => void commitEditingFolder()}
-            onEditingFolderCancel={() => setEditingFolder(null)}
-            onSelect={onSelect}
-            onContextMenu={handleContextMenu}
-            onFolderContextMenu={handleFolderContextMenu}
-            onMoveDrop={(uid, folder) => void handleMoveDrop(uid, folder)}
-          />
+          <>
+            {pinnedMeetings.length > 0 ? (
+              <PinnedSection
+                meetings={pinnedMeetings}
+                selectedUid={selectedId}
+                onSelect={onSelect}
+                onContextMenu={handleContextMenu}
+                onUnpin={(uid) => void handleTogglePin(uid, false)}
+              />
+            ) : null}
+            <MeetingsTreeView
+              meetings={unpinnedMeetings}
+              extraFolders={folders ?? []}
+              selectedUid={selectedId}
+              sortMeetings={sortComparator}
+              editingFolder={editingFolder}
+              editingFolderPending={renameFolderMutation.isPending}
+              onEditingFolderChange={(v) =>
+                setEditingFolder((prev) => (prev ? { ...prev, value: v } : prev))
+              }
+              onEditingFolderCommit={() => void commitEditingFolder()}
+              onEditingFolderCancel={() => setEditingFolder(null)}
+              onSelect={onSelect}
+              onContextMenu={handleContextMenu}
+              onFolderContextMenu={handleFolderContextMenu}
+              onMoveDrop={(uid, folder) => void handleMoveDrop(uid, folder)}
+            />
+          </>
         )}
       </div>
 
@@ -345,9 +383,16 @@ export function MeetingsSidePanel({
         <MeetingContextMenu
           x={contextMenu.x}
           y={contextMenu.y}
+          pinned={contextMeeting?.pinned ?? false}
           onMove={() => {
             setMoveModalFor(contextMenu.meetingId);
             setContextMenu(null);
+          }}
+          onTogglePin={() => {
+            const m = contextMeeting;
+            setContextMenu(null);
+            if (!m) return;
+            void handleTogglePin(m.uid, !m.pinned);
           }}
         />
       ) : null}
@@ -377,6 +422,79 @@ export function MeetingsSidePanel({
         onClose={() => setMoveModalFor(null)}
         onMove={handleMoveFromModal}
       />
+    </div>
+  );
+}
+
+// 사이드바 상단 즐겨찾기 그룹 — MeetingsTreeView 와 별도. 폴더/drag 없는 flat 리스트.
+// 옵시디안 bookmarks 패턴: 같은 메모가 트리에도 보이지 않음 (mutual exclusive).
+// 행 hover 시 우측에 채워진 별 아이콘 (클릭 = 고정 해제). 정렬은 사이드바 sortKey 적용.
+function PinnedSection({
+  meetings,
+  selectedUid,
+  onSelect,
+  onContextMenu,
+  onUnpin,
+}: {
+  meetings: Meeting[];
+  selectedUid: string | null;
+  onSelect: (uid: string) => void;
+  onContextMenu: (meetingId: string, x: number, y: number) => void;
+  onUnpin: (uid: string) => void;
+}) {
+  return (
+    <div className="border-b" style={{ borderColor: "var(--border-subtle)" }}>
+      <div
+        className="px-3 pt-2 pb-1 text-[10px] uppercase tracking-wider"
+        style={{ color: "var(--text-muted)" }}
+      >
+        고정됨
+      </div>
+      <ul className="p-1 pt-0">
+        {meetings.map((m) => (
+          <li key={m.uid} className="list-none">
+            <Button
+              variant="ghost"
+              onClick={() => onSelect(m.uid)}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                onContextMenu(m.id, e.clientX, e.clientY);
+              }}
+              className="group w-full justify-start gap-1.5 rounded py-1 pr-2 text-[13px] font-normal"
+              style={{
+                paddingLeft: "8px",
+                backgroundColor:
+                  m.uid === selectedUid ? "var(--bg-surface-active)" : undefined,
+                color: "var(--text-primary)",
+              }}
+            >
+              <Star
+                className="h-3 w-3 shrink-0"
+                fill="var(--accent-yellow)"
+                style={{ color: "var(--accent-yellow)" }}
+              />
+              <span className="min-w-0 flex-1 truncate text-left">
+                {m.title?.trim() || "(제목 없음)"}
+              </span>
+              {/* hover 시 우측에 unpin 버튼 (X 처럼 — 별 위에 사선 대신 단순 X 가
+                  명확). nested button 회피 위해 span + onMouseDown 처리. */}
+              <span
+                role="button"
+                aria-label="고정 해제"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onUnpin(m.uid);
+                }}
+                className="hidden h-4 w-4 shrink-0 items-center justify-center rounded group-hover:inline-flex"
+                style={{ color: "var(--text-muted)" }}
+              >
+                <X className="h-3 w-3" />
+              </span>
+            </Button>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
@@ -446,20 +564,24 @@ function FolderContextMenu({
   );
 }
 
-// 메모 우클릭 컨텍스트 메뉴. 현재는 '폴더로 이동' 하나만. 추후 항목 추가 시
+// 메모 우클릭 컨텍스트 메뉴. '고정/해제' + '폴더로 이동'. 추후 항목 추가 시
 // 같은 패턴으로 button list 만 늘리면 됨.
 function MeetingContextMenu({
   x,
   y,
+  pinned,
   onMove,
+  onTogglePin,
 }: {
   x: number;
   y: number;
+  pinned: boolean;
   onMove: () => void;
+  onTogglePin: () => void;
 }) {
   // 우측/하단 viewport 초과 방지 — 간단히 좌표만 clamp (메뉴 크기 추정).
   const MENU_W = 180;
-  const MENU_H = 44;
+  const MENU_H = 80;
   const left = Math.min(x, window.innerWidth - MENU_W - 8);
   const top = Math.min(y, window.innerHeight - MENU_H - 8);
   return (
@@ -475,6 +597,22 @@ function MeetingContextMenu({
       // mousedown 으로 메뉴 자체 클릭이 outside-close trigger 되지 않도록 막음
       onMouseDown={(e) => e.stopPropagation()}
     >
+      <Button
+        variant="ghost"
+        onClick={onTogglePin}
+        className="w-full justify-start gap-2 rounded-none px-3 py-2"
+        leftIcon={
+          <Star
+            className="h-3.5 w-3.5 shrink-0"
+            // 고정 상태면 채워진 별 — 의미 신호. 해제 액션 시각 단서.
+            fill={pinned ? "var(--accent-yellow)" : "none"}
+            style={{ color: pinned ? "var(--accent-yellow)" : "var(--text-muted)" }}
+          />
+        }
+        style={{ color: "var(--text-primary)" }}
+      >
+        {pinned ? "고정 해제" : "고정"}
+      </Button>
       <Button
         variant="ghost"
         onClick={onMove}

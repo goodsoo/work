@@ -5,6 +5,7 @@ import { GlobalTooltip } from "./components/Tooltip";
 import { ToastProvider, useToast } from "./components/Toast";
 import { TABS, type Tab } from "./components/nav/BottomTabs";
 import { MeetingForm } from "./components/meetings/MeetingForm";
+import { QuickSwitcher } from "./components/meetings/QuickSwitcher";
 import { TrashModal } from "./components/meetings/TrashModal";
 import { PortfolioTrashModal } from "./components/portfolio/PortfolioTrashModal";
 import {
@@ -104,6 +105,9 @@ function AppContent() {
   const [trashOpen, setTrashOpen] = useState(false);
   const [todoTrashOpen, setTodoTrashOpen] = useState(false);
   const [portfolioTrashOpen, setPortfolioTrashOpen] = useState(false);
+  // 옵시디안 quick switcher (Cmd+P). 메모장 탭에 한정하지 않고 어디서든 발사 가능 —
+  // 선택 시 메모장 탭으로 자동 이동. 검색 인덱스 build 는 모달 open 시점에 lazy.
+  const [quickSwitcherOpen, setQuickSwitcherOpen] = useState(false);
   const portfolioSync = useGhSync();
   const toast = useToast();
 
@@ -248,6 +252,13 @@ function AppContent() {
       if (e.key === "\\") {
         e.preventDefault();
         sidebar.toggle();
+        return;
+      }
+      // Cmd+P — quick switcher 모달 토글 (input/textarea 안에서도 동작).
+      // 브라우저 인쇄 단축키는 Tauri 환경에서 별 의미 X (window.print 미지원).
+      if (e.key === "p" || e.key === "P") {
+        e.preventDefault();
+        setQuickSwitcherOpen((v) => !v);
         return;
       }
       const idx = "1234".indexOf(e.key);
@@ -477,6 +488,7 @@ function AppContent() {
       sidePanel={sidePanel}
       sidePanelFooter={sidePanelFooter}
       sidebarCollapsed={sidebar.collapsed}
+      onOpenSearch={() => setQuickSwitcherOpen(true)}
     >
       {tab === "meetings" ? (
         selectedMeetingId ? (
@@ -519,6 +531,40 @@ function AppContent() {
       <PortfolioTrashModal
         open={portfolioTrashOpen}
         onClose={() => setPortfolioTrashOpen(false)}
+      />
+      <QuickSwitcher
+        open={quickSwitcherOpen}
+        onClose={() => setQuickSwitcherOpen(false)}
+        onSelect={(entry) => {
+          switch (entry.domain) {
+            case "meeting":
+              openMeeting(entry.id);
+              return;
+            case "todo":
+              openTodo(entry.id);
+              return;
+            case "journal":
+              // 일기 = 캘린더 탭의 그 날짜로 이동. 사이드 panel 의 "일기 보기" 가
+              // 1-click — detail 모달 자동 open 은 follow-up (selectedDate prop
+              // 만 갱신해도 충분히 빠른 라우팅).
+              drawer.close();
+              setCalendarDate(entry.id);
+              setTab("calendar");
+              if (window.location.hash !== "#calendar") {
+                window.history.pushState({ tab: "calendar" }, "", "#calendar");
+              }
+              return;
+            case "portfolio":
+              // 포트폴리오 탭으로 이동. 카드 정확 위치 scroll 은 follow-up (PortfolioPage
+              // 가 scrollToSlug prop 받는 구조로 확장 필요).
+              drawer.close();
+              setTab("portfolio");
+              if (window.location.hash !== "#portfolio") {
+                window.history.pushState({ tab: "portfolio" }, "", "#portfolio");
+              }
+              return;
+          }
+        }}
       />
     </AppShell>
   );

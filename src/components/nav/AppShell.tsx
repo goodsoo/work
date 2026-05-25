@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Sun, Moon, Menu, Settings, ChevronDown } from "lucide-react";
+import { Sun, Moon, Menu, Settings, Search, ChevronDown } from "lucide-react";
 import { useTheme } from "../../hooks/useTheme";
 import {
   useSidePanelWidth,
@@ -28,6 +28,9 @@ type Props = {
   // 데스크탑 SidePanel collapse 상태. true = 사이드바 숨김 + main 이 윈도우 전체.
   // 옵시디안 패턴 — Cmd+\ 단축키로 토글, useSidebarCollapsed 가 관리.
   sidebarCollapsed?: boolean;
+  // 타이틀바 우측 검색 버튼 클릭 시 호출 — App.tsx 의 QuickSwitcher 를 open.
+  // 단축키 Cmd+P 와 같은 동작, 데스크탑/모바일 양쪽 헤더에 노출.
+  onOpenSearch?: () => void;
   children: ReactNode;
 };
 
@@ -37,6 +40,7 @@ export function AppShell({
   sidePanel,
   sidePanelFooter,
   sidebarCollapsed = false,
+  onOpenSearch,
   children,
 }: Props) {
   const { theme, toggle } = useTheme();
@@ -136,8 +140,19 @@ export function AppShell({
         </div>
         {/* 가운데 flex-1 = drag region 빈 공간 */}
         <div data-tauri-drag-region className="flex-1" />
-        {/* 우측: settings + theme. button 자체는 click, 사이 gap 은 drag region. */}
+        {/* 우측: search + settings + theme. button 자체는 click, 사이 gap 은 drag region. */}
         <div data-tauri-drag-region className="flex items-center gap-0.5 pr-2">
+          {onOpenSearch ? (
+            <Button
+              variant="icon"
+              onClick={() => onOpenSearch()}
+              title="검색 (⌘P)"
+              aria-label="검색"
+              style={{ color: "var(--text-secondary)" }}
+            >
+              <Search className="h-3.5 w-3.5" />
+            </Button>
+          ) : null}
           <Button
             variant="icon"
             onClick={() => setSettingsOpen(true)}
@@ -217,6 +232,17 @@ export function AppShell({
             </Text>
           </div>
           <div className="flex items-center gap-0.5">
+            {onOpenSearch ? (
+              <Button
+                variant="icon"
+                onClick={() => onOpenSearch()}
+                aria-label="검색"
+                className="h-8 w-8"
+                style={{ color: "var(--text-muted)" }}
+              >
+                <Search className="h-4 w-4" />
+              </Button>
+            ) : null}
             <Button
               variant="icon"
               onClick={() => setSettingsOpen(true)}
