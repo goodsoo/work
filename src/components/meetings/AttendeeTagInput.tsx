@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from "react";
-import { X } from "lucide-react";
 import { formatAttendees, parseAttendees } from "../../lib/attendees";
 import { Button } from "../common/Button";
+import { RemovableChip } from "../common/RemovableChip";
 
 type Props = {
   value: string;
@@ -100,25 +100,13 @@ export function AttendeeTagInput({
         onClick={() => inputRef.current?.focus()}
       >
         {tags.map((tag, i) => (
-          <span
+          <RemovableChip
             key={`${tag}-${i}`}
-            className="inline-flex items-center gap-0.5 pr-2"
-            style={{ color: "var(--text-primary)" }}
+            onRemove={() => removeAt(i)}
+            ariaLabel={`${tag} 제거`}
           >
             {tag}
-            <Button
-              variant="ghost"
-              onClick={(e) => {
-                e.stopPropagation();
-                removeAt(i);
-              }}
-              aria-label={`${tag} 제거`}
-              className="p-0"
-              style={{ color: "var(--text-muted)", minWidth: 14 }}
-            >
-              <X className="h-3 w-3" />
-            </Button>
-          </span>
+          </RemovableChip>
         ))}
         <input
           ref={inputRef}

@@ -56,6 +56,7 @@
     --accent-blue-bg: #eff6ff;
     --accent-blue-text: #1d4ed8;
     --accent-green: #16a34a;
+    --accent-yellow: #eab308; /* 즐겨찾기/별 — 사이드바 pinned 메모 아이콘 */
 
     /* Portfolio category dots */
     --cat-uiux: #2563eb;
@@ -154,6 +155,7 @@
     --accent-blue-bg: rgba(96, 165, 250, 0.1);
     --accent-blue-text: #93c5fd;
     --accent-green: #4ade80;
+    --accent-yellow: #fbbf24; /* 즐겨찾기/별 — 사이드바 pinned 메모 아이콘 (dark) */
 
     /* Portfolio category dots */
     --cat-uiux: #60a5fa;
@@ -258,13 +260,11 @@
     letter-spacing: -0.01em;
   }
 
-  button,
-  a {
-    min-height: 44px;
-  }
-
   /* 기본 hover — disabled / active nav / inline bg 가진 버튼은 자동 제외
-     (inline bg 있는 primary/accent 버튼은 specificity 로 인해 적용 안 됨) */
+     (inline bg 있는 primary/accent 버튼은 specificity 로 인해 적용 안 됨).
+     V0.0 PWA scaffold 시 박혔던 `button, a { min-height: 44px }` 룰은
+     데스크탑 전용 전환 (V0.6) 이후 명분 사라져 제거. 모바일 부활 시 필요한
+     곳만 컴포넌트 단에서 min-h-11 박는 방향. */
   button:not(:disabled):not([aria-current="page"]):hover {
     background-color: var(--bg-surface-hover);
   }

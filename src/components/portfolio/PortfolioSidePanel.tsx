@@ -14,7 +14,7 @@ import { PortfolioProjectList, type ProjectFilter } from "./PortfolioProjectList
 import { PortfolioGuideModal } from "./PortfolioGuideModal";
 import { SyncButton } from "./SyncButton";
 import { Button } from "../common/Button";
-import { Chip } from "../common/Chip";
+import { SelectableChip } from "../common/SelectableChip";
 import { Text } from "../common/Text";
 import { Popover } from "../common/Popover";
 
@@ -223,36 +223,16 @@ function CategoryChipRow({
           const count = counts.get(cat) ?? 0;
           const color = CATEGORY_COLOR[cat];
           return (
-            <Chip
+            <SelectableChip
               key={cat}
-              size="sm"
-              dot={color}
-              role="button"
-              tabIndex={0}
-              aria-pressed={active}
-              onClick={() => onToggle(cat)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  onToggle(cat);
-                }
-              }}
+              active={active}
+              count={count}
+              color={color}
+              onToggle={() => onToggle(cat)}
               title={`${CATEGORY_LABEL[cat]} ${count > 0 ? `(${count})` : ""}`.trim()}
-              className="cursor-pointer select-none"
-              style={{
-                // active: 카테고리 색 ring + tinted bg → 한눈에 "켜진 상태" 인지.
-                // inactive: 평소 chip 톤 (bg-surface-hover, no border)
-                // fontWeight 은 동일하게 둠 — bold 토글 시 글자 너비 바뀌어 chip 크기 흔들림.
-                backgroundColor: active
-                  ? `color-mix(in srgb, ${color} 14%, var(--bg-surface))`
-                  : "var(--bg-surface-hover)",
-                color: active ? "var(--text-primary)" : "var(--text-secondary)",
-                boxShadow: active ? `inset 0 0 0 1px ${color}` : undefined,
-                opacity: count === 0 && !active ? 0.45 : 1,
-              }}
             >
               {CATEGORY_LABEL[cat]}
-            </Chip>
+            </SelectableChip>
           );
         })}
       </div>
