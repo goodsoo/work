@@ -17,6 +17,16 @@
 - **글로벌 `button, a { min-height: 44px }` 룰 제거** — V0.0 PWA scaffold 잔재. V0.6 부터 Tauri 데스크탑 전용 전환 후 touch target 44pt 명분 사라짐. 작은 icon 버튼들이 의도 외 height 부풀어 chip 안 X 버튼 hit 영역이 12×44 가 되던 버그도 함께 해결.
 - **태그 입력 UI 시도 후 폐기** — 메모 폼/사이드바에 frontmatter `tags` 입력 + chip 필터 UI 구현해뒀다가 dogfood 중 본인이 "안 쓸 것 같다" 판단 → 제거. scan.ts 의 `tags` 파싱 + 검색 인덱스의 `tags` 필드는 옵시디안 호환 위해 dormant 보존 (옵시디안에서 박은 태그는 frontmatter 에 그대로 남음).
 
+### PR #42 — 메모 본문 체크박스 라인 → 할 일 한 클릭 추가
+
+- **한 줄 임팩트**: 메모 본문 `- [ ]` 한 줄을 마우스로 todos 페이지에 추가
+- **보기 모드 + 버튼** — `MarkdownView` 의 task li 좌측 (체크박스 왼쪽 본문 wrapper padding 영역) 에 absolute Plus. hover 시에만 등장 (chrome 노이즈 회피). markdown 시각 정렬 안 깨짐.
+- **편집 모드도 동일 위치 + 버튼** — `SourceBodyEditor` 의 GutterMarker 가 checkbox 라인일 때 gutter 좌측 외부에 같은 Plus. 기존 ⌘Enter 단축키와 한 쌍 — 마우스 작업 동선 보강.
+- **공통 핸들러 재사용** — 둘 다 `lineToTaskPrefill` → `TaskAddModal` 진입. extractTodos 가 `- [x] foo --- 내일 #work` 같은 자연어 토큰 그대로 파싱 → title / due_date / category / priority prefill.
+- **중복 허용** — 같은 라인 다시 클릭하면 또 모달 → 또 추가. todos 페이지가 source of truth, 메모 본문은 snapshot.
+- **갭 hover off fix** — group-hover 트리거 영역 (li / gutter row) 과 absolute 버튼 사이 갭에서 마우스가 통과 시 opacity 풀리던 깜빡임. `::before` invisible hit-area 24px 좌측 확장으로 영역 이음.
+- **min-height 두 줄 부풂 fix** — 글로벌 `button { min-height: 44px }` (index.css) 이 inline `height: 1rem` 을 덮어 컴퓨티드 height 44px 되던 회기. `minHeight: 0` 명시 우회. size/line-height 도 inline 으로 박아 cascade 충돌 차단.
+
 ---
 
 ## 2026-05-24
