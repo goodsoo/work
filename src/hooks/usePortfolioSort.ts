@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useScopedKey } from "../lib/vault/scopedStorage";
 
 // 내 작업 카드 정렬 옵션. useMeetingSort 패턴 동일 (localStorage persist).
 // - merged_desc: 최신 PR (default). github_merged_at 내림차순.
@@ -14,7 +15,7 @@ export type PortfolioSortKey =
   | "project"
   | "impact";
 
-const STORAGE_KEY = "goodsoob:portfolioSort";
+const BASE_KEY = "goodsoob:portfolioSort";
 
 const VALID_KEYS = new Set<PortfolioSortKey>([
   "merged_desc",
@@ -24,9 +25,9 @@ const VALID_KEYS = new Set<PortfolioSortKey>([
   "impact",
 ]);
 
-function read(): PortfolioSortKey {
+function readKey(key: string): PortfolioSortKey {
   if (typeof localStorage === "undefined") return "merged_desc";
-  const v = localStorage.getItem(STORAGE_KEY);
+  const v = localStorage.getItem(key);
   if (v && VALID_KEYS.has(v as PortfolioSortKey)) {
     return v as PortfolioSortKey;
   }
@@ -34,10 +35,14 @@ function read(): PortfolioSortKey {
 }
 
 export function usePortfolioSort() {
-  const [key, setKey] = useState<PortfolioSortKey>(read);
+  const key = useScopedKey(BASE_KEY);
+  const [sortKey, setSortKey] = useState<PortfolioSortKey>(() => readKey(key));
+  useEffect(() => {
+    setSortKey(readKey(key));
+  }, [key]);
   useEffect(() => {
     if (typeof localStorage === "undefined") return;
-    localStorage.setItem(STORAGE_KEY, key);
-  }, [key]);
-  return [key, setKey] as const;
+    localStorage.setItem(key, sortKey);
+  }, [key, sortKey]);
+  return [sortKey, setSortKey] as const;
 }

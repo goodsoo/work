@@ -1,24 +1,32 @@
 import { useCallback, useEffect, useState } from "react";
+import { useScopedKey } from "../lib/vault/scopedStorage";
 
-const KEY = "goodsoob:sidebarCollapsed";
+const BASE_KEY = "goodsoob:sidebarCollapsed";
+
+function readKey(key: string): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem(key) === "1";
+  } catch {
+    return false;
+  }
+}
 
 export function useSidebarCollapsed() {
-  const [collapsed, setCollapsed] = useState<boolean>(() => {
-    if (typeof window === "undefined") return false;
-    try {
-      return window.localStorage.getItem(KEY) === "1";
-    } catch {
-      return false;
-    }
-  });
+  const key = useScopedKey(BASE_KEY);
+  const [collapsed, setCollapsed] = useState<boolean>(() => readKey(key));
+
+  useEffect(() => {
+    setCollapsed(readKey(key));
+  }, [key]);
 
   useEffect(() => {
     try {
-      window.localStorage.setItem(KEY, collapsed ? "1" : "0");
+      window.localStorage.setItem(key, collapsed ? "1" : "0");
     } catch {
       // ignore — private mode / quota
     }
-  }, [collapsed]);
+  }, [key, collapsed]);
 
   const toggle = useCallback(() => {
     setCollapsed((v) => !v);
