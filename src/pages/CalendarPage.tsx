@@ -27,10 +27,12 @@ type Props = {
   onSelectedDateChange?: (date: string) => void;
 };
 
-// 연속 스크롤 버퍼: 49주 (약 11개월). 가장자리 근접 시 rebalance.
-const WEEK_BUFFER = 49;
-const WEEK_CENTER = Math.floor(WEEK_BUFFER / 2); // 24
-const REBALANCE_EDGE = 8;
+// 연속 스크롤 버퍼: 21주 (약 5개월). 가장자리 근접 시 rebalance.
+// 49주에서 21주로 축소 — DOM 셀 343 → 147 (57% 감소). edge 근접 rebalance 가
+// 더 자주 발생하지만 handleScroll 안 RAF 시점에 자연스럽게 처리되어 체감 동일.
+const WEEK_BUFFER = 21;
+const WEEK_CENTER = Math.floor(WEEK_BUFFER / 2); // 10
+const REBALANCE_EDGE = 4;
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
 // 2026년 이전은 표시하지 않음. 버퍼 first week가 startOfWeek(2026-01-01) 보다 앞으로
@@ -216,24 +218,22 @@ export function CalendarPage({ targetDate, onSelectedDateChange }: Props) {
   // Initial 또는 rebalance 시 scroll 위치 복원.
   // Initial: cache 가 있으면 그 scrollTop, 없으면 오늘을 viewport top 으로
   // (오늘 offset=0, idx_today = WEEK_CENTER - centerOff).
+  // useLayoutEffect 자체가 paint 직전 sync 단계라 RAF 한 frame 미루지 않고
+  // 직접 set → "scrollTop=0 으로 한 번 paint 됐다 점프" jitter 0.
   useLayoutEffect(() => {
     const el = containerRef.current;
-    if (!el) return;
+    if (!el || !el.clientHeight) return;
     if (!initialScrollDone.current || rebalanceTargetRef.current !== null) {
-      requestAnimationFrame(() => {
-        const e = containerRef.current;
-        if (!e || !e.clientHeight) return;
-        rowHeightRef.current = measureRowHeight();
-        const rh = rowHeightRef.current;
-        const initialTarget =
-          initialScrollTopRef.current ?? (WEEK_CENTER - centerWeekOffset) * rh;
-        const target = rebalanceTargetRef.current ?? initialTarget;
-        e.scrollTop = target;
-        scrollTopRef.current = target;
-        rebalanceTargetRef.current = null;
-        initialScrollTopRef.current = null;
-        initialScrollDone.current = true;
-      });
+      rowHeightRef.current = measureRowHeight();
+      const rh = rowHeightRef.current;
+      const initialTarget =
+        initialScrollTopRef.current ?? (WEEK_CENTER - centerWeekOffset) * rh;
+      const target = rebalanceTargetRef.current ?? initialTarget;
+      el.scrollTop = target;
+      scrollTopRef.current = target;
+      rebalanceTargetRef.current = null;
+      initialScrollTopRef.current = null;
+      initialScrollDone.current = true;
     }
   }, [centerWeekOffset, isLoading]);
 
