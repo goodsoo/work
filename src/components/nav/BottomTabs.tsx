@@ -1,4 +1,4 @@
-import { ClipboardList, CalendarDays, ListChecks, Briefcase } from "lucide-react";
+import { Calendar, FileText, CheckSquare, LayoutGrid } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 export type Tab = "meetings" | "calendar" | "todos" | "portfolio";
@@ -13,10 +13,10 @@ type Props = {
 // 순서 = 사용 빈도 + Cmd+1..4 의미 (App.tsx 단축키가 TABS index 기반).
 // 캘린더 첫 진입이 본인 daily routine — 메모장은 메모 선택 후 본문 작업이라 진입 빈도 낮음.
 export const TABS: Array<{ id: Tab; label: string; icon: LucideIcon }> = [
-  { id: "calendar", label: "캘린더", icon: CalendarDays },
-  { id: "meetings", label: "메모장", icon: ClipboardList },
-  { id: "todos", label: "할 일", icon: ListChecks },
-  { id: "portfolio", label: "포트폴리오", icon: Briefcase },
+  { id: "calendar", label: "캘린더", icon: Calendar },
+  { id: "meetings", label: "메모장", icon: FileText },
+  { id: "todos", label: "할 일", icon: CheckSquare },
+  { id: "portfolio", label: "포트폴리오", icon: LayoutGrid },
 ];
 
 export function BottomTabs({ activeTab, onTabChange }: Props) {

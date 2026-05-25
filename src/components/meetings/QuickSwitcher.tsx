@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   BookOpen,
-  Briefcase,
+  LayoutGrid,
   CheckSquare,
   FileText,
   Search,
@@ -303,7 +303,7 @@ function domainMeta(d: SearchDomain): {
     case "portfolio":
       return {
         label: "포트폴리오",
-        icon: Briefcase,
+        icon: LayoutGrid,
         color: "var(--cat-uiux)",
         bg: "var(--bg-surface)",
       };
