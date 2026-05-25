@@ -4,7 +4,7 @@ import {
   type PortfolioCategory,
 } from "../api/portfolio";
 
-// 내 작업 카드 카테고리 chip 필터. 다중 OR. 빈 Set = 전체 (필터 X).
+// 포트폴리오 카드 카테고리 chip 필터. 다중 OR. 빈 Set = 전체 (필터 X).
 // localStorage 에 string[] 직렬화 — 빈 배열도 보존 (사용자가 의도적으로 다 끄고 빈 상태로 둘 수도 있음).
 const STORAGE_KEY = "goodsoob:portfolioCategoryFilter";
 

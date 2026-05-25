@@ -291,7 +291,7 @@ function PortfolioHeader() {
     <PageHeaderBar
       center={
         <Text variant="h4" as="h1">
-          내 작업
+          포트폴리오
         </Text>
       }
     />

@@ -16,7 +16,7 @@ export const TABS: Array<{ id: Tab; label: string; icon: LucideIcon }> = [
   { id: "calendar", label: "캘린더", icon: CalendarDays },
   { id: "meetings", label: "메모장", icon: ClipboardList },
   { id: "todos", label: "할 일", icon: ListChecks },
-  { id: "portfolio", label: "내 작업", icon: Briefcase },
+  { id: "portfolio", label: "포트폴리오", icon: Briefcase },
 ];
 
 export function BottomTabs({ activeTab, onTabChange }: Props) {

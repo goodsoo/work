@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-// 내 작업 카드 정렬 옵션. useMeetingSort 패턴 동일 (localStorage persist).
+// 포트폴리오 카드 정렬 옵션. useMeetingSort 패턴 동일 (localStorage persist).
 // - merged_desc: 최신 PR (default). github_merged_at 내림차순.
 // - merged_asc: 오래된 PR.
 // - category: 카테고리 그룹 (PORTFOLIO_CATEGORIES 순서 = ui_ux → backend → infra → fix → other).
