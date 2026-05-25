@@ -10,14 +10,6 @@ PR 단위로 묶음. 각 PR 의 **한 줄 임팩트** 는 카드 frontmatter `im
 
 ## 🚀 메모 에디터 (마크다운) 강화
 
-### PR — 보기모드 todo 라인 → todo 페이지 추가 버튼 `ui_ux`
-한 줄 임팩트: 보기 모드에서도 본문 `- [ ]` 한 줄을 todo 페이지로 한 클릭 등록
-
-- [ ] 본문 markdown `- [ ]` / `- [x]` 라인 옆에 "todo 추가" 버튼. **hover 시에만 등장** (chrome 노이즈 회피).
-- [ ] 클릭 = 편집 모드 Cmd+Enter 동등 액션 (해당 라인을 todos 페이지 카드로 추가). 보기 모드엔 textarea focus 가 없어 단축키 안 먹히는 gap 메움.
-- [ ] **중복 허용** — 이미 todo 로 추가된 라인도 구분 안 함. todos 페이지가 source of truth, 메모 본문은 snapshot. 중복 카드 생기면 todos 페이지에서 정리.
-- [ ] 위치 후보: 줄 우측 끝 / gutter 영역. markdown 시각 정렬 안 깨지는 곳 우선.
-
 ### PR — 본문 이미지 paste / drag&drop `ui_ux`
 한 줄 임팩트: 캡쳐 이미지 본문에 paste/drop → vault `_attachments/` 저장 + markdown 자동 insert
 
@@ -55,12 +47,6 @@ PR 단위로 묶음. 각 PR 의 **한 줄 임팩트** 는 카드 frontmatter `im
 - [ ] **UI** — 추가/삭제 위치 결정 (TaskAddModal select 안 inline / 설정 패널 / 사이드바 헤더 편집 모드). 사이드패널 필터 + 캘린더 사이드는 동적 빌드.
 - [ ] **Sanitize 정책** — 카테고리 삭제 시 그 카테고리 todo 처리: (a) vault 라인 `#xxx` 자동 strip (b) UI null 표시 + 라인 보존 (c) 삭제 차단 + 옮기라고 경고. 한 가지 고르기.
 - [ ] **알 수 없는 카테고리 표기** — vault 의 `#unknown` 같은 tag 가 카테고리 list 에 없을 때 UI 에서 어떻게 보일지 (지금은 null 로 무시 + 라인 보존).
-
-### PR — portfolio 카드 시각 재설계 `ui_ux`
-한 줄 임팩트: 카드 크기 축소 + 한눈에 정보 + inline 편집
-
-- [ ] **카드 크기/레이아웃 재설계** — 현재 카드 너무 크고 한눈에 중요 정보 (impact_summary / 날짜 / 카테고리) 안 들어옴. 정보 우선순위 정리 + 작은 카드 그리드.
-- [ ] **카드 inline 편집** — 현재 lightbox 모달 진입 후 편집. 카드 클릭 = inline 펼침 + 편집 모드 전환 검토. 메모장 패턴 (제목 → 본문 inline) 과 비교.
 
 ### PR — portfolio 입력 흐름 `ui_ux`
 한 줄 임팩트: ResponsePasteArea 발견성 + 드래그&드롭 동작 검증
@@ -127,6 +113,21 @@ PR 단위로 묶음. 각 PR 의 **한 줄 임팩트** 는 카드 frontmatter `im
 ---
 
 ## 🧹 안정성 / 위생
+
+### PR — 메모 사이드바 드래그 race fix `fix`
+한 줄 임팩트: drop 한 번 한 뒤 잠시 dragstart 안 잡히던 race fix
+
+- [ ] **재현** — 메모를 폴더로 drag&drop 성공한 직후, 같은/다른 메모 다시 잡으면 dragstart 자체가 안 시작됨. 수초~수십초 지나면 자동 회복.
+- [ ] **원인 추정** — PR #34 의 Tauri `dragDropEnabled: false` + WKWebView dragend 후 native drop layer reset 타이밍 race. dragend 발화 누락 또는 element draggable 속성 복구 지연 의심.
+- [ ] **fix 방향** — dragend 이후 강제 reset (draggable 속성 toggle, native drop layer 명시 해제). 재현 안 되는 케이스 대비 dev 로그 먼저 박고 며칠 dogfood 후 확정.
+
+### PR — 루틴 추가 모달 validation 보강 `fix`
+한 줄 임팩트: 루틴 추가/편집 시 시작일/종료일/이름 빈 값·역전 차단
+
+- [ ] **시작일 빈 값 차단** — 빈 값이면 active 기간 판단 망가짐 (`listRoutinesActiveOn` 클램프 fail). 현재 빈 값으로도 저장됨.
+- [ ] **종료일 < 시작일 차단** — 음수 기간 루틴 저장 차단.
+- [ ] **이름 빈 값 차단** — 빈 이름은 파일명도 안 잡힘.
+- [ ] **UI** — submit 버튼 비활성 + 인라인 에러 (toast 보다 즉시 인식). voice/tone "원인 + 해결" 2단 따름.
 
 ### PR — 백업 가시성 강화 `ui_ux`
 한 줄 임팩트: spinner + 마지막 백업 시각 + 오래된 zip 정리 = 백업 영역 dogfood 폴리싱
