@@ -10,13 +10,6 @@ PR 단위로 묶음. 각 PR 의 **한 줄 임팩트** 는 카드 frontmatter `im
 
 ## 🚀 메모 에디터 (마크다운) 강화
 
-### PR — 사이드바 메모 탐색 (검색 + 태그 + 즐겨찾기) `ui_ux`
-한 줄 임팩트: 메모 많아져도 사이드바에서 즉시 좁히기 — 이름·태그·즐겨찾기
-
-- [ ] **검색** — 옵시디안 quick switcher 패턴. title + body 즉시 매칭, 결과 highlight. 단축키 `Cmd+P`. 사이드바 검색창 + 결과 highlight.
-- [ ] **태그 필터** — 사이드바 위 태그 chip 행. frontmatter `tags: [foo, bar]` union. 클릭 = 그 태그 메모만, 다중 선택 = AND. 태그 입력 UI 는 별 작업 (frontmatter 직접 편집 의존).
-- [ ] **즐겨찾기 / pin** — 메모 카드에 별/핀 토글. frontmatter `pinned: true` (옵시디안 호환). 사이드바 상단 고정 + 정렬 그룹 분리.
-
 ### PR — 보기모드 todo 라인 → todo 페이지 추가 버튼 `ui_ux`
 한 줄 임팩트: 보기 모드에서도 본문 `- [ ]` 한 줄을 todo 페이지로 한 클릭 등록
 

@@ -4,6 +4,21 @@
 
 ---
 
+## 2026-05-25
+
+### PR #43 — 사이드바 finder: pinned + Cmd+P 통합 검색
+
+- **한 줄 임팩트**: Cmd+P 로 vault 전체 즉시 검색
+- **메모 pinned (즐겨찾기)** — frontmatter `pinned: true` (옵시디안 호환, false 면 키 제거). 사이드바 상단 "고정됨" 그룹, 트리에서 mutual exclusive. 메모 우클릭 컨텍스트 메뉴 "고정 / 해제" + 행 hover 시 unpin X. `useTogglePinMeeting` (uid scope + optimistic). `--accent-yellow` 토큰 (라이트/다크) — 별 아이콘 색.
+- **Cmd+P 통합 검색** — 4 도메인 (메모/할 일/포트폴리오/일기) 결과 한 list. `useGlobalSearchIndex` 가 모달 open 시 lazy fetch (메모만 본문, todo는 title, portfolio 는 github_title + impact_summary + project, journal 은 전체 content) + 30초 staleTime cache. title + body indexOf 매칭 (vault 1MB 미만, sub-ms). 매칭 부분 `<mark>` highlight. 결과 행 우측 도메인 chip — 모든 행 통일 anchor. 도메인별 라우팅 (메모 → openMeeting, 할 일 → openTodo + todos 탭 scroll, 일기 → 캘린더 selectedDate, 포트폴리오 → 포트폴리오 탭).
+- **타이틀바 검색 버튼** — 설정 옆 Search 아이콘 (데스크탑/모바일 양쪽). Cmd+P 와 동일 동작. `AppShell` 의 `onOpenSearch` prop.
+- **QuickSwitcher 오버레이 크기 고정** — 640×560 (작은 화면 viewport clamp). 결과 갯수 무관 모달 자체는 안 흔들림 — 내부 list 가 flex-1 overflow-y-auto 흡수.
+- **chip 공용 컴포넌트 추출** — 포트폴리오 카테고리 row 가 원본. `SelectableChip` (토글 chip — active 시 color tint bg + ring) / `RemovableChip` (입력 chip — children + 우측 정사각형 X 버튼). 포트폴리오 카테고리 + 참석자 입력 chip 양쪽 통일.
+- **글로벌 `button, a { min-height: 44px }` 룰 제거** — V0.0 PWA scaffold 잔재. V0.6 부터 Tauri 데스크탑 전용 전환 후 touch target 44pt 명분 사라짐. 작은 icon 버튼들이 의도 외 height 부풀어 chip 안 X 버튼 hit 영역이 12×44 가 되던 버그도 함께 해결.
+- **태그 입력 UI 시도 후 폐기** — 메모 폼/사이드바에 frontmatter `tags` 입력 + chip 필터 UI 구현해뒀다가 dogfood 중 본인이 "안 쓸 것 같다" 판단 → 제거. scan.ts 의 `tags` 파싱 + 검색 인덱스의 `tags` 필드는 옵시디안 호환 위해 dormant 보존 (옵시디안에서 박은 태그는 frontmatter 에 그대로 남음).
+
+---
+
 ## 2026-05-24
 
 ### PR #41 — 캘린더 사이드바 정리 + 셀 chip UI + 카테고리 범례
