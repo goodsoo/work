@@ -20,6 +20,7 @@ interface MonthGroup {
 const CELL = 13;
 const CELL_GAP = 3;
 const ROW_GAP = 3;
+const WEEKDAY_LABELS = ["S", "M", "T", "W", "T", "F", "S"] as const;
 
 // 월별 그룹 + 한 월 안에서 캘린더 레이아웃 (요일 가로 7컬럼). GitHub 박스 시각 유지 —
 // done 채움 / miss 옅음 / future outline. 월들은 가로로 wrap (max-w-xl 컨테이너에서
@@ -135,6 +136,24 @@ function MonthBlock({
       >
         {label}
       </Text>
+      <div
+        className="mb-1 grid"
+        style={{
+          gridTemplateColumns: `repeat(7, ${CELL}px)`,
+          columnGap: CELL_GAP,
+        }}
+        aria-hidden
+      >
+        {WEEKDAY_LABELS.map((w, i) => (
+          <span
+            key={i}
+            className="text-center text-[10px] leading-none"
+            style={{ color: "var(--text-muted)", width: CELL }}
+          >
+            {w}
+          </span>
+        ))}
+      </div>
       <div
         className="grid"
         style={{
