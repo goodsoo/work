@@ -30,14 +30,6 @@ PR 단위로 묶음. 각 PR 의 **한 줄 임팩트** 는 카드 frontmatter `im
 
 ## ✨ 신규 기능
 
-### PR — 루틴 (매일 하는 할일) `ui_ux`
-한 줄 임팩트: 출퇴근 / 운동 / 일기 같은 매일 streak 시각화
-
-- [ ] vault `routines/` 폴더 신설. 1 routine = 1 md 파일 (frontmatter `type: routine`, `schedule: every day` 등)
-- [ ] 본문은 Obsidian Tasks 호환 라인 (`- [x] ✅ YYYY-MM-DD`) 이력 누적
-- [ ] ActivityBar 새 탭 "루틴" (⌘5). 좌측 routine 리스트 (오늘 체크박스 + 현재 streak `🔥7`), 우측 12주 GitHub-style heatmap + 통계 (현재/최장 streak, 30일 완료율)
-- [ ] 놓친 날 자동 fail (streak break). 수동 휴무일 토글 (`- [-] 휴무 YYYY-MM-DD`) 로 streak 보호
-
 ### PR — 단축키 자료/통계 페이지 `ui_ux` 🟡
 한 줄 임팩트: 분기 평가용 — 회의 N건 / 일기 streak / todos 완료율 한 화면
 
