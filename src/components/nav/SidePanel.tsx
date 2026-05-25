@@ -10,6 +10,7 @@ import {
   Pencil,
   Circle,
   XCircle,
+  List,
   FolderInput,
   FolderPlus,
   ChevronDown,
@@ -32,7 +33,9 @@ import { useMeetingSort, type MeetingSortKey } from "../../hooks/useMeetingSort"
 import { type TodoSortKey } from "../../hooks/useTodoSort";
 import { useJournals } from "../../hooks/useJournals";
 import { useTodos, useUpdateTodo } from "../../hooks/useTodos";
+import { useActiveRoutines, useToggleRoutineDay } from "../../hooks/useRoutines";
 import type { Meeting } from "../../api/meetings";
+import type { Routine } from "../../api/routines";
 import type { Todo, TodoCategory } from "../../api/todos";
 import { TODO_CATEGORIES } from "../../api/todos";
 import { formatDateLong, isToday, todayIso } from "../../lib/dates";
@@ -871,10 +874,10 @@ export function CalendarDayPanel({
   const [showAddModal, setShowAddModal] = useState(false);
   const [showJournalOverlay, setShowJournalOverlay] = useState(false);
   // 3개 섹션 collapse — 메모장 폴더 패턴 차용. 새로고침 시 모두 펴짐 (session 단위).
-  const [collapsed, setCollapsed] = useState<Set<"journal" | "todos" | "meetings">>(
-    () => new Set(),
-  );
-  function toggleSection(name: "journal" | "todos" | "meetings") {
+  const [collapsed, setCollapsed] = useState<
+    Set<"journal" | "routines" | "todos" | "meetings">
+  >(() => new Set());
+  function toggleSection(name: "journal" | "routines" | "todos" | "meetings") {
     setCollapsed((prev) => {
       const next = new Set(prev);
       if (next.has(name)) next.delete(name);
@@ -884,6 +887,8 @@ export function CalendarDayPanel({
   }
 
   const today = isToday(selectedDate);
+  const dayRoutines = useActiveRoutines(selectedDate);
+  const toggleRoutineDayMutation = useToggleRoutineDay();
 
   const { meetings, todos, journal } = useMemo(() => {
     const meetings = (meetingsQ.data ?? []).filter(
@@ -1017,6 +1022,69 @@ export function CalendarDayPanel({
                 )}
               </div>
             </Button>
+          </div>
+        ) : null}
+
+        {/* 루틴 section — 그 날 active routine list + 체크 토글. 시각 X (시간순) */}
+        <SidePanelSectionHeader
+          label="루틴"
+          collapsed={collapsed.has("routines")}
+          onToggle={() => toggleSection("routines")}
+          count={dayRoutines.length}
+        />
+        {!collapsed.has("routines") ? (
+          <div className="space-y-1 px-3 pb-2">
+            {dayRoutines.length === 0 ? (
+              <Text
+                variant="caption"
+                color="muted"
+                as="div"
+                className="px-3 py-1.5"
+              >
+                루틴이 없어요
+              </Text>
+            ) : (
+              dayRoutines.map((r) => {
+                const done = r.log.has(selectedDate);
+                return (
+                  <div
+                    key={r.name}
+                    className="flex items-start gap-2 rounded-md px-3 py-2"
+                  >
+                    <span className="mt-0.5">
+                      <CheckboxButton
+                        status={done ? "done" : "pending"}
+                        category={null}
+                        onClick={() =>
+                          toggleRoutineDayMutation.mutate({
+                            name: r.name,
+                            date: selectedDate,
+                            done: !done,
+                          })
+                        }
+                      />
+                    </span>
+                    <Text
+                      variant="body"
+                      as="span"
+                      className={`flex-1 ${done ? "line-through" : ""}`}
+                      style={{
+                        color: done
+                          ? "var(--text-muted)"
+                          : "var(--text-primary)",
+                      }}
+                    >
+                      {r.frontmatter.time ? (
+                        <Text variant="body" color="muted" as="span">
+                          {r.frontmatter.time}{" "}
+                        </Text>
+                      ) : null}
+                      {r.name}
+                    </Text>
+                  </div>
+                );
+              })
+            )}
           </div>
         ) : null}
 
@@ -1218,6 +1286,11 @@ type TodosPanelProps = {
   onCategoryChange: (next: TodosCategoryFilter) => void;
   sortKey: TodoSortKey;
   onSortKeyChange: (next: TodoSortKey) => void;
+  // 사이드바 폴더 2개 구조 (V0.7.3) — 루틴 폴더의 selected entry 와 onSelect.
+  // null = 루틴 미선택 (= 태스크 필터 활성). routine 선택 시 본문이 RoutineDetail 로
+  // 전환되고 태스크 필터는 시각 비활성 (회색).
+  selectedRoutineName: string | null;
+  onSelectRoutine: (name: string | null) => void;
 };
 
 export function TodosSidePanel({
@@ -1227,9 +1300,30 @@ export function TodosSidePanel({
   onCategoryChange,
   sortKey,
   onSortKeyChange,
+  selectedRoutineName,
+  onSelectRoutine,
 }: TodosPanelProps) {
   const { data } = useTodos();
   const todos = data ?? [];
+  const activeRoutines = useActiveRoutines(todayIso());
+  const toggleRoutineDayMutation = useToggleRoutineDay();
+  const today = todayIso();
+  const [collapsedRoutines, setCollapsedRoutines] = useState(false);
+  const [collapsedTasks, setCollapsedTasks] = useState(false);
+
+  // 루틴 폴더 row 의 오늘 체크박스. CheckboxButton 이 e.stopPropagation 내장 — row click 안 trigger.
+  function handleToggleRoutineToday(name: string) {
+    const r = activeRoutines.find((x) => x.name === name);
+    if (!r) return;
+    const done = !r.log.has(today);
+    toggleRoutineDayMutation.mutate({ name, date: today, done });
+  }
+
+  // 태스크 필터 클릭 = 루틴 미선택으로 (선택된 게 있었으면 자동 해제).
+  function selectTaskFilter(fn: () => void) {
+    if (selectedRoutineName !== null) onSelectRoutine(null);
+    fn();
+  }
 
   // 두 차원 독립. 한 차원 count 는 다른 차원과 AND 후 — 사용자가 "현재 다른
   // 차원 적용 후 이 옵션 누르면 몇 개?" 미리 보기. (예: status=done 일 때
@@ -1291,7 +1385,18 @@ export function TodosSidePanel({
     count: number;
     leading: ReactNode;
   }> = [
-    { id: "all", label: "전체", count: counts.status.all, leading: null },
+    {
+      id: "all",
+      label: "전체",
+      count: counts.status.all,
+      leading: (
+        <List
+          className="h-3 w-3"
+          strokeWidth={1.75}
+          style={{ color: "var(--text-secondary)" }}
+        />
+      ),
+    },
     {
       id: "pending",
       label: "미완료",
@@ -1354,7 +1459,23 @@ export function TodosSidePanel({
           <SortMenu value={sortKey} onChange={onSortKeyChange} />
           <Button
             variant="icon"
-            onClick={() => window.dispatchEvent(new Event("todos:add-request"))}
+            onClick={() =>
+              window.dispatchEvent(
+                new CustomEvent("todos:add-request", {
+                  // 루틴 폴더 active 상태면 모달 default 탭 = routine.
+                  detail: {
+                    type: selectedRoutineName !== null ? "routine" : "task",
+                    // 태스크 필터에 카테고리 적용된 상태면 prefill 해서 빠르게.
+                    category:
+                      categoryFilter === "work" ||
+                      categoryFilter === "schedule" ||
+                      categoryFilter === "other"
+                        ? categoryFilter
+                        : null,
+                  },
+                }),
+              )
+            }
             title="새 할 일"
             style={{ color: "var(--text-secondary)" }}
           >
@@ -1362,56 +1483,115 @@ export function TodosSidePanel({
           </Button>
         </div>
       </div>
-      <nav className="flex min-h-0 flex-1 flex-col p-2" aria-label="필터">
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          {statusItems.map((item) => (
-            <TodosFilterItem
-              key={item.id}
-              item={item}
-              leading={item.leading}
-              active={item.id === statusFilter}
-              onClick={() => onStatusChange(item.id)}
-            />
-          ))}
-          <div
-            className="my-2"
-            style={{ borderTop: "1px solid var(--border-subtle)" }}
+      <nav
+        className="flex min-h-0 flex-1 flex-col"
+        aria-label="필터"
+      >
+        <div className="min-h-0 flex-1 overflow-y-auto py-1">
+          {/* 루틴 폴더 — 캘린더 사이드바 패턴 차용: SectionHeader (outer) + 안 항목들은
+              px-3 wrapper 로 들여쓰기 (chevron 옆 정렬). 시각 계층 = outer header / inner items. */}
+          <SidePanelSectionHeader
+            label="루틴"
+            collapsed={collapsedRoutines}
+            onToggle={() => setCollapsedRoutines((v) => !v)}
           />
-          {categoryItems.map((item) => {
-            // 카테고리 필터 entry 옆에 시맨틱 색 dot — 캘린더 / 체크박스 와
-            // 동일 토큰. uncategorized 는 회색 (--text-muted) 로 명시. "전체"
-            // 는 status "전체" 와 동일하게 leading 비움.
-            const dotColor =
-              item.id === "uncategorized"
-                ? "var(--text-muted)"
-                : item.id === "all"
-                  ? ""
-                  : categoryColor(item.id as TodoCategory);
-            const leading = dotColor ? (
-              <span
-                aria-hidden
-                className="inline-block h-2 w-2 rounded-full"
-                style={{ backgroundColor: dotColor }}
+          {!collapsedRoutines ? (
+            <div className="space-y-1 px-3 pb-2">
+              {activeRoutines.length === 0 ? (
+                <Text
+                  variant="caption"
+                  color="muted"
+                  as="div"
+                  className="px-3 py-1.5"
+                >
+                  아직 루틴이 없어요
+                </Text>
+              ) : (
+                activeRoutines.map((r) => (
+                  <RoutineSidebarItem
+                    key={r.name}
+                    routine={r}
+                    today={today}
+                    active={r.name === selectedRoutineName}
+                    onSelect={() => onSelectRoutine(r.name)}
+                    onToggleToday={() => handleToggleRoutineToday(r.name)}
+                  />
+                ))
+              )}
+            </div>
+          ) : null}
+
+          {/* 태스크 폴더 — 같은 패턴: outer header + inner px-3 wrapper.
+              안에 status / category 두 그룹은 hr 로 분리. */}
+          <SidePanelSectionHeader
+            label="태스크"
+            collapsed={collapsedTasks}
+            onToggle={() => setCollapsedTasks((v) => !v)}
+          />
+          {!collapsedTasks ? (
+            <div className="space-y-1 px-3 pb-2">
+              {statusItems.map((item) => (
+                <TodosFilterItem
+                  key={item.id}
+                  item={item}
+                  leading={item.leading}
+                  active={
+                    selectedRoutineName === null && item.id === statusFilter
+                  }
+                  onClick={() =>
+                    selectTaskFilter(() => onStatusChange(item.id))
+                  }
+                />
+              ))}
+              <div
+                className="my-1.5"
+                style={{ borderTop: "1px solid var(--border-subtle)" }}
               />
-            ) : null;
-            return (
-              <TodosFilterItem
-                key={item.id}
-                item={item}
-                leading={leading}
-                active={item.id === categoryFilter}
-                onClick={() => onCategoryChange(item.id)}
-              />
-            );
-          })}
+              {categoryItems.map((item) => {
+                const dotColor =
+                  item.id === "uncategorized"
+                    ? "var(--text-muted)"
+                    : item.id === "all"
+                      ? ""
+                      : categoryColor(item.id as TodoCategory);
+                const leading =
+                  item.id === "all" ? (
+                    <List
+                      className="h-3 w-3"
+                      strokeWidth={1.75}
+                      style={{ color: "var(--text-secondary)" }}
+                    />
+                  ) : dotColor ? (
+                    <span
+                      aria-hidden
+                      className="inline-block h-2 w-2 rounded-full"
+                      style={{ backgroundColor: dotColor }}
+                    />
+                  ) : null;
+                return (
+                  <TodosFilterItem
+                    key={item.id}
+                    item={item}
+                    leading={leading}
+                    active={
+                      selectedRoutineName === null && item.id === categoryFilter
+                    }
+                    onClick={() =>
+                      selectTaskFilter(() => onCategoryChange(item.id))
+                    }
+                  />
+                );
+              })}
+            </div>
+          ) : null}
         </div>
-        {/* 취소됨 — 사이드바 하단 별도 entry. 클릭 시 다른 필터 무시. */}
+        {/* 취소됨 — 사이드바 하단 별도 entry. 폴더 밖이라 들여쓰기 없이 outer level. */}
         <div
-          className="mt-2 pt-2"
+          className="px-3 py-2"
           style={{ borderTop: "1px solid var(--border-default)" }}
         >
           <TodosFilterItem
-            item={{ label: "취소됨", count: counts.status.cancelled }}
+            item={{ label: "취소됨" }}
             leading={
               <XCircle
                 className="h-3 w-3"
@@ -1419,11 +1599,75 @@ export function TodosSidePanel({
                 style={{ color: "var(--text-secondary)" }}
               />
             }
-            active={statusFilter === "cancelled"}
-            onClick={() => onStatusChange("cancelled")}
+            active={selectedRoutineName === null && statusFilter === "cancelled"}
+            onClick={() => selectTaskFilter(() => onStatusChange("cancelled"))}
           />
         </div>
       </nav>
+    </div>
+  );
+}
+
+// 루틴 사이드바 row — 오늘 체크박스 + 시간 + 이름. row click = RoutineDetail 진입.
+// 루틴 사이드바 row — 캘린더 사이드바의 todo row 패턴 차용 (div role=button + flex
+// items-start + CheckboxButton). 디자인 시스템의 체크박스/Text 컴포넌트만 사용.
+function RoutineSidebarItem({
+  routine,
+  today,
+  active,
+  onSelect,
+  onToggleToday,
+}: {
+  routine: Routine;
+  today: string;
+  active: boolean;
+  onSelect: () => void;
+  onToggleToday: () => void;
+}) {
+  const done = routine.log.has(today);
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onSelect}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onSelect();
+        }
+      }}
+      className="flex cursor-pointer items-start gap-2 rounded-md px-3 py-2 transition hover:bg-[var(--bg-surface-hover)]"
+      style={{
+        backgroundColor: active ? "var(--bg-surface-active)" : undefined,
+      }}
+    >
+      <span className="mt-0.5">
+        <CheckboxButton
+          status={done ? "done" : "pending"}
+          category={null}
+          onClick={onToggleToday}
+        />
+      </span>
+      <Text
+        variant="body"
+        as="span"
+        className={`min-w-0 flex-1 truncate ${done ? "line-through" : ""}`}
+        style={{
+          color: done ? "var(--text-muted)" : "var(--text-primary)",
+        }}
+      >
+        {routine.name}
+      </Text>
+      {routine.frontmatter.time ? (
+        <Text
+          variant="caption"
+          color="muted"
+          as="span"
+          className="shrink-0 font-mono"
+        >
+          {routine.frontmatter.time}
+        </Text>
+      ) : null}
     </div>
   );
 }
@@ -1434,7 +1678,7 @@ function TodosFilterItem({
   onClick,
   leading,
 }: {
-  item: { label: string; count: number };
+  item: { label: string };
   active: boolean;
   onClick: () => void;
   leading?: ReactNode;
@@ -1443,7 +1687,7 @@ function TodosFilterItem({
     <Button
       variant="ghost"
       onClick={onClick}
-      className={`w-full justify-between px-3 py-2 ${
+      className={`w-full justify-start px-3 py-2 ${
         active ? "font-medium" : ""
       }`}
       style={{
@@ -1461,16 +1705,6 @@ function TodosFilterItem({
         </span>
         {item.label}
       </span>
-      <Text
-        variant="caption"
-        as="span"
-        className="font-mono"
-        style={{
-          color: active ? "var(--text-secondary)" : "var(--text-muted)",
-        }}
-      >
-        {item.count}
-      </Text>
     </Button>
   );
 }
