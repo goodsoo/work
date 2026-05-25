@@ -11,6 +11,7 @@ function fakeMeeting(id: string, title: string, mtime = 1000): Meeting {
     time: null,
     attendees: [],
     tags: [],
+    pinned: false,
     mtime,
     created_at: "",
     updated_at: "",
