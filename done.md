@@ -6,6 +6,17 @@
 
 ## 2026-05-25
 
+### PR #44 — 루틴: 매일 반복 작업 별도 도메인 + 월별 그리드
+
+- **한 줄 임팩트**: 매일 반복 작업 자동 추적 (todo 와 분리)
+- **별도 도메인** — 처음 design 의 "별도 탭 + heatmap + streak" 폐기, 1차 pivot "todo 카테고리 routine 추가" 도 폐기. 최종은 vault `routines/{name}.md` 마스터 + 옵시디안 Tasks 호환 체크 로그 (`- [x] ✅ YYYY-MM-DD`). 매일 활성 기간 안에 사이드바에 자동 등장 — 본인이 매일 todo 에 같은 항목 다시 추가하는 의식 사라짐. 종료일 지나면 자동 숨김 (마스터 보존).
+- **사이드바 폴더 2개** — 할 일 탭 사이드바를 `루틴` / `태스크` collapsible 폴더로 분리. 루틴 폴더 = 그날 active 마스터 + 오늘 체크박스 + 우측 시간. 태스크 폴더 = 기존 status/category 필터. 필터/폴더 우측 카운트 숫자 제거 + "전체" 항목 List 아이콘 추가 (다른 항목과 균형). 시각 계층 = outer SectionHeader (chevron) / inner px-3 wrapper 항목 (캘린더 사이드바 패턴 통일).
+- **캘린더 사이드바 통합** — 일기/할일/메모 옆에 "루틴" 섹션 추가, 그날 active routine + 체크 토글. 캘린더 grid 셀은 변경 X.
+- **추가 모달 탭 분리** — `+` 모달 상단 segmented 탭 `[태스크/루틴]`. 루틴 폼 = 이름/시간/시작일/종료일. 모달 owner 를 TodosPage → App.tsx 로 이전 (RoutineDetail 마운트 중에도 사이드바 + 가 트리거 가능하도록).
+- **RoutineDetail + 월별 그리드** — 컴팩트 폼 (이름 / 시간·시작일·종료일 grid) + GitHub-style 박스 (13px, rounded-[3px]) 월별 그룹화한 캘린더 레이아웃 (요일 가로 7컬럼 × 6 rows). 월들은 flex-wrap + 역순 (최신 월이 좌측/위 — 본인 매일 사용 시 시야 우선). 색은 디자인시스템 토큰 — done 검정, miss 옅음, today inset ring, future·기간외 outline. streak / heatmap 통계 시각화는 폐기 (1인 사용에 generic SaaS pattern).
+- **CheckboxButton 통일** — 사이드바 / 캘린더 사이드바 / RoutineDetail 14일 list 모두 기존 todo `CheckboxButton` 사용 (3-state, category null = 회색 톤). raw 박스 X. row 패턴도 캘린더 todo row 패턴 차용 (`div role=button` + `items-start` + `mt-0.5` 정렬).
+- **vault adapter / hooks / watcher** — `createRoutine`/`readRoutine`/`updateRoutine`/`deleteRoutine`/`toggleRoutineDay` + `listRoutinesActiveOn` (시작일/종료일 클램프). `useToggleRoutineDay` 가 optimistic + uid scope. watcher 의 path 분기에 routines/ 추가 — 옵시디안 모바일 외부 편집 시 사이드바 즉시 반영.
+
 ### PR #43 — 사이드바 finder: pinned + Cmd+P 통합 검색
 
 - **한 줄 임팩트**: Cmd+P 로 vault 전체 즉시 검색

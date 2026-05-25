@@ -16,6 +16,11 @@ function affectedQueryKeys(path: string): unknown[][] {
     keys.push(["journals"]);
     keys.push(["journals", path]);
     keys.push(["todos"]);
+  } else if (path.startsWith("routines/")) {
+    keys.push(["routines"]);
+    const base = path.split("/").pop() ?? "";
+    const name = base.replace(/\.md$/, "");
+    if (name) keys.push(["routine", name]);
   } else if (path.startsWith("portfolio/")) {
     keys.push(["portfolio"]);
     keys.push(["portfolio", path]);
