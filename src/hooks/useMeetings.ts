@@ -73,6 +73,7 @@ function applyOptimisticPatch(prev: Meeting, patch: MeetingUpdate): Meeting {
     out.attendees = normalizeAttendeesPatch(patch.attendees);
   }
   if (patch.tags !== undefined) out.tags = patch.tags ?? [];
+  if (patch.pinned !== undefined) out.pinned = patch.pinned ?? false;
   if (patch.content !== undefined) out.content = patch.content ?? "";
   if (patch.transcript !== undefined) out.transcript = patch.transcript ?? "";
   if (patch.discussion_items !== undefined) {
@@ -93,6 +94,7 @@ export function useMeetings() {
     enabled: isReady,
   });
 }
+
 
 // vault 의 meetings/ 안 모든 폴더 (빈 폴더 포함). queryKey prefix 가 ["meetings"]
 // 라 watcher 의 list invalidation 이 같이 trigger — 폴더 변경 시 자동 refetch.
@@ -239,6 +241,42 @@ export function useUpdateMeeting(uid: string) {
         prev?.map((m) => (m.uid === uid ? updated : m)),
       );
       qc.invalidateQueries({ queryKey: ["todos"] });
+    },
+  });
+}
+
+// 사이드바 즐겨찾기 토글 — uid 를 mutate 시점에 받음 (메모마다 hook instance 안 만들고
+// 컨텍스트 메뉴에서 직접 호출). 같은 메모 동시 토글 방지를 위해 scope 사용.
+export function useTogglePinMeeting() {
+  const { adapter, watcher } = useVault();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ uid, pinned }: { uid: string; pinned: boolean }) => {
+      const path = uidToPath(qc, uid);
+      if (!path) throw new Error(`meeting not found: uid=${uid}`);
+      markMeetingSelfWrite(watcher, path);
+      return updateMeeting(adapter, path, { pinned });
+    },
+    onMutate: async ({ uid, pinned }) => {
+      await qc.cancelQueries({ queryKey: meetingKey(uid) });
+      const prevDetail = qc.getQueryData<Meeting>(meetingKey(uid));
+      if (prevDetail) {
+        qc.setQueryData(meetingKey(uid), { ...prevDetail, pinned });
+      }
+      qc.setQueryData<Meeting[]>(meetingsKey, (curr) =>
+        curr?.map((m) => (m.uid === uid ? { ...m, pinned } : m)),
+      );
+      return { prevDetail };
+    },
+    onError: (_err, vars, ctx) => {
+      if (ctx?.prevDetail) qc.setQueryData(meetingKey(vars.uid), ctx.prevDetail);
+      qc.invalidateQueries({ queryKey: meetingsKey });
+    },
+    onSuccess: (updated) => {
+      qc.setQueryData(meetingKey(updated.uid), updated);
+      qc.setQueryData<Meeting[]>(meetingsKey, (prev) =>
+        prev?.map((m) => (m.uid === updated.uid ? updated : m)),
+      );
     },
   });
 }

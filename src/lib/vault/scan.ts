@@ -18,6 +18,9 @@ export interface MeetingMeta {
   time: string | null;
   attendees: string[];
   tags: string[];
+  // 즐겨찾기 — frontmatter `pinned: true`. 옵시디안 community 표준 (bookmarks /
+  // pin-it-to-the-top 등) 과 호환. 사이드바 상단에 별도 그룹으로 고정.
+  pinned: boolean;
   mtime: number;
   // V0.5.3 호환 필드 (UI 가 의존). vault 에선 파일 mtime 사용.
   created_at: string;
@@ -101,6 +104,15 @@ function fmStringArray(value: unknown): string[] {
   return [];
 }
 
+function fmBoolean(value: unknown): boolean {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "string") {
+    const v = value.trim().toLowerCase();
+    return v === "true" || v === "yes" || v === "1";
+  }
+  return false;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Summary body — `## 논의 사항` / `## 결정 사항` / `## 액션 아이템` H2 list 형식.
 // summary sidecar 파일 안 markdown.
@@ -172,6 +184,7 @@ export function fileToMeeting(
     time: fmString(fm.time),
     attendees: fmStringArray(fm.attendees),
     tags: fmStringArray(fm.tags),
+    pinned: fmBoolean(fm.pinned),
     mtime,
     created_at: isoMtime,
     updated_at: isoMtime,
@@ -220,6 +233,10 @@ export function meetingToMainRaw(meeting: Meeting): string {
   if (meeting.time) frontmatter.time = meeting.time;
   if (meeting.attendees.length > 0) frontmatter.attendees = meeting.attendees;
   if (meeting.tags.length > 0) frontmatter.tags = meeting.tags;
+  // pinned 는 true 일 때만 박음 — false 면 frontmatter 자체에서 제거 (옵시디안 다른
+  // pin 플러그인들과 mutual: 우리 앱이 false 박아두면 사용자가 옵시디안에서 pin 해도
+  // 다음 write 때 사라짐). default = absent 가 곧 false.
+  if (meeting.pinned) frontmatter.pinned = true;
 
   return serializeVaultFile({
     raw: "",
@@ -529,6 +546,7 @@ export async function scanMeetings(adapter: VaultAdapter): Promise<MeetingMeta[]
         time: m.time,
         attendees: m.attendees,
         tags: m.tags,
+        pinned: m.pinned,
         mtime: m.mtime,
         created_at: m.created_at,
         updated_at: m.updated_at,

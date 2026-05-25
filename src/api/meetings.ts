@@ -43,6 +43,7 @@ export interface MeetingInsert {
   decisions?: string[] | null;
   action_items?: string[] | null;
   tags?: string[] | null;
+  pinned?: boolean | null;
 }
 
 export type MeetingUpdate = MeetingInsert;
@@ -65,6 +66,7 @@ function buildMeeting(input: MeetingInsert, id: string, uid: string): Meeting {
     time: input.time ?? null,
     attendees: normalizeAttendees(input.attendees),
     tags: input.tags ?? [],
+    pinned: input.pinned ?? false,
     mtime: 0,
     created_at: now,
     updated_at: now,
@@ -236,6 +238,9 @@ export async function updateMeeting(
     fmPatch.attendees = normalizeAttendees(patch.attendees);
   }
   if (patch.tags !== undefined) fmPatch.tags = patch.tags;
+  // pinned 가 false 면 frontmatter 키 자체 제거 (옵시디안 호환). patchFrontmatter 가
+  // undefined 값은 키 삭제로 처리.
+  if (patch.pinned !== undefined) fmPatch.pinned = patch.pinned ? true : undefined;
 
   const touchesMain =
     Object.keys(fmPatch).length > 0 || patch.content !== undefined;

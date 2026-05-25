@@ -395,6 +395,7 @@ function makeMeta(id: string, uid: string, mtime: number): MeetingMeta {
     time: null,
     attendees: [],
     tags: [],
+    pinned: false,
     mtime,
     created_at: iso,
     updated_at: iso,
