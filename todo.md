@@ -28,14 +28,6 @@ PR 단위로 묶음. 각 PR 의 **한 줄 임팩트** 는 카드 frontmatter `im
 - [ ] ActivityBar 새 탭 또는 portfolio 탭 안 별 view. 후순위 — dogfood 통증 작음, 평가 시즌 근접에 진입 결정.
 - [ ] vault scan 기반 — meetings 수 (월별), journals streak, todos 완료율 (이번 달 / 분기). 외부 의존 0.
 
-### PR — Multi-vault (개인 / 회사 vault 전환) `backend`
-한 줄 임팩트: 개인용 / 회사용 vault 따로 전환 — 같은 앱에서 컨텍스트 분리
-
-- [ ] **vault list 관리** — 설정 모달에 vault 추가/이름/path/삭제 UI. 메타는 `~/.goodsoob/vaults.json` 같은 외부 메타 (vault 자신 안에 두면 닭-알). 현재 단일 vault path 도 여기에 흡수.
-- [ ] **vault switcher** — 윈도우 헤더 vault badge 클릭 → dropdown. 전환 = 모든 React Query invalidate + watcher 재구독 + `selectedMeetingId` 리셋.
-- [ ] **vault 별 상태 분리** — localStorage key 에 vault id 네임스페이스. 최근 메모 / 필터 / sort / sidebar collapse 등 vault 별 보존.
-- [ ] **첫 진입 / path missing** — vault list 비었거나 선택 vault path 가 없을 때 진입 모달 (새 vault 또는 폴더 선택).
-
 ---
 
 ## 🎨 폴리시

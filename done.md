@@ -6,6 +6,17 @@
 
 ## 2026-05-25
 
+### PR #45 — Multi-vault: 개인 / 회사 vault 전환
+
+- **한 줄 임팩트**: 개인용 / 회사용 vault 따로 전환 — 같은 앱에서 컨텍스트 분리
+- **registry 모델** — `VaultEntry {id, name, path, addedAt}` localStorage (`goodsoob:vaults` + `goodsoob:activeVaultId`). path 중복 자동 dedupe, 빈 이름 입력 시 폴더명 자동 보충. 옛 단일 `vaultRoot` key 는 첫 부팅에서 1개 vault 로 흡수 (테스트 데이터 단계 — 정교한 migration 코드 생략).
+- **VaultProvider 확장** — vaults/activeVaultId state + switchVault/addVault/removeVault/renameVault/disconnect. activeVaultId 변경 useEffect 가 단일 진입점으로 watcher.stop → adapter.setRoot → queryClient.clear → ensureStructure → watcher.start 일관 처리. 전환 시 `#meeting-{uid}` hash 도 reset (옛 vault 의 uid 가 detail page 깜빡임 일으키던 케이스 차단).
+- **localStorage namespace** — `useScopedKey(baseKey)` 가 vault id suffix 자동 부착. 7개 hook 갱신 (meetingSort / todoSort / portfolioSort / portfolioCategoryFilter / bodyViewMode / sidebarCollapsed / MeetingsTreeView 폴더 collapsed). 회사 vault 의 폴더 접힘이 개인 vault 에 안 새어 들어옴.
+- **헤더 vault badge dropdown** — vault 목록 라디오 (체크 표시) + "새 vault 추가" + 설정 + 스타일가이드. 1 클릭 전환.
+- **설정 모달 VaultSection** — 라디오 list 패턴 (todos CheckboxButton 시각 언어 차용 — 18px, border 두께, hover preview) + 별칭 inline rename + remove + 추가. **별칭이 폴더명과 다를 때만** 행 안에 `(실제 폴더명: xxx)` muted disclosure — 별칭/폴더명 혼동 차단. 폴더 실제 rename 은 안 함 (옵시디안 default 모델 + iCloud sync 깨짐 위험 회피).
+- **VaultPicker selector 모드** — vaults list 가 있고 active 가 없을 때 (disconnect 후 재진입) 기존 vault 목록 라디오 + "새 폴더 추가" 함께. 첫 진입은 기존 단순 picker 그대로.
+- **테스트** — registry 9 unit (add/dedupe/remove/rename/empty-name/legacy bootstrap) + scopedKey 2 unit. 22 files, 307 tests pass.
+
 ### PR #44 — 루틴: 매일 반복 작업 별도 도메인 + 월별 그리드
 
 - **한 줄 임팩트**: 매일 반복 작업 자동 추적 (todo 와 분리)
