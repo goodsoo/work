@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { Undo2, Redo2, AlertCircle } from "lucide-react";
 import {
   useDeleteTodo,
@@ -11,7 +11,6 @@ import {
   useTodoUndoShortcut,
 } from "../hooks/useTodoHistory";
 import type { Todo, TodoPriority, TodoCategory } from "../api/todos";
-import { TaskAddModal } from "../components/tasks/TaskAddModal";
 import { TodoRow } from "../components/todos/TodoRow";
 import { PageHeaderBar } from "../components/common/PageHeaderBar";
 import { Button } from "../components/common/Button";
@@ -43,18 +42,9 @@ export function TodosPage({
   const updateMutation = useUpdateTodo();
   const deleteMutation = useDeleteTodo();
 
-  const [adding, setAdding] = useState(false);
   const { canUndo, canRedo, undo, redo } = useTodoUndo();
 
   useTodoUndoShortcut({ active: true });
-
-  useEffect(() => {
-    function open() {
-      setAdding(true);
-    }
-    window.addEventListener("todos:add-request", open);
-    return () => window.removeEventListener("todos:add-request", open);
-  }, []);
 
   // 두 필터 AND + sortKey 적용한 단일 list. done todo 도 inline (체크 + line-through).
   const todos = useMemo(() => {
@@ -202,18 +192,6 @@ export function TodosPage({
             할 일
           </Text>
         }
-      />
-      <TaskAddModal
-        open={adding}
-        onClose={() => setAdding(false)}
-        prefill={{
-          category:
-            categoryFilter === "work" ||
-            categoryFilter === "schedule" ||
-            categoryFilter === "other"
-              ? categoryFilter
-              : null,
-        }}
       />
       <div className="mx-auto w-full max-w-2xl px-5 pb-16 pt-5 lg:max-w-4xl">
       {error ? (

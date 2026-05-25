@@ -6,6 +6,7 @@ import { ToastProvider, useToast } from "./components/Toast";
 import { TABS, type Tab } from "./components/nav/BottomTabs";
 import { MeetingForm } from "./components/meetings/MeetingForm";
 import { QuickSwitcher } from "./components/meetings/QuickSwitcher";
+import { TaskAddModal } from "./components/tasks/TaskAddModal";
 import { TrashModal } from "./components/meetings/TrashModal";
 import { PortfolioTrashModal } from "./components/portfolio/PortfolioTrashModal";
 import {
@@ -21,6 +22,7 @@ import {
 import { useTodoSort } from "./hooks/useTodoSort";
 import { usePortfolioSort } from "./hooks/usePortfolioSort";
 import { usePortfolioCategoryFilter } from "./hooks/usePortfolioCategoryFilter";
+import type { TodoCategory, TodoInsert } from "./api/todos";
 import { TodoTrashModal } from "./components/todos/TodoTrashModal";
 import { Text } from "./components/common/Text";
 import { EmptyState } from "./components/common/EmptyState";
@@ -29,6 +31,7 @@ import { TodosPage } from "./pages/TodosPage";
 import { PortfolioPage } from "./pages/PortfolioPage";
 import { StyleguidePage } from "./pages/StyleguidePage";
 import { PortfolioSidePanel } from "./components/portfolio/PortfolioSidePanel";
+import { RoutineDetail } from "./components/routines/RoutineDetail";
 import type { ProjectFilter } from "./components/portfolio/PortfolioProjectList";
 import { useGhSync } from "./hooks/usePortfolio";
 import { useMeetings, useCreateMeeting, useDeleteMeeting } from "./hooks/useMeetings";
@@ -96,6 +99,28 @@ function AppContent() {
   const [portfolioFilter, setPortfolioFilter] = useState<ProjectFilter>({
     kind: "all",
   });
+  // 할 일 탭 안 routine 선택 — null = 태스크 필터 모드 (기존 TodosPage).
+  const [selectedRoutineName, setSelectedRoutineName] = useState<string | null>(null);
+  // task/routine 추가 모달 — App.tsx 가 owner. RoutineDetail / TodosPage 어느 쪽이
+  // 마운트되어도 사이드바 + 가 trigger 하면 보임. event detail 로 type/prefill 받음.
+  const [taskAddOpen, setTaskAddOpen] = useState(false);
+  const [taskAddPrefill, setTaskAddPrefill] = useState<Partial<TodoInsert> | undefined>(undefined);
+  const [taskAddType, setTaskAddType] = useState<"task" | "routine">("task");
+
+  useEffect(() => {
+    function handler(e: Event) {
+      const detail = (e as CustomEvent).detail as
+        | { type?: "task" | "routine"; category?: TodoCategory | null; prefill?: Partial<TodoInsert> }
+        | undefined;
+      setTaskAddType(detail?.type ?? "task");
+      const prefill = detail?.prefill ?? {};
+      if (detail?.category !== undefined) prefill.category = detail.category;
+      setTaskAddPrefill(prefill);
+      setTaskAddOpen(true);
+    }
+    window.addEventListener("todos:add-request", handler);
+    return () => window.removeEventListener("todos:add-request", handler);
+  }, []);
   // 캘린더 사이드바의 todo 클릭으로 진입 시 TodosPage 가 한 번 scroll 후 clear.
   const [scrollToTodoId, setScrollToTodoId] = useState<string | null>(null);
   const [portfolioSortKey, setPortfolioSortKey] = usePortfolioSort();
@@ -452,6 +477,8 @@ function AppContent() {
         onCategoryChange={setTodoCategory}
         sortKey={todoSortKey}
         onSortKeyChange={setTodoSortKey}
+        selectedRoutineName={selectedRoutineName}
+        onSelectRoutine={setSelectedRoutineName}
       />
     ) : tab === "portfolio" ? (
       <PortfolioSidePanel
@@ -511,6 +538,11 @@ function AppContent() {
           onSync={portfolioRunFullSync}
           syncRunning={portfolioSync.state.running}
         />
+      ) : selectedRoutineName ? (
+        <RoutineDetail
+          name={selectedRoutineName}
+          onClose={() => setSelectedRoutineName(null)}
+        />
       ) : (
         <TodosPage
           statusFilter={todoStatus}
@@ -565,6 +597,12 @@ function AppContent() {
               return;
           }
         }}
+      />
+      <TaskAddModal
+        open={taskAddOpen}
+        onClose={() => setTaskAddOpen(false)}
+        defaultType={taskAddType}
+        prefill={taskAddPrefill}
       />
     </AppShell>
   );
