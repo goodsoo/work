@@ -12,18 +12,24 @@ import {
   Check,
   Pencil,
 } from "lucide-react";
-import type {
-  PortfolioCategory,
-  PortfolioProject,
-  PortfolioWorkMeta,
+import {
+  folderPathOfCard,
+  isGithubCard,
+  type PortfolioCategory,
+  type PortfolioWorkMeta,
 } from "../../api/portfolio";
 import {
   useDeletePortfolioWork,
+  usePortfolioCategories,
   usePortfolioWork,
   useUpdatePortfolioFrontmatter,
 } from "../../hooks/usePortfolio";
 import { useVault } from "../../lib/vault/useVault";
 import { vaultAssetSrc } from "../../lib/portfolio/assetUrl";
+import {
+  categoryColor as lookupCategoryColor,
+  categoryLabel as lookupCategoryLabel,
+} from "../../lib/portfolio/categoryLookup";
 import { relativeDateLabel } from "../../lib/dates";
 import { buildPRPrompt, parsePRResponse } from "../../lib/clipboardPrompt";
 import { runClaude } from "../../lib/portfolio/claude";
@@ -35,32 +41,15 @@ import { Text } from "../common/Text";
 import { Chip } from "../common/Chip";
 import { Spinner } from "../common/Spinner";
 
-const CATEGORY_LABEL: Record<PortfolioCategory, string> = {
-  ui_ux: "UI/UX",
-  backend: "Backend",
-  infra: "Infra",
-  fix: "Fix",
-  other: "기타",
-};
-
-const CATEGORY_COLOR: Record<PortfolioCategory, string> = {
-  ui_ux: "var(--cat-uiux)",
-  backend: "var(--cat-backend)",
-  infra: "var(--cat-infra)",
-  fix: "var(--cat-fix)",
-  other: "var(--cat-other)",
-};
-
 type Props = {
   work: PortfolioWorkMeta;
-  projects: PortfolioProject[];
   onClose: () => void;
 };
 
 // 카드 클릭 시 열리는 detail / 편집 모달.
 // 좌측: 큰 스크린샷 viewer + thumb strip + dropzone
-// 우측: impact / 카테고리 / 프로젝트 / paste area / 메타 / included·삭제
-export function PortfolioDetailModal({ work, projects, onClose }: Props) {
+// 우측: impact / 카테고리 / 위치 (read only) / paste area / 메타 / included·삭제
+export function PortfolioDetailModal({ work, onClose }: Props) {
   const fm = work.frontmatter;
   const updateFm = useUpdatePortfolioFrontmatter(work.prSlug);
   const deleteWork = useDeletePortfolioWork();
@@ -74,7 +63,6 @@ export function PortfolioDetailModal({ work, projects, onClose }: Props) {
   const [categoryDraft, setCategoryDraft] = useState<PortfolioCategory>(
     fm.category,
   );
-  const [projectDraft, setProjectDraft] = useState(fm.project);
   const [promptCopied, setPromptCopied] = useState(false);
   const [requesting, setRequesting] = useState(false);
   const [requestError, setRequestError] = useState<string | null>(null);
@@ -82,11 +70,12 @@ export function PortfolioDetailModal({ work, projects, onClose }: Props) {
     { impact: string; category: PortfolioCategory } | null
   >(null);
   const fullWork = usePortfolioWork(work.prSlug);
+  const categoriesQuery = usePortfolioCategories();
+  const categoryDefs = categoriesQuery.data ?? [];
 
   const resetDraft = () => {
     setImpactDraft(fm.impact_summary);
     setCategoryDraft(fm.category);
-    setProjectDraft(fm.project);
     setSuggestion(null);
     setRequestError(null);
   };
@@ -104,7 +93,6 @@ export function PortfolioDetailModal({ work, projects, onClose }: Props) {
     updateFm.mutate({
       impact_summary: trimmedImpact,
       category: categoryDraft,
-      project: projectDraft,
     });
     setEditing(false);
     setSuggestion(null);
@@ -118,8 +106,12 @@ export function PortfolioDetailModal({ work, projects, onClose }: Props) {
   };
 
   const screenshotSrc = (path: string) => vaultAssetSrc(vaultRoot, path);
-  const categoryLabel = CATEGORY_LABEL[fm.category] ?? fm.category;
-  const categoryColor = CATEGORY_COLOR[fm.category] ?? "var(--cat-other)";
+  const categoryLabel = lookupCategoryLabel(fm.category, categoryDefs);
+  const categoryColor = lookupCategoryColor(fm.category, categoryDefs);
+  // 카드 위치 라벨 — github 카드는 repo, 수동 카드는 vault folder path. 편집 X.
+  const sourceDescription = isGithubCard(fm)
+    ? `${fm.github_owner}/${fm.github_repo}`
+    : folderPathOfCard(work.filePath);
   const relTime = fm.github_merged_at
     ? relativeDateLabel(fm.github_merged_at.slice(0, 10))
     : "";
@@ -430,28 +422,28 @@ export function PortfolioDetailModal({ work, projects, onClose }: Props) {
             ) : null}
 
           </div>
-            {/* dropzone — edit mode 에서만 노출. 업로드는 즉시 vault 적용 (취소와 무관). */}
-            {editing ? (
-              <div
-                className="flex shrink-0 gap-2 border-t px-4 py-3"
-                style={{ borderColor: "var(--border-subtle)" }}
-              >
-                <div className="flex-1">
-                  <ScreenshotDropzone
-                    prSlug={work.prSlug}
-                    existing={fm.screenshots}
-                    label="before"
-                  />
-                </div>
-                <div className="flex-1">
-                  <ScreenshotDropzone
-                    prSlug={work.prSlug}
-                    existing={fm.screenshots}
-                    label="after"
-                  />
-                </div>
+            {/* dropzone — read mode 에서도 노출. 수동 카드는 빈 채로 시작해 스크린샷
+                추가 진입이 항상 필요 + 옛 PR 카드도 PR body 자동 import 누락 시 동일 자리.
+                업로드는 즉시 vault 적용 (편집 모드 / 취소와 무관). */}
+            <div
+              className="flex shrink-0 gap-2 border-t px-4 py-3"
+              style={{ borderColor: "var(--border-subtle)" }}
+            >
+              <div className="flex-1">
+                <ScreenshotDropzone
+                  prSlug={work.prSlug}
+                  existing={fm.screenshots}
+                  label="before"
+                />
               </div>
-            ) : null}
+              <div className="flex-1">
+                <ScreenshotDropzone
+                  prSlug={work.prSlug}
+                  existing={fm.screenshots}
+                  label="after"
+                />
+              </div>
+            </div>
           </div>
 
           {/* 우측: 편집 패널 — scroll content + sticky footer */}
@@ -528,11 +520,11 @@ export function PortfolioDetailModal({ work, projects, onClose }: Props) {
                     color: "var(--text-primary)",
                   }}
                 >
-                  <option value="ui_ux">UI/UX</option>
-                  <option value="backend">Backend</option>
-                  <option value="infra">Infra</option>
-                  <option value="fix">Fix</option>
-                  <option value="other">기타</option>
+                  {categoryDefs.map((c) => (
+                    <option key={c.slug} value={c.slug}>
+                      {c.label}
+                    </option>
+                  ))}
                 </select>
               ) : (
                 <Text
@@ -550,37 +542,14 @@ export function PortfolioDetailModal({ work, projects, onClose }: Props) {
               )}
             </Field>
 
-            <Field label="프로젝트">
-              {editing ? (
-                <select
-                  value={projectDraft}
-                  onChange={(e) => setProjectDraft(e.target.value)}
-                  className="w-full rounded-md px-2 py-1.5 text-sm"
-                  style={{
-                    backgroundColor: "var(--bg-surface)",
-                    border: "1px solid var(--border-default)",
-                    color: "var(--text-primary)",
-                  }}
-                >
-                  <option value="">분류안됨</option>
-                  {projects.map((p) => (
-                    <option key={p.slug} value={p.slug}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <Text
-                  variant="body"
-                  as="div"
-                  color={fm.project ? "primary" : "muted"}
-                >
-                  {fm.project
-                    ? projects.find((p) => p.slug === fm.project)?.name ??
-                      fm.project
-                    : "분류안됨"}
-                </Text>
-              )}
+            <Field label="위치">
+              <Text
+                variant="body"
+                as="div"
+                color={sourceDescription ? "primary" : "muted"}
+              >
+                {sourceDescription || "(폴더 없음 — root)"}
+              </Text>
             </Field>
 
             {editing ? (
@@ -653,13 +622,13 @@ export function PortfolioDetailModal({ work, projects, onClose }: Props) {
                     </Text>
                     <div className="flex items-center gap-2">
                       <Chip
-                        dot={
-                          CATEGORY_COLOR[suggestion.category] ??
-                          "var(--cat-other)"
-                        }
+                        dot={lookupCategoryColor(
+                          suggestion.category,
+                          categoryDefs,
+                        )}
                         style={{ backgroundColor: "var(--bg-surface)" }}
                       >
-                        {CATEGORY_LABEL[suggestion.category] ?? suggestion.category}
+                        {lookupCategoryLabel(suggestion.category, categoryDefs)}
                       </Chip>
                     </div>
                     <div className="flex items-center gap-2 pt-1">

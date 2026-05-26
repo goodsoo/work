@@ -47,11 +47,6 @@ PR 단위로 묶음. 각 PR 의 **한 줄 임팩트** 는 카드 frontmatter `im
 
 ## 📊 Portfolio (V0.7.x 후속)
 
-### PR — 내 작업 수동 추가 `ui_ux`
-한 줄 임팩트: GitHub PR 무관 카드 (오프라인 업무 / 회의 발표) 도 portfolio 에 직접 추가
-
-- [ ] portfolio 탭에서 "새 카드" 버튼 → title/date/category/impact_summary 입력 + screenshots dropzone → 저장. frontmatter `github_pr_id` 없거나 0 → sync 가 건드리지 않음 (legacy 카드 schema 그대로 활용). 평가 자료에 PR 외 활동도 포함.
-
 ### PR — sync 결과 카드 식별 `ui_ux`
 한 줄 임팩트: 어떤 카드가 새로 들어왔는지 한눈에
 

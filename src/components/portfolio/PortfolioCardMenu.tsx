@@ -1,11 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { MoreVertical } from "lucide-react";
-import type { PortfolioWorkMeta } from "../../api/portfolio";
+import {
+  isGithubCard,
+  type PortfolioWorkMeta,
+} from "../../api/portfolio";
 import {
   useDeletePortfolioWork,
   useUpdatePortfolioFrontmatter,
 } from "../../hooks/usePortfolio";
 import { Button } from "../common/Button";
+import { PortfolioMoveFolderModal } from "./PortfolioMoveFolderModal";
 
 type Props = {
   work: PortfolioWorkMeta;
@@ -17,10 +21,12 @@ type Props = {
 //   "삭제" (accent-red-text, confirm)
 export function PortfolioCardMenu({ work }: Props) {
   const [open, setOpen] = useState(false);
+  const [moveOpen, setMoveOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
   const updateFm = useUpdatePortfolioFrontmatter(work.prSlug);
   const deleteWork = useDeletePortfolioWork();
+  const isGithub = isGithubCard(work.frontmatter);
 
   // 외부 클릭 닫기 + ESC
   useEffect(() => {
@@ -94,13 +100,24 @@ export function PortfolioCardMenu({ work }: Props) {
             border: "1px solid var(--border-default)",
           }}
         >
+          {!isGithub ? (
+            <>
+              <MenuItem
+                label="폴더로 이동..."
+                onClick={() => {
+                  close();
+                  setMoveOpen(true);
+                }}
+              />
+              <div
+                className="my-1 h-px"
+                style={{ backgroundColor: "var(--border-default)" }}
+              />
+            </>
+          ) : null}
           <MenuItem
             label={work.frontmatter.included ? "미사용" : "포함"}
             onClick={handleIncludedToggle}
-          />
-          <div
-            className="my-1 h-px"
-            style={{ backgroundColor: "var(--border-default)" }}
           />
           <MenuItem
             label="삭제"
@@ -108,6 +125,14 @@ export function PortfolioCardMenu({ work }: Props) {
             onClick={handleDelete}
           />
         </div>
+      ) : null}
+
+      {moveOpen ? (
+        <PortfolioMoveFolderModal
+          open={moveOpen}
+          onClose={() => setMoveOpen(false)}
+          work={work}
+        />
       ) : null}
     </div>
   );

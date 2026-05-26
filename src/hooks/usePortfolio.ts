@@ -2,23 +2,33 @@
 // useMeetings 패턴 그대로. useGhSync 는 별도 (mutable run state 보유).
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
   ATTACHMENTS_DIR,
+  BUILTIN_CATEGORIES,
+  CATEGORIES_FILE,
+  PORTFOLIO_DIR,
   PORTFOLIO_TRASH_DIR,
-  PROJECTS_FILE,
+  createManualPortfolioWork,
+  createPortfolioFolder,
+  deletePortfolioFolder,
   emptyPortfolioTrash,
+  listManualFolders,
   listTrashedPortfolioWorks,
+  mergeCategoryDefs,
+  moveManualCard,
   portfolioWorkPath,
   purgePortfolioWork,
-  readPortfolioProjects,
+  readPortfolioCategories,
   readSyncState,
   readPortfolioWork,
+  renamePortfolioFolder,
   restorePortfolioWork,
   scanPortfolio,
   syncPortfolio,
-  writePortfolioProjects,
-  type PortfolioProject,
+  writePortfolioCategories,
+  type CreateManualPortfolioInput,
+  type PortfolioCategoryDef,
   type PortfolioWork,
   type PortfolioWorkFrontmatter,
   type PortfolioWorkMeta,
@@ -31,7 +41,8 @@ import { patchFrontmatter } from "../lib/vault/parser";
 
 const worksKey = ["portfolio"] as const;
 const workKey = (slug: string) => ["portfolio", "work", slug] as const;
-const projectsKey = ["portfolio-projects"] as const;
+const foldersKey = ["portfolio-folders"] as const;
+const categoriesKey = ["portfolio-categories"] as const;
 const trashKey = ["portfolio", "trash"] as const;
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -60,7 +71,7 @@ export function usePortfolioWork(slug: string | undefined) {
 export type PortfolioFrontmatterPatch = Partial<
   Pick<
     PortfolioWorkFrontmatter,
-    "project" | "included" | "category" | "impact_summary" | "screenshots"
+    "included" | "category" | "impact_summary" | "screenshots"
   >
 >;
 
@@ -105,6 +116,22 @@ export function useUpdatePortfolioFrontmatter(slug: string) {
       if (updated) {
         qc.setQueryData(workKey(slug), updated);
       }
+      qc.invalidateQueries({ queryKey: worksKey });
+    },
+  });
+}
+
+// 수동 카드 생성 — PR 무관 (오프라인 업무, 회의 발표 등). legacy schema 로 저장.
+export function useCreateManualPortfolioWork() {
+  const { adapter, watcher } = useVault();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: CreateManualPortfolioInput) => {
+      const work = await createManualPortfolioWork(adapter, input);
+      watcher.markSelfWrite(work.filePath);
+      return work;
+    },
+    onSuccess: () => {
       qc.invalidateQueries({ queryKey: worksKey });
     },
   });
@@ -214,31 +241,195 @@ export function useEmptyPortfolioTrash() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Projects
+// Manual folders — vault 실제 디렉토리 트리. 메모장 폴더 패턴 동형.
 
-export function usePortfolioProjects() {
+export function useManualFolders() {
   const { adapter, isReady } = useVault();
   return useQuery({
-    queryKey: projectsKey,
-    queryFn: () => readPortfolioProjects(adapter),
+    queryKey: foldersKey,
+    queryFn: () => listManualFolders(adapter),
     enabled: isReady,
   });
 }
 
-export function useWritePortfolioProjects() {
+export function useCreatePortfolioFolder() {
   const { adapter, watcher } = useVault();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (projects: PortfolioProject[]) => {
-      await writePortfolioProjects(adapter, projects);
-      watcher.markSelfWrite(PROJECTS_FILE);
-      return projects;
+    mutationFn: async (input: { parent: string; name: string }) => {
+      const path = await createPortfolioFolder(adapter, input.parent, input.name);
+      watcher.markSelfWrite(`${PORTFOLIO_DIR}/${path}`);
+      return path;
     },
-    onSuccess: (projects) => {
-      qc.setQueryData(projectsKey, projects);
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: foldersKey });
     },
   });
 }
+
+export function useRenamePortfolioFolder() {
+  const { adapter, watcher } = useVault();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { fromPath: string; newName: string }) => {
+      const toPath = await renamePortfolioFolder(
+        adapter,
+        input.fromPath,
+        input.newName,
+      );
+      watcher.markSelfWrite(`${PORTFOLIO_DIR}/${input.fromPath}`);
+      watcher.markSelfWrite(`${PORTFOLIO_DIR}/${toPath}`);
+      return { fromPath: input.fromPath, toPath };
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: foldersKey });
+      qc.invalidateQueries({ queryKey: worksKey });
+    },
+  });
+}
+
+// 수동 카드의 폴더 이동 — disk rename. 카드 frontmatter 안 만짐 (vault path 가 진실).
+export function useMoveManualCard() {
+  const { adapter, watcher } = useVault();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { fromPath: string; toFolder: string }) => {
+      const newPath = await moveManualCard(
+        adapter,
+        input.fromPath,
+        input.toFolder,
+      );
+      watcher.markSelfWrite(input.fromPath);
+      watcher.markSelfWrite(newPath);
+      return newPath;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: worksKey });
+      qc.invalidateQueries({ queryKey: foldersKey });
+    },
+  });
+}
+
+export function useDeletePortfolioFolder() {
+  const { adapter, watcher } = useVault();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (folderPath: string) => {
+      const result = await deletePortfolioFolder(adapter, folderPath);
+      watcher.markSelfWrite(`${PORTFOLIO_DIR}/${folderPath}`);
+      return result;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: foldersKey });
+      qc.invalidateQueries({ queryKey: worksKey });
+      qc.invalidateQueries({ queryKey: trashKey });
+    },
+  });
+}
+
+// 카테고리 정의 — builtin 5 + categories.md user-defined + 카드 frontmatter 의 unique
+// slug 들 union. 옵시디안에서 카드 frontmatter 만 임의 slug 박아도 사이드바 chip row 에
+// 자동 등장 (orphan 개념 없음). categories.md 는 색·label override + 빈 카테고리 즐겨찾기.
+//
+// 구현: raw user 정의를 query 로 캐싱 + worksQuery 의 data 와 useMemo 로 union 계산.
+// works 는 같은 queryKey(`portfolio`) 라 다른 hook 호출과 자동 캐시 공유.
+export function usePortfolioCategories() {
+  const { adapter, isReady } = useVault();
+  const worksQuery = useQuery({
+    queryKey: worksKey,
+    queryFn: () => scanPortfolio(adapter),
+    enabled: isReady,
+  });
+  const raw = useQuery({
+    queryKey: categoriesKey,
+    queryFn: () => readPortfolioCategories(adapter),
+    enabled: isReady,
+  });
+  const data = useMemo(
+    () => mergeCategoryDefs(raw.data ?? [], worksQuery.data ?? []),
+    [raw.data, worksQuery.data],
+  );
+  return { ...raw, data };
+}
+
+// 사용자 카테고리 추가 / 수정 — categories.md 의 user-defined 배열만 갱신 (builtin 5 는
+// 코드 const). builtin slug 와 같으면 label/color override 로 동작. 호출처에서 신규/수정
+// 모두 이걸로 처리.
+export function useAddPortfolioCategory() {
+  const { adapter, watcher } = useVault();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (def: PortfolioCategoryDef) => {
+      const existing = await readPortfolioCategories(adapter);
+      // 같은 slug 있으면 새 def 로 덮기, 아니면 append.
+      const idx = existing.findIndex((c) => c.slug === def.slug);
+      const next =
+        idx >= 0
+          ? existing.map((c, i) => (i === idx ? def : c))
+          : [...existing, def];
+      await writePortfolioCategories(adapter, next);
+      watcher.markSelfWrite(CATEGORIES_FILE);
+      return next;
+    },
+    onSuccess: (next) => {
+      // raw user-defined 만 categoriesKey 에 보관 — usePortfolioCategories 의
+      // useMemo 가 builtin + 카드 frontmatter 와 union 계산.
+      qc.setQueryData(categoriesKey, next);
+    },
+  });
+}
+
+// 카테고리 삭제 — categories.md user-defined 에서 entry 제거.
+// 사용 중인 카드 (frontmatter.category === slug) 는 "other" 로 일괄 patch.
+// builtin slug (ui_ux 등) 삭제 = categories.md 의 override 제거 = label/color default 복귀
+// (코드 const 5는 항상 존재). 카드 마이그레이션도 builtin 의 경우 적용 안 함 (slug 그대로 유효).
+export function useDeletePortfolioCategory() {
+  const { adapter, watcher } = useVault();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (slug: string) => {
+      // 1) categories.md 에서 entry 제거 (없으면 변동 없음 — builtin 만 있던 경우)
+      const existing = await readPortfolioCategories(adapter);
+      const next = existing.filter((c) => c.slug !== slug);
+      if (next.length !== existing.length) {
+        await writePortfolioCategories(adapter, next);
+        watcher.markSelfWrite(CATEGORIES_FILE);
+      }
+      // 2) custom slug (builtin 외) 인 경우만 카드 마이그레이션 — 빌트인 slug 는 코드 const
+      //    상수라 항상 유효, override 만 제거됨.
+      const isBuiltin = (BUILTIN_CATEGORIES as readonly string[]).includes(slug);
+      let migrated = 0;
+      if (!isBuiltin) {
+        const works = await scanPortfolio(adapter);
+        for (const w of works) {
+          if (w.frontmatter.category !== slug) continue;
+          try {
+            const path = w.filePath;
+            const raw = await adapter.read(path);
+            const patched = patchFrontmatter(raw, { category: "other" });
+            if (patched !== raw) {
+              await adapter.write(path, patched);
+              watcher.markSelfWrite(path);
+              migrated++;
+            }
+          } catch {
+            // 한 카드 실패해도 다음 진행
+          }
+        }
+      }
+      return { next, migrated };
+    },
+    onSuccess: ({ next }) => {
+      qc.setQueryData(categoriesKey, next);
+      qc.invalidateQueries({ queryKey: worksKey });
+    },
+  });
+}
+
+// 옛 projects.md 기반 hook (useWritePortfolioProjects / useAddPortfolioProject /
+// useDeletePortfolioProject / useRenamePortfolioProject) 은 vault path 기반 폴더
+// 모델로 대체되어 제거됨. github 그룹은 카드 frontmatter 에서 derive, 수동 폴더는
+// 실제 vault 디렉토리 — useManualFolders / useCreatePortfolioFolder / 등 사용.
 
 // ─────────────────────────────────────────────────────────────────────────────
 // useGhSync — local mutable run state. design 1B: 시작/완료/중단 상태 노출.

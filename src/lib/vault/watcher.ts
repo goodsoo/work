@@ -24,9 +24,11 @@ function affectedQueryKeys(path: string): unknown[][] {
   } else if (path.startsWith("portfolio/")) {
     keys.push(["portfolio"]);
     keys.push(["portfolio", path]);
-    if (path === "portfolio/projects.md") {
-      keys.push(["portfolio-projects"]);
+    if (path === "portfolio/categories.md") {
+      keys.push(["portfolio-categories"]);
     }
+    // 폴더 변경 (rename/create/delete) 도 사이드바 트리 새로고침 필요
+    keys.push(["portfolio-folders"]);
     // _attachments/* 변경도 카드 새로고침 필요 (썸네일 캐시)
   } else if (path === "inbox.md" || !path.includes("/")) {
     // root level *.md (inbox 등)

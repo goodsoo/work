@@ -155,7 +155,7 @@ function TaskForm({
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          placeholder="예: 보고서 작성"
+          placeholder="할 일 제목을 입력하세요"
           aria-required="true"
           maxLength={200}
           className="mt-1 w-full rounded-md px-2 py-1.5 text-sm outline-none"
@@ -368,7 +368,7 @@ function RoutineForm({ onDone }: { onDone: () => void }) {
             setName(e.target.value);
             clearError("name");
           }}
-          placeholder="예: 운동, 일기"
+          placeholder="루틴 이름을 입력하세요"
           aria-required="true"
           aria-invalid={errors.name ? true : undefined}
           maxLength={100}

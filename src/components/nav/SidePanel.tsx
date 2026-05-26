@@ -686,13 +686,16 @@ export function MeetingsSidePanelFooter({
 }
 
 // portfolio 탭에서만 보임. 메모장과 별개 도메인 휴지통 (portfolio/.trash/).
+// 가이드북 진입도 같이 — 사이드바 헤더 자리 비우고 footer 로 모은다.
 export function PortfolioSidePanelFooter({
   onTrashOpen,
+  onGuideOpen,
 }: {
   onTrashOpen: () => void;
+  onGuideOpen: () => void;
 }) {
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex items-center justify-end gap-1">
       <Button
         variant="icon"
         onClick={onTrashOpen}
@@ -701,6 +704,15 @@ export function PortfolioSidePanelFooter({
         style={{ color: "var(--text-muted)" }}
       >
         <Trash2 className="h-3.5 w-3.5" />
+      </Button>
+      <Button
+        variant="icon"
+        onClick={onGuideOpen}
+        title="가이드북"
+        aria-label="가이드북"
+        style={{ color: "var(--text-muted)" }}
+      >
+        <BookOpen className="h-3.5 w-3.5" />
       </Button>
     </div>
   );

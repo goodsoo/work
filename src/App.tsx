@@ -9,6 +9,7 @@ import { QuickSwitcher } from "./components/meetings/QuickSwitcher";
 import { TaskAddModal } from "./components/tasks/TaskAddModal";
 import { TrashModal } from "./components/meetings/TrashModal";
 import { PortfolioTrashModal } from "./components/portfolio/PortfolioTrashModal";
+import { PortfolioGuideModal } from "./components/portfolio/PortfolioGuideModal";
 import {
   MeetingsSidePanel,
   MeetingsSidePanelFooter,
@@ -34,8 +35,13 @@ import { PortfolioSidePanel } from "./components/portfolio/PortfolioSidePanel";
 import { InstallGuideModal } from "./components/portfolio/InstallGuideModal";
 import { AuthGuideModal } from "./components/portfolio/AuthGuideModal";
 import { RoutineDetail } from "./components/routines/RoutineDetail";
-import type { ProjectFilter } from "./components/portfolio/PortfolioProjectList";
-import { useGhSync, usePortfolioWorks, usePortfolioProjects } from "./hooks/usePortfolio";
+import type { SourceFilter } from "./components/portfolio/PortfolioSourceTree";
+import {
+  useGhSync,
+  useManualFolders,
+  usePortfolioCategories,
+  usePortfolioWorks,
+} from "./hooks/usePortfolio";
 import { GhAuthError, GhNotInstalledError } from "./lib/portfolio/gh";
 import { useMeetings, useCreateMeeting, useDeleteMeeting } from "./hooks/useMeetings";
 import { useMeetingSort } from "./hooks/useMeetingSort";
@@ -118,7 +124,7 @@ function AppContent() {
   const [todoStatus, setTodoStatus] = useState<TodosStatusFilter>("all");
   const [todoCategory, setTodoCategory] = useState<TodosCategoryFilter>("all");
   const [todoSortKey, setTodoSortKey] = useTodoSort();
-  const [portfolioFilter, setPortfolioFilter] = useState<ProjectFilter>({
+  const [portfolioFilter, setPortfolioFilter] = useState<SourceFilter>({
     kind: "all",
   });
   // 할 일 탭 안 routine 선택 — null = 태스크 필터 모드 (기존 TodosPage).
@@ -152,6 +158,7 @@ function AppContent() {
   const [trashOpen, setTrashOpen] = useState(false);
   const [todoTrashOpen, setTodoTrashOpen] = useState(false);
   const [portfolioTrashOpen, setPortfolioTrashOpen] = useState(false);
+  const [portfolioGuideOpen, setPortfolioGuideOpen] = useState(false);
   // 옵시디안 quick switcher (Cmd+P). 메모장 탭에 한정하지 않고 어디서든 발사 가능 —
   // 선택 시 메모장 탭으로 자동 이동. 검색 인덱스 build 는 모달 open 시점에 lazy.
   const [quickSwitcherOpen, setQuickSwitcherOpen] = useState(false);
@@ -609,12 +616,9 @@ function AppContent() {
       <PortfolioSidePanel
         activeFilter={portfolioFilter}
         onFilterChange={setPortfolioFilter}
-        sortKey={portfolioSortKey}
-        onSortKeyChange={setPortfolioSortKey}
         syncState={portfolioSync.state}
         onSyncRun={portfolioRunIncrementalSync}
         onSyncCancel={portfolioSync.cancel}
-        onFullSyncRun={portfolioRunFullSync}
         onOpenInstallGuide={() => setInstallGuideOpen(true)}
         onOpenAuthGuide={() => setAuthGuideOpen(true)}
         onDismissSyncError={portfolioSync.dismissError}
@@ -630,6 +634,7 @@ function AppContent() {
     ) : tab === "portfolio" ? (
       <PortfolioSidePanelFooter
         onTrashOpen={() => setPortfolioTrashOpen(true)}
+        onGuideOpen={() => setPortfolioGuideOpen(true)}
       />
     ) : undefined;
 
@@ -671,6 +676,7 @@ function AppContent() {
         <PortfolioPage
           activeFilter={portfolioFilter}
           sortKey={portfolioSortKey}
+          onSortKeyChange={setPortfolioSortKey}
           selectedCategory={portfolioCategoryFilter.selected}
           onCategoryChange={portfolioCategoryFilter.change}
           onSync={portfolioRunFullSync}
@@ -702,6 +708,14 @@ function AppContent() {
       <PortfolioTrashModal
         open={portfolioTrashOpen}
         onClose={() => setPortfolioTrashOpen(false)}
+      />
+      <PortfolioGuideModal
+        open={portfolioGuideOpen}
+        onClose={() => setPortfolioGuideOpen(false)}
+        onFullSyncRun={portfolioRunFullSync}
+        fullSyncRunning={portfolioSync.state.running}
+        onOpenInstallGuide={() => setInstallGuideOpen(true)}
+        onOpenAuthGuide={() => setAuthGuideOpen(true)}
       />
       <InstallGuideModal
         open={installGuideOpen}
@@ -772,7 +786,8 @@ function PrefetchWarmup() {
   useJournals();
   useTodos();
   usePortfolioWorks();
-  usePortfolioProjects();
+  useManualFolders();
+  usePortfolioCategories();
   return null;
 }
 
