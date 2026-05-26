@@ -1,6 +1,6 @@
 import {
   Plus,
-  ClipboardList,
+  FileText,
   BookOpen,
   HelpCircle,
   X,
@@ -1144,7 +1144,7 @@ export function CalendarDayPanel({
                   onClick={() => onOpenMeeting(m.uid)}
                   className="w-full justify-start items-start gap-2 px-2 py-1 text-[13px]"
                   leftIcon={
-                    <ClipboardList className="mt-0.5 h-3 w-3 shrink-0 text-blue-500" />
+                    <FileText className="mt-0.5 h-3 w-3 shrink-0 text-blue-500" />
                   }
                 >
                   <div className="min-w-0 flex-1">

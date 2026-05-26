@@ -43,7 +43,8 @@ export function TaskAddModal({
 
   return (
     <Modal open={open} onClose={onClose} size="sm" ariaLabelledBy="task-add-title">
-      <div className="p-5">
+      {/* min-height 로 탭 (태스크/루틴) 컨텐츠 길이 차이에 모달이 흔들리지 않도록 고정. */}
+      <div className="flex flex-col p-5" style={{ minHeight: "24rem" }}>
         <Text id="task-add-title" variant="h4" as="h2">
           {type === "routine" ? "루틴 추가" : "할 일 추가"}
         </Text>
@@ -139,7 +140,7 @@ function TaskForm({
   }
 
   return (
-    <form onSubmit={handleSubmit}>
+    <form className="flex flex-1 flex-col" onSubmit={handleSubmit}>
       <label className="mt-4 block">
         <Text
           variant="caption"
@@ -258,7 +259,7 @@ function TaskForm({
         </Text>
       ) : null}
 
-      <div className="mt-5 flex justify-end gap-2">
+      <div className="mt-auto flex justify-end gap-2 pt-5">
         <Button
           variant="secondary"
           onClick={onDone}
@@ -280,6 +281,8 @@ function TaskForm({
 
 // ─── 루틴 폼 ───────────────────────────────────────────────────────────────
 
+type RoutineErrors = { name?: string; started?: string; ends?: string };
+
 function RoutineForm({ onDone }: { onDone: () => void }) {
   const createMutation = useCreateRoutine();
   const toast = useToast();
@@ -287,6 +290,7 @@ function RoutineForm({ onDone }: { onDone: () => void }) {
   const [time, setTime] = useState("");
   const [started, setStarted] = useState(todayIso());
   const [ends, setEnds] = useState("");
+  const [errors, setErrors] = useState<RoutineErrors>({});
   const nameRef = useRef<HTMLInputElement>(null);
 
   /* eslint-disable react-hooks/set-state-in-effect */
@@ -295,15 +299,34 @@ function RoutineForm({ onDone }: { onDone: () => void }) {
     setTime("");
     setStarted(todayIso());
     setEnds("");
+    setErrors({});
     requestAnimationFrame(() => nameRef.current?.focus());
   }, []);
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  const canSubmit = name.trim().length > 0 && started.length > 0;
+  function validate(): RoutineErrors {
+    const next: RoutineErrors = {};
+    if (!name.trim()) next.name = "이름을 입력하세요.";
+    if (!started) next.started = "시작일을 입력하세요.";
+    if (started && ends && ends < started) {
+      next.ends = "종료일은 시작일과 같거나 이후여야 합니다.";
+    }
+    return next;
+  }
+
+  // 클릭 못 누르는 게 1차 게이트 — 사용자가 비활성 이유를 빠르게 인지하도록 라벨의 `*` +
+  // started/ends onCommit 의 즉시 인라인 에러로 보강.
+  const canSubmit =
+    name.trim().length > 0 && !!started && (!ends || ends >= started);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!canSubmit) return;
+    const next = validate();
+    if (Object.keys(next).length > 0) {
+      setErrors(next);
+      return;
+    }
+    setErrors({});
     createMutation.mutate(
       {
         name: name.trim(),
@@ -318,8 +341,16 @@ function RoutineForm({ onDone }: { onDone: () => void }) {
     );
   }
 
+  function clearError(field: keyof RoutineErrors) {
+    setErrors((prev) => (prev[field] ? { ...prev, [field]: undefined } : prev));
+  }
+
+  function setError(field: keyof RoutineErrors, msg: string) {
+    setErrors((prev) => (prev[field] === msg ? prev : { ...prev, [field]: msg }));
+  }
+
   return (
-    <form onSubmit={handleSubmit}>
+    <form className="flex flex-1 flex-col" onSubmit={handleSubmit}>
       <label className="mt-4 block">
         <Text
           variant="caption"
@@ -333,17 +364,31 @@ function RoutineForm({ onDone }: { onDone: () => void }) {
           ref={nameRef}
           type="text"
           value={name}
-          onChange={(e) => setName(e.target.value)}
+          onChange={(e) => {
+            setName(e.target.value);
+            clearError("name");
+          }}
           placeholder="예: 운동, 일기"
           aria-required="true"
+          aria-invalid={errors.name ? true : undefined}
           maxLength={100}
           className="mt-1 w-full rounded-md px-2 py-1.5 text-sm outline-none"
           style={{
             backgroundColor: "var(--bg-surface)",
-            border: "1px solid var(--border-default)",
+            border: `1px solid ${errors.name ? "var(--accent-red)" : "var(--border-default)"}`,
             color: "var(--text-primary)",
           }}
         />
+        {errors.name ? (
+          <Text
+            variant="caption"
+            as="p"
+            className="mt-1"
+            style={{ color: "var(--accent-red)" }}
+          >
+            {errors.name}
+          </Text>
+        ) : null}
       </label>
 
       <label className="mt-3 block">
@@ -373,10 +418,25 @@ function RoutineForm({ onDone }: { onDone: () => void }) {
             className="mt-1 rounded-md px-2 py-1.5"
             style={{
               backgroundColor: "var(--bg-surface)",
-              border: "1px solid var(--border-default)",
+              border: `1px solid ${errors.started ? "var(--accent-red)" : "var(--border-default)"}`,
             }}
           >
-            <LooseDateInput value={started} onCommit={setStarted} fullWidth />
+            <LooseDateInput
+              value={started}
+              onCommit={(next) => {
+                setStarted(next);
+                if (!next) {
+                  setError("started", "시작일을 입력하세요.");
+                } else {
+                  clearError("started");
+                }
+                if (next && ends) {
+                  if (ends >= next) clearError("ends");
+                  else setError("ends", "종료일은 시작일과 같거나 이후여야 합니다.");
+                }
+              }}
+              fullWidth
+            />
           </div>
         </label>
         <label className="block">
@@ -387,15 +447,37 @@ function RoutineForm({ onDone }: { onDone: () => void }) {
             className="mt-1 rounded-md px-2 py-1.5"
             style={{
               backgroundColor: "var(--bg-surface)",
-              border: "1px solid var(--border-default)",
+              border: `1px solid ${errors.ends ? "var(--accent-red)" : "var(--border-default)"}`,
             }}
           >
-            <LooseDateInput value={ends} onCommit={setEnds} fullWidth />
+            <LooseDateInput
+              value={ends}
+              onCommit={(next) => {
+                setEnds(next);
+                if (started && next && next < started) {
+                  setError("ends", "종료일은 시작일과 같거나 이후여야 합니다.");
+                } else {
+                  clearError("ends");
+                }
+              }}
+              fullWidth
+            />
           </div>
         </label>
       </div>
 
-      <div className="mt-5 flex justify-end gap-2">
+      {errors.started || errors.ends ? (
+        <Text
+          variant="caption"
+          as="p"
+          className="mt-1"
+          style={{ color: "var(--accent-red)" }}
+        >
+          {errors.started ?? errors.ends}
+        </Text>
+      ) : null}
+
+      <div className="mt-auto flex justify-end gap-2 pt-5">
         <Button
           variant="secondary"
           onClick={onDone}

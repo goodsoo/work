@@ -6,15 +6,17 @@ import {
   type MeetingComparator,
   type MeetingsFolderNode,
 } from "../../lib/meetingsTree";
+import { useScopedKey } from "../../lib/vault/scopedStorage";
 import { Button } from "../common/Button";
 import { Text } from "../common/Text";
 
-const FOLDER_EXPAND_KEY = "goodsoob:meetingFolderExpand";
+const FOLDER_EXPAND_BASE_KEY = "goodsoob:meetingFolderExpand";
 // 트리 collapsed 상태를 localStorage 에 저장. "expanded" set 보다 "collapsed" set 으로
 // 보관 — 새 폴더는 default expanded (사용자가 명시적으로 collapse 한 폴더만 기억).
-function loadCollapsed(): Set<string> {
+// vault 별로 폴더 위계가 다르므로 useScopedKey 로 vault id namespace.
+function loadCollapsed(key: string): Set<string> {
   try {
-    const raw = window.localStorage.getItem(FOLDER_EXPAND_KEY);
+    const raw = window.localStorage.getItem(key);
     if (!raw) return new Set();
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return new Set();
@@ -24,9 +26,9 @@ function loadCollapsed(): Set<string> {
   }
 }
 
-function saveCollapsed(set: Set<string>): void {
+function saveCollapsed(key: string, set: Set<string>): void {
   try {
-    window.localStorage.setItem(FOLDER_EXPAND_KEY, JSON.stringify([...set]));
+    window.localStorage.setItem(key, JSON.stringify([...set]));
   } catch {
     // ignore — localStorage 막혀있어도 in-memory state 는 그대로 동작
   }
@@ -82,13 +84,19 @@ export function MeetingsTreeView({
   onFolderContextMenu,
   onMoveDrop,
 }: Props) {
-  const [collapsed, setCollapsed] = useState<Set<string>>(() => loadCollapsed());
+  const folderExpandKey = useScopedKey(FOLDER_EXPAND_BASE_KEY);
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => loadCollapsed(folderExpandKey));
   const [dropTarget, setDropTarget] = useState<string | null>(null); // 강조 중인 폴더 path
   const [dragUid, setDragUid] = useState<string | null>(null);
 
+  // vault 전환 시 새 vault 의 collapsed set 으로 갈아끼움.
   useEffect(() => {
-    saveCollapsed(collapsed);
-  }, [collapsed]);
+    setCollapsed(loadCollapsed(folderExpandKey));
+  }, [folderExpandKey]);
+
+  useEffect(() => {
+    saveCollapsed(folderExpandKey, collapsed);
+  }, [folderExpandKey, collapsed]);
 
   const tree = useMemo(
     () => buildMeetingsTree(meetings, sortMeetings, extraFolders ?? []),
@@ -107,7 +115,11 @@ export function MeetingsTreeView({
   function handleDragStart(e: React.DragEvent, uid: string) {
     e.dataTransfer.setData("text/x-goodsoob-meeting-uid", uid);
     e.dataTransfer.effectAllowed = "move";
-    setDragUid(uid);
+    // dragstart handler 안에서 동기 setState 호출하면 React reconciliation 이
+    // RootDropZone outline 을 mount → DOM mutation → WKWebView 가 drag source
+    // 변경 감지하고 native drag operation 즉시 cancel (start 직후 9ms 안에 end
+    // 발사되던 패턴). setTimeout(0) 으로 native drag init commit 이후 setState.
+    setTimeout(() => setDragUid(uid), 0);
   }
 
   function handleDragEnd() {
@@ -171,65 +183,97 @@ export function MeetingsTreeView({
           onDropFolder={handleDropFolder}
         />
       ))}
-      {/* root 메모도 트리의 일부 — depth 0, 폴더 다음 위치. drag 중일 때만 hit
-          가능한 drop slot 노출. */}
-      <RootDropCatcher
-        isDragging={dragUid !== null}
-        isDropTarget={dropTarget === ""}
-        onDragOverFolder={handleDragOverFolder}
-        onDragLeaveFolder={handleDragLeaveFolder}
-        onDropFolder={handleDropFolder}
-      />
-      {tree.rootMeetings.map((m) => (
-        <MeetingRow
-          key={m.uid}
-          meeting={m}
-          depth={0}
-          selected={m.uid === selectedUid}
-          isDragging={dragUid === m.uid}
-          onClick={() => onSelect(m.uid)}
-          onContextMenu={onContextMenu}
-          onDragStart={handleDragStart}
-          onDragEnd={handleDragEnd}
-        />
-      ))}
+      {/* root 메모들 — 폴더가 하나라도 있으면 "폴더 밖" 영역을 시각적으로 구분.
+          drag 중에만 점선 박스 (dropTarget="" 일 땐 강조). 폴더 0개면 wrap 없이
+          ul 직속 (트리 전체가 root 라 박스가 시각 noise). */}
+      {tree.folders.length > 0 ? (
+        <RootDropZone
+          isDragging={dragUid !== null}
+          isDropTarget={dropTarget === ""}
+          isEmpty={tree.rootMeetings.length === 0}
+          onDragOverFolder={handleDragOverFolder}
+          onDragLeaveFolder={handleDragLeaveFolder}
+          onDropFolder={handleDropFolder}
+        >
+          {tree.rootMeetings.map((m) => (
+            <MeetingRow
+              key={m.uid}
+              meeting={m}
+              depth={0}
+              selected={m.uid === selectedUid}
+              isDragging={dragUid === m.uid}
+              onClick={() => onSelect(m.uid)}
+              onContextMenu={onContextMenu}
+              onDragStart={handleDragStart}
+              onDragEnd={handleDragEnd}
+            />
+          ))}
+        </RootDropZone>
+      ) : (
+        tree.rootMeetings.map((m) => (
+          <MeetingRow
+            key={m.uid}
+            meeting={m}
+            depth={0}
+            selected={m.uid === selectedUid}
+            isDragging={dragUid === m.uid}
+            onClick={() => onSelect(m.uid)}
+            onContextMenu={onContextMenu}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+          />
+        ))
+      )}
     </ul>
   );
 }
 
-// root drop target — 폴더 위계 + 메모 사이의 slot. drag 중일 때만 hit 가능
-// 영역 (16-20px) 노출, 평소엔 0px (보이지 않음). dashed border 는 drop target 일 때.
-function RootDropCatcher({
+// root drop zone — 폴더 밖 메모들을 감싸는 영역. drag 중에만 점선 박스 visible.
+// 폴더와 명확히 구분되는 "기타 / 미분류" 영역의 시각 표현. root 메모 0개라도
+// drag 중이면 빈 박스로 drop hint.
+function RootDropZone({
   isDragging,
   isDropTarget,
+  isEmpty,
   onDragOverFolder,
   onDragLeaveFolder,
   onDropFolder,
+  children,
 }: {
   isDragging: boolean;
   isDropTarget: boolean;
+  isEmpty: boolean;
   onDragOverFolder: (e: React.DragEvent, folder: string) => void;
   onDragLeaveFolder: (folder: string) => void;
   onDropFolder: (e: React.DragEvent, folder: string) => void;
+  children: React.ReactNode;
 }) {
-  if (!isDragging) return null;
+  // root 메모 0개 + drag 중이 아님 → 안 그림 (빈 박스 noise).
+  if (isEmpty && !isDragging) return null;
+  // layout shift 방지: margin/padding 은 평상시도 drag 중도 동일. outline 만 toggle
+  // (outline 은 border 와 달리 layout 영향 0). drop target backgroundColor 도 layout 무관.
   return (
     <li
-      className="list-none rounded transition"
+      className="list-none rounded"
       style={{
-        height: "16px",
-        marginTop: "2px",
-        marginBottom: "2px",
-        backgroundColor: isDropTarget ? "var(--bg-surface-active)" : undefined,
-        outline: isDropTarget
-          ? "1px dashed var(--btn-primary)"
-          : "1px dashed var(--border-subtle)",
-        outlineOffset: "-2px",
+        margin: "0",
+        padding: "0",
+        minHeight: isDragging && isEmpty ? "32px" : undefined,
+        backgroundColor:
+          isDragging && isDropTarget ? "var(--bg-surface-active)" : undefined,
+        outline: isDragging
+          ? isDropTarget
+            ? "1px dashed var(--btn-primary)"
+            : "1px dashed var(--border-subtle)"
+          : undefined,
+        outlineOffset: "0px",
       }}
       onDragOver={(e) => onDragOverFolder(e, "")}
       onDragLeave={() => onDragLeaveFolder("")}
       onDrop={(e) => onDropFolder(e, "")}
-    />
+    >
+      <ul className="list-none p-0 m-0">{children}</ul>
+    </li>
   );
 }
 

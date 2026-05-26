@@ -2,20 +2,25 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import { Ban, X } from "lucide-react";
 import { Button } from "./common/Button";
 import { Text } from "./common/Text";
+import { Spinner } from "./common/Spinner";
 
 // 글로벌 toast — 어느 컴포넌트에서나 `useToast().show("...")` 로 우측하단 frost
 // 카드 띄움. MeetingForm 의 자체 actionError toast 와 같은 디자인 (var(--surface-frost)).
 // 다른 토스트 라이브러리 의존성 없이 가볍게.
 
+export type ToastKind = "error" | "progress";
+
 type Toast = {
   id: number;
   message: string;
-  // null 이면 영구 (사용자가 X 눌러서 닫음). 숫자 ms 면 자동 dismiss.
+  kind: ToastKind;
+  // null 이면 영구 (사용자가 X 눌러서 닫음 또는 dismiss(id) 호출). 숫자 ms 면 자동 dismiss.
   durationMs: number | null;
 };
 
 interface ToastContextValue {
-  show(message: string, opts?: { durationMs?: number | null }): void;
+  show(message: string, opts?: { durationMs?: number | null; kind?: ToastKind }): number;
+  dismiss(id: number): void;
 }
 
 const ToastContext = createContext<ToastContextValue | null>(null);
@@ -37,12 +42,16 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const show = useCallback<ToastContextValue["show"]>(
     (message, opts) => {
       const id = nextIdRef.current++;
-      const durationMs = opts?.durationMs === undefined ? 5000 : opts.durationMs;
-      setToasts((prev) => [...prev, { id, message, durationMs }]);
+      const kind: ToastKind = opts?.kind ?? "error";
+      // progress 는 호출자가 dismiss(id) 로 닫는 게 기본. 명시 안 하면 영구.
+      const defaultDuration = kind === "progress" ? null : 5000;
+      const durationMs = opts?.durationMs === undefined ? defaultDuration : opts.durationMs;
+      setToasts((prev) => [...prev, { id, message, kind, durationMs }]);
       if (durationMs !== null) {
         const t = setTimeout(() => dismiss(id), durationMs);
         timersRef.current.set(id, t);
       }
+      return id;
     },
     [dismiss],
   );
@@ -55,7 +64,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <ToastContext.Provider value={{ show }}>
+    <ToastContext.Provider value={{ show, dismiss }}>
       {children}
       {toasts.length > 0 ? (
         <div
@@ -77,12 +86,16 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               }}
             >
               <div className="flex items-center gap-2">
-                <Ban
-                  className="h-4 w-4 shrink-0"
-                  style={{ color: "var(--accent-red)" }}
-                />
+                {t.kind === "error" ? (
+                  <Ban
+                    className="h-4 w-4 shrink-0"
+                    style={{ color: "var(--accent-red)" }}
+                  />
+                ) : (
+                  <Spinner size="sm" />
+                )}
                 <span className="min-w-0 flex-1 truncate font-semibold">
-                  ERROR
+                  {t.kind === "error" ? "ERROR" : "진행 중"}
                 </span>
                 <Button
                   variant="icon"

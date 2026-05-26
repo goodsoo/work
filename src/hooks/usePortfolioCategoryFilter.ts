@@ -3,17 +3,19 @@ import {
   PORTFOLIO_CATEGORIES,
   type PortfolioCategory,
 } from "../api/portfolio";
+import { useScopedKey } from "../lib/vault/scopedStorage";
 
-// 내 작업 카드 카테고리 chip 필터. single radio. "all" = 전체 (필터 X).
+// 작업 카드 카테고리 chip 필터. single radio. "all" = 전체 (필터 X).
 // 할일 카테고리 필터와 동일한 정신 모델 — 한 번에 하나만 본다.
+// vault id namespace 적용 — 개인/회사 vault 별 필터 분리 (PR #45 흡수).
 // localStorage 에 직렬화. 옛 multi (string[]) 도 lazy 흡수 — 첫 값만 채용.
-const STORAGE_KEY = "goodsoob:portfolioCategoryFilter";
+const BASE_KEY = "goodsoob:portfolioCategoryFilter";
 
 export type PortfolioCategoryFilter = "all" | PortfolioCategory;
 
-function read(): PortfolioCategoryFilter {
+function readKey(key: string): PortfolioCategoryFilter {
   if (typeof localStorage === "undefined") return "all";
-  const raw = localStorage.getItem(STORAGE_KEY);
+  const raw = localStorage.getItem(key);
   if (!raw) return "all";
   try {
     const parsed = JSON.parse(raw);
@@ -40,12 +42,20 @@ function read(): PortfolioCategoryFilter {
 }
 
 export function usePortfolioCategoryFilter() {
-  const [selected, setSelected] = useState<PortfolioCategoryFilter>(read);
+  const key = useScopedKey(BASE_KEY);
+  const [selected, setSelected] = useState<PortfolioCategoryFilter>(() =>
+    readKey(key),
+  );
+
+  // vault 전환 시 새 key 에서 다시 read.
+  useEffect(() => {
+    setSelected(readKey(key));
+  }, [key]);
 
   useEffect(() => {
     if (typeof localStorage === "undefined") return;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(selected));
-  }, [selected]);
+    localStorage.setItem(key, JSON.stringify(selected));
+  }, [key, selected]);
 
   const change = useCallback((next: PortfolioCategoryFilter) => {
     setSelected(next);

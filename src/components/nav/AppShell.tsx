@@ -1,5 +1,15 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Sun, Moon, Menu, Settings, Search, ChevronDown } from "lucide-react";
+import {
+  Sun,
+  Moon,
+  Menu,
+  Settings,
+  Search,
+  ChevronDown,
+  Check,
+  Plus,
+} from "lucide-react";
+import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { useTheme } from "../../hooks/useTheme";
 import {
   useSidePanelWidth,
@@ -436,13 +446,38 @@ function HeaderTabs({
 }
 
 // 윈도우 헤더 좌측의 vault 이름 chip — 클릭 시 dropdown 진입점.
-// 항목: vault 설정 (SettingsModal vault section) / 스타일가이드 (#styleguide hash).
+// 항목: vault 목록 (라디오 전환) → "새 vault 추가..." → "Vault 설정" → "스타일가이드".
 // vault > tabs 시각 계층 명시 — vault 가 root container 임을 좌→우 순서로 표현.
 function VaultBadge({ onOpenSettings }: { onOpenSettings: () => void }) {
-  const { vaultRoot } = useVault();
+  const { vaultRoot, vaults, activeVaultId, switchVault, setVaultRoot } = useVault();
   const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
   if (!vaultRoot) return null;
-  const name = vaultRoot.split("/").filter(Boolean).pop() ?? vaultRoot;
+  const activeName =
+    vaults.find((v) => v.id === activeVaultId)?.name ??
+    vaultRoot.split("/").filter(Boolean).pop() ??
+    vaultRoot;
+
+  async function handleAddVault() {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const result = await openDialog({
+        directory: true,
+        multiple: false,
+        title: "새 vault 폴더 선택",
+      });
+      if (typeof result !== "string") return; // 취소
+      await setVaultRoot(result);
+      setOpen(false);
+    } catch (err) {
+      console.error("vault 추가 실패", err);
+      // setVaultRoot 가 throw 한 경우 disconnected 분기로 빠지므로 별도 UI 없음.
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <Popover
       open={open}
@@ -452,15 +487,15 @@ function VaultBadge({ onOpenSettings }: { onOpenSettings: () => void }) {
           variant="ghost"
           onClick={() => setOpen((v) => !v)}
           title={vaultRoot}
-          aria-label={`vault: ${name}`}
+          aria-label={`vault: ${activeName}`}
           className="h-7 max-w-full gap-1 px-2 text-[13px]"
           style={{ color: "var(--text-primary)" }}
         >
-          <span className="truncate">{name}</span>
+          <span className="truncate">{activeName}</span>
           <ChevronDown className="h-3 w-3 shrink-0 opacity-60" />
         </Button>
       }
-      panelClassName="absolute left-0 top-full mt-1 w-44 rounded-md p-1"
+      panelClassName="absolute left-0 top-full mt-1 w-60 rounded-md p-1"
       panelStyle={{
         background: "var(--bg-base)",
         border: "1px solid var(--border-default)",
@@ -468,6 +503,45 @@ function VaultBadge({ onOpenSettings }: { onOpenSettings: () => void }) {
         zIndex: 30,
       }}
     >
+      {/* vault 목록 — 라디오. active 행에 체크. */}
+      <div className="max-h-64 overflow-y-auto">
+        {vaults.map((v) => {
+          const active = v.id === activeVaultId;
+          return (
+            <button
+              key={v.id}
+              type="button"
+              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-[var(--bg-surface-hover)]"
+              style={{ color: "var(--text-primary)" }}
+              onClick={async () => {
+                if (!active) await switchVault(v.id);
+                setOpen(false);
+              }}
+              title={v.path}
+            >
+              <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center">
+                {active ? <Check className="h-3.5 w-3.5" /> : null}
+              </span>
+              <span className="min-w-0 flex-1 truncate">{v.name}</span>
+            </button>
+          );
+        })}
+      </div>
+      <div
+        className="my-1 h-px"
+        style={{ background: "var(--border-subtle)" }}
+        aria-hidden
+      />
+      <button
+        type="button"
+        className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-[var(--bg-surface-hover)] disabled:opacity-50"
+        style={{ color: "var(--text-primary)" }}
+        disabled={busy}
+        onClick={handleAddVault}
+      >
+        <Plus className="h-3.5 w-3.5" />
+        <span>{busy ? "추가 중…" : "새 vault 추가"}</span>
+      </button>
       <button
         type="button"
         className="w-full rounded-md px-2 py-1.5 text-left text-sm hover:bg-[var(--bg-surface-hover)]"

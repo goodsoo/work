@@ -10,6 +10,7 @@ import {
   parseRoutineLog,
   readRoutine,
   RoutineConflictError,
+  RoutineDateRangeError,
   routineToRaw,
   sortRoutines,
   toggleRoutineDay,
@@ -152,6 +153,17 @@ describe("createRoutine", () => {
       createRoutine(a, { name: "운/동", started: "2026-05-25" }),
     ).rejects.toThrow(InvalidRoutineNameError);
   });
+
+  it("ends < started reject", async () => {
+    const a = makeAdapter();
+    await expect(
+      createRoutine(a, {
+        name: "운동",
+        started: "2026-05-25",
+        ends: "2026-05-20",
+      }),
+    ).rejects.toThrow(RoutineDateRangeError);
+  });
 });
 
 describe("updateRoutine", () => {
@@ -194,6 +206,26 @@ describe("updateRoutine", () => {
     await expect(
       updateRoutine(a, "조깅", { rename: "운동" }),
     ).rejects.toThrow(RoutineConflictError);
+  });
+
+  it("ends 를 started 이전으로 patch 시 reject", async () => {
+    const a = makeAdapter();
+    await createRoutine(a, { name: "PT", started: "2026-05-25" });
+    await expect(
+      updateRoutine(a, "PT", { ends: "2026-05-20" }),
+    ).rejects.toThrow(RoutineDateRangeError);
+  });
+
+  it("started 를 기존 ends 이후로 patch 시 reject", async () => {
+    const a = makeAdapter();
+    await createRoutine(a, {
+      name: "PT",
+      started: "2026-05-25",
+      ends: "2026-06-25",
+    });
+    await expect(
+      updateRoutine(a, "PT", { started: "2026-07-01" }),
+    ).rejects.toThrow(RoutineDateRangeError);
   });
 });
 

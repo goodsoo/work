@@ -59,7 +59,7 @@ export function PortfolioSidePanel({
           className="font-serif text-sm font-medium"
           style={{ color: "var(--text-primary)" }}
         >
-          내 작업
+          포트폴리오
         </h2>
         <div className="flex items-center gap-0.5">
           <SortMenu value={sortKey} onChange={onSortKeyChange} />

@@ -19,6 +19,30 @@
 - **시간 폰트 통일** — 캘린더 루틴/할일/메모 row 의 인라인 시간 prefix 를 우측 정렬 `text-[11px] tabular-nums` 으로 통일. 메모장 폴더 트리 패턴과 동일.
 - **캘린더 "할 일" 섹션 통합** — 옛 "루틴" / "할 일" 두 섹션을 한 collapsible 섹션으로 (구분선 없이 시각만으로). 메모/할 일 0건이면 섹션 자체 hide, 일기는 항상 노출.
 
+### 직커밋 — 백업 가시성: 마지막 백업/폴더 열기/보관 개수/진행 toast (faf9aa2)
+
+- **한 줄 임팩트**: 설정 모달 백업 영역에서 마지막 백업 + 경로 한눈에, 1초+ 작업은 화면 어디서나 진행 표시
+- **마지막 백업 박스** — 상단에 "마지막 백업: YYYY-MM-DD HH:mm" + 그 아래 vault 안 `.backups` 절대경로 (`~` 축약). 한 번 봤을 때 백업이 실제로 도는지 + 어디 저장됐는지 즉시 확인.
+- **백업 폴더 열기 버튼** — "지금 백업" 옆 ghost 버튼. `sh -lc 'open ...'` 으로 macOS Finder 진입 (portfolio capability 의 sh 권한 재사용, 추가 권한 0). zip 잃을까 걱정 시 1 클릭 확인.
+- **보관 개수 사용자 설정** — 옛 `BACKUP_KEEP_COUNT = 10` 고정 → `keepCount` 필드 + select (5/10/20/30/50). `AutoBackupConfig` 에 추가, 옛 localStorage 는 default 10 으로 흡수. 큰 vault 일수록 디스크 부담, 작은 vault 일수록 안전성. 본인이 조절.
+- **1초+ progress toast** — Toast 시스템에 `kind: "progress"` variant (Spinner + "진행 중" 라벨). 백업 button spinner 는 모달 안에서만 보이는데, 모달 닫거나 자동 백업이 부팅 직후 silent 로 1-10초 lock 될 때 "왜 freeze?" 체감 차단. `show()` 가 id 반환 + `dismiss(id)` expose — 호출자가 완료 시 닫음.
+- **자동 백업도 동일 toast** — App 부팅 10초 뒤 트리거되는 `maybeAutoBackup` 도 같은 1초 timeout → progress toast 패턴.
+
+- **한 줄 임팩트**: 개인용 / 회사용 vault 따로 전환 — 같은 앱에서 컨텍스트 분리
+- **registry 모델** — `VaultEntry {id, name, path, addedAt}` localStorage (`goodsoob:vaults` + `goodsoob:activeVaultId`). path 중복 자동 dedupe, 빈 이름 입력 시 폴더명 자동 보충. 옛 단일 `vaultRoot` key 는 첫 부팅에서 1개 vault 로 흡수 (테스트 데이터 단계 — 정교한 migration 코드 생략).
+- **VaultProvider 확장** — vaults/activeVaultId state + switchVault/addVault/removeVault/renameVault/disconnect. activeVaultId 변경 useEffect 가 단일 진입점으로 watcher.stop → adapter.setRoot → queryClient.clear → ensureStructure → watcher.start 일관 처리. 전환 시 `#meeting-{uid}` hash 도 reset (옛 vault 의 uid 가 detail page 깜빡임 일으키던 케이스 차단).
+- **localStorage namespace** — `useScopedKey(baseKey)` 가 vault id suffix 자동 부착. 7개 hook 갱신 (meetingSort / todoSort / portfolioSort / portfolioCategoryFilter / bodyViewMode / sidebarCollapsed / MeetingsTreeView 폴더 collapsed). 회사 vault 의 폴더 접힘이 개인 vault 에 안 새어 들어옴.
+- **헤더 vault badge dropdown** — vault 목록 라디오 (체크 표시) + "새 vault 추가" + 설정 + 스타일가이드. 1 클릭 전환.
+- **설정 모달 VaultSection** — 라디오 list 패턴 (todos CheckboxButton 시각 언어 차용 — 18px, border 두께, hover preview) + 별칭 inline rename + remove + 추가. **별칭이 폴더명과 다를 때만** 행 안에 `(실제 폴더명: xxx)` muted disclosure — 별칭/폴더명 혼동 차단. 폴더 실제 rename 은 안 함 (옵시디안 default 모델 + iCloud sync 깨짐 위험 회피).
+- **VaultPicker selector 모드** — vaults list 가 있고 active 가 없을 때 (disconnect 후 재진입) 기존 vault 목록 라디오 + "새 폴더 추가" 함께. 첫 진입은 기존 단순 picker 그대로.
+- **테스트** — registry 9 unit (add/dedupe/remove/rename/empty-name/legacy bootstrap) + scopedKey 2 unit. 22 files, 307 tests pass.
+
+### 직커밋 — 메모 사이드바 root drag race fix + 라벨/아이콘 polish
+
+- **race fix** (6cb0872): root → folder drop 시 dragstart 직후 9ms 만에 dragend 가 발사되어 drag 시작 자체가 안 되던 race. `handleDragStart` 의 동기 `setDragUid` 가 React reconciliation 으로 `RootDropCatcher` mount → DOM mutation → WKWebView 가 drag source 변경 감지하고 native drag operation 즉시 cancel. `setTimeout(0)` 으로 setState 를 다음 tick 으로 미뤄 native drag init commit 이후 mount. UX 도 같이 손봄 — 16px slot `RootDropCatcher` → root 메모 전체 wrapping 박스 `RootDropZone` 으로 교체, 폴더 밖 영역 어디든 drop 가능 + 평상시·drag 중 동일 layout (outline 만 toggle, margin/padding 변동 0).
+- **라벨 통일** (28c3150): "내 작업" → "포트폴리오". 다른 탭 (캘린더 / 메모장 / 할 일) 명사 단독 톤과 일치, vault 폴더명 `portfolio` 와도 일치. ActivityBar / 사이드바 헤더 / 페이지 h1 / 단축키 / 가이드 모달 + 코드 주석까지 11곳.
+- **아이콘 4개 정리** (5c01af5): 메모장 `ClipboardList` ↔ 할 일 `ListChecks` 가 시각 유사해 헷갈리던 문제. notion 풍 단순/평면 아이콘으로 교체 — `Calendar` / `FileText` / `CheckSquare` / `LayoutGrid`. 캘린더 셀 메모 표시, 할 일 사이드패널의 메모 링크 leftIcon, 포트폴리오 empty state, QuickSwitcher 항목까지 일관 갱신.
+
 ---
 
 ## 2026-05-25

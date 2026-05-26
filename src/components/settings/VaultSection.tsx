@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
-import { FolderOpen, Unlink } from "lucide-react";
+import { Pencil, Plus, Trash2, Unlink } from "lucide-react";
 import { useVault } from "../../lib/vault/useVault";
 import { Button } from "../common/Button";
 import { Text } from "../common/Text";
@@ -12,23 +12,33 @@ type Props = {
 };
 
 export function VaultSection({ onAfterSwitch }: Props) {
-  const { vaultRoot, setVaultRoot, disconnect } = useVault();
+  const {
+    vaults,
+    activeVaultId,
+    activeVault,
+    setVaultRoot,
+    switchVault,
+    removeVault,
+    renameVault,
+    disconnect,
+  } = useVault();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
+  const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null);
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameDraft, setRenameDraft] = useState("");
 
-  async function changeVault() {
+  async function handleAddVault() {
     setError(null);
     setBusy(true);
     try {
       const result = await open({
         directory: true,
         multiple: false,
-        title: "Vault 폴더 선택",
-        defaultPath: vaultRoot ?? undefined,
+        title: "새 vault 폴더 선택",
       });
-      if (typeof result !== "string") return; // 취소
-      if (result === vaultRoot) return; // 같은 폴더 → no-op
+      if (typeof result !== "string") return;
       await setVaultRoot(result);
       onAfterSwitch?.();
     } catch (err) {
@@ -36,6 +46,49 @@ export function VaultSection({ onAfterSwitch }: Props) {
     } finally {
       setBusy(false);
     }
+  }
+
+  async function handleSwitch(id: string) {
+    if (id === activeVaultId) return;
+    setError(null);
+    setBusy(true);
+    try {
+      await switchVault(id);
+      onAfterSwitch?.();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function startRename(id: string, current: string) {
+    setRenamingId(id);
+    setRenameDraft(current);
+  }
+
+  function commitRename() {
+    if (!renamingId) return;
+    const trimmed = renameDraft.trim();
+    if (trimmed) renameVault(renamingId, trimmed);
+    setRenamingId(null);
+    setRenameDraft("");
+  }
+
+  function cancelRename() {
+    setRenamingId(null);
+    setRenameDraft("");
+  }
+
+  function handleRemove(id: string) {
+    removeVault(id);
+    setConfirmRemoveId(null);
+  }
+
+  const removingEntry = vaults.find((v) => v.id === confirmRemoveId) ?? null;
+
+  function folderBasename(path: string): string {
+    return path.split("/").filter(Boolean).pop() ?? path;
   }
 
   return (
@@ -48,21 +101,142 @@ export function VaultSection({ onAfterSwitch }: Props) {
           weight="semibold"
           className="mb-2 uppercase tracking-wide"
         >
-          현재 vault
+          Vault 목록
         </Text>
-        <Text
-          variant="caption"
-          as="div"
-          className="break-all rounded px-3 py-2"
+        <ul
+          className="rounded"
           style={{
             background: "var(--bg-base)",
-            color: "var(--text-primary)",
             border: "1px solid var(--border-subtle)",
-            fontFamily: "ui-monospace, SFMono-Regular, monospace",
           }}
         >
-          {vaultRoot ?? "(없음)"}
-        </Text>
+          {vaults.length === 0 && (
+            <li className="px-3 py-3">
+              <Text variant="caption" color="muted">
+                등록된 vault 가 없습니다. 아래에서 새 vault 를 추가하세요.
+              </Text>
+            </li>
+          )}
+          {vaults.map((v, i) => {
+            const isActive = v.id === activeVaultId;
+            const isRenaming = renamingId === v.id;
+            return (
+              <li
+                key={v.id}
+                className="flex items-center gap-2 px-3 py-2"
+                style={{
+                  borderTop:
+                    i === 0 ? undefined : "1px solid var(--border-subtle)",
+                }}
+              >
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={isActive}
+                  onClick={() => handleSwitch(v.id)}
+                  disabled={busy || isActive}
+                  title={isActive ? "활성 vault" : "이 vault 로 전환"}
+                  aria-label={isActive ? "활성 vault" : `${v.name} 으로 전환`}
+                  className="group/radio flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border transition disabled:cursor-default"
+                  style={{
+                    minHeight: 18,
+                    minWidth: 18,
+                    borderColor: isActive
+                      ? "var(--btn-primary)"
+                      : "var(--border-default)",
+                    borderWidth: isActive ? 1.5 : 1,
+                    backgroundColor: isActive
+                      ? "color-mix(in srgb, var(--btn-primary) 6%, transparent)"
+                      : "transparent",
+                  }}
+                >
+                  <span
+                    aria-hidden
+                    className={`h-2 w-2 rounded-full transition-opacity ${
+                      isActive
+                        ? "opacity-100"
+                        : "opacity-0 group-hover/radio:opacity-40"
+                    }`}
+                    style={{ backgroundColor: "var(--btn-primary)" }}
+                  />
+                </button>
+                <div className="min-w-0 flex-1">
+                  {isRenaming ? (
+                    <input
+                      type="text"
+                      value={renameDraft}
+                      autoFocus
+                      onChange={(e) => setRenameDraft(e.target.value)}
+                      onBlur={commitRename}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") commitRename();
+                        else if (e.key === "Escape") cancelRename();
+                      }}
+                      className="w-full rounded px-1.5 py-0.5 text-sm"
+                      style={{
+                        background: "var(--bg-surface)",
+                        color: "var(--text-primary)",
+                        border: "1px solid var(--border-default)",
+                      }}
+                    />
+                  ) : (
+                    <div className="flex items-baseline gap-1.5 overflow-hidden">
+                      <Text
+                        variant="body"
+                        weight="medium"
+                        as="span"
+                        className="truncate"
+                      >
+                        {v.name}
+                      </Text>
+                      {v.name !== folderBasename(v.path) && (
+                        <Text
+                          variant="caption"
+                          color="muted"
+                          as="span"
+                          className="shrink-0 whitespace-nowrap"
+                        >
+                          (실제 폴더명: {folderBasename(v.path)})
+                        </Text>
+                      )}
+                    </div>
+                  )}
+                  <Text
+                    variant="caption"
+                    color="muted"
+                    as="div"
+                    className="truncate"
+                    style={{ fontFamily: "ui-monospace, SFMono-Regular, monospace" }}
+                  >
+                    {v.path}
+                  </Text>
+                </div>
+                {!isRenaming && (
+                  <Button
+                    variant="icon"
+                    onClick={() => startRename(v.id, v.name)}
+                    title="별칭 변경 (표시명만, 폴더는 그대로)"
+                    aria-label="별칭 변경"
+                    className="h-7 w-7"
+                    style={{ color: "var(--text-secondary)" }}
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
+                )}
+                <Button
+                  variant="icon"
+                  onClick={() => setConfirmRemoveId(v.id)}
+                  title="목록에서 제거"
+                  aria-label="목록에서 제거"
+                  className="h-7 w-7"
+                  style={{ color: "var(--text-secondary)" }}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </li>
+            );
+          })}
+        </ul>
       </section>
 
       <section className="space-y-2">
@@ -70,31 +244,30 @@ export function VaultSection({ onAfterSwitch }: Props) {
           <Button
             variant="primary"
             disabled={busy}
-            onClick={changeVault}
+            onClick={handleAddVault}
             leftIcon={
-              busy ? (
-                <Spinner size="md" />
-              ) : (
-                <FolderOpen className="h-4 w-4" />
-              )
+              busy ? <Spinner size="md" /> : <Plus className="h-4 w-4" />
             }
             className="rounded-lg px-3 py-2 active:opacity-80 disabled:opacity-50"
           >
-            {busy ? "전환 중…" : "다른 폴더로 변경"}
+            {busy ? "추가 중…" : "새 vault 추가"}
           </Button>
-          <Button
-            variant="secondary"
-            disabled={busy}
-            onClick={() => setConfirmDisconnect(true)}
-            leftIcon={<Unlink className="h-4 w-4" />}
-            className="rounded-lg px-3 py-2 active:opacity-80 disabled:opacity-50"
-            style={{ background: "var(--bg-base)" }}
-          >
-            연결 해제
-          </Button>
+          {activeVault && (
+            <Button
+              variant="secondary"
+              disabled={busy}
+              onClick={() => setConfirmDisconnect(true)}
+              leftIcon={<Unlink className="h-4 w-4" />}
+              className="rounded-lg px-3 py-2 active:opacity-80 disabled:opacity-50"
+              style={{ background: "var(--bg-base)" }}
+            >
+              연결 해제
+            </Button>
+          )}
         </div>
         <Text variant="caption" color="muted" as="p">
-          새 폴더에 메모/일기/할 일 구조를 자동 생성. 옛 vault 의 파일은 그대로 남아있어요 (이동 X).
+          새 폴더 추가 시 메모/일기/할 일 구조를 자동 생성. 폴더 안 파일은 그대로
+          남아있어요 (이동 X). 정렬·필터·사이드바 접힘은 vault 별로 따로 기억합니다.
         </Text>
 
         {error && (
@@ -122,6 +295,14 @@ export function VaultSection({ onAfterSwitch }: Props) {
           onCancel={() => setConfirmDisconnect(false)}
         />
       )}
+      {removingEntry && (
+        <RemoveVaultConfirmModal
+          name={removingEntry.name}
+          isActive={removingEntry.id === activeVaultId}
+          onConfirm={() => handleRemove(removingEntry.id)}
+          onCancel={() => setConfirmRemoveId(null)}
+        />
+      )}
     </div>
   );
 }
@@ -140,7 +321,8 @@ function DisconnectConfirmModal({
           vault 연결 해제할까요?
         </Text>
         <Text variant="body" color="secondary" as="p" className="mb-4">
-          폴더 안 파일은 그대로 남아있어요. 다시 사용하려면 vault 폴더를 다시 골라야 합니다.
+          vault 는 목록에 남아있고, 폴더 안 파일도 그대로예요. 다시 사용하려면
+          헤더의 vault 드롭다운에서 선택하세요.
         </Text>
         <div className="flex items-center justify-end gap-2">
           <Button
@@ -163,3 +345,49 @@ function DisconnectConfirmModal({
     </Modal>
   );
 }
+
+function RemoveVaultConfirmModal({
+  name,
+  isActive,
+  onConfirm,
+  onCancel,
+}: {
+  name: string;
+  isActive: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <Modal open onClose={onCancel} size="md" ariaLabel="vault 제거">
+      <div className="p-5">
+        <Text variant="body" weight="semibold" as="h3" className="mb-2">
+          "{name}" 을 목록에서 제거할까요?
+        </Text>
+        <Text variant="body" color="secondary" as="p" className="mb-4">
+          폴더 안 파일은 그대로 남아있어요 (디스크에서 삭제 X). 나중에 "새 vault
+          추가" 로 다시 등록할 수 있습니다.
+          {isActive && " 활성 vault 였다면 연결도 함께 해제됩니다."}
+        </Text>
+        <div className="flex items-center justify-end gap-2">
+          <Button
+            variant="ghost"
+            onClick={onCancel}
+            className="px-3 py-1.5"
+            style={{ color: "var(--text-secondary)" }}
+          >
+            취소
+          </Button>
+          <Button
+            variant="danger"
+            onClick={onConfirm}
+            className="px-3 py-1.5"
+            leftIcon={<Trash2 className="h-4 w-4" />}
+          >
+            제거
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+

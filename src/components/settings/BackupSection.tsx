@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
-import { Archive, Trash2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Archive, FolderOpen, Trash2 } from "lucide-react";
 import { useVault } from "../../lib/vault/useVault";
 import { Button } from "../common/Button";
 import { Text } from "../common/Text";
 import { Modal } from "../common/Modal";
 import { Spinner } from "../common/Spinner";
+import { useToast } from "../Toast";
 import {
   runBackup,
   listBackups,
@@ -12,19 +13,25 @@ import {
   readAutoBackupConfig,
   writeAutoBackupConfig,
   deletionsRequiredForNewBackup,
-  BACKUP_KEEP_COUNT,
+  openInFinder,
+  KEEP_COUNT_OPTIONS,
+  BACKUP_DIR,
   type BackupEntry,
   type AutoBackupConfig,
 } from "../../lib/backup";
 
 export function BackupSection() {
   const { adapter } = useVault();
+  const toast = useToast();
   const [entries, setEntries] = useState<BackupEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [cfg, setCfg] = useState<AutoBackupConfig>(() => readAutoBackupConfig());
   const [confirmCandidates, setConfirmCandidates] = useState<BackupEntry[] | null>(null);
+
+  const vaultRoot = adapter.getRoot();
+  const backupAbsPath = vaultRoot ? `${vaultRoot}/${BACKUP_DIR}` : null;
 
   async function refresh() {
     try {
@@ -46,13 +53,40 @@ export function BackupSection() {
 
   async function handleManualBackup() {
     setError(null);
-    const toDelete = deletionsRequiredForNewBackup(entries, BACKUP_KEEP_COUNT);
+    const toDelete = deletionsRequiredForNewBackup(entries, cfg.keepCount);
     if (toDelete.length > 0) {
       setConfirmCandidates(toDelete);
       return;
     }
     await actuallyBackup();
   }
+
+  // 1초 이상 걸리면 화면 어디 있어도 진행 보이게 progress toast.
+  // running=true 1초 후 toast 띄움, running=false 면 즉시 dismiss.
+  const progressIdRef = useRef<number | null>(null);
+  /* eslint-disable react-hooks/exhaustive-deps */
+  useEffect(() => {
+    if (!running) {
+      if (progressIdRef.current !== null) {
+        toast.dismiss(progressIdRef.current);
+        progressIdRef.current = null;
+      }
+      return;
+    }
+    const timer = setTimeout(() => {
+      progressIdRef.current = toast.show("vault 백업 중… (크기에 따라 1-10초)", {
+        kind: "progress",
+      });
+    }, 1000);
+    return () => {
+      clearTimeout(timer);
+      if (progressIdRef.current !== null) {
+        toast.dismiss(progressIdRef.current);
+        progressIdRef.current = null;
+      }
+    };
+  }, [running]);
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   async function actuallyBackup() {
     setRunning(true);
@@ -84,6 +118,15 @@ export function BackupSection() {
     }
   }
 
+  async function handleOpenFolder() {
+    if (!backupAbsPath) return;
+    try {
+      await openInFinder(backupAbsPath);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
   function cancelConfirm() {
     if (running) return;
     setConfirmCandidates(null);
@@ -105,27 +148,64 @@ export function BackupSection() {
     writeAutoBackupConfig(next);
   }
 
+  const lastEntry = entries[0];
+
   return (
     <div className="space-y-6">
-      <section className="space-y-2">
-        <Button
-          variant="primary"
-          onClick={handleManualBackup}
-          disabled={running}
-          leftIcon={
-            running ? (
-              <Spinner size="md" />
-            ) : (
-              <Archive className="h-4 w-4" />
-            )
-          }
-          className="rounded-lg px-3 py-2 active:opacity-80 disabled:opacity-50"
+      <section className="space-y-3">
+        <div className="flex items-center gap-2">
+          <Button
+            variant="primary"
+            onClick={handleManualBackup}
+            disabled={running}
+            leftIcon={
+              running ? (
+                <Spinner size="md" />
+              ) : (
+                <Archive className="h-4 w-4" />
+              )
+            }
+            className="rounded-lg px-3 py-2 active:opacity-80 disabled:opacity-50"
+          >
+            {running ? "백업 중…" : "지금 백업"}
+          </Button>
+          {backupAbsPath ? (
+            <Button
+              variant="ghost"
+              onClick={handleOpenFolder}
+              leftIcon={<FolderOpen className="h-4 w-4" />}
+              className="rounded-lg px-3 py-2"
+              style={{ color: "var(--text-secondary)" }}
+            >
+              백업 폴더 열기
+            </Button>
+          ) : null}
+        </div>
+        <div
+          className="space-y-1 rounded-lg px-3 py-2"
+          style={{
+            background: "var(--bg-base)",
+            border: "1px solid var(--border-subtle)",
+          }}
         >
-          {running ? "백업 중…" : "지금 백업"}
-        </Button>
-        <Text variant="caption" color="muted" as="p">
-          vault 안 <code>.backups/</code> 폴더에 zip 으로 저장됩니다.
-        </Text>
+          <Text variant="caption" color="muted" as="div">
+            마지막 백업
+          </Text>
+          <Text variant="body" as="div">
+            {lastEntry ? formatBackupDate(lastEntry.mtime) : "없음"}
+          </Text>
+          {backupAbsPath ? (
+            <Text
+              variant="caption"
+              color="muted"
+              as="div"
+              className="break-all"
+              style={{ fontFamily: "var(--font-mono, monospace)" }}
+            >
+              {formatHomeRelative(backupAbsPath)}
+            </Text>
+          ) : null}
+        </div>
       </section>
 
       <section className="space-y-2">
@@ -172,11 +252,26 @@ export function BackupSection() {
             </Text>
             <Text
               variant="caption"
-              color="muted"
-              as="p"
-              className="pb-1.5"
+              color="secondary"
+              as="label"
             >
-              최근 {BACKUP_KEEP_COUNT}개까지 보관
+              <span className="mb-1 block">보관</span>
+              <select
+                value={cfg.keepCount}
+                onChange={(e) => updateConfig({ keepCount: Number(e.target.value) })}
+                className="cursor-pointer rounded px-2 py-1 text-sm"
+                style={{
+                  background: "var(--bg-base)",
+                  border: "1px solid var(--border-default)",
+                  color: "var(--text-primary)",
+                }}
+              >
+                {KEEP_COUNT_OPTIONS.map((n) => (
+                  <option key={n} value={n}>
+                    {n}개
+                  </option>
+                ))}
+              </select>
             </Text>
           </div>
         )}
@@ -185,7 +280,7 @@ export function BackupSection() {
       {confirmCandidates && (
         <BackupConfirmModal
           candidates={confirmCandidates}
-          keepCount={BACKUP_KEEP_COUNT}
+          keepCount={cfg.keepCount}
           running={running}
           onConfirm={confirmBackup}
           onCancel={cancelConfirm}
@@ -262,6 +357,15 @@ export function BackupSection() {
 function formatBackupDate(mtime: number): string {
   const d = new Date(mtime);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+// 사용자 home 으로 시작하는 path 면 `~` 로 축약. 더 길어도 표시 가능.
+function formatHomeRelative(absPath: string): string {
+  // Tauri 환경에서 vault root 가 절대경로. home prefix 추출은 OS dependent 라
+  // 가장 흔한 `/Users/<name>/` 만 처리. 그 외는 그대로 노출.
+  const m = absPath.match(/^(\/Users\/[^/]+)\//);
+  if (m) return "~" + absPath.slice(m[1].length);
+  return absPath;
 }
 
 function formatSize(bytes: number): string {
