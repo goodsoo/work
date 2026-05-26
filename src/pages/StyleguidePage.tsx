@@ -268,9 +268,9 @@ const WRITING: WritingItem[] = [
   },
   {
     category: "placeholder",
-    rule: "한글 예시형 (`예: ...`).",
-    good: "예: 홍길동",
-    bad: "이름을 입력하세요 / Search...",
+    rule: "명령형 안내 (`{필드 이름}을 입력하세요`). 예시 (`예: ...`) 형식 X — 사용자 입력값을 좁힘. 영문/축약 X.",
+    good: "이름을 입력하세요 / 카테고리 이름을 입력하세요",
+    bad: "예: 홍길동 / Search... / 입력",
   },
   {
     category: "empty state",
