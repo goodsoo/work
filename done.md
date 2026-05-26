@@ -6,6 +6,15 @@
 
 ## 2026-05-26
 
+### PR #49 — 메모장 폴더·삭제·생성 흐름 안정화 (dogfood 4건)
+
+- **한 줄 임팩트**: 메모장 일상 흐름 안 끊기는 디테일 4건 정리
+- **폴더 삭제 confirm** — Tauri WebView 에서 `window.confirm` 이 noop 통과되어 폴더가 그냥 삭제되던 이슈. ConfirmDialog 모달 (danger, 멀티라인) 로 교체. 폴더 영구 삭제 + 안 메모 N개 휴지통 이동 안내 + 폴더 안 고정 메모 N개 빨간 경고 줄. ConfirmDialog 의 `message` prop 을 `string` → `ReactNode` 확장.
+- **고정 메모 중복 표시** — 옵시디안 bookmarks 패턴 (트리에서 제외) 거스르고 상단 PinnedSection + 트리 양쪽 표시. 트리에서 사라지는 게 "고정한 메모 어디 갔지" 헷갈림 더 큼.
+- **삭제 후 자동 선택 = 옵시디안 패턴** — 같은 폴더 안 다음 (사이드바 정렬 적용) → 없으면 이전 → 폴더 안 다 비면 부모 폴더 첫 메모 (root 까지 재귀) → root 도 비면 empty. raw mtime desc 옛 로직은 사용자 시각 순서와 mismatch ("왔다갔다") 였음. Cmd+↑/↓ 도 같은 메커니즘으로 통일 — 폴더 경계 안 넘어감.
+- **sortComparator helper 추출** — `src/lib/meetingSort.ts` 의 `buildMeetingSortComparator(sortKey)` 를 SidePanel + App.tsx 가 공유. localStorage (`goodsoob:meetingSort`) 통해 자동 동기화.
+- **메모 생성 race fix** — 사이드바 + 버튼 빠르게 연달아 누르면 "이미 같은 제목 'untitled'" 토스트가 떴음. 원인: `MeetingForm` 이 다른 `meetingId` 로 reconcile 될 때 `titleDraft` useState 가 옛 메모 값으로 carryover → blur 시 `commitTitle` 이 옛 "untitled" 로 mutate → 새 메모 path 와 충돌. `key={meetingId}` 추가로 강제 remount. `activeTab` / `docHistory` 는 module-level cache (uid 기반) 라 remount 후 복원.
+
 ### PR #48 — 본문 이미지 paste/drop + 사용 안 하는 첨부 정리
 
 - **한 줄 임팩트**: 본문에 이미지 paste/드롭 — 옵시디안 흐름 + 명시 cleanup

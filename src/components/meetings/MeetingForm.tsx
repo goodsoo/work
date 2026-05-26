@@ -59,6 +59,12 @@ const TITLE_UNSAFE_RE = /[/\\:*?"<>|#^[\]]/;
 type Props = {
   meetingId: string;
   onBack: () => void;
+  // 삭제 직후 다음 메모 선택. caller 가 신선한 nextUid 받음 — null 이면 onBack 으로 fallback.
+  // pre-capture 가 caller 책임 (await 사이 list cache 가 invalidate 되므로).
+  onAfterDelete?: (nextUid: string | null) => void;
+  // 삭제 직전 다음 메모 uid 계산 (사이드바 정렬 / 폴더 위계 적용). 미제공 시
+  // raw list 의 idx+1/-1 fallback.
+  computeNextAfterDelete?: (uid: string) => string | null;
 };
 
 type SummaryDoc = {
@@ -152,7 +158,12 @@ const ACTIVE_TAB_CACHE = new Map<string, ActiveTab>();
 // 전환 시 outgoing 탭의 위치 저장 + incoming 탭의 위치 복원. 새로고침 시 초기화.
 const SCROLL_CACHE = new Map<string, number>();
 
-export function MeetingForm({ meetingId, onBack }: Props) {
+export function MeetingForm({
+  meetingId,
+  onBack,
+  onAfterDelete,
+  computeNextAfterDelete,
+}: Props) {
   const { data, isLoading, error, refetch } = useMeeting(meetingId);
   const meetingsQ = useMeetings();
   const updateMutation = useUpdateMeeting(meetingId);
@@ -491,9 +502,26 @@ export function MeetingForm({ meetingId, onBack }: Props) {
   async function handleDelete() {
     if (!data) return;
     if (!window.confirm("이 메모를 휴지통으로 옮길까요?")) return;
+    // 삭제 전 옛 list 에서 다음 메모 capture. mutate 의 onSuccess 가 cache 의 list
+    // 에서 deleted 를 즉시 filter 하므로 await 후엔 idx 가 무의미 — pre-capture 필수.
+    // caller 가 사이드바 정렬/폴더 위계 알아서 결정 (computeNextAfterDelete). 미제공
+    // 시 raw list idx+1/-1 fallback.
+    let nextUid: string | null;
+    if (computeNextAfterDelete) {
+      nextUid = computeNextAfterDelete(data.uid);
+    } else {
+      const list = meetingsQ.data ?? [];
+      const idx = list.findIndex((m) => m.uid === data.uid);
+      nextUid =
+        idx >= 0 ? (list[idx + 1]?.uid ?? list[idx - 1]?.uid ?? null) : null;
+    }
     try {
       await deleteMutation.mutateAsync(data.uid);
-      onBack();
+      if (onAfterDelete) {
+        onAfterDelete(nextUid);
+      } else {
+        onBack();
+      }
     } catch (e) {
       setActionError(formatError(e));
     }

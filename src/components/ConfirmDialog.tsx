@@ -1,12 +1,15 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { Modal } from "./common/Modal";
 import { Button } from "./common/Button";
 import { Text } from "./common/Text";
 
+// message 가 string 이면 Text 로 감싸고, ReactNode 면 multi-line/강조 자유.
+// div wrap 은 text-sm + secondary 색 토큰 자동 적용.
+
 type Props = {
   open: boolean;
   title: string;
-  message?: string;
+  message?: ReactNode;
   confirmLabel?: string;
   cancelLabel?: string;
   danger?: boolean;
@@ -55,9 +58,18 @@ export function ConfirmDialog({
           {title}
         </Text>
         {message ? (
-          <Text variant="body" color="secondary" className="mt-2">
-            {message}
-          </Text>
+          typeof message === "string" ? (
+            <Text variant="body" color="secondary" className="mt-2">
+              {message}
+            </Text>
+          ) : (
+            <div
+              className="mt-2 text-sm"
+              style={{ color: "var(--text-secondary)" }}
+            >
+              {message}
+            </div>
+          )
         ) : null}
         <div className="mt-5 flex justify-end gap-2">
           <Button
