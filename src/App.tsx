@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { VaultGate } from "./components/vault/VaultGate";
 import { AppShell } from "./components/nav/AppShell";
 import { GlobalTooltip } from "./components/Tooltip";
@@ -38,6 +38,9 @@ import type { ProjectFilter } from "./components/portfolio/PortfolioProjectList"
 import { useGhSync, usePortfolioWorks, usePortfolioProjects } from "./hooks/usePortfolio";
 import { GhAuthError, GhNotInstalledError } from "./lib/portfolio/gh";
 import { useMeetings, useCreateMeeting, useDeleteMeeting } from "./hooks/useMeetings";
+import { useMeetingSort } from "./hooks/useMeetingSort";
+import { buildMeetingSortComparator } from "./lib/meetingSort";
+import { meetingFolder } from "./api/meetings";
 import { useJournals } from "./hooks/useJournals";
 import { useTodos } from "./hooks/useTodos";
 import { useVault } from "./lib/vault/useVault";
@@ -177,6 +180,13 @@ function AppContent() {
   };
   const { adapter, isReady } = useVault();
   const meetings = useMeetings();
+  // 사이드바와 같은 sortKey 공유 — 메모 삭제 후 자동 선택 / Cmd+↑/↓ 이동이
+  // 사이드바 시각 순서와 일치해야 직관 맞음. localStorage 통해 동기화.
+  const [meetingSortKey] = useMeetingSort();
+  const meetingSortComparator = useMemo(
+    () => buildMeetingSortComparator(meetingSortKey),
+    [meetingSortKey],
+  );
   const sidebar = useSidebarCollapsed();
   const createMeetingMutation = useCreateMeeting();
   const deleteMeetingMutation = useDeleteMeeting();
@@ -367,9 +377,17 @@ function AppContent() {
       if (!selectedMeetingId) return;
       if (deleteMeetingMutation.isPending) return;
       if (!window.confirm("이 메모를 휴지통으로 옮길까요?")) return;
+      // 삭제 전 옛 list 에서 다음 메모 capture. mutate 의 onSuccess 가 cache 의 list
+      // 에서 deleted 를 즉시 filter 하므로 await 후엔 idx 가 무의미 — pre-capture 필수.
+      // 같은 폴더 안 → 부모 폴더 재귀 (사이드바 정렬 적용).
+      const nextUid = findDeleteNeighbor(selectedMeetingId);
       try {
         await deleteMeetingMutation.mutateAsync(selectedMeetingId);
-        closeMeeting();
+        if (nextUid) {
+          openMeeting(nextUid);
+        } else {
+          closeMeeting();
+        }
       } catch {
         // ignore — TanStack Query mutation state 에 반영됨
       }
@@ -378,20 +396,17 @@ function AppContent() {
     function moveSelection(dir: 1 | -1) {
       const list = meetings.data;
       if (!list || list.length === 0) return;
-      const currIdx = selectedMeetingId
-        ? list.findIndex((m) => m.uid === selectedMeetingId)
-        : -1;
-      let nextIdx: number;
-      if (currIdx === -1) {
-        nextIdx = dir === 1 ? 0 : list.length - 1;
-      } else {
-        nextIdx =
-          dir === 1
-            ? Math.min(currIdx + 1, list.length - 1)
-            : Math.max(currIdx - 1, 0);
+      // 메모 미선택 상태 — raw list 의 첫/마지막 (옛 동작 유지). 폴더 정보 없으니
+      // 폴더 안 메커니즘 적용 불가, 진입 안내용 fallback.
+      if (!selectedMeetingId) {
+        openMeeting(list[dir === 1 ? 0 : list.length - 1].uid);
+        return;
       }
-      if (nextIdx === currIdx) return;
-      openMeeting(list[nextIdx].uid);
+      // 같은 폴더 안 (사이드바 정렬 적용) dir 방향만. 폴더 경계 안 넘어감 —
+      // 폴더 끝이면 no-op. 옵시디안 패턴.
+      const nextUid = findAdjacentInFolder(selectedMeetingId, dir);
+      if (!nextUid) return;
+      openMeeting(nextUid);
     }
 
     function onKeyDown(e: KeyboardEvent) {
@@ -486,6 +501,64 @@ function AppContent() {
     }
   }
 
+  // 폴더 경로의 부모. "work/2026" → "work", "work" → "", "" → null (root 의 부모 없음).
+  function parentFolderPath(folder: string): string | null {
+    if (folder === "") return null;
+    const idx = folder.lastIndexOf("/");
+    return idx === -1 ? "" : folder.slice(0, idx);
+  }
+
+  // 삭제 직후 자동 선택할 다음 메모 uid. 옵시디안 패턴:
+  //   1. 같은 폴더 안 (사이드바 정렬 적용) 다음 메모, 없으면 이전 메모
+  //   2. 같은 폴더 안 다른 메모 0개면 부모 폴더의 첫 메모 (정렬 적용) — root 까지 재귀
+  //   3. root 까지 다 비면 null (empty state)
+  // 사이드바 sortKey 와 동일 comparator 라 사용자 시각과 일치.
+  const findDeleteNeighbor = useCallback(
+    (uid: string): string | null => {
+      const list = meetings.data ?? [];
+      const target = list.find((m) => m.uid === uid);
+      if (!target) return null;
+      const folder = meetingFolder(target.id);
+      const inFolder = list
+        .filter((m) => meetingFolder(m.id) === folder)
+        .sort(meetingSortComparator);
+      const idx = inFolder.findIndex((m) => m.uid === uid);
+      if (idx >= 0) {
+        const sibling = inFolder[idx + 1] ?? inFolder[idx - 1];
+        if (sibling) return sibling.uid;
+      }
+      // 같은 폴더 안 다른 메모 없음 → 부모 폴더 재귀
+      let parent = parentFolderPath(folder);
+      while (parent !== null) {
+        const inParent = list
+          .filter((m) => m.uid !== uid && meetingFolder(m.id) === parent)
+          .sort(meetingSortComparator);
+        if (inParent.length > 0) return inParent[0].uid;
+        parent = parentFolderPath(parent);
+      }
+      return null;
+    },
+    [meetings.data, meetingSortComparator],
+  );
+
+  // Cmd+↑/↓ 이동용. 같은 폴더 안 (사이드바 정렬 적용) dir 방향만. 폴더 경계 안
+  // 넘어감 — 폴더 끝이면 no-op (옵시디안 패턴).
+  const findAdjacentInFolder = useCallback(
+    (uid: string, dir: 1 | -1): string | null => {
+      const list = meetings.data ?? [];
+      const target = list.find((m) => m.uid === uid);
+      if (!target) return null;
+      const folder = meetingFolder(target.id);
+      const inFolder = list
+        .filter((m) => meetingFolder(m.id) === folder)
+        .sort(meetingSortComparator);
+      const idx = inFolder.findIndex((m) => m.uid === uid);
+      if (idx < 0) return null;
+      return inFolder[idx + dir]?.uid ?? null;
+    },
+    [meetings.data, meetingSortComparator],
+  );
+
   // Side panel per tab (모바일에선 drawer, 데스크탑에선 3-pane 왼쪽 컬럼).
   const sidePanel =
     tab === "meetings" ? (
@@ -548,7 +621,20 @@ function AppContent() {
       <PrefetchWarmup />
       {tab === "meetings" ? (
         selectedMeetingId ? (
-          <MeetingForm meetingId={selectedMeetingId} onBack={closeMeeting} />
+          <MeetingForm
+            // 메모 전환 시 강제 remount — titleDraft 등 useState 가 reconcile 로 옛
+            // 메모의 값으로 carryover 되며 commitTitle 가 옛 title 로 mutate → 충돌
+            // toast ("이미 같은 제목 'untitled'") 발사하던 race 차단. activeTab /
+            // docHistory 등은 module-level cache (uid 기반) 라 remount 후 복원.
+            key={selectedMeetingId}
+            meetingId={selectedMeetingId}
+            onBack={closeMeeting}
+            onAfterDelete={(nextUid) => {
+              if (nextUid) openMeeting(nextUid);
+              else closeMeeting();
+            }}
+            computeNextAfterDelete={findDeleteNeighbor}
+          />
         ) : (
           <MeetingsEmpty count={meetings.data?.length ?? 0} loading={meetings.isLoading} />
         )
