@@ -12,10 +12,10 @@ import { Button } from "../components/common/Button";
 import { Text } from "../components/common/Text";
 import { useMeetings } from "../hooks/useMeetings";
 import { useJournals } from "../hooks/useJournals";
-import { useTodos } from "../hooks/useTodos";
+import { useTasks } from "../hooks/useTasks";
 import { todayIso } from "../lib/dates";
-import { TODO_CATEGORIES } from "../api/todos";
-import { categoryColor } from "../lib/todoCategory";
+import { TASK_CATEGORIES } from "../api/tasks";
+import { categoryColor } from "../lib/taskCategory";
 import {
   MonthGrid,
   WEEKDAYS,
@@ -68,7 +68,7 @@ let calendarStateCache: CalendarStateCache | null = null;
 export function CalendarPage({ targetDate, onSelectedDateChange }: Props) {
   const meetingsQ = useMeetings();
   const journalsQ = useJournals();
-  const todosQ = useTodos();
+  const todosQ = useTasks();
 
   const today = todayIso();
   // anchor: 오늘 주의 일요일. 마운트 이후 변경 X.
@@ -136,7 +136,7 @@ export function CalendarPage({ targetDate, onSelectedDateChange }: Props) {
     function ensure(d: string): DayItems {
       let items = map.get(d);
       if (!items) {
-        items = { meetings: [], todos: [], journal: null };
+        items = { meetings: [], tasks: [], journal: null };
         map.set(d, items);
       }
       return items;
@@ -155,7 +155,7 @@ export function CalendarPage({ targetDate, onSelectedDateChange }: Props) {
       } else if (t.due_date) {
         d = t.due_date;
       }
-      if (d) ensure(d).todos.push(t);
+      if (d) ensure(d).tasks.push(t);
     }
     for (const items of map.values()) {
       items.meetings.sort((a, b) => {
@@ -164,8 +164,8 @@ export function CalendarPage({ targetDate, onSelectedDateChange }: Props) {
         if (ta !== tb) return ta < tb ? -1 : 1;
         return a.created_at < b.created_at ? -1 : 1;
       });
-      // 시간 없는 todo 가 앞 (할일 탭과 동일), 시간 있는 것은 시간순 뒤로.
-      items.todos.sort((a, b) => {
+      // 시간 없는 태스크가 앞 (할 일 탭과 동일), 시간 있는 것은 시간순 뒤로.
+      items.tasks.sort((a, b) => {
         if (a.done !== b.done) return a.done ? 1 : -1;
         const ta = a.due_time ?? "";
         const tb = b.due_time ?? "";
@@ -398,7 +398,7 @@ export function CalendarPage({ targetDate, onSelectedDateChange }: Props) {
               chip 의 fallback tint 와 동일. */}
           <div className="justify-self-start flex items-center gap-2.5">
             {[
-              ...TODO_CATEGORIES.map((c) => ({
+              ...TASK_CATEGORIES.map((c) => ({
                 key: c.id,
                 label: c.label,
                 color: categoryColor(c.id),

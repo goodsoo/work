@@ -1,22 +1,29 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   createRoutine,
-  deleteRoutine,
+  emptyRoutineTrash,
   isActiveOn,
+  isArchivedOn,
   listRoutines,
+  listTrashedRoutines,
+  purgeRoutine,
   readRoutine,
+  restoreRoutine,
   routinePath,
   sortRoutines,
   toggleRoutineDay,
+  trashRoutine,
   updateRoutine,
   type CreateRoutineInput,
   type Routine,
+  type TrashedRoutine,
   type UpdateRoutineInput,
 } from "../api/routines";
 import { useVault } from "../lib/vault/useVault";
 
 const routinesKey = ["routines"] as const;
 const routineKey = (name: string) => ["routine", name] as const;
+const routineTrashKey = ["routines", "trash"] as const;
 
 export function useRoutines() {
   const { adapter, isReady } = useVault();
@@ -34,6 +41,15 @@ export function useActiveRoutines(dateIso: string): Routine[] {
   if (!all.data) return [];
   return sortRoutines(
     all.data.filter((r) => isActiveOn(r.frontmatter, dateIso)),
+  );
+}
+
+// 종료일 지난 routine — "지난 루틴" 영역 표시용. useActiveRoutines 와 같은 derive 패턴.
+export function useArchivedRoutines(dateIso: string): Routine[] {
+  const all = useRoutines();
+  if (!all.data) return [];
+  return sortRoutines(
+    all.data.filter((r) => isArchivedOn(r.frontmatter, dateIso)),
   );
 }
 
@@ -97,13 +113,16 @@ export function useUpdateRoutine() {
   });
 }
 
+// 삭제 = 휴지통 이동 (soft delete). 메모/포트폴리오와 같은 패턴.
+// 복원 가능하므로 invalidate 시 trash list 도 함께 갱신.
 export function useDeleteRoutine() {
   const { adapter, watcher } = useVault();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (name: string) => {
-      await deleteRoutine(adapter, name);
+      const trashPath = await trashRoutine(adapter, name);
       watcher.markSelfWrite(routinePath(name));
+      watcher.markSelfWrite(trashPath);
       return name;
     },
     onSuccess: (name) => {
@@ -111,6 +130,65 @@ export function useDeleteRoutine() {
         prev?.filter((r) => r.name !== name),
       );
       qc.removeQueries({ queryKey: routineKey(name) });
+      qc.invalidateQueries({ queryKey: routineTrashKey });
+    },
+  });
+}
+
+export function useTrashedRoutines() {
+  const { adapter, isReady } = useVault();
+  return useQuery({
+    queryKey: routineTrashKey,
+    queryFn: () => listTrashedRoutines(adapter),
+    enabled: isReady,
+  });
+}
+
+export function useRestoreRoutine() {
+  const { adapter, watcher } = useVault();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (trashPath: string) => {
+      const restoredPath = await restoreRoutine(adapter, trashPath);
+      watcher.markSelfWrite(trashPath);
+      watcher.markSelfWrite(restoredPath);
+      return { trashPath, restoredPath };
+    },
+    onSuccess: ({ trashPath }) => {
+      qc.setQueryData<TrashedRoutine[]>(routineTrashKey, (prev) =>
+        prev?.filter((t) => t.trashPath !== trashPath),
+      );
+      qc.invalidateQueries({ queryKey: routinesKey });
+    },
+  });
+}
+
+export function usePurgeRoutine() {
+  const { adapter, watcher } = useVault();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (trashPath: string) => {
+      await purgeRoutine(adapter, trashPath);
+      watcher.markSelfWrite(trashPath);
+      return trashPath;
+    },
+    onSuccess: (trashPath) => {
+      qc.setQueryData<TrashedRoutine[]>(routineTrashKey, (prev) =>
+        prev?.filter((t) => t.trashPath !== trashPath),
+      );
+    },
+  });
+}
+
+export function useEmptyRoutineTrash() {
+  const { adapter } = useVault();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      await emptyRoutineTrash(adapter);
+    },
+    onSuccess: () => {
+      qc.setQueryData<TrashedRoutine[]>(routineTrashKey, []);
     },
   });
 }

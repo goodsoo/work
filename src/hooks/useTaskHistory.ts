@@ -1,8 +1,8 @@
 import { useEffect, useReducer, useState } from "react";
-import type { Todo, TodoUpdate } from "../api/todos";
-import { useUpdateTodo } from "./useTodos";
+import type { Task, TodoUpdate } from "../api/tasks";
+import { useUpdateTask } from "./useTasks";
 
-// Module-level stack survives TodosPage unmount (cross-page 유지).
+// Module-level stack survives TasksPage unmount (cross-page 유지).
 // 새로고침 시만 reset — useStateHistory 의 HISTORY_CACHE 와 동일 패턴.
 type Entry =
   | { kind: "toggle"; id: string; before: boolean }
@@ -12,7 +12,7 @@ const UNDO: Entry[] = [];
 const REDO: Entry[] = [];
 const MAX = 50;
 const listeners = new Set<() => void>();
-// undo/redo 시 영향받은 todo id — 카드 flash 용. listener pattern 으로 reactive.
+// undo/redo 시 영향받은 task id — 카드 flash 용. listener pattern 으로 reactive.
 const flashListeners = new Set<(id: string) => void>();
 
 function notify() {
@@ -30,28 +30,28 @@ function push(entry: Entry) {
   notify();
 }
 
-/** mutation 직전 호출. patch 와 todo 현재 상태로 inverse entry 만들어 stack 에 push. */
-export function recordTodoUpdate(todo: Todo, patch: TodoUpdate) {
+/** mutation 직전 호출. patch 와 task 현재 상태로 inverse entry 만들어 stack 에 push. */
+export function recordTaskUpdate(task: Task, patch: TodoUpdate) {
   const before: TodoUpdate = {};
-  if (patch.title !== undefined) before.title = todo.title;
-  if (patch.priority !== undefined) before.priority = todo.priority;
-  if (patch.due_date !== undefined) before.due_date = todo.due_date;
-  if (patch.due_time !== undefined) before.due_time = todo.due_time;
-  if (patch.category !== undefined) before.category = todo.category;
+  if (patch.title !== undefined) before.title = task.title;
+  if (patch.priority !== undefined) before.priority = task.priority;
+  if (patch.due_date !== undefined) before.due_date = task.due_date;
+  if (patch.due_time !== undefined) before.due_time = task.due_time;
+  if (patch.category !== undefined) before.category = task.category;
   if (patch.source_meeting_uid !== undefined)
-    before.source_meeting_uid = todo.source_meeting_uid;
-  if (patch.cancelled !== undefined) before.cancelled = todo.cancelled;
-  if (patch.deleted !== undefined) before.deleted = todo.deleted;
+    before.source_meeting_uid = task.source_meeting_uid;
+  if (patch.cancelled !== undefined) before.cancelled = task.cancelled;
+  if (patch.deleted !== undefined) before.deleted = task.deleted;
   // done 은 toggle entry 로 분리 — done_at 포함이라 모양이 다름.
   if (patch.done !== undefined && Object.keys(patch).length <= 2) {
-    push({ kind: "toggle", id: todo.id, before: todo.done });
+    push({ kind: "toggle", id: task.id, before: task.done });
     return;
   }
   if (Object.keys(before).length === 0) return;
   const after: TodoUpdate = { ...patch };
   delete after.done;
   delete after.done_at;
-  push({ kind: "update", id: todo.id, before, after });
+  push({ kind: "update", id: task.id, before, after });
 }
 
 export function clearTodoHistory() {
@@ -82,9 +82,9 @@ function isEditableTarget(el: EventTarget | null): boolean {
  * undo/redo 액션 + reactive canUndo/canRedo. 사이드패널 button + 페이지 단축키
  * listener 가 같은 hook 사용. 같은 module stack 공유.
  */
-export function useTodoUndo() {
+export function useTaskUndo() {
   useStackVersion();
-  const updateMutation = useUpdateTodo();
+  const updateMutation = useUpdateTask();
 
   function applyToggle(id: string, nextDone: boolean) {
     updateMutation.mutate({
@@ -128,10 +128,10 @@ export function useTodoUndo() {
 }
 
 /**
- * 특정 todo id 의 flash 트리거 감지. undo/redo 시 영향받은 카드 잠시 깜빡임 cue.
+ * 특정 task id 의 flash 트리거 감지. undo/redo 시 영향받은 카드 잠시 깜빡임 cue.
  * 카드 mount/unmount 와 무관하게 listener 패턴.
  */
-export function useTodoFlash(todoId: string): boolean {
+export function useTaskFlash(todoId: string): boolean {
   const [flashing, setFlashing] = useState(false);
   useEffect(() => {
     function onFlash(id: string) {
@@ -147,8 +147,8 @@ export function useTodoFlash(todoId: string): boolean {
   return flashing;
 }
 
-export function useTodoUndoShortcut(opts: { active: boolean }) {
-  const { undo, redo } = useTodoUndo();
+export function useTaskUndoShortcut(opts: { active: boolean }) {
+  const { undo, redo } = useTaskUndo();
   useEffect(() => {
     if (!opts.active) return;
     const handler = (e: KeyboardEvent) => {

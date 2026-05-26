@@ -1,18 +1,18 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   createTodo,
-  deleteTodo,
+  deleteTask,
   listTodos,
-  updateTodo,
-  type Todo,
-  type TodoInsert,
+  updateTask,
+  type Task,
+  type TaskInsert,
   type TodoUpdate,
-} from "../api/todos";
+} from "../api/tasks";
 import { useVault } from "../lib/vault/useVault";
 
 const todosKey = ["todos"] as const;
 
-export function useTodos() {
+export function useTasks() {
   const { adapter, isReady } = useVault();
   return useQuery({
     queryKey: todosKey,
@@ -21,37 +21,37 @@ export function useTodos() {
   });
 }
 
-export function useCreateTodo() {
+export function useCreateTask() {
   const { adapter, watcher } = useVault();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (input: TodoInsert) => {
+    mutationFn: async (input: TaskInsert) => {
       const created = await createTodo(adapter, input);
       watcher.markSelfWrite(created._source.file);
       return created;
     },
     onSuccess: (created) => {
-      qc.setQueryData<Todo[]>(todosKey, (prev) =>
+      qc.setQueryData<Task[]>(todosKey, (prev) =>
         prev ? [created, ...prev] : [created],
       );
     },
   });
 }
 
-export function useUpdateTodo() {
+export function useUpdateTask() {
   const { adapter, watcher } = useVault();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, patch }: { id: string; patch: TodoUpdate }) => {
-      const updated = await updateTodo(adapter, id, patch);
+      const updated = await updateTask(adapter, id, patch);
       watcher.markSelfWrite(updated._source.file);
       return updated;
     },
     onMutate: async ({ id, patch }) => {
       await qc.cancelQueries({ queryKey: todosKey });
-      const prev = qc.getQueryData<Todo[]>(todosKey);
-      qc.setQueryData<Todo[]>(todosKey, (curr) =>
-        curr?.map((t) => (t.id === id ? ({ ...t, ...patch } as Todo) : t)),
+      const prev = qc.getQueryData<Task[]>(todosKey);
+      qc.setQueryData<Task[]>(todosKey, (curr) =>
+        curr?.map((t) => (t.id === id ? ({ ...t, ...patch } as Task) : t)),
       );
       return { prev };
     },
@@ -64,17 +64,17 @@ export function useUpdateTodo() {
   });
 }
 
-export function useDeleteTodo() {
+export function useDeleteTask() {
   const { adapter, watcher } = useVault();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
       const file = id.replace(/#L\d+$/, "");
-      await deleteTodo(adapter, id);
+      await deleteTask(adapter, id);
       watcher.markSelfWrite(file);
     },
     onSuccess: (_void, id) => {
-      qc.setQueryData<Todo[]>(todosKey, (prev) =>
+      qc.setQueryData<Task[]>(todosKey, (prev) =>
         prev?.filter((t) => t.id !== id),
       );
     },

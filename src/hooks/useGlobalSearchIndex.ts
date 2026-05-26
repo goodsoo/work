@@ -1,10 +1,10 @@
-// 통합 검색 인덱스 — QuickSwitcher (Cmd+P) 가 사용. 4 도메인 (meeting / todo /
+// 통합 검색 인덱스 — QuickSwitcher (Cmd+P) 가 사용. 4 도메인 (meeting / task /
 // portfolio / journal) 의 entry 를 단일 array 로 반환. modal open 시 enabled=true
 // 로 lazy fetch. 검색 자체는 indexOf — 1MB 미만 vault 에서 sub-millisecond.
 //
 // 도메인별 본문 정책:
 //   - meeting: 메인 파일 본문 (transcript/summary sidecar 는 제외 — 첫 발사 비용 절감)
-//   - todo: title 만 (vault inbox.md 한 줄)
+//   - task: title 만 (vault inbox.md 한 줄)
 //   - portfolio: frontmatter title + impact_summary + tags + project (body 제외 — 첫 발사 비용 절감)
 //   - journal: 전체 content (날짜별 단일 파일, list 가 이미 본문 포함)
 // 본문 검색 부족 시 사용자 dogfood 후 확장.
@@ -13,14 +13,14 @@ import { useQuery } from "@tanstack/react-query";
 import { useJournals } from "./useJournals";
 import { useMeetings } from "./useMeetings";
 import { usePortfolioWorks } from "./usePortfolio";
-import { useTodos } from "./useTodos";
+import { useTasks } from "./useTasks";
 import { useVault } from "../lib/vault/useVault";
 
-export type SearchDomain = "meeting" | "todo" | "portfolio" | "journal";
+export type SearchDomain = "meeting" | "task" | "portfolio" | "journal";
 
 export type SearchEntry = {
   domain: SearchDomain;
-  // 도메인별 id — 라우팅 시 사용. meeting=uid, todo=id, portfolio=prSlug, journal=date
+  // 도메인별 id — 라우팅 시 사용. meeting=uid, task=id, portfolio=prSlug, journal=date
   id: string;
   title: string;
   body: string;
@@ -34,13 +34,13 @@ const indexKey = ["global-search-index"] as const;
 export function useGlobalSearchIndex(enabled: boolean) {
   const { adapter, isReady } = useVault();
   const meetings = useMeetings();
-  const todos = useTodos();
+  const tasks = useTasks();
   const portfolio = usePortfolioWorks();
   const journals = useJournals();
 
   const sourcesReady =
     meetings.isSuccess &&
-    todos.isSuccess &&
+    tasks.isSuccess &&
     portfolio.isSuccess &&
     journals.isSuccess;
 
@@ -75,8 +75,8 @@ export function useGlobalSearchIndex(enabled: boolean) {
         }
       }
 
-      // todos — deleted 제외. cancelled/done 은 포함 (이력 검색 가능).
-      for (const t of todos.data ?? []) {
+      // tasks — deleted 제외. cancelled/done 은 포함 (이력 검색 가능).
+      for (const t of tasks.data ?? []) {
         if (t.deleted) continue;
         const status = t.cancelled
           ? "취소됨"
@@ -84,7 +84,7 @@ export function useGlobalSearchIndex(enabled: boolean) {
             ? "완료"
             : t.due_date ?? null;
         entries.push({
-          domain: "todo",
+          domain: "task",
           id: t.id,
           title: t.title,
           body: "",

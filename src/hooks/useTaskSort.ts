@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import { useScopedKey } from "../lib/vault/scopedStorage";
 
-export type TodoSortKey = "name" | "date_desc" | "date_asc";
+export type TaskSortKey = "name" | "date_desc" | "date_asc";
 
 const BASE_KEY = "goodsoob:todoSort";
 
-function readKey(key: string): TodoSortKey {
+function readKey(key: string): TaskSortKey {
   if (typeof localStorage === "undefined") return "date_desc";
   const v = localStorage.getItem(key);
   if (v === "date_desc") return "date_desc";
@@ -14,9 +14,9 @@ function readKey(key: string): TodoSortKey {
   return "date_desc";
 }
 
-export function useTodoSort() {
+export function useTaskSort() {
   const key = useScopedKey(BASE_KEY);
-  const [sortKey, setSortKey] = useState<TodoSortKey>(() => readKey(key));
+  const [sortKey, setSortKey] = useState<TaskSortKey>(() => readKey(key));
   useEffect(() => {
     setSortKey(readKey(key));
   }, [key]);

@@ -50,7 +50,7 @@ export function PortfolioSidePanel({
   const sourceTreeRef = useRef<PortfolioSourceTreeHandle>(null);
 
   // "미사용" entry 의 count — included=false 인 카드 수. 0 이어도 항상 노출
-  // (할일 사이드바 "취소됨" 패턴과 동일).
+  // (할 일 사이드바 "취소됨" 패턴과 동일).
   const excludedCount = useMemo(
     () => (works.data ?? []).filter((w) => !w.frontmatter.included).length,
     [works.data],
@@ -152,7 +152,7 @@ export function PortfolioSidePanel({
         />
       </div>
 
-      {/* 미사용 — 사이드바 하단 별도 entry. 할일 "취소됨" 패턴과 동일. */}
+      {/* 미사용 — 사이드바 하단 별도 entry. 할 일 "취소됨" 패턴과 동일. */}
       <div
         className="px-1 py-2"
         style={{ borderTop: "1px solid var(--border-default)" }}

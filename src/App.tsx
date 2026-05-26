@@ -17,18 +17,18 @@ import {
   CalendarDayPanel,
   TodosSidePanel,
   TodosSidePanelFooter,
-  type TodosStatusFilter,
-  type TodosCategoryFilter,
+  type TaskStatusFilter,
+  type TaskCategoryFilter,
 } from "./components/nav/SidePanel";
-import { useTodoSort } from "./hooks/useTodoSort";
+import { useTaskSort } from "./hooks/useTaskSort";
 import { usePortfolioSort } from "./hooks/usePortfolioSort";
 import { usePortfolioCategoryFilter } from "./hooks/usePortfolioCategoryFilter";
-import type { TodoCategory, TodoInsert } from "./api/todos";
-import { TodoTrashModal } from "./components/todos/TodoTrashModal";
+import type { TaskCategory, TaskInsert } from "./api/tasks";
+import { TodosTrashModal } from "./components/tasks/TodosTrashModal";
 import { Text } from "./components/common/Text";
 import { EmptyState } from "./components/common/EmptyState";
 import { CalendarPage } from "./pages/CalendarPage";
-import { TodosPage } from "./pages/TodosPage";
+import { TasksPage } from "./pages/TasksPage";
 import { PortfolioPage } from "./pages/PortfolioPage";
 import { StyleguidePage } from "./pages/StyleguidePage";
 import { PortfolioSidePanel } from "./components/portfolio/PortfolioSidePanel";
@@ -48,7 +48,7 @@ import { useMeetingSort } from "./hooks/useMeetingSort";
 import { buildMeetingSortComparator } from "./lib/meetingSort";
 import { meetingFolder } from "./api/meetings";
 import { useJournals } from "./hooks/useJournals";
-import { useTodos } from "./hooks/useTodos";
+import { useTasks } from "./hooks/useTasks";
 import { useVault } from "./lib/vault/useVault";
 import { maybeAutoBackup } from "./lib/backup";
 import { DrawerProvider, useDrawer } from "./hooks/useDrawer";
@@ -121,24 +121,24 @@ function AppContent() {
     readMeetingFromHash(),
   );
   const [calendarDate, setCalendarDate] = useState<string>(todayIso());
-  const [todoStatus, setTodoStatus] = useState<TodosStatusFilter>("all");
-  const [todoCategory, setTodoCategory] = useState<TodosCategoryFilter>("all");
-  const [todoSortKey, setTodoSortKey] = useTodoSort();
+  const [taskStatus, setTaskStatus] = useState<TaskStatusFilter>("all");
+  const [taskCategory, setTaskCategory] = useState<TaskCategoryFilter>("all");
+  const [taskSortKey, setTaskSortKey] = useTaskSort();
   const [portfolioFilter, setPortfolioFilter] = useState<SourceFilter>({
     kind: "all",
   });
-  // 할 일 탭 안 routine 선택 — null = 태스크 필터 모드 (기존 TodosPage).
+  // 할 일 탭 안 routine 선택 — null = 태스크 필터 모드 (기존 TasksPage).
   const [selectedRoutineName, setSelectedRoutineName] = useState<string | null>(null);
-  // task/routine 추가 모달 — App.tsx 가 owner. RoutineDetail / TodosPage 어느 쪽이
+  // task/routine 추가 모달 — App.tsx 가 owner. RoutineDetail / TasksPage 어느 쪽이
   // 마운트되어도 사이드바 + 가 trigger 하면 보임. event detail 로 type/prefill 받음.
   const [taskAddOpen, setTaskAddOpen] = useState(false);
-  const [taskAddPrefill, setTaskAddPrefill] = useState<Partial<TodoInsert> | undefined>(undefined);
+  const [taskAddPrefill, setTaskAddPrefill] = useState<Partial<TaskInsert> | undefined>(undefined);
   const [taskAddType, setTaskAddType] = useState<"task" | "routine">("task");
 
   useEffect(() => {
     function handler(e: Event) {
       const detail = (e as CustomEvent).detail as
-        | { type?: "task" | "routine"; category?: TodoCategory | null; prefill?: Partial<TodoInsert> }
+        | { type?: "task" | "routine"; category?: TaskCategory | null; prefill?: Partial<TaskInsert> }
         | undefined;
       setTaskAddType(detail?.type ?? "task");
       const prefill = detail?.prefill ?? {};
@@ -149,14 +149,14 @@ function AppContent() {
     window.addEventListener("todos:add-request", handler);
     return () => window.removeEventListener("todos:add-request", handler);
   }, []);
-  // 캘린더 사이드바의 todo 클릭으로 진입 시 TodosPage 가 한 번 scroll 후 clear.
-  const [scrollToTodoId, setScrollToTodoId] = useState<string | null>(null);
+  // 캘린더 사이드바의 task 클릭으로 진입 시 TasksPage 가 한 번 scroll 후 clear.
+  const [scrollToTaskId, setScrollToTaskId] = useState<string | null>(null);
   const [portfolioSortKey, setPortfolioSortKey] = usePortfolioSort();
   const portfolioCategoryFilter = usePortfolioCategoryFilter();
   // 휴지통은 overlay — utility 액션이라 SettingsModal 과 같은 패턴.
-  // 메모 + todo 휴지통 별도 — 데이터 영역 다름.
+  // 탭별 1 trash — 할 일 탭은 태스크/루틴 둘 다 chip 으로 구분한 단일 flat 리스트.
   const [trashOpen, setTrashOpen] = useState(false);
-  const [todoTrashOpen, setTodoTrashOpen] = useState(false);
+  const [todosTrashOpen, setTodosTrashOpen] = useState(false);
   const [portfolioTrashOpen, setPortfolioTrashOpen] = useState(false);
   const [portfolioGuideOpen, setPortfolioGuideOpen] = useState(false);
   // 옵시디안 quick switcher (Cmd+P). 메모장 탭에 한정하지 않고 어디서든 발사 가능 —
@@ -501,14 +501,14 @@ function AppContent() {
     window.history.pushState({ meetingId: id }, "", `#meeting-${id}`);
   }
 
-  function openTodo(id: string) {
+  function openTask(id: string) {
     drawer.close();
     setTab("todos");
-    // 클릭한 todo 가 현재 필터(cancelled view, 특정 카테고리 등) 밖이면 안 보임 →
-    // 필터 reset 후 scroll. 사용자는 "그 todo 로 이동" 의도가 명확.
-    setTodoStatus("all");
-    setTodoCategory("all");
-    setScrollToTodoId(id);
+    // 클릭한 task 가 현재 필터(cancelled view, 특정 카테고리 등) 밖이면 안 보임 →
+    // 필터 reset 후 scroll. 사용자는 "그 task 로 이동" 의도가 명확.
+    setTaskStatus("all");
+    setTaskCategory("all");
+    setScrollToTaskId(id);
     if (window.location.hash !== "#todos") {
       window.history.pushState({ tab: "todos" }, "", "#todos");
     }
@@ -600,15 +600,15 @@ function AppContent() {
       <CalendarDayPanel
         selectedDate={calendarDate}
         onOpenMeeting={openMeeting}
-        onOpenTodo={openTodo}
+        onOpenTask={openTask}
         onOpenRoutine={openRoutine}
       />
     ) : tab === "todos" ? (
       <TodosSidePanel
-        statusFilter={todoStatus}
-        onStatusChange={setTodoStatus}
-        sortKey={todoSortKey}
-        onSortKeyChange={setTodoSortKey}
+        statusFilter={taskStatus}
+        onStatusChange={setTaskStatus}
+        sortKey={taskSortKey}
+        onSortKeyChange={setTaskSortKey}
         selectedRoutineName={selectedRoutineName}
         onSelectRoutine={setSelectedRoutineName}
       />
@@ -630,7 +630,7 @@ function AppContent() {
     tab === "meetings" ? (
       <MeetingsSidePanelFooter onTrashOpen={() => setTrashOpen(true)} />
     ) : tab === "todos" ? (
-      <TodosSidePanelFooter onTrashOpen={() => setTodoTrashOpen(true)} />
+      <TodosSidePanelFooter onTrashOpen={() => setTodosTrashOpen(true)} />
     ) : tab === "portfolio" ? (
       <PortfolioSidePanelFooter
         onTrashOpen={() => setPortfolioTrashOpen(true)}
@@ -688,22 +688,22 @@ function AppContent() {
           onClose={() => setSelectedRoutineName(null)}
         />
       ) : (
-        <TodosPage
-          statusFilter={todoStatus}
-          categoryFilter={todoCategory}
-          onCategoryChange={setTodoCategory}
-          sortKey={todoSortKey}
-          scrollToTodoId={scrollToTodoId}
-          onScrollHandled={() => setScrollToTodoId(null)}
+        <TasksPage
+          statusFilter={taskStatus}
+          categoryFilter={taskCategory}
+          onCategoryChange={setTaskCategory}
+          sortKey={taskSortKey}
+          scrollToTaskId={scrollToTaskId}
+          onScrollHandled={() => setScrollToTaskId(null)}
         />
       )}
       <TrashModal
         open={trashOpen}
         onClose={() => setTrashOpen(false)}
       />
-      <TodoTrashModal
-        open={todoTrashOpen}
-        onClose={() => setTodoTrashOpen(false)}
+      <TodosTrashModal
+        open={todosTrashOpen}
+        onClose={() => setTodosTrashOpen(false)}
       />
       <PortfolioTrashModal
         open={portfolioTrashOpen}
@@ -743,8 +743,8 @@ function AppContent() {
             case "meeting":
               openMeeting(entry.id);
               return;
-            case "todo":
-              openTodo(entry.id);
+            case "task":
+              openTask(entry.id);
               return;
             case "journal":
               // 일기 = 캘린더 탭의 그 날짜로 이동. 사이드 panel 의 "일기 보기" 가
@@ -784,7 +784,7 @@ function AppContent() {
 // 컴포넌트 mount 는 안 함 — query cache 만 채움 → 진입 시 cache hit, 메모리 부담 0.
 function PrefetchWarmup() {
   useJournals();
-  useTodos();
+  useTasks();
   usePortfolioWorks();
   useManualFolders();
   usePortfolioCategories();

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useScopedKey } from "../lib/vault/scopedStorage";
 
 // 작업 카드 카테고리 chip 필터. single radio. "all" = 전체 (필터 X).
-// 할일 카테고리 필터와 동일한 정신 모델 — 한 번에 하나만 본다.
+// 할 일 카테고리 필터와 동일한 정신 모델 — 한 번에 하나만 본다.
 // vault id namespace 적용 — 개인/회사 vault 별 필터 분리 (PR #45 흡수).
 // localStorage 에 직렬화. 옛 multi (string[]) 도 lazy 흡수 — 첫 값만 채용.
 // 카테고리는 builtin 5 + categories.md user-defined 라 enum check 없이 string 그대로

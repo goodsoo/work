@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { useCreateTodo } from "../../hooks/useTodos";
+import { useCreateTask } from "../../hooks/useTasks";
 import { useCreateRoutine } from "../../hooks/useRoutines";
 import {
-  TODO_CATEGORIES,
-  type TodoCategory,
-  type TodoInsert,
-} from "../../api/todos";
+  TASK_CATEGORIES,
+  type TaskCategory,
+  type TaskInsert,
+} from "../../api/tasks";
 import { todayIso } from "../../lib/dates";
 import { LooseDateInput } from "../common/LooseDateInput";
 import { LooseTimeInput } from "../common/LooseTimeInput";
@@ -20,7 +20,7 @@ type AddType = "task" | "routine";
 type Props = {
   open: boolean;
   onClose: () => void;
-  prefill?: Partial<TodoInsert>;
+  prefill?: Partial<TaskInsert>;
   // 모달 default 탭. 미지정 = "task". 사이드바 polish 단계에서 사용자가 routine
   // 폴더 활성 상태에서 + 눌렀을 때 "routine" 직접 지정 가능.
   defaultType?: AddType;
@@ -46,7 +46,7 @@ export function TaskAddModal({
       {/* min-height 로 탭 (태스크/루틴) 컨텐츠 길이 차이에 모달이 흔들리지 않도록 고정. */}
       <div className="flex flex-col p-5" style={{ minHeight: "24rem" }}>
         <Text id="task-add-title" variant="h4" as="h2">
-          {type === "routine" ? "루틴 추가" : "할 일 추가"}
+          {type === "routine" ? "루틴 추가" : "태스크 추가"}
         </Text>
 
         {/* 탭 segmented control */}
@@ -97,14 +97,14 @@ function TaskForm({
   prefill,
   onDone,
 }: {
-  prefill?: Partial<TodoInsert>;
+  prefill?: Partial<TaskInsert>;
   onDone: () => void;
 }) {
-  const createMutation = useCreateTodo();
+  const createMutation = useCreateTask();
   const [title, setTitle] = useState("");
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
-  const [category, setCategory] = useState<TodoCategory | null>(null);
+  const [category, setCategory] = useState<TaskCategory | null>(null);
   const [done, setDone] = useState(false);
   const [sourceMeetingUid, setSourceMeetingUid] = useState<string | null>(null);
   const titleRef = useRef<HTMLInputElement>(null);
@@ -226,7 +226,7 @@ function TaskForm({
             active={category === null}
             onClick={() => setCategory(null)}
           />
-          {TODO_CATEGORIES.map((c) => (
+          {TASK_CATEGORIES.map((c) => (
             <CategoryChip
               key={c.id}
               label={c.label}

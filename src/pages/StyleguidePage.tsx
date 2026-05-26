@@ -94,9 +94,9 @@ const COLOR_GROUPS: ColorGroup[] = [
       { name: "--cat-backend", usage: "portfolio backend" },
       { name: "--cat-infra", usage: "portfolio infra" },
       { name: "--cat-fix", usage: "portfolio fix" },
-      { name: "--cat-other", usage: "portfolio other + todo 미분류" },
-      { name: "--cat-work", usage: "todo 업무" },
-      { name: "--cat-schedule", usage: "todo 일정" },
+      { name: "--cat-other", usage: "portfolio other + task 미분류" },
+      { name: "--cat-work", usage: "태스크 업무" },
+      { name: "--cat-schedule", usage: "태스크 일정" },
     ],
   },
   {

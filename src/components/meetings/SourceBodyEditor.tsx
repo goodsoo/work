@@ -38,7 +38,7 @@ type Props = {
   // cursor 가 - [ ] 라인 위에서 ⌘⏎ 누르면 그 라인 텍스트를 부모에게 전달.
   // 부모 (MeetingForm) 가 TaskAddModal prefill 로 띄움. 일방향 복제 — 메모 라인은 그대로.
   onSendLineToInbox?: (lineText: string) => void;
-  // 일기/메모/todo description 등 다른 소비처에서 폰트·placeholder·blur 핸들러를
+  // 일기/메모/task description 등 다른 소비처에서 폰트·placeholder·blur 핸들러를
   // 갈아끼우려고 추가. 기본값 유지 시 MeetingForm 사용감 변함 없음.
   placeholder?: string;
   // outer flex container 에 적용. textarea 와 mirror 가 font-family/font-size 를

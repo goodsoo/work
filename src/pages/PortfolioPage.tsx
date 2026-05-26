@@ -214,7 +214,7 @@ export function PortfolioPage({
 }
 
 // 페이지 헤더 아래 sub-header — 카테고리 chip group (single radio). 옛 사이드바
-// CategoryChipRow 를 본문 헤더로 옮긴 자리. 할일 페이지의 같은 자리와 통일.
+// CategoryChipRow 를 본문 헤더로 옮긴 자리. 할 일 페이지의 같은 자리와 통일.
 // "전체" chip 1개 + 카테고리 5개 = 6개 chip 가로 wrap.
 function CategoryChipRow({
   selected,

@@ -26,7 +26,7 @@ import {
   useDeleteMeeting,
 } from "../../hooks/useMeetings";
 import { useStateHistory } from "../../hooks/useStateHistory";
-import { useCreateTodo } from "../../hooks/useTodos";
+import { useCreateTask } from "../../hooks/useTasks";
 import type { MeetingUpdate } from "../../api/meetings";
 import { ClipPromptButton } from "../common/ClipPromptButton";
 import { Button } from "../common/Button";
@@ -43,8 +43,8 @@ import { useVault } from "../../lib/vault/useVault";
 import { saveAttachment } from "../../lib/attachments";
 import { MarkdownView } from "./MarkdownView";
 import { TaskAddModal } from "../tasks/TaskAddModal";
-import type { TodoCategory, TodoInsert, TodoPriority } from "../../api/todos";
-import { extractTodos } from "../../lib/vault/tasks";
+import type { TaskCategory, TaskInsert, TaskPriority } from "../../api/tasks";
+import { extractTasks } from "../../lib/vault/tasks";
 import { useViewMode } from "../../hooks/useViewMode";
 import { isTauri } from "../../lib/isTauri";
 import { formatError } from "../../lib/errors";
@@ -168,7 +168,7 @@ export function MeetingForm({
   const meetingsQ = useMeetings();
   const updateMutation = useUpdateMeeting(meetingId);
   const deleteMutation = useDeleteMeeting();
-  const createTodoMutation = useCreateTodo();
+  const createTodoMutation = useCreateTask();
   const [viewMode, setViewMode] = useViewMode();
   const { adapter } = useVault();
 
@@ -360,7 +360,7 @@ export function MeetingForm({
   }
   const [taskModalOpen, setTaskModalOpen] = useState(false);
   const [taskModalPrefill, setTaskModalPrefill] = useState<
-    Partial<TodoInsert>
+    Partial<TaskInsert>
   >({});
   const [addedTodoIndices, setAddedTodoIndices] = useState<Set<number>>(
     () => new Set(),
@@ -527,7 +527,7 @@ export function MeetingForm({
     }
   }
 
-  async function addActionItemAsTodo(index: number, text: string) {
+  async function addActionItemAsTask(index: number, text: string) {
     if (addedTodoIndices.has(index)) return;
     try {
       await createTodoMutation.mutateAsync({
@@ -1025,7 +1025,7 @@ export function MeetingForm({
                   // 합쳐져 undo 가 어색해짐).
                   setDoc("body", { ...doc, body: v }, true);
                 }}
-                onAddTodoFromLine={(lineText) => {
+                onAddTaskFromLine={(lineText) => {
                   setTaskModalPrefill(lineToTaskPrefill(lineText, meetingId));
                   setTaskModalOpen(true);
                 }}
@@ -1124,7 +1124,7 @@ export function MeetingForm({
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => addActionItemAsTodo(i, text)}
+                            onClick={() => addActionItemAsTask(i, text)}
                             disabled={createTodoMutation.isPending}
                             className="px-1.5 py-0.5 disabled:opacity-40"
                             style={{ color: "var(--text-secondary)" }}
@@ -1158,7 +1158,7 @@ export function MeetingForm({
   );
 }
 
-// 메모 안 한 줄 → TaskAddModal prefill. extractTodos parser 가 자연어까지 처리
+// 메모 안 한 줄 → TaskAddModal prefill. extractTasks parser 가 자연어까지 처리
 // (오늘, 내일, 월/화/일요일, 한글/압축 날짜, "오후 2시" 등).
 // 문법: `- [x] 본문 --- (날짜) (시간) #category #priority`
 //   - [x] / [ ]    = done
@@ -1169,20 +1169,20 @@ export function MeetingForm({
 function lineToTaskPrefill(
   lineText: string,
   meetingUid: string,
-): Partial<TodoInsert> {
-  const items = extractTodos("inbox.md", `${lineText}\n`);
+): Partial<TaskInsert> {
+  const items = extractTasks("inbox.md", `${lineText}\n`);
   const item = items[0];
   if (!item) return { source_meeting_uid: meetingUid };
-  const prefill: Partial<TodoInsert> = {
+  const prefill: Partial<TaskInsert> = {
     title: item.text,
     done: item.done,
     source_meeting_uid: meetingUid,
   };
   if (item.due) prefill.due_date = item.due;
   if (item.time) prefill.due_time = item.time;
-  const cat = item.tags.find((t): t is TodoCategory => t === "work" || t === "schedule" || t === "other");
+  const cat = item.tags.find((t): t is TaskCategory => t === "work" || t === "schedule" || t === "other");
   if (cat) prefill.category = cat;
-  const pri = item.tags.find((t): t is TodoPriority =>
+  const pri = item.tags.find((t): t is TaskPriority =>
     t === "high" || t === "medium" || t === "low",
   );
   if (pri) prefill.priority = pri;

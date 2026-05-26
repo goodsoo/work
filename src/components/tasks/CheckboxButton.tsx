@@ -1,5 +1,5 @@
-import type { TodoCategory } from "../../api/todos";
-import { categoryColor } from "../../lib/todoCategory";
+import type { TaskCategory } from "../../api/tasks";
+import { categoryColor } from "../../lib/taskCategory";
 
 // 체크박스 button — pending / done / cancelled 3 state. pending 일 때 카테고리 색을
 // border 로, 미분류는 회색 (--text-muted). done/cancelled 는 카테고리 무관 (완료/취소가
@@ -14,8 +14,8 @@ export function CheckboxButton({
   onClick,
 }: {
   status: "pending" | "done" | "cancelled";
-  category: TodoCategory | null;
-  // 루틴 row 에서는 "circle" — 원형 체크박스. 할 일/일회성 작업은 default "square".
+  category: TaskCategory | null;
+  // 루틴 row 에서는 "circle" — 원형 체크박스. 태스크는 default "square".
   // 같은 사이드바에 두 종류가 섞일 때 시각으로만 type 구분 가능 (라벨 X).
   shape?: "square" | "circle";
   onClick: () => void;

@@ -1,59 +1,59 @@
 import { useEffect, useMemo } from "react";
 import { Undo2, Redo2, AlertCircle } from "lucide-react";
 import {
-  useDeleteTodo,
-  useTodos,
-  useUpdateTodo,
-} from "../hooks/useTodos";
+  useDeleteTask,
+  useTasks,
+  useUpdateTask,
+} from "../hooks/useTasks";
 import {
-  recordTodoUpdate,
-  useTodoUndo,
-  useTodoUndoShortcut,
-} from "../hooks/useTodoHistory";
+  recordTaskUpdate,
+  useTaskUndo,
+  useTaskUndoShortcut,
+} from "../hooks/useTaskHistory";
 import {
-  TODO_CATEGORIES,
-  type Todo,
-  type TodoPriority,
-  type TodoCategory,
-} from "../api/todos";
-import { categoryColor } from "../lib/todoCategory";
-import { TodoRow } from "../components/todos/TodoRow";
+  TASK_CATEGORIES,
+  type Task,
+  type TaskPriority,
+  type TaskCategory,
+} from "../api/tasks";
+import { categoryColor } from "../lib/taskCategory";
+import { TaskRow } from "../components/tasks/TaskRow";
 import { PageHeaderBar } from "../components/common/PageHeaderBar";
 import { Button } from "../components/common/Button";
 import { Text } from "../components/common/Text";
 import { SelectableChip } from "../components/common/SelectableChip";
 import { EmptyState } from "../components/common/EmptyState";
 import type {
-  TodosCategoryFilter,
-  TodosStatusFilter,
+  TaskCategoryFilter,
+  TaskStatusFilter,
 } from "../components/nav/SidePanel";
-import { type TodoSortKey } from "../hooks/useTodoSort";
+import { type TaskSortKey } from "../hooks/useTaskSort";
 
 type Props = {
-  statusFilter?: TodosStatusFilter;
-  categoryFilter?: TodosCategoryFilter;
-  onCategoryChange?: (next: TodosCategoryFilter) => void;
-  sortKey?: TodoSortKey;
-  // 캘린더 사이드바 todo 클릭으로 진입 시 해당 row 로 scroll. 한 번 처리 후 clear.
-  scrollToTodoId?: string | null;
+  statusFilter?: TaskStatusFilter;
+  categoryFilter?: TaskCategoryFilter;
+  onCategoryChange?: (next: TaskCategoryFilter) => void;
+  sortKey?: TaskSortKey;
+  // 캘린더 사이드바 task 클릭으로 진입 시 해당 row 로 scroll. 한 번 처리 후 clear.
+  scrollToTaskId?: string | null;
   onScrollHandled?: () => void;
 };
 
-export function TodosPage({
+export function TasksPage({
   statusFilter = "all",
   categoryFilter = "all",
   onCategoryChange,
   sortKey = "date_desc",
-  scrollToTodoId = null,
+  scrollToTaskId = null,
   onScrollHandled,
 }: Props) {
-  const { data, isLoading, error, refetch } = useTodos();
-  const updateMutation = useUpdateTodo();
-  const deleteMutation = useDeleteTodo();
+  const { data, isLoading, error, refetch } = useTasks();
+  const updateMutation = useUpdateTask();
+  const deleteMutation = useDeleteTask();
 
   // 카테고리별 카운트 — cancelled/deleted 제외. 카테고리 chip 의 dim 처리에 사용.
   const categoryCounts = useMemo(() => {
-    const map = new Map<TodoCategory | "uncategorized", number>();
+    const map = new Map<TaskCategory | "uncategorized", number>();
     let uncategorized = 0;
     for (const t of data ?? []) {
       if (t.deleted || t.cancelled) continue;
@@ -64,12 +64,12 @@ export function TodosPage({
     return map;
   }, [data]);
 
-  const { canUndo, canRedo, undo, redo } = useTodoUndo();
+  const { canUndo, canRedo, undo, redo } = useTaskUndo();
 
-  useTodoUndoShortcut({ active: true });
+  useTaskUndoShortcut({ active: true });
 
-  // 두 필터 AND + sortKey 적용한 단일 list. done todo 도 inline (체크 + line-through).
-  const todos = useMemo(() => {
+  // 두 필터 AND + sortKey 적용한 단일 list. done task 도 inline (체크 + line-through).
+  const tasks = useMemo(() => {
     const all = data ?? [];
     // deleted 는 항상 list 에서 제외 (휴지통 modal 에서만 보임). cancelled 는
     // 별도 view — cancelled view 에선 카테고리 필터 무시.
@@ -88,9 +88,9 @@ export function TodosPage({
         filtered = filtered.filter((t) => t.category === categoryFilter);
     }
     const copy = filtered.slice();
-    // 정렬 기준은 due_date + due_time. **null first** — 날짜 미적용 todo 는 최상단
+    // 정렬 기준은 due_date + due_time. **null first** — 날짜 미적용 task 는 최상단
     // 으로 올려서 "기한 정해야 함" 보채는 시각 신호. tie-break 은 라인 위치.
-    function cmpDate(a: Todo, b: Todo, asc: boolean): number {
+    function cmpDate(a: Task, b: Task, asc: boolean): number {
       const ad = a.due_date;
       const bd = b.due_date;
       if (!ad && bd) return -1; // null first
@@ -113,33 +113,33 @@ export function TodosPage({
     return copy;
   }, [data, statusFilter, categoryFilter, sortKey]);
 
-  // 캘린더 사이드바에서 todo 클릭 → 할일 탭 진입 시 해당 row 로 부드럽게 scroll 후
-  // 편집모드 자동 진입 (el.click() 이 TodoRow li 의 onClick → setEditing(true) 트리거).
-  // list 렌더 완료 후 (todos / scrollToTodoId 모두 valid) 한 번만 실행 → onScrollHandled
-  // 로 부모 state 정리. todos.length 의존: filter reset 후 list 가 도착해야 element 가 mount 됨.
+  // 캘린더 사이드바에서 태스크 클릭 → 할 일 탭 진입 시 해당 row 로 부드럽게 scroll 후
+  // 편집모드 자동 진입 (el.click() 이 TaskRow li 의 onClick → setEditing(true) 트리거).
+  // list 렌더 완료 후 (tasks / scrollToTaskId 모두 valid) 한 번만 실행 → onScrollHandled
+  // 로 부모 state 정리. tasks.length 의존: filter reset 후 list 가 도착해야 element 가 mount 됨.
   useEffect(() => {
-    if (!scrollToTodoId || todos.length === 0) return;
+    if (!scrollToTaskId || tasks.length === 0) return;
     const el = document.querySelector<HTMLElement>(
-      `[data-todoid="${CSS.escape(scrollToTodoId)}"]`,
+      `[data-todoid="${CSS.escape(scrollToTaskId)}"]`,
     );
     if (el) {
       el.scrollIntoView({ behavior: "smooth", block: "center" });
       el.click();
     }
     onScrollHandled?.();
-  }, [scrollToTodoId, todos, onScrollHandled]);
+  }, [scrollToTaskId, tasks, onScrollHandled]);
 
-  function handleToggle(todo: Todo) {
-    // cancelled todo 의 체크박스 클릭 = 취소 해제 (pending 복원).
-    if (todo.cancelled) {
-      recordTodoUpdate(todo, { cancelled: false });
-      updateMutation.mutate({ id: todo.id, patch: { cancelled: false } });
+  function handleToggle(task: Task) {
+    // cancelled task 의 체크박스 클릭 = 취소 해제 (pending 복원).
+    if (task.cancelled) {
+      recordTaskUpdate(task, { cancelled: false });
+      updateMutation.mutate({ id: task.id, patch: { cancelled: false } });
       return;
     }
-    const nextDone = !todo.done;
-    recordTodoUpdate(todo, { done: nextDone });
+    const nextDone = !task.done;
+    recordTaskUpdate(task, { done: nextDone });
     updateMutation.mutate({
-      id: todo.id,
+      id: task.id,
       patch: {
         done: nextDone,
         done_at: nextDone ? new Date().toISOString() : null,
@@ -148,32 +148,32 @@ export function TodosPage({
   }
 
   function handleUpdate(
-    todo: Todo,
+    task: Task,
     patch: {
       title?: string;
-      priority?: TodoPriority;
+      priority?: TaskPriority;
       due_date?: string | null;
       due_time?: string | null;
-      category?: TodoCategory | null;
+      category?: TaskCategory | null;
       source_meeting_uid?: string | null;
       done?: boolean;
       cancelled?: boolean;
       deleted?: boolean;
     },
   ) {
-    recordTodoUpdate(todo, patch);
-    updateMutation.mutate({ id: todo.id, patch });
+    recordTaskUpdate(task, patch);
+    updateMutation.mutate({ id: task.id, patch });
   }
 
-  function handleDelete(todo: Todo) {
+  function handleDelete(task: Task) {
     // soft-delete: vault 라인은 `- [D]` 로 변경 (영구 삭제 X). 휴지통 view 에서
     // 복원 / 영구 삭제 가능. 이미 삭제됨 이면 영구 삭제 (vault 라인 제거).
-    if (todo.deleted) {
-      deleteMutation.mutate(todo.id);
+    if (task.deleted) {
+      deleteMutation.mutate(task.id);
       return;
     }
-    recordTodoUpdate(todo, { deleted: true });
-    updateMutation.mutate({ id: todo.id, patch: { deleted: true } });
+    recordTaskUpdate(task, { deleted: true });
+    updateMutation.mutate({ id: task.id, patch: { deleted: true } });
   }
 
   return (
@@ -251,17 +251,17 @@ export function TodosPage({
         />
       ) : isLoading ? (
         <SkeletonList />
-      ) : todos.length === 0 ? (
-        <TodoEmptyState />
+      ) : tasks.length === 0 ? (
+        <TasksEmptyState />
       ) : (
         <ul
           key={`${statusFilter}-${categoryFilter}-${sortKey}`}
           className="mt-2 space-y-2"
         >
-          {todos.map((t) => (
-            <TodoRow
+          {tasks.map((t) => (
+            <TaskRow
               key={t.id}
-              todo={t}
+              task={t}
               onToggle={handleToggle}
               onUpdate={handleUpdate}
               onDelete={handleDelete}
@@ -281,9 +281,9 @@ function CategoryChipRow({
   counts,
   onChange,
 }: {
-  selected: TodosCategoryFilter;
-  counts: Map<TodoCategory | "uncategorized", number>;
-  onChange: (next: TodosCategoryFilter) => void;
+  selected: TaskCategoryFilter;
+  counts: Map<TaskCategory | "uncategorized", number>;
+  onChange: (next: TaskCategoryFilter) => void;
 }) {
   return (
     <div
@@ -307,7 +307,7 @@ function CategoryChipRow({
         >
           미분류
         </SelectableChip>
-        {TODO_CATEGORIES.map((c) => {
+        {TASK_CATEGORIES.map((c) => {
           const active = selected === c.id;
           const count = counts.get(c.id) ?? 0;
           const color = categoryColor(c.id);
@@ -343,10 +343,10 @@ function SkeletonList() {
   );
 }
 
-function TodoEmptyState() {
+function TasksEmptyState() {
   return (
     <EmptyState
-      title="할 일이 비어있어요"
+      title="태스크가 비어있어요"
       description="오늘 가장 먼저 끝낼 한 가지를 적어보세요."
     />
   );

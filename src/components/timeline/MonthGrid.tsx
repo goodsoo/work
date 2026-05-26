@@ -2,12 +2,12 @@ import { useMemo } from "react";
 import { addDays } from "date-fns";
 import { BookOpen, FileText } from "lucide-react";
 import { todayIso, isToday } from "../../lib/dates";
-import { categoryColor } from "../../lib/todoCategory";
+import { categoryColor } from "../../lib/taskCategory";
 import { Button } from "../common/Button";
 import { Text } from "../common/Text";
 import type { Meeting } from "../../api/meetings";
 import type { Journal } from "../../api/journals";
-import type { Todo, TodoCategory } from "../../api/todos";
+import type { Task, TaskCategory } from "../../api/tasks";
 
 // 셀 chip 시간 표시 — 가능한 짧게.
 // - 정각 (mm=00) → "h시" / "H시"
@@ -25,7 +25,7 @@ function formatChipTime(time: string): string {
 
 export type DayItems = {
   meetings: Meeting[];
-  todos: Todo[];
+  tasks: Task[];
   journal: Journal | null;
 };
 
@@ -38,7 +38,7 @@ type CellEvent = {
   label: string;
   time?: string;
   done?: boolean;
-  category?: TodoCategory | null;
+  category?: TaskCategory | null;
 };
 
 const MAX_CELL_EVENTS = 3;
@@ -196,7 +196,7 @@ export function MonthGrid({
               </div>
             ) : null}
 
-            {/* Todo chips — 셀 가로 폭 100% 차지 (items-start 의 cross-axis stretch 비활성
+            {/* Task chips — 셀 가로 폭 100% 차지 (items-start 의 cross-axis stretch 비활성
                 보정용 w-full). 텍스트가 짧아도 박스가 셀 안쪽 꽉 채워서 그려짐. */}
             <div className="mt-0.5 min-h-0 w-full flex-1 space-y-px overflow-hidden">
               {visible.map((ev) => {
@@ -247,13 +247,13 @@ export function MonthGrid({
   );
 }
 
-// 메모(meeting) 는 우상단 FileText+N 아이콘으로 압축 표시 — 셀 안 chip 은 todo 만.
+// 메모(meeting) 는 우상단 FileText+N 아이콘으로 압축 표시 — 셀 안 chip 은 task 만.
 function buildCellEvents(items: DayItems | undefined): CellEvent[] {
   if (!items) return [];
   const events: CellEvent[] = [];
 
-  // due_time 있는 todo 는 같은 todo 줄에서 시각 prefix 만 추가.
-  for (const t of items.todos) {
+  // due_time 있는 task 는 같은 task 줄에서 시각 prefix 만 추가.
+  for (const t of items.tasks) {
     events.push({
       key: `t-${t.id}`,
       label: t.title,
@@ -263,7 +263,7 @@ function buildCellEvents(items: DayItems | undefined): CellEvent[] {
     });
   }
 
-  // 시간 없는 todo 가 앞 (할일 탭 + 사이드바와 일관), 시간 있는 것은 시간순 뒤로.
+  // 시간 없는 태스크가 앞 (할 일 탭 + 사이드바와 일관), 시간 있는 것은 시간순 뒤로.
   events.sort((a, b) => {
     if (a.time && b.time) return a.time < b.time ? -1 : 1;
     if (a.time && !b.time) return 1;

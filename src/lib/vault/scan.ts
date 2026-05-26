@@ -5,7 +5,7 @@ import {
   patchFrontmatter,
   patchBody,
 } from "./parser";
-import { extractTodos, type TodoItem } from "./tasks";
+import { extractTasks, type TaskItem } from "./tasks";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types — UI/hooks 가 다루는 형태
@@ -674,14 +674,14 @@ export async function scanJournals(adapter: VaultAdapter): Promise<JournalMeta[]
   return results;
 }
 
-// inbox.md 안 todo 만 수집. 메모/일기 안 - [ ] 는 todo 페이지 등장 X
-// (단순 체크박스 / 시각 element). 메모 → inbox 는 명시적 "할일로 보내기" 액션.
-export async function scanAllTodos(adapter: VaultAdapter): Promise<TodoItem[]> {
+// inbox.md 안 태스크만 수집. 메모/일기 안 - [ ] 는 할 일 페이지 등장 X
+// (단순 체크박스 / 시각 element). 메모 → inbox 는 명시적 "태스크로 보내기" 액션.
+export async function scanAllTasks(adapter: VaultAdapter): Promise<TaskItem[]> {
   const path = "inbox.md";
   if (!(await adapter.exists(path))) return [];
   try {
     const raw = await adapter.read(path);
-    return extractTodos(path, raw);
+    return extractTasks(path, raw);
   } catch {
     return [];
   }

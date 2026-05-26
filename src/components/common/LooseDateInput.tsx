@@ -5,7 +5,7 @@ type Props = {
   value: string;
   onCommit: (next: string) => void;
   fullWidth?: boolean;
-  // todo 카드 같은 좁은 메타 row 용 — text-xs.
+  // task 카드 같은 좁은 메타 row 용 — text-xs.
   compact?: boolean;
 };
 

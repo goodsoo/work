@@ -29,17 +29,21 @@ import {
 import { meetingFolder } from "../../api/meetings";
 import { useMeetingSort, type MeetingSortKey } from "../../hooks/useMeetingSort";
 import { buildMeetingSortComparator } from "../../lib/meetingSort";
-import { type TodoSortKey } from "../../hooks/useTodoSort";
+import { type TaskSortKey } from "../../hooks/useTaskSort";
 import { useJournals } from "../../hooks/useJournals";
-import { useTodos, useUpdateTodo } from "../../hooks/useTodos";
-import { useActiveRoutines, useToggleRoutineDay } from "../../hooks/useRoutines";
+import { useTasks, useUpdateTask } from "../../hooks/useTasks";
+import {
+  useActiveRoutines,
+  useArchivedRoutines,
+  useToggleRoutineDay,
+} from "../../hooks/useRoutines";
 import type { Meeting } from "../../api/meetings";
 import type { Routine } from "../../api/routines";
-import type { Todo, TodoCategory } from "../../api/todos";
+import type { Task, TaskCategory } from "../../api/tasks";
 import { formatDateLong, isToday, todayIso } from "../../lib/dates";
 import { formatError } from "../../lib/errors";
 import { TaskAddModal } from "../tasks/TaskAddModal";
-import { CheckboxButton } from "../todos/CheckboxButton";
+import { CheckboxButton } from "../tasks/CheckboxButton";
 import { JournalOverlay } from "../calendar/JournalOverlay";
 import { MeetingsTreeView } from "../meetings/MeetingsTreeView";
 import { MoveFolderModal } from "../meetings/MoveFolderModal";
@@ -896,7 +900,7 @@ const MARKDOWN_HINTS: Array<{ syntax: string; desc: string; section?: string }> 
 type CalendarDayPanelProps = {
   selectedDate: string;
   onOpenMeeting: (id: string) => void;
-  onOpenTodo: (id: string) => void;
+  onOpenTask: (id: string) => void;
   onOpenRoutine: (name: string) => void;
 };
 
@@ -907,17 +911,17 @@ function timestampToLocalIso(ts: string): string {
 export function CalendarDayPanel({
   selectedDate,
   onOpenMeeting,
-  onOpenTodo,
+  onOpenTask,
   onOpenRoutine,
 }: CalendarDayPanelProps) {
   const meetingsQ = useMeetings();
   const journalsQ = useJournals();
-  const todosQ = useTodos();
-  const updateTodo = useUpdateTodo();
+  const todosQ = useTasks();
+  const updateTask = useUpdateTask();
   const [showAddModal, setShowAddModal] = useState(false);
   const [showJournalOverlay, setShowJournalOverlay] = useState(false);
   // 3개 섹션 collapse — 메모장 폴더 패턴 차용. 새로고침 시 모두 펴짐 (session 단위).
-  // 루틴과 할일은 "할 일" 1개 섹션으로 통합 (안에서 구분선으로 분리). 별도 폴더 X.
+  // 태스크와 루틴은 "할 일" 1개 섹션으로 통합 (안에서 구분선으로 분리). 별도 폴더 X.
   const [collapsed, setCollapsed] = useState<
     Set<"journal" | "tasks" | "meetings">
   >(() => new Set());
@@ -934,14 +938,14 @@ export function CalendarDayPanel({
   const dayRoutines = useActiveRoutines(selectedDate);
   const toggleRoutineDayMutation = useToggleRoutineDay();
 
-  const { meetings, todos, journal } = useMemo(() => {
+  const { meetings, tasks, journal } = useMemo(() => {
     const meetings = (meetingsQ.data ?? []).filter(
       (m) => m.date === selectedDate,
     );
     const journals = (journalsQ.data ?? []).filter(
       (j) => j.date === selectedDate,
     );
-    const todos = (todosQ.data ?? []).filter((t) => {
+    const tasks = (todosQ.data ?? []).filter((t) => {
       if (t.done) {
         const d = t.done_at
           ? timestampToLocalIso(t.done_at)
@@ -957,9 +961,9 @@ export function CalendarDayPanel({
       if (ta !== tb) return ta < tb ? -1 : 1;
       return a.created_at < b.created_at ? -1 : 1;
     });
-    // 시간 없는 todo 가 앞 (할일 탭과 동일 — "정해진 시각 없는 작업 먼저"),
+    // 시간 없는 태스크가 앞 (할 일 탭과 동일 — "정해진 시각 없는 작업 먼저"),
     // 시간 있는 것은 시간순 뒤로.
-    todos.sort((a, b) => {
+    tasks.sort((a, b) => {
       if (a.done !== b.done) return a.done ? 1 : -1;
       const ta = a.due_time ?? "";
       const tb = b.due_time ?? "";
@@ -973,16 +977,16 @@ export function CalendarDayPanel({
 
     return {
       meetings,
-      todos,
+      tasks,
       journal: journals[0] ?? null,
     };
   }, [meetingsQ.data, journalsQ.data, todosQ.data, selectedDate]);
 
-  function handleToggle(t: Todo) {
+  function handleToggle(t: Task) {
     // done 만 patch — vault md 에 done_at 안 저장돼 refetch 후 항상 null 로 돌아옴.
     // optimistic 시 done_at=ISO 박으면 filter 가 today 로 판정 → 미래·과거 날 사이드바에서
     // 토글 직후 잠깐 사라졌다 (invalidate 후 due_date fallback 으로) 다시 생기는 깜빡임 발생.
-    updateTodo.mutate({ id: t.id, patch: { done: !t.done } });
+    updateTask.mutate({ id: t.id, patch: { done: !t.done } });
   }
 
   return (
@@ -1069,15 +1073,15 @@ export function CalendarDayPanel({
           </SectionChildren>
         ) : null}
 
-        {/* 할 일 section — 루틴 + 일회성 할일 통합 (구분선으로 시각 분리). 별도 폴더 X.
+        {/* 할 일 section — 루틴 + 태스크 통합 (구분선으로 시각 분리). 별도 폴더 X.
             내용 없으면 섹션 자체 숨김 (일기는 항상 노출, 그 외는 0건이면 hide). */}
-        {dayRoutines.length + todos.length > 0 ? (
+        {dayRoutines.length + tasks.length > 0 ? (
           <>
             <SidePanelSectionHeader
               label="할 일"
               collapsed={collapsed.has("tasks")}
               onToggle={() => toggleSection("tasks")}
-              count={dayRoutines.length + todos.length}
+              count={dayRoutines.length + tasks.length}
             />
             {!collapsed.has("tasks") ? (
               <SectionChildren>
@@ -1130,7 +1134,7 @@ export function CalendarDayPanel({
                     </div>
                   );
                 })}
-                {todos.map((t) => {
+                {tasks.map((t) => {
                   const status = t.cancelled
                     ? "cancelled"
                     : t.done
@@ -1138,14 +1142,14 @@ export function CalendarDayPanel({
                       : "pending";
                   return (
                     <div
-                      key={`todo:${t.id}`}
+                      key={`task:${t.id}`}
                       role="button"
                       tabIndex={0}
-                      onClick={() => onOpenTodo(t.id)}
+                      onClick={() => onOpenTask(t.id)}
                       onKeyDown={(e) => {
                         if (e.key === "Enter" || e.key === " ") {
                           e.preventDefault();
-                          onOpenTodo(t.id);
+                          onOpenTask(t.id);
                         }
                       }}
                       className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-[13px] transition hover:bg-[var(--bg-surface-hover)]"
@@ -1308,17 +1312,17 @@ function SidePanelSectionHeader({
 
 /* ── Todos Side Panel — 상태 필터 + 카테고리 필터 (독립 차원, AND 결합) ── */
 
-export type TodosStatusFilter = "all" | "pending" | "done" | "cancelled";
-export type TodosCategoryFilter =
+export type TaskStatusFilter = "all" | "pending" | "done" | "cancelled";
+export type TaskCategoryFilter =
   | "all"
   | "uncategorized"
-  | TodoCategory;
+  | TaskCategory;
 
 type TodosPanelProps = {
-  statusFilter: TodosStatusFilter;
-  onStatusChange: (next: TodosStatusFilter) => void;
-  sortKey: TodoSortKey;
-  onSortKeyChange: (next: TodoSortKey) => void;
+  statusFilter: TaskStatusFilter;
+  onStatusChange: (next: TaskStatusFilter) => void;
+  sortKey: TaskSortKey;
+  onSortKeyChange: (next: TaskSortKey) => void;
   // 사이드바 루틴 폴더의 selected entry 와 onSelect.
   // null = 루틴 미선택 (= 태스크 필터 활성). routine 선택 시 본문이 RoutineDetail 로
   // 전환되고 태스크 필터는 시각 비활성 (회색).
@@ -1334,12 +1338,15 @@ export function TodosSidePanel({
   selectedRoutineName,
   onSelectRoutine,
 }: TodosPanelProps) {
-  const { data } = useTodos();
-  const todos = data ?? [];
+  const { data } = useTasks();
+  const tasks = data ?? [];
   const activeRoutines = useActiveRoutines(todayIso());
+  const archivedRoutines = useArchivedRoutines(todayIso());
   const toggleRoutineDayMutation = useToggleRoutineDay();
   const today = todayIso();
   const [collapsedRoutines, setCollapsedRoutines] = useState(false);
+  // "지난 루틴"은 default collapsed — 보관 의도, 평소엔 시야에서 빠져 있어야 함.
+  const [collapsedArchive, setCollapsedArchive] = useState(true);
 
   // 루틴 폴더 row 의 오늘 체크박스. CheckboxButton 이 e.stopPropagation 내장 — row click 안 trigger.
   function handleToggleRoutineToday(name: string) {
@@ -1359,13 +1366,13 @@ export function TodosSidePanel({
   // count 는 status 만 — 카테고리와 AND 결합 없음. deleted 는 휴지통 modal 전용
   // 으로 격리.
   const counts = useMemo(() => {
-    const status: Record<TodosStatusFilter, number> = {
+    const status: Record<TaskStatusFilter, number> = {
       all: 0,
       pending: 0,
       done: 0,
       cancelled: 0,
     };
-    for (const t of todos) {
+    for (const t of tasks) {
       if (t.deleted) continue;
       if (t.cancelled) {
         status.cancelled++;
@@ -1376,12 +1383,12 @@ export function TodosSidePanel({
       else status.pending++;
     }
     return { status };
-  }, [todos]);
+  }, [tasks]);
 
   // status row — 라벨 + 카운트만, leading 아이콘 없음. status 가 단일 차원이라
   // 라벨 텍스트만으로 충분히 명확. 캘린더/포트폴리오 패턴과 align.
   const statusItems: Array<{
-    id: TodosStatusFilter;
+    id: TaskStatusFilter;
     label: string;
     count: number;
   }> = [
@@ -1481,6 +1488,31 @@ export function TodosSidePanel({
               )}
             </SectionChildren>
           ) : null}
+
+          {/* 지난 루틴 — ends < today. 활성 list 와 분리하여 보관 영역에 별도 노출.
+              0개면 섹션 자체 숨김 — 평소엔 시야 안 침범. count chip 으로 갯수 안내. */}
+          {archivedRoutines.length > 0 ? (
+            <>
+              <SidePanelSectionHeader
+                label="지난 루틴"
+                collapsed={collapsedArchive}
+                onToggle={() => setCollapsedArchive((v) => !v)}
+                count={archivedRoutines.length}
+              />
+              {!collapsedArchive ? (
+                <SectionChildren>
+                  {archivedRoutines.map((r) => (
+                    <ArchivedRoutineSidebarItem
+                      key={r.name}
+                      routine={r}
+                      active={r.name === selectedRoutineName}
+                      onSelect={() => onSelectRoutine(r.name)}
+                    />
+                  ))}
+                </SectionChildren>
+              ) : null}
+            </>
+          ) : null}
         </div>
         {/* 취소됨 — 사이드바 하단 별도 entry. 폴더 밖이라 들여쓰기 없이 outer level
             (헤더 chevron 위치 8px 와 align). 좌우 padding 1 = 메모장 트리 root 와 동일. */}
@@ -1508,7 +1540,7 @@ export function TodosSidePanel({
 }
 
 // 루틴 사이드바 row — 오늘 체크박스 + 시간 + 이름. row click = RoutineDetail 진입.
-// 루틴 사이드바 row — 캘린더 사이드바의 todo row 패턴 차용 (div role=button + flex
+// 루틴 사이드바 row — 캘린더 사이드바의 task row 패턴 차용 (div role=button + flex
 // items-start + CheckboxButton). 디자인 시스템의 체크박스/Text 컴포넌트만 사용.
 function RoutineSidebarItem({
   routine,
@@ -1566,8 +1598,55 @@ function RoutineSidebarItem({
   );
 }
 
-// AppShell.sidePanelFooter slot 으로 주입. 할 일 탭의 휴지통 entry.
-// 메모장 MeetingsSidePanelFooter 와 동일 패턴.
+// 지난 루틴 사이드바 row — 종료일 chip 만 표시 (체크박스 없음, 시간 정보 무의미).
+// 클릭 시 RoutineDetail 진입 — 사용자는 종료일을 미래로 미루면 다시 활성으로 돌아옴.
+function ArchivedRoutineSidebarItem({
+  routine,
+  active,
+  onSelect,
+}: {
+  routine: Routine;
+  active: boolean;
+  onSelect: () => void;
+}) {
+  const ends = routine.frontmatter.ends ?? "";
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onSelect}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onSelect();
+        }
+      }}
+      className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-[13px] transition hover:bg-[var(--bg-surface-hover)]"
+      style={{
+        backgroundColor: active ? "var(--bg-surface-active)" : undefined,
+      }}
+    >
+      <span
+        className="min-w-0 flex-1 truncate"
+        style={{ color: "var(--text-secondary)" }}
+      >
+        {routine.name}
+      </span>
+      {ends ? (
+        <span
+          className="shrink-0 text-[11px] tabular-nums"
+          style={{ color: "var(--text-muted)" }}
+          title={`종료일 ${ends}`}
+        >
+          ~{ends.slice(5)}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+// AppShell.sidePanelFooter slot 으로 주입. 할 일 탭의 휴지통 entry —
+// 메모/포트폴리오와 동일 패턴 (탭별 1 trash). 모달은 태스크/루틴 chip 으로 구분한 단일 리스트.
 export function TodosSidePanelFooter({
   onTrashOpen,
 }: {

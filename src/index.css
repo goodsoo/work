@@ -65,7 +65,7 @@
     --cat-fix: #dc2626;
     --cat-other: #7c3aed;
 
-    /* Todo category dots — work/schedule 신규, other 는 portfolio 와 공유.
+    /* Task category dots — work/schedule 신규, other 는 portfolio 와 공유.
        work 는 보라 계열인 --cat-other 와 명확히 구분되도록 주황. */
     --cat-work: #ea580c;
     --cat-schedule: #0d9488;
@@ -164,7 +164,7 @@
     --cat-fix: #f87171;
     --cat-other: #a78bfa;
 
-    /* Todo category dots */
+    /* Task category dots */
     --cat-work: #fb923c;
     --cat-schedule: #2dd4bf;
 
@@ -205,7 +205,7 @@
   }
 
   /* 입력/편집 텍스트는 항상 selectable — 메모 제목, transcript, attendees,
-     일기 본문, todo 제목, impact_summary 등 모든 form input. */
+     일기 본문, task 제목, impact_summary 등 모든 form input. */
   input,
   textarea {
     user-select: text;
@@ -330,29 +330,29 @@
     to { opacity: 1; }
   }
 
-  /* todo 카드 mount fade — 필터/정렬 변경 시 list 새로 그릴 때만 trigger.
+  /* task 카드 mount fade — 필터/정렬 변경 시 list 새로 그릴 때만 trigger.
      ul 의 key 변경으로 unmount→remount. 짧게 (180ms) — 정신없지 않게.
      class 기반 — mount 시 한 번만 실행. flash class 적용·해제 시 재실행 X. */
-  @keyframes todoCardEnter {
+  @keyframes taskCardEnter {
     from { opacity: 0; transform: translateY(-4px); }
     to { opacity: 1; transform: translateY(0); }
   }
-  .todo-card-enter { animation: todoCardEnter 180ms ease; }
+  .task-card-enter { animation: taskCardEnter 180ms ease; }
 
-  /* todo 카드 exit fade — 삭제/취소 시 unmount 직전. forwards 로 끝 상태 유지.
+  /* task 카드 exit fade — 삭제/취소 시 unmount 직전. forwards 로 끝 상태 유지.
      JS 가 inline style 로 적용 (mutation 전 setTimeout). */
-  @keyframes todoCardExit {
+  @keyframes taskCardExit {
     from { opacity: 1; transform: translateY(0); }
     to { opacity: 0; transform: translateY(-4px) scale(0.98); }
   }
 
   /* undo/redo 시 영향받은 카드 short flash — "이 카드가 바뀌었어요" 시각 cue.
      flash 끝나면 class 제거 — enter animation 은 이미 끝났으니 재실행 X. */
-  @keyframes todoCardFlash {
+  @keyframes taskCardFlash {
     0%, 100% { background-color: transparent; }
     25%, 75% { background-color: var(--accent-blue-bg); }
   }
-  .todo-card-flash { animation: todoCardFlash 600ms ease; }
+  .task-card-flash { animation: taskCardFlash 600ms ease; }
 
   /* 메모 meta 영역 input — 옵시디안 properties 스타일 plain text.
      WebKit type=date/time 의 강제 native UI 박스 회피 위해 type=text 사용. */
