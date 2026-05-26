@@ -1,6 +1,7 @@
 import {
   readTextFile,
   writeTextFile,
+  writeFile,
   readDir,
   mkdir as tauriMkdir,
   remove as tauriRemove,
@@ -56,6 +57,9 @@ export interface VaultAdapter {
     content: string,
     expectedMtime?: number,
   ): Promise<FileMeta>;
+  // 바이너리 write — 이미지 paste/drop attachments 저장용. text write 와 같은 atomic
+  // tmp→rename 패턴 + per-path lock 공유 (md 파일과 동시 쓰기 race 차단).
+  writeBinary(relPath: string, bytes: Uint8Array): Promise<FileMeta>;
   // recursive=true 면 디렉토리 + 내부 모든 콘텐츠 삭제. 폴더 삭제용.
   // (메모 본체는 호출자가 먼저 휴지통 이동 후 빈 디렉토리 청소 용도.)
   delete(relPath: string, options?: { recursive?: boolean }): Promise<void>;
@@ -232,6 +236,28 @@ export function createTauriAdapter(): VaultAdapter {
       });
     },
 
+    async writeBinary(
+      relPath: string,
+      bytes: Uint8Array,
+    ): Promise<FileMeta> {
+      const abs = joinAbs(requireRoot(), relPath);
+      return withWriteLock(abs, async () => {
+        const suffix = `${Date.now().toString(36)}-${Math.random()
+          .toString(36)
+          .slice(2, 10)}`;
+        const tmp = `${abs}.${suffix}.tmp`;
+        await writeFile(tmp, bytes);
+        const existed = await tauriExists(abs);
+        if (existed) await tauriRemove(abs);
+        await tauriRename(tmp, abs);
+        const s = await tauriStat(abs);
+        return {
+          mtime: s.mtime ? new Date(s.mtime).getTime() : Date.now(),
+          size: s.size,
+        };
+      });
+    },
+
     async delete(
       relPath: string,
       options?: { recursive?: boolean },
@@ -311,9 +337,11 @@ export function createTauriAdapter(): VaultAdapter {
 export function createMemoryAdapter(): VaultAdapter & {
   __trigger(event: VaultWatchEvent): void;
   __dump(): Map<string, { content: string; mtime: number }>;
+  __dumpBinary(): Map<string, { bytes: Uint8Array; mtime: number }>;
 } {
   let root: string | null = null;
   const files = new Map<string, { content: string; mtime: number }>();
+  const binaryFiles = new Map<string, { bytes: Uint8Array; mtime: number }>();
   const dirs = new Set<string>();
   const watchers = new Set<(e: VaultWatchEvent) => void>();
   let clock = 1_700_000_000_000;
@@ -336,7 +364,8 @@ export function createMemoryAdapter(): VaultAdapter & {
       requireRoot();
       const prefix = subdir === "" ? "" : subdir + "/";
       const result: string[] = [];
-      for (const path of files.keys()) {
+      const allPaths = new Set([...files.keys(), ...binaryFiles.keys()]);
+      for (const path of allPaths) {
         if (!path.startsWith(prefix)) continue;
         const rest = path.slice(prefix.length);
         // 직속 자식만 (한 단계 깊이)
@@ -351,7 +380,8 @@ export function createMemoryAdapter(): VaultAdapter & {
       requireRoot();
       const prefix = subdir === "" ? "" : subdir + "/";
       const result: string[] = [];
-      for (const path of files.keys()) {
+      const allPaths = new Set([...files.keys(), ...binaryFiles.keys()]);
+      for (const path of allPaths) {
         if (subdir !== "" && !path.startsWith(prefix)) continue;
         const rest = subdir === "" ? path : path.slice(prefix.length);
         // dot-prefix 가 path 어디든 끼면 skip (`.trash/x.md`, `foo/.x.md`).
@@ -424,6 +454,18 @@ export function createMemoryAdapter(): VaultAdapter & {
       return { mtime, size: content.length };
     },
 
+    async writeBinary(
+      relPath: string,
+      bytes: Uint8Array,
+    ): Promise<FileMeta> {
+      requireRoot();
+      const mtime = tick();
+      binaryFiles.set(relPath, { bytes, mtime });
+      const event: VaultWatchEvent = { type: "modified", path: relPath };
+      for (const w of watchers) w(event);
+      return { mtime, size: bytes.byteLength };
+    },
+
     async delete(
       relPath: string,
       options?: { recursive?: boolean },
@@ -439,6 +481,14 @@ export function createMemoryAdapter(): VaultAdapter & {
           files.delete(p);
           for (const w of watchers) w({ type: "deleted", path: p });
         }
+        const removedBinary: string[] = [];
+        for (const p of binaryFiles.keys()) {
+          if (p === relPath || p.startsWith(prefix)) removedBinary.push(p);
+        }
+        for (const p of removedBinary) {
+          binaryFiles.delete(p);
+          for (const w of watchers) w({ type: "deleted", path: p });
+        }
         const removedDirs: string[] = [];
         for (const d of dirs) {
           if (d === relPath || d.startsWith(prefix)) removedDirs.push(d);
@@ -447,6 +497,7 @@ export function createMemoryAdapter(): VaultAdapter & {
         return;
       }
       files.delete(relPath);
+      binaryFiles.delete(relPath);
       dirs.delete(relPath);
       for (const w of watchers) w({ type: "deleted", path: relPath });
     },
@@ -495,7 +546,7 @@ export function createMemoryAdapter(): VaultAdapter & {
 
     async exists(relPath: string): Promise<boolean> {
       requireRoot();
-      return files.has(relPath) || dirs.has(relPath);
+      return files.has(relPath) || binaryFiles.has(relPath) || dirs.has(relPath);
     },
 
     async mkdir(relPath: string): Promise<void> {
@@ -515,6 +566,9 @@ export function createMemoryAdapter(): VaultAdapter & {
     },
     __dump() {
       return new Map(files);
+    },
+    __dumpBinary() {
+      return new Map(binaryFiles);
     },
   };
 }
