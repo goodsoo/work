@@ -6,6 +6,15 @@
 
 ## 2026-05-26
 
+### PR #51 — 루틴 만료 분리 + 휴지통 + 내부 코드 용어 통일
+
+- **한 줄 임팩트**: 만료 루틴 분리 + 삭제 복구 + 용어 정리
+- **만료 루틴 사이드바 분리** — 종료일 < 오늘 인 루틴은 활성 list 에서 자동 빠지고 "지난 루틴 (N)" 별도 collapsible 섹션 (default 접힘). 종료일 chip 만 표시. 클릭 시 RoutineDetail 진입 → 종료일을 미래로 옮기면 자동 복귀.
+- **루틴 soft delete** — `deleteRoutine` 이 즉시 파일 삭제하던 거 → `routines/.trash/{stamp}-{name}.md` 로 이동 (메모/포트폴리오와 같은 패턴). `restoreRoutine` / `purgeRoutine` / `emptyRoutineTrash` API + 같은 이름 충돌 시 `RoutineConflictError` toast. RoutineDetail confirm 문구도 "휴지통으로 옮길까요? 나중에 복원할 수 있습니다." 로 변경.
+- **할 일 탭 통합 휴지통** — 옛 `TodoTrashModal` 을 `TodosTrashModal` 로 확장 + 태스크/루틴 한 flat 리스트, chip (`태스크` / `루틴`) + 아이콘 (✓ / Repeat) 으로 시각 구분. 헤더에 전체 "비우기" 하나. 사이드바 푸터 휴지통 1 아이콘 유지 (탭별 1 trash 원칙). 모달 size `md`→`lg` (포트폴리오와 동일 고정 크기 통일).
+- **용어 정리** — "할 일" = 큰 집합(탭/모음), "태스크" + "루틴" = 하위. 사용자 라벨 (`TaskAddModal` 헤더, `TaskRow` "할일 삭제"/"할일 취소", `TasksPage` 빈 상태, `TodoTrashModal` chip) + 주석 ("할일 탭"→"할 일 탭", "todo→task" 등) 일관화.
+- **내부 코드 rename** — `Todo`/`TodoXxx` type → `Task`/`TaskXxx`, `useTodos`/`useCreateTodo`/`useUpdateTodo`/`useDeleteTodo`/`useTodoSort`/`useTodoHistory`/`useTodoUndo`/`useTodoFlash` → `useTasks`/`useCreateTask`/`...` 등 hook, `TodoRow`/`TodoBlock`/`TodosPage`/`TodoTrashModal` 컴포넌트, `extractTodos`/`scanAllTodos`/`toggleTodo`/`setTodoCheckChar`/`onAddTodoFromLine` 함수, `todoCategory.ts`/`todoSort.ts`/`todoHistory.ts` 파일, CSS `todo-card-*` / `@keyframes todoCard*` 일괄 변경. SearchDomain literal `"todo"` → `"task"`. 13 파일 git mv. 외부 인터페이스 (탭 id `"todos"`, URL hash `#todos`, 이벤트 `"todos:add-request"`, localStorage `goodsoob:todoSort`, React Query 키 `["todos"]`, vault `inbox.md`, `TodosSidePanel`/`TodosSidePanelFooter`) 는 유지.
+
 ### PR #50 — Portfolio vault 폴더 모델 + 수동 카드/카테고리 관리
 
 - **한 줄 임팩트**: GitHub PR + 오프라인 업무 한 곳에 + 옵시디안 자유 분류
