@@ -94,12 +94,10 @@ export function useGlobalSearchIndex(enabled: boolean) {
       }
 
       // portfolio — body 안 읽음 (PR 카드 100+ 가능, 첫 발사 비용 절감).
-      // github_title + impact_summary + project 가 검색 대상. body 검색은 follow-up.
+      // github_title + impact_summary 가 검색 대상. body 검색은 follow-up.
       for (const p of portfolio.data ?? []) {
         const fm = p.frontmatter;
-        const searchBody = [fm.impact_summary, fm.project]
-          .filter(Boolean)
-          .join("\n");
+        const searchBody = fm.impact_summary;
         entries.push({
           domain: "portfolio",
           id: p.prSlug,
