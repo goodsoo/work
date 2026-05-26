@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { addDays } from "date-fns";
-import { BookOpen, ClipboardList } from "lucide-react";
+import { BookOpen, FileText } from "lucide-react";
 import { todayIso, isToday } from "../../lib/dates";
 import { categoryColor } from "../../lib/todoCategory";
 import { Button } from "../common/Button";
@@ -177,7 +177,7 @@ export function MonthGrid({
               )}
             </div>
 
-            {/* 우상단 corner — 일기 BookOpen + 메모 ClipboardList N 한 줄.
+            {/* 우상단 corner — 일기 BookOpen + 메모 FileText N 한 줄.
                 메모는 텍스트 chip 대신 카운트만 압축 (사이드바에서 상세 확인). */}
             {items?.journal || meetingCount > 0 ? (
               <div
@@ -189,7 +189,7 @@ export function MonthGrid({
                 ) : null}
                 {meetingCount > 0 ? (
                   <span className="flex items-center gap-0.5 text-[10px] font-medium leading-none">
-                    <ClipboardList className="h-3 w-3" aria-label="메모" />
+                    <FileText className="h-3 w-3" aria-label="메모" />
                     {meetingCount}
                   </span>
                 ) : null}
@@ -247,7 +247,7 @@ export function MonthGrid({
   );
 }
 
-// 메모(meeting) 는 우상단 ClipboardList+N 아이콘으로 압축 표시 — 셀 안 chip 은 todo 만.
+// 메모(meeting) 는 우상단 FileText+N 아이콘으로 압축 표시 — 셀 안 chip 은 todo 만.
 function buildCellEvents(items: DayItems | undefined): CellEvent[] {
   if (!items) return [];
   const events: CellEvent[] = [];

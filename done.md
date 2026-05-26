@@ -17,6 +17,12 @@
 - **VaultPicker selector 모드** — vaults list 가 있고 active 가 없을 때 (disconnect 후 재진입) 기존 vault 목록 라디오 + "새 폴더 추가" 함께. 첫 진입은 기존 단순 picker 그대로.
 - **테스트** — registry 9 unit (add/dedupe/remove/rename/empty-name/legacy bootstrap) + scopedKey 2 unit. 22 files, 307 tests pass.
 
+### 직커밋 — 메모 사이드바 root drag race fix + 라벨/아이콘 polish
+
+- **race fix** (6cb0872): root → folder drop 시 dragstart 직후 9ms 만에 dragend 가 발사되어 drag 시작 자체가 안 되던 race. `handleDragStart` 의 동기 `setDragUid` 가 React reconciliation 으로 `RootDropCatcher` mount → DOM mutation → WKWebView 가 drag source 변경 감지하고 native drag operation 즉시 cancel. `setTimeout(0)` 으로 setState 를 다음 tick 으로 미뤄 native drag init commit 이후 mount. UX 도 같이 손봄 — 16px slot `RootDropCatcher` → root 메모 전체 wrapping 박스 `RootDropZone` 으로 교체, 폴더 밖 영역 어디든 drop 가능 + 평상시·drag 중 동일 layout (outline 만 toggle, margin/padding 변동 0).
+- **라벨 통일** (28c3150): "내 작업" → "포트폴리오". 다른 탭 (캘린더 / 메모장 / 할 일) 명사 단독 톤과 일치, vault 폴더명 `portfolio` 와도 일치. ActivityBar / 사이드바 헤더 / 페이지 h1 / 단축키 / 가이드 모달 + 코드 주석까지 11곳.
+- **아이콘 4개 정리** (5c01af5): 메모장 `ClipboardList` ↔ 할 일 `ListChecks` 가 시각 유사해 헷갈리던 문제. notion 풍 단순/평면 아이콘으로 교체 — `Calendar` / `FileText` / `CheckSquare` / `LayoutGrid`. 캘린더 셀 메모 표시, 할 일 사이드패널의 메모 링크 leftIcon, 포트폴리오 empty state, QuickSwitcher 항목까지 일관 갱신.
+
 ### PR #44 — 루틴: 매일 반복 작업 별도 도메인 + 월별 그리드
 
 - **한 줄 임팩트**: 매일 반복 작업 자동 추적 (todo 와 분리)

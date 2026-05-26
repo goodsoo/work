@@ -20,7 +20,7 @@ const GROUPS: Group[] = [
       { keys: ["⌘", "1"], label: "메모장" },
       { keys: ["⌘", "2"], label: "캘린더" },
       { keys: ["⌘", "3"], label: "할 일" },
-      { keys: ["⌘", "4"], label: "내 작업" },
+      { keys: ["⌘", "4"], label: "포트폴리오" },
     ],
   },
   {

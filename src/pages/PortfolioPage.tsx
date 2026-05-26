@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Briefcase, X } from "lucide-react";
+import { LayoutGrid, X } from "lucide-react";
 import {
   usePortfolioProjects,
   usePortfolioWorks,
@@ -291,7 +291,7 @@ function PortfolioHeader() {
     <PageHeaderBar
       center={
         <Text variant="h4" as="h1">
-          내 작업
+          포트폴리오
         </Text>
       }
     />
@@ -328,7 +328,7 @@ function EmptyVault({
     <EmptyState
       className="flex h-[calc(100svh-3rem)] flex-col items-center justify-center gap-3 px-6 text-center"
       icon={
-        <Briefcase
+        <LayoutGrid
           className="h-12 w-12"
           strokeWidth={1.25}
           style={{ color: "var(--text-muted)" }}

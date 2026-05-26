@@ -1,4 +1,4 @@
-// V0.7 "내 작업" 탭 — vault 기반 PR 카드 데이터 모델 + 식별자 helpers + scan.
+// V0.7 포트폴리오 탭 — vault 기반 PR 카드 데이터 모델 + 식별자 helpers + scan.
 //
 // design doc v2.3 (ENG + DESIGN CLEAR):
 //   ~/.gstack/projects/goodsoob-work/ham-main-design-20260518-105501.md
@@ -791,7 +791,7 @@ export async function writePortfolioProjects(
   );
   const body =
     `---\n${fm.trimEnd()}\n---\n\n# Portfolio Projects\n\n` +
-    `V0.7 "내 작업" 탭 사이드바의 source. frontmatter \`projects\` 배열을 ` +
+    `V0.7 포트폴리오 탭 사이드바의 source. frontmatter \`projects\` 배열을 ` +
     `수정하면 사이드바 반영. slug 는 kebab-case (폴더명 호환).\n`;
   await adapter.write(PROJECTS_FILE, body);
 }

@@ -8,18 +8,6 @@ PR 단위로 묶음. 각 PR 의 **한 줄 임팩트** 는 카드 frontmatter `im
 
 ---
 
-## 🚀 메모 에디터 (마크다운) 강화
-
-### PR — 본문 이미지 paste / drag&drop `ui_ux`
-한 줄 임팩트: 캡쳐 이미지 본문에 paste/drop → vault `_attachments/` 저장 + markdown 자동 insert
-
-- [ ] textarea (편집 모드) 안 이미지 paste / drag&drop 감지. `_attachments/{slug}/{n}.{ext}` 저장 + caret 위치에 `![](상대경로)` insert.
-- [ ] slug = 현재 메모 title kebab-case. 같은 메모 안 이미지 N 증가.
-- [ ] portfolio 카드의 `_attachments/{slug}/before-N.{ext}` 와 같은 패턴 — 자산 위치 일관.
-- [ ] PR #22 의 이미지 렌더링과 정합 — 저장 후 보기 모드 즉시 정상 표시.
-
----
-
 ## ✨ 신규 기능
 
 ### PR — 단축키 자료/통계 페이지 `ui_ux` 🟡
@@ -31,14 +19,6 @@ PR 단위로 묶음. 각 PR 의 **한 줄 임팩트** 는 카드 frontmatter `im
 ---
 
 ## 🎨 폴리시
-
-### PR — 동적 카테고리 (사용자 정의 분류) `backend`
-한 줄 임팩트: 업무/미팅 외 본인 카테고리 자유 추가
-
-- [ ] **데이터 모델** — `TodoCategory` union → `string`. vault 안 `categories.md` (한 줄당 `id: label`) 가 source of truth. 기본 `work / schedule / other` 부트스트랩.
-- [ ] **UI** — 추가/삭제 위치 결정 (TaskAddModal select 안 inline / 설정 패널 / 사이드바 헤더 편집 모드). 사이드패널 필터 + 캘린더 사이드는 동적 빌드.
-- [ ] **Sanitize 정책** — 카테고리 삭제 시 그 카테고리 todo 처리: (a) vault 라인 `#xxx` 자동 strip (b) UI null 표시 + 라인 보존 (c) 삭제 차단 + 옮기라고 경고. 한 가지 고르기.
-- [ ] **알 수 없는 카테고리 표기** — vault 의 `#unknown` 같은 tag 가 카테고리 list 에 없을 때 UI 에서 어떻게 보일지 (지금은 null 로 무시 + 라인 보존).
 
 ### PR — portfolio 입력 흐름 `ui_ux`
 한 줄 임팩트: ResponsePasteArea 발견성 + 드래그&드롭 동작 검증
@@ -106,13 +86,6 @@ PR 단위로 묶음. 각 PR 의 **한 줄 임팩트** 는 카드 frontmatter `im
 
 ## 🧹 안정성 / 위생
 
-### PR — 메모 사이드바 드래그 race fix `fix`
-한 줄 임팩트: drop 한 번 한 뒤 잠시 dragstart 안 잡히던 race fix
-
-- [ ] **재현** — 메모를 폴더로 drag&drop 성공한 직후, 같은/다른 메모 다시 잡으면 dragstart 자체가 안 시작됨. 수초~수십초 지나면 자동 회복.
-- [ ] **원인 추정** — PR #34 의 Tauri `dragDropEnabled: false` + WKWebView dragend 후 native drop layer reset 타이밍 race. dragend 발화 누락 또는 element draggable 속성 복구 지연 의심.
-- [ ] **fix 방향** — dragend 이후 강제 reset (draggable 속성 toggle, native drop layer 명시 해제). 재현 안 되는 케이스 대비 dev 로그 먼저 박고 며칠 dogfood 후 확정.
-
 ### PR — 루틴 추가 모달 validation 보강 `fix`
 한 줄 임팩트: 루틴 추가/편집 시 시작일/종료일/이름 빈 값·역전 차단
 
@@ -127,6 +100,26 @@ PR 단위로 묶음. 각 PR 의 **한 줄 임팩트** 는 카드 frontmatter `im
 - [ ] **첫 zip spinner toast** — vault 크기 따라 첫 zip 1-10초 침묵. 1초+ 면 spinner toast.
 - [ ] **설정 모달에 마지막 백업 시각 + 백업 path 노출** — "마지막 백업: 2026-05-21 14:32 · 경로 ~/Backups/...". 클릭 = path 클립보드 또는 Finder 진입.
 - [ ] **오래된 zip 자동 정리** — 최근 N개 (default 30개) 만 유지, 그 외 삭제. 정책 = 설정 모달에서 조정 가능.
+
+---
+
+## 💤 후순위 (dogfood 통증 부족)
+
+### PR — 본문 이미지 paste / drag&drop `ui_ux`
+한 줄 임팩트: 캡쳐 이미지 본문에 paste/drop → vault `_attachments/` 저장 + markdown 자동 insert
+
+- [ ] textarea (편집 모드) 안 이미지 paste / drag&drop 감지. `_attachments/{slug}/{n}.{ext}` 저장 + caret 위치에 `![](상대경로)` insert.
+- [ ] slug = 현재 메모 title kebab-case. 같은 메모 안 이미지 N 증가.
+- [ ] portfolio 카드의 `_attachments/{slug}/before-N.{ext}` 와 같은 패턴 — 자산 위치 일관.
+- [ ] PR #22 의 이미지 렌더링과 정합 — 저장 후 보기 모드 즉시 정상 표시.
+
+### PR — 동적 카테고리 (사용자 정의 분류) `backend`
+한 줄 임팩트: 업무/미팅 외 본인 카테고리 자유 추가
+
+- [ ] **데이터 모델** — `TodoCategory` union → `string`. vault 안 `categories.md` (한 줄당 `id: label`) 가 source of truth. 기본 `work / schedule / other` 부트스트랩.
+- [ ] **UI** — 추가/삭제 위치 결정 (TaskAddModal select 안 inline / 설정 패널 / 사이드바 헤더 편집 모드). 사이드패널 필터 + 캘린더 사이드는 동적 빌드.
+- [ ] **Sanitize 정책** — 카테고리 삭제 시 그 카테고리 todo 처리: (a) vault 라인 `#xxx` 자동 strip (b) UI null 표시 + 라인 보존 (c) 삭제 차단 + 옮기라고 경고. 한 가지 고르기.
+- [ ] **알 수 없는 카테고리 표기** — vault 의 `#unknown` 같은 tag 가 카테고리 list 에 없을 때 UI 에서 어떻게 보일지 (지금은 null 로 무시 + 라인 보존).
 
 ---
 

@@ -24,7 +24,7 @@ type Props = {
   fullSyncRunning: boolean;
 };
 
-// "내 작업" 탭의 가이드북 — 동기화 방식, Claude 자동 채움, 프롬프트 도구.
+// 포트폴리오 탭의 가이드북 — 동기화 방식, Claude 자동 채움, 프롬프트 도구.
 // 사이드바 헤더의 BookOpen 아이콘 버튼이 열어줌. 메모장 TrashModal 패턴 동일.
 export function PortfolioGuideModal({
   open,
@@ -35,7 +35,7 @@ export function PortfolioGuideModal({
   const { vaultRoot } = useVault();
 
   return (
-    <Modal open={open} onClose={onClose} size="lg" ariaLabel="내 작업 가이드북">
+    <Modal open={open} onClose={onClose} size="lg" ariaLabel="포트폴리오 가이드북">
         {/* 헤더 */}
         <div
           className="flex shrink-0 items-center gap-2 px-5 py-3"
@@ -46,7 +46,7 @@ export function PortfolioGuideModal({
             style={{ color: "var(--text-secondary)" }}
           />
           <Text variant="body" weight="semibold" as="h2">
-            내 작업 가이드북
+            포트폴리오 가이드북
           </Text>
           <Button
             variant="icon"
