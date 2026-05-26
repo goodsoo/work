@@ -94,13 +94,6 @@ PR 단위로 묶음. 각 PR 의 **한 줄 임팩트** 는 카드 frontmatter `im
 - [ ] **이름 빈 값 차단** — 빈 이름은 파일명도 안 잡힘.
 - [ ] **UI** — submit 버튼 비활성 + 인라인 에러 (toast 보다 즉시 인식). voice/tone "원인 + 해결" 2단 따름.
 
-### PR — 백업 가시성 강화 `ui_ux`
-한 줄 임팩트: spinner + 마지막 백업 시각 + 오래된 zip 정리 = 백업 영역 dogfood 폴리싱
-
-- [ ] **첫 zip spinner toast** — vault 크기 따라 첫 zip 1-10초 침묵. 1초+ 면 spinner toast.
-- [ ] **설정 모달에 마지막 백업 시각 + 백업 path 노출** — "마지막 백업: 2026-05-21 14:32 · 경로 ~/Backups/...". 클릭 = path 클립보드 또는 Finder 진입.
-- [ ] **오래된 zip 자동 정리** — 최근 N개 (default 30개) 만 유지, 그 외 삭제. 정책 = 설정 모달에서 조정 가능.
-
 ---
 
 ## 💤 후순위 (dogfood 통증 부족)
