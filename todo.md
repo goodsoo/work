@@ -87,11 +87,6 @@ PR 단위로 묶음. 각 PR 의 **한 줄 임팩트** 는 카드 frontmatter `im
 - [ ] 갱신 카드 표시는 noise — 거의 매번 발생. skip.
 - [ ] (선택) 사이드바 "새 카드 N" 클릭 → 그 N 개만 임시 필터.
 
-### PR — 사이드바 FilterItem 통일 `ui_ux`
-한 줄 임팩트: 메모장/캘린더/할일/포트폴리오 사이드바 공통 컴포넌트화
-
-- [ ] 현재 PortfolioProjectList 의 FilterItem (px-2 py-1 text-[13px]) 과 SidePanel.tsx 의 TodosFilterItem (px-3 py-2 text-sm) 사이즈/패턴 차이. common/FilterItem 으로 추출 + 모든 사이드바 마이그레이트.
-
 ### PR — 가이드북 UIUX 다듬기 `ui_ux`
 한 줄 임팩트: 동기화 진행 표시 + 가독성 정돈
 

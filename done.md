@@ -4,6 +4,23 @@
 
 ---
 
+## 2026-05-26
+
+### PR #46 — 사이드바·헤더 필터 자리 통일
+
+- **한 줄 임팩트**: 작업/할일 두 페이지 필터 정신 모델 일치
+- **카테고리 = 본문 헤더 chip (single radio)** — 옛 사이드바 카테고리 (작업의 multi chip + 할일의 row 그룹) 를 페이지 본문 헤더 sub-row 로 이동. 두 페이지 동일 자리, 동일 패턴 ("전체" + 카테고리들). 작업 카테고리 데이터 모델 multi(`Set<Cat>`) → single(`"all" | Cat`), localStorage 옛 multi 형식 lazy 흡수.
+- **사이드바 = single dimension row** — 두 페이지 사이드바를 한 차원으로 단순화. 작업 = 프로젝트 (전체/분류안됨/프로젝트들). 할일 = status (전체/미완료/완료). "둘 다 하나씩 선택해야 하는데 어떻게 결합?" 인지 부담 해소.
+- **할일 사이드바 status row 최상단 flat** — "태스크" outer 폴더 제거. status 가 사이드바 메인. 그 아래 루틴 폴더 (별개 도메인, collapsible 유지), 하단 "취소됨" 별도 entry.
+- **작업 사이드바 "미사용" 하단 이동** — 할일 "취소됨" 패턴과 동일 위치 (`border-default + px-1 py-2`). inner divider (분류안됨/프로젝트 그룹 사이) 도 제거 — 할일 사이드바와 통일.
+- **공통 `common/FilterItem`** — 사이드바 row 통일 컴포넌트 (px-2 py-1 13px, count/leading/muted prop). `leading` 없으면 wrapper 자체 안 그리기 — leading 그룹 / non-leading 그룹 모두 자기 그룹 안에서 label 시작 x 일관. status row 의 빈 wrapper 12px + gap 8px = 20px 빈 공간 해소.
+- **CheckboxButton `shape="circle"` prop** — 캘린더 사이드바 "할 일" 섹션 안에서 루틴 (원형) / 일회성 할일 (사각) 시각 구분. 라벨/구분선 없이 시각만으로 type 인지 + todos 사이드바 루틴 row 도 같이 원형 (전 앱 일관성).
+- **캘린더 사이드바 폴더 indent + guide line** — 메모장 트리 패턴 차용. `SectionChildren` 헬퍼가 `paddingLeft: 16px` 자식 indent + `left: 14px` 세로 guide line 그림. "폴더 안에 들어있다" 시각 신호.
+- **시간 폰트 통일** — 캘린더 루틴/할일/메모 row 의 인라인 시간 prefix 를 우측 정렬 `text-[11px] tabular-nums` 으로 통일. 메모장 폴더 트리 패턴과 동일.
+- **캘린더 "할 일" 섹션 통합** — 옛 "루틴" / "할 일" 두 섹션을 한 collapsible 섹션으로 (구분선 없이 시각만으로). 메모/할 일 0건이면 섹션 자체 hide, 일기는 항상 노출.
+
+---
+
 ## 2026-05-25
 
 ### PR #44 — 루틴: 매일 반복 작업 별도 도메인 + 월별 그리드
