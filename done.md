@@ -14,11 +14,27 @@
 - **AuthGuideModal** — `gh auth login` 단계 + 계정 변경 시나리오 (`gh auth logout` 후 재로그인) 안내.
 - **에러 종류별 모달 분기** — 사이드바 SyncButton 의 lastResult 에서 GhNotInstalledError / GhAuthError 식별 → App.tsx 가 적절한 모달 트리거. 한 화면 한 액션 원칙 (inline expand 대신 모달) — 정보 밀도 폭증 회피.
 
----
+### PR #46 — 사이드바·헤더 필터 자리 통일
 
-## 2026-05-25
+- **한 줄 임팩트**: 작업/할일 두 페이지 필터 정신 모델 일치
+- **카테고리 = 본문 헤더 chip (single radio)** — 옛 사이드바 카테고리 (작업의 multi chip + 할일의 row 그룹) 를 페이지 본문 헤더 sub-row 로 이동. 두 페이지 동일 자리, 동일 패턴 ("전체" + 카테고리들). 작업 카테고리 데이터 모델 multi(`Set<Cat>`) → single(`"all" | Cat`), localStorage 옛 multi 형식 lazy 흡수.
+- **사이드바 = single dimension row** — 두 페이지 사이드바를 한 차원으로 단순화. 작업 = 프로젝트 (전체/분류안됨/프로젝트들). 할일 = status (전체/미완료/완료). "둘 다 하나씩 선택해야 하는데 어떻게 결합?" 인지 부담 해소.
+- **할일 사이드바 status row 최상단 flat** — "태스크" outer 폴더 제거. status 가 사이드바 메인. 그 아래 루틴 폴더 (별개 도메인, collapsible 유지), 하단 "취소됨" 별도 entry.
+- **작업 사이드바 "미사용" 하단 이동** — 할일 "취소됨" 패턴과 동일 위치 (`border-default + px-1 py-2`). inner divider (분류안됨/프로젝트 그룹 사이) 도 제거 — 할일 사이드바와 통일.
+- **공통 `common/FilterItem`** — 사이드바 row 통일 컴포넌트 (px-2 py-1 13px, count/leading/muted prop). `leading` 없으면 wrapper 자체 안 그리기 — leading 그룹 / non-leading 그룹 모두 자기 그룹 안에서 label 시작 x 일관. status row 의 빈 wrapper 12px + gap 8px = 20px 빈 공간 해소.
+- **CheckboxButton `shape="circle"` prop** — 캘린더 사이드바 "할 일" 섹션 안에서 루틴 (원형) / 일회성 할일 (사각) 시각 구분. 라벨/구분선 없이 시각만으로 type 인지 + todos 사이드바 루틴 row 도 같이 원형 (전 앱 일관성).
+- **캘린더 사이드바 폴더 indent + guide line** — 메모장 트리 패턴 차용. `SectionChildren` 헬퍼가 `paddingLeft: 16px` 자식 indent + `left: 14px` 세로 guide line 그림. "폴더 안에 들어있다" 시각 신호.
+- **시간 폰트 통일** — 캘린더 루틴/할일/메모 row 의 인라인 시간 prefix 를 우측 정렬 `text-[11px] tabular-nums` 으로 통일. 메모장 폴더 트리 패턴과 동일.
+- **캘린더 "할 일" 섹션 통합** — 옛 "루틴" / "할 일" 두 섹션을 한 collapsible 섹션으로 (구분선 없이 시각만으로). 메모/할 일 0건이면 섹션 자체 hide, 일기는 항상 노출.
 
-### PR #45 — Multi-vault: 개인 / 회사 vault 전환
+### 직커밋 — 백업 가시성: 마지막 백업/폴더 열기/보관 개수/진행 toast (faf9aa2)
+
+- **한 줄 임팩트**: 설정 모달 백업 영역에서 마지막 백업 + 경로 한눈에, 1초+ 작업은 화면 어디서나 진행 표시
+- **마지막 백업 박스** — 상단에 "마지막 백업: YYYY-MM-DD HH:mm" + 그 아래 vault 안 `.backups` 절대경로 (`~` 축약). 한 번 봤을 때 백업이 실제로 도는지 + 어디 저장됐는지 즉시 확인.
+- **백업 폴더 열기 버튼** — "지금 백업" 옆 ghost 버튼. `sh -lc 'open ...'` 으로 macOS Finder 진입 (portfolio capability 의 sh 권한 재사용, 추가 권한 0). zip 잃을까 걱정 시 1 클릭 확인.
+- **보관 개수 사용자 설정** — 옛 `BACKUP_KEEP_COUNT = 10` 고정 → `keepCount` 필드 + select (5/10/20/30/50). `AutoBackupConfig` 에 추가, 옛 localStorage 는 default 10 으로 흡수. 큰 vault 일수록 디스크 부담, 작은 vault 일수록 안전성. 본인이 조절.
+- **1초+ progress toast** — Toast 시스템에 `kind: "progress"` variant (Spinner + "진행 중" 라벨). 백업 button spinner 는 모달 안에서만 보이는데, 모달 닫거나 자동 백업이 부팅 직후 silent 로 1-10초 lock 될 때 "왜 freeze?" 체감 차단. `show()` 가 id 반환 + `dismiss(id)` expose — 호출자가 완료 시 닫음.
+- **자동 백업도 동일 toast** — App 부팅 10초 뒤 트리거되는 `maybeAutoBackup` 도 같은 1초 timeout → progress toast 패턴.
 
 - **한 줄 임팩트**: 개인용 / 회사용 vault 따로 전환 — 같은 앱에서 컨텍스트 분리
 - **registry 모델** — `VaultEntry {id, name, path, addedAt}` localStorage (`goodsoob:vaults` + `goodsoob:activeVaultId`). path 중복 자동 dedupe, 빈 이름 입력 시 폴더명 자동 보충. 옛 단일 `vaultRoot` key 는 첫 부팅에서 1개 vault 로 흡수 (테스트 데이터 단계 — 정교한 migration 코드 생략).
@@ -34,6 +50,10 @@
 - **race fix** (6cb0872): root → folder drop 시 dragstart 직후 9ms 만에 dragend 가 발사되어 drag 시작 자체가 안 되던 race. `handleDragStart` 의 동기 `setDragUid` 가 React reconciliation 으로 `RootDropCatcher` mount → DOM mutation → WKWebView 가 drag source 변경 감지하고 native drag operation 즉시 cancel. `setTimeout(0)` 으로 setState 를 다음 tick 으로 미뤄 native drag init commit 이후 mount. UX 도 같이 손봄 — 16px slot `RootDropCatcher` → root 메모 전체 wrapping 박스 `RootDropZone` 으로 교체, 폴더 밖 영역 어디든 drop 가능 + 평상시·drag 중 동일 layout (outline 만 toggle, margin/padding 변동 0).
 - **라벨 통일** (28c3150): "내 작업" → "포트폴리오". 다른 탭 (캘린더 / 메모장 / 할 일) 명사 단독 톤과 일치, vault 폴더명 `portfolio` 와도 일치. ActivityBar / 사이드바 헤더 / 페이지 h1 / 단축키 / 가이드 모달 + 코드 주석까지 11곳.
 - **아이콘 4개 정리** (5c01af5): 메모장 `ClipboardList` ↔ 할 일 `ListChecks` 가 시각 유사해 헷갈리던 문제. notion 풍 단순/평면 아이콘으로 교체 — `Calendar` / `FileText` / `CheckSquare` / `LayoutGrid`. 캘린더 셀 메모 표시, 할 일 사이드패널의 메모 링크 leftIcon, 포트폴리오 empty state, QuickSwitcher 항목까지 일관 갱신.
+
+---
+
+## 2026-05-25
 
 ### PR #44 — 루틴: 매일 반복 작업 별도 도메인 + 월별 그리드
 

@@ -8,9 +8,7 @@ import {
   ArrowUpDown,
   Check,
   Pencil,
-  Circle,
   XCircle,
-  List,
   FolderInput,
   FolderPlus,
   ChevronDown,
@@ -37,10 +35,8 @@ import { useActiveRoutines, useToggleRoutineDay } from "../../hooks/useRoutines"
 import type { Meeting } from "../../api/meetings";
 import type { Routine } from "../../api/routines";
 import type { Todo, TodoCategory } from "../../api/todos";
-import { TODO_CATEGORIES } from "../../api/todos";
 import { formatDateLong, isToday, todayIso } from "../../lib/dates";
 import { formatError } from "../../lib/errors";
-import { categoryColor } from "../../lib/todoCategory";
 import { TaskAddModal } from "../tasks/TaskAddModal";
 import { CheckboxButton } from "../todos/CheckboxButton";
 import { JournalOverlay } from "../calendar/JournalOverlay";
@@ -48,6 +44,7 @@ import { MeetingsTreeView } from "../meetings/MeetingsTreeView";
 import { MoveFolderModal } from "../meetings/MoveFolderModal";
 import { Button } from "../common/Button";
 import { Text } from "../common/Text";
+import { FilterItem } from "../common/FilterItem";
 import { Popover } from "../common/Popover";
 import { useToast } from "../Toast";
 
@@ -874,10 +871,11 @@ export function CalendarDayPanel({
   const [showAddModal, setShowAddModal] = useState(false);
   const [showJournalOverlay, setShowJournalOverlay] = useState(false);
   // 3개 섹션 collapse — 메모장 폴더 패턴 차용. 새로고침 시 모두 펴짐 (session 단위).
+  // 루틴과 할일은 "할 일" 1개 섹션으로 통합 (안에서 구분선으로 분리). 별도 폴더 X.
   const [collapsed, setCollapsed] = useState<
-    Set<"journal" | "routines" | "todos" | "meetings">
+    Set<"journal" | "tasks" | "meetings">
   >(() => new Set());
-  function toggleSection(name: "journal" | "routines" | "todos" | "meetings") {
+  function toggleSection(name: "journal" | "tasks" | "meetings") {
     setCollapsed((prev) => {
       const next = new Set(prev);
       if (next.has(name)) next.delete(name);
@@ -986,16 +984,16 @@ export function CalendarDayPanel({
           onToggle={() => toggleSection("journal")}
         />
         {!collapsed.has("journal") ? (
-          <div className="px-3 pb-2">
+          <SectionChildren>
             {/* 메모 블럭과 동일 패턴 — leftIcon (BookOpen) + body Text. journal 있으면
                 내용 미리보기(첫 줄), 없으면 "일기 쓰기" muted. */}
             <Button
               variant="ghost"
               onClick={() => setShowJournalOverlay(true)}
-              className="w-full justify-start items-start gap-2 px-3 py-2"
+              className="w-full justify-start items-start gap-2 px-2 py-1 text-[13px]"
               leftIcon={
                 <BookOpen
-                  className="mt-0.5 h-3.5 w-3.5 shrink-0"
+                  className="h-3 w-3 shrink-0"
                   style={{ color: "var(--text-muted)" }}
                 />
               }
@@ -1003,7 +1001,7 @@ export function CalendarDayPanel({
             >
               <div className="min-w-0 flex-1">
                 {journal ? (
-                  <Text variant="body" as="div" truncate>
+                  <Text variant="caption" as="div" truncate className="text-[13px]">
                     {(() => {
                       // 첫 non-empty 줄을 제목처럼 표시. 마크다운 ATX heading prefix
                       // (`# `, `## `, ...) 만 strip — `#안녕` 처럼 공백 없는 케이스는
@@ -1016,45 +1014,38 @@ export function CalendarDayPanel({
                     })()}
                   </Text>
                 ) : (
-                  <Text variant="body" color="muted" as="div">
+                  <Text variant="caption" color="muted" as="div" className="text-[13px]">
                     일기 쓰기
                   </Text>
                 )}
               </div>
             </Button>
-          </div>
+          </SectionChildren>
         ) : null}
 
-        {/* 루틴 section — 그 날 active routine list + 체크 토글. 시각 X (시간순) */}
-        <SidePanelSectionHeader
-          label="루틴"
-          collapsed={collapsed.has("routines")}
-          onToggle={() => toggleSection("routines")}
-          count={dayRoutines.length}
-        />
-        {!collapsed.has("routines") ? (
-          <div className="space-y-1 px-3 pb-2">
-            {dayRoutines.length === 0 ? (
-              <Text
-                variant="caption"
-                color="muted"
-                as="div"
-                className="px-3 py-1.5"
-              >
-                루틴이 없어요
-              </Text>
-            ) : (
-              dayRoutines.map((r) => {
-                const done = r.log.has(selectedDate);
-                return (
-                  <div
-                    key={r.name}
-                    className="flex items-start gap-2 rounded-md px-3 py-2"
-                  >
-                    <span className="mt-0.5">
+        {/* 할 일 section — 루틴 + 일회성 할일 통합 (구분선으로 시각 분리). 별도 폴더 X.
+            내용 없으면 섹션 자체 숨김 (일기는 항상 노출, 그 외는 0건이면 hide). */}
+        {dayRoutines.length + todos.length > 0 ? (
+          <>
+            <SidePanelSectionHeader
+              label="할 일"
+              collapsed={collapsed.has("tasks")}
+              onToggle={() => toggleSection("tasks")}
+              count={dayRoutines.length + todos.length}
+            />
+            {!collapsed.has("tasks") ? (
+              <SectionChildren>
+                {dayRoutines.map((r) => {
+                  const done = r.log.has(selectedDate);
+                  return (
+                    <div
+                      key={`routine:${r.name}`}
+                      className="flex items-center gap-2 rounded-md px-2 py-1 text-[13px]"
+                    >
                       <CheckboxButton
                         status={done ? "done" : "pending"}
                         category={null}
+                        shape="circle"
                         onClick={() =>
                           toggleRoutineDayMutation.mutate({
                             name: r.name,
@@ -1063,155 +1054,130 @@ export function CalendarDayPanel({
                           })
                         }
                       />
-                    </span>
-                    <Text
-                      variant="body"
-                      as="span"
-                      className={`flex-1 ${done ? "line-through" : ""}`}
-                      style={{
-                        color: done
-                          ? "var(--text-muted)"
-                          : "var(--text-primary)",
-                      }}
-                    >
+                      <span
+                        className={`min-w-0 flex-1 truncate ${done ? "line-through" : ""}`}
+                        style={{
+                          color: done
+                            ? "var(--text-muted)"
+                            : "var(--text-primary)",
+                        }}
+                      >
+                        {r.name}
+                      </span>
                       {r.frontmatter.time ? (
-                        <Text variant="body" color="muted" as="span">
-                          {r.frontmatter.time}{" "}
-                        </Text>
+                        <span
+                          className="shrink-0 text-[11px] tabular-nums"
+                          style={{ color: "var(--text-muted)" }}
+                        >
+                          {r.frontmatter.time}
+                        </span>
                       ) : null}
-                      {r.name}
-                    </Text>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        ) : null}
-
-        {/* 할 일 section */}
-        <SidePanelSectionHeader
-          label="할 일"
-          collapsed={collapsed.has("todos")}
-          onToggle={() => toggleSection("todos")}
-          count={todos.length}
-        />
-        {!collapsed.has("todos") ? (
-          <div className="space-y-1 px-3 pb-2">
-            {todos.length === 0 ? (
-              <Text
-                variant="caption"
-                color="muted"
-                as="div"
-                className="px-3 py-1.5"
-              >
-                할 일이 없어요
-              </Text>
-            ) : (
-              todos.map((t) => {
-                const status = t.cancelled
-                  ? "cancelled"
-                  : t.done
-                    ? "done"
-                    : "pending";
-                return (
-                  <div
-                    key={t.id}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => onOpenTodo(t.id)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        onOpenTodo(t.id);
-                      }
-                    }}
-                    className="flex cursor-pointer items-start gap-2 rounded-md px-3 py-2 transition hover:bg-[var(--bg-surface-hover)]"
-                  >
-                    <span className="mt-0.5">
+                    </div>
+                  );
+                })}
+                {todos.map((t) => {
+                  const status = t.cancelled
+                    ? "cancelled"
+                    : t.done
+                      ? "done"
+                      : "pending";
+                  return (
+                    <div
+                      key={`todo:${t.id}`}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => onOpenTodo(t.id)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          onOpenTodo(t.id);
+                        }
+                      }}
+                      className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-[13px] transition hover:bg-[var(--bg-surface-hover)]"
+                    >
                       <CheckboxButton
                         status={status}
                         category={t.category}
                         onClick={() => handleToggle(t)}
                       />
-                    </span>
-                    <Text
-                      variant="body"
-                      as="span"
-                      className={`flex-1 ${t.done ? "line-through" : ""}`}
-                      style={{
-                        color: t.done
-                          ? "var(--text-muted)"
-                          : "var(--text-primary)",
-                      }}
-                    >
+                      <span
+                        className={`min-w-0 flex-1 truncate ${t.done ? "line-through" : ""}`}
+                        style={{
+                          color: t.done
+                            ? "var(--text-muted)"
+                            : "var(--text-primary)",
+                        }}
+                      >
+                        {t.title}
+                      </span>
                       {t.due_time ? (
-                        <Text variant="body" color="muted" as="span">
-                          {t.due_time}{" "}
-                        </Text>
+                        <span
+                          className="shrink-0 text-[11px] tabular-nums"
+                          style={{ color: "var(--text-muted)" }}
+                        >
+                          {t.due_time}
+                        </span>
                       ) : null}
-                      {t.title}
-                    </Text>
-                  </div>
-                );
-              })
-            )}
-          </div>
+                    </div>
+                  );
+                })}
+              </SectionChildren>
+            ) : null}
+          </>
         ) : null}
 
-        {/* 메모 section */}
-        <SidePanelSectionHeader
-          label="메모"
-          collapsed={collapsed.has("meetings")}
-          onToggle={() => toggleSection("meetings")}
-          count={meetings.length}
-        />
-        {!collapsed.has("meetings") ? (
-          <div className="space-y-1 px-3 pb-2">
-            {meetings.length === 0 ? (
-              <Text
-                variant="caption"
-                color="muted"
-                as="div"
-                className="px-3 py-1.5"
-              >
-                메모가 없어요
-              </Text>
-            ) : (
-              meetings.map((m) => (
+        {/* 메모 section — 0건이면 섹션 자체 숨김. */}
+        {meetings.length > 0 ? (
+          <>
+            <SidePanelSectionHeader
+              label="메모"
+              collapsed={collapsed.has("meetings")}
+              onToggle={() => toggleSection("meetings")}
+              count={meetings.length}
+            />
+            {!collapsed.has("meetings") ? (
+              <SectionChildren>
+                {meetings.map((m) => (
                 <Button
                   key={m.uid}
                   variant="ghost"
                   onClick={() => onOpenMeeting(m.uid)}
-                  className="w-full justify-start items-start gap-2 px-3 py-2"
+                  className="w-full justify-start items-start gap-2 px-2 py-1 text-[13px]"
                   leftIcon={
-                    <FileText className="mt-0.5 h-3.5 w-3.5 shrink-0 text-blue-500" />
+                    <FileText className="mt-0.5 h-3 w-3 shrink-0 text-blue-500" />
                   }
                 >
                   <div className="min-w-0 flex-1">
-                    <Text variant="body" as="div">
+                    <div className="flex items-baseline gap-2">
+                      <span className="min-w-0 flex-1 truncate">
+                        {m.title?.trim() || "(제목 없음)"}
+                      </span>
                       {m.time ? (
-                        <Text variant="body" color="muted" as="span">
+                        <span
+                          className="shrink-0 text-[11px] tabular-nums"
+                          style={{ color: "var(--text-muted)" }}
+                        >
                           {m.time}
-                        </Text>
-                      ) : null}{" "}
-                      {m.title?.trim() || "(제목 없음)"}
-                    </Text>
+                        </span>
+                      ) : null}
+                    </div>
                     {m.attendees ? (
                       <Text
                         variant="caption"
                         color="secondary"
                         as="div"
                         truncate
-                        className="mt-0.5"
+                        className="mt-0.5 text-[11px]"
                       >
                         {m.attendees}
                       </Text>
                     ) : null}
                   </div>
                 </Button>
-              ))
-            )}
-          </div>
+                ))}
+              </SectionChildren>
+            ) : null}
+          </>
         ) : null}
       </div>
 
@@ -1225,6 +1191,22 @@ export function CalendarDayPanel({
         date={selectedDate}
         onClose={() => setShowJournalOverlay(false)}
       />
+    </div>
+  );
+}
+
+// 섹션 children wrapper — 메모장 폴더 트리의 indent + vertical guide 패턴 차용.
+// 헤더 chevron(8px paddingLeft + 6px half)=14px 위치에 세로 guide line, 안의 항목들은
+// paddingLeft 16px 만큼 들여쓰기 → "폴더 안에 들어있다" 시각 신호.
+function SectionChildren({ children }: { children: ReactNode }) {
+  return (
+    <div className="relative pr-1 pb-2" style={{ paddingLeft: "16px" }}>
+      <div
+        aria-hidden
+        className="pointer-events-none absolute top-0 bottom-0 w-px"
+        style={{ left: "14px", backgroundColor: "var(--border-default)" }}
+      />
+      {children}
     </div>
   );
 }
@@ -1246,8 +1228,8 @@ function SidePanelSectionHeader({
     <Button
       variant="ghost"
       onClick={onToggle}
-      className="w-full justify-between gap-1.5 rounded-none px-3 py-1 text-[13px] font-normal"
-      style={{ color: "var(--text-secondary)" }}
+      className="w-full justify-between gap-1.5 rounded-none py-1 pr-2 text-[13px] font-normal"
+      style={{ paddingLeft: "8px", color: "var(--text-secondary)" }}
     >
       <span className="inline-flex items-center gap-1.5">
         {collapsed ? (
@@ -1258,14 +1240,12 @@ function SidePanelSectionHeader({
         <span>{label}</span>
       </span>
       {typeof count === "number" ? (
-        <Text
-          variant="caption"
-          as="span"
-          className="font-mono"
+        <span
+          className="text-[11px] tabular-nums"
           style={{ color: "var(--text-muted)" }}
         >
           {count}
-        </Text>
+        </span>
       ) : null}
     </Button>
   );
@@ -1282,11 +1262,9 @@ export type TodosCategoryFilter =
 type TodosPanelProps = {
   statusFilter: TodosStatusFilter;
   onStatusChange: (next: TodosStatusFilter) => void;
-  categoryFilter: TodosCategoryFilter;
-  onCategoryChange: (next: TodosCategoryFilter) => void;
   sortKey: TodoSortKey;
   onSortKeyChange: (next: TodoSortKey) => void;
-  // 사이드바 폴더 2개 구조 (V0.7.3) — 루틴 폴더의 selected entry 와 onSelect.
+  // 사이드바 루틴 폴더의 selected entry 와 onSelect.
   // null = 루틴 미선택 (= 태스크 필터 활성). routine 선택 시 본문이 RoutineDetail 로
   // 전환되고 태스크 필터는 시각 비활성 (회색).
   selectedRoutineName: string | null;
@@ -1296,8 +1274,6 @@ type TodosPanelProps = {
 export function TodosSidePanel({
   statusFilter,
   onStatusChange,
-  categoryFilter,
-  onCategoryChange,
   sortKey,
   onSortKeyChange,
   selectedRoutineName,
@@ -1309,7 +1285,6 @@ export function TodosSidePanel({
   const toggleRoutineDayMutation = useToggleRoutineDay();
   const today = todayIso();
   const [collapsedRoutines, setCollapsedRoutines] = useState(false);
-  const [collapsedTasks, setCollapsedTasks] = useState(false);
 
   // 루틴 폴더 row 의 오늘 체크박스. CheckboxButton 이 e.stopPropagation 내장 — row click 안 trigger.
   function handleToggleRoutineToday(name: string) {
@@ -1325,119 +1300,39 @@ export function TodosSidePanel({
     fn();
   }
 
-  // 두 차원 독립. 한 차원 count 는 다른 차원과 AND 후 — 사용자가 "현재 다른
-  // 차원 적용 후 이 옵션 누르면 몇 개?" 미리 보기. (예: status=done 일 때
-  // 카테고리별 count 는 done 만 센 값.)
-  // status: 미완료 = !done && !cancelled (actionable), 완료 = done, 취소 = cancelled.
-  // cancelled 는 별도 view 로 분리 (사이드바 하단 entry). deleted 는 footer 의
-  // 휴지통 modal 에서 처리 — 다른 모든 필터 (전체/미완료/완료 + 카테고리) 에서
-  // 격리.
+  // status 별 count. 카테고리 필터는 페이지 헤더 chip 으로 이동했으니 사이드바
+  // count 는 status 만 — 카테고리와 AND 결합 없음. deleted 는 휴지통 modal 전용
+  // 으로 격리.
   const counts = useMemo(() => {
-    function inStatus(t: Todo): boolean {
-      if (t.deleted) return false; // deleted 는 절대 안 셈
-      if (statusFilter === "cancelled") return t.cancelled;
-      if (t.cancelled) return false;
-      if (statusFilter === "all") return true;
-      if (statusFilter === "pending") return !t.done;
-      return t.done;
-    }
-    function inCategory(t: Todo): boolean {
-      if (categoryFilter === "all") return true;
-      if (categoryFilter === "uncategorized") return !t.category;
-      return t.category === categoryFilter;
-    }
     const status: Record<TodosStatusFilter, number> = {
       all: 0,
       pending: 0,
       done: 0,
       cancelled: 0,
     };
-    const category: Record<string, number> = { all: 0, uncategorized: 0 };
-    for (const c of TODO_CATEGORIES) category[c.id] = 0;
     for (const t of todos) {
-      if (t.deleted) continue; // 휴지통 modal 에서만 보임
+      if (t.deleted) continue;
       if (t.cancelled) {
         status.cancelled++;
         continue;
       }
-      if (inCategory(t)) {
-        status.all++;
-        if (t.done) status.done++;
-        else status.pending++;
-      }
-      if (inStatus(t)) {
-        category.all++;
-        if (t.category) {
-          category[t.category] = (category[t.category] ?? 0) + 1;
-        } else {
-          category.uncategorized++;
-        }
-      }
+      status.all++;
+      if (t.done) status.done++;
+      else status.pending++;
     }
-    return { status, category };
-  }, [todos, statusFilter, categoryFilter]);
+    return { status };
+  }, [todos]);
 
-  // status leading 아이콘 — 카테고리 dot 과 동일한 12px 박스 안에서 정렬.
-  // "전체" 는 카테고리 "전체"와 동일하게 leading 비움 (시각 비대칭이 의미 신호).
+  // status row — 라벨 + 카운트만, leading 아이콘 없음. status 가 단일 차원이라
+  // 라벨 텍스트만으로 충분히 명확. 캘린더/포트폴리오 패턴과 align.
   const statusItems: Array<{
     id: TodosStatusFilter;
     label: string;
     count: number;
-    leading: ReactNode;
   }> = [
-    {
-      id: "all",
-      label: "전체",
-      count: counts.status.all,
-      leading: (
-        <List
-          className="h-3 w-3"
-          strokeWidth={1.75}
-          style={{ color: "var(--text-secondary)" }}
-        />
-      ),
-    },
-    {
-      id: "pending",
-      label: "미완료",
-      count: counts.status.pending,
-      leading: (
-        <Circle
-          className="h-3 w-3"
-          strokeWidth={1.75}
-          style={{ color: "var(--text-secondary)" }}
-        />
-      ),
-    },
-    {
-      id: "done",
-      label: "완료",
-      count: counts.status.done,
-      // CheckCircle2 (lucide) 의 내부 체크가 12px 사이즈에서 너무 작아 보여 →
-      // filled 원 + Check (체크만 아이콘, strokeWidth 굵게) wrapper 로 교체.
-      // 체크 path 가 원 영역을 더 많이 차지 → 작은 사이즈에서도 또렷.
-      leading: (
-        <span
-          className="inline-flex h-3 w-3 items-center justify-center rounded-full"
-          style={{ backgroundColor: "var(--text-secondary)" }}
-        >
-          <Check
-            className="h-2 w-2"
-            strokeWidth={3.5}
-            style={{ color: "var(--text-inverse)" }}
-          />
-        </span>
-      ),
-    },
-  ];
-  const categoryItems: Array<{ id: TodosCategoryFilter; label: string; count: number }> = [
-    { id: "all", label: "전체", count: counts.category.all },
-    { id: "uncategorized", label: "미분류", count: counts.category.uncategorized },
-    ...TODO_CATEGORIES.map((c) => ({
-      id: c.id as TodosCategoryFilter,
-      label: c.label,
-      count: counts.category[c.id] ?? 0,
-    })),
+    { id: "all", label: "전체", count: counts.status.all },
+    { id: "pending", label: "미완료", count: counts.status.pending },
+    { id: "done", label: "완료", count: counts.status.done },
   ];
 
   return (
@@ -1465,13 +1360,6 @@ export function TodosSidePanel({
                   // 루틴 폴더 active 상태면 모달 default 탭 = routine.
                   detail: {
                     type: selectedRoutineName !== null ? "routine" : "task",
-                    // 태스크 필터에 카테고리 적용된 상태면 prefill 해서 빠르게.
-                    category:
-                      categoryFilter === "work" ||
-                      categoryFilter === "schedule" ||
-                      categoryFilter === "other"
-                        ? categoryFilter
-                        : null,
                   },
                 }),
               )
@@ -1488,21 +1376,39 @@ export function TodosSidePanel({
         aria-label="필터"
       >
         <div className="min-h-0 flex-1 overflow-y-auto py-1">
-          {/* 루틴 폴더 — 캘린더 사이드바 패턴 차용: SectionHeader (outer) + 안 항목들은
-              px-3 wrapper 로 들여쓰기 (chevron 옆 정렬). 시각 계층 = outer header / inner items. */}
+          {/* status 필터 — 사이드바 최상단 flat. 카테고리 차원은 페이지 헤더 chip 으로
+              이동 — 사이드바는 단일 차원 (status). 폴더 outer 없이 메모장 트리의 nav p-1 패턴. */}
+          <div className="p-1">
+            {statusItems.map((item) => (
+              <FilterItem
+                key={item.id}
+                label={item.label}
+                count={item.count}
+                active={
+                  selectedRoutineName === null && item.id === statusFilter
+                }
+                onClick={() =>
+                  selectTaskFilter(() => onStatusChange(item.id))
+                }
+              />
+            ))}
+          </div>
+
+          {/* 루틴 폴더 — status 아래에 별도 도메인. SectionHeader (outer) + 안 항목들은
+              SectionChildren wrapper 로 들여쓰기. */}
           <SidePanelSectionHeader
             label="루틴"
             collapsed={collapsedRoutines}
             onToggle={() => setCollapsedRoutines((v) => !v)}
           />
           {!collapsedRoutines ? (
-            <div className="space-y-1 px-3 pb-2">
+            <SectionChildren>
               {activeRoutines.length === 0 ? (
                 <Text
                   variant="caption"
                   color="muted"
                   as="div"
-                  className="px-3 py-1.5"
+                  className="px-2 py-1 text-[13px]"
                 >
                   아직 루틴이 없어요
                 </Text>
@@ -1518,80 +1424,18 @@ export function TodosSidePanel({
                   />
                 ))
               )}
-            </div>
-          ) : null}
-
-          {/* 태스크 폴더 — 같은 패턴: outer header + inner px-3 wrapper.
-              안에 status / category 두 그룹은 hr 로 분리. */}
-          <SidePanelSectionHeader
-            label="태스크"
-            collapsed={collapsedTasks}
-            onToggle={() => setCollapsedTasks((v) => !v)}
-          />
-          {!collapsedTasks ? (
-            <div className="space-y-1 px-3 pb-2">
-              {statusItems.map((item) => (
-                <TodosFilterItem
-                  key={item.id}
-                  item={item}
-                  leading={item.leading}
-                  active={
-                    selectedRoutineName === null && item.id === statusFilter
-                  }
-                  onClick={() =>
-                    selectTaskFilter(() => onStatusChange(item.id))
-                  }
-                />
-              ))}
-              <div
-                className="my-1.5"
-                style={{ borderTop: "1px solid var(--border-subtle)" }}
-              />
-              {categoryItems.map((item) => {
-                const dotColor =
-                  item.id === "uncategorized"
-                    ? "var(--text-muted)"
-                    : item.id === "all"
-                      ? ""
-                      : categoryColor(item.id as TodoCategory);
-                const leading =
-                  item.id === "all" ? (
-                    <List
-                      className="h-3 w-3"
-                      strokeWidth={1.75}
-                      style={{ color: "var(--text-secondary)" }}
-                    />
-                  ) : dotColor ? (
-                    <span
-                      aria-hidden
-                      className="inline-block h-2 w-2 rounded-full"
-                      style={{ backgroundColor: dotColor }}
-                    />
-                  ) : null;
-                return (
-                  <TodosFilterItem
-                    key={item.id}
-                    item={item}
-                    leading={leading}
-                    active={
-                      selectedRoutineName === null && item.id === categoryFilter
-                    }
-                    onClick={() =>
-                      selectTaskFilter(() => onCategoryChange(item.id))
-                    }
-                  />
-                );
-              })}
-            </div>
+            </SectionChildren>
           ) : null}
         </div>
-        {/* 취소됨 — 사이드바 하단 별도 entry. 폴더 밖이라 들여쓰기 없이 outer level. */}
+        {/* 취소됨 — 사이드바 하단 별도 entry. 폴더 밖이라 들여쓰기 없이 outer level
+            (헤더 chevron 위치 8px 와 align). 좌우 padding 1 = 메모장 트리 root 와 동일. */}
         <div
-          className="px-3 py-2"
+          className="px-1 py-2"
           style={{ borderTop: "1px solid var(--border-default)" }}
         >
-          <TodosFilterItem
-            item={{ label: "취소됨" }}
+          <FilterItem
+            label="취소됨"
+            count={counts.status.cancelled}
             leading={
               <XCircle
                 className="h-3 w-3"
@@ -1636,76 +1480,34 @@ function RoutineSidebarItem({
           onSelect();
         }
       }}
-      className="flex cursor-pointer items-start gap-2 rounded-md px-3 py-2 transition hover:bg-[var(--bg-surface-hover)]"
+      className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-[13px] transition hover:bg-[var(--bg-surface-hover)]"
       style={{
         backgroundColor: active ? "var(--bg-surface-active)" : undefined,
       }}
     >
-      <span className="mt-0.5">
-        <CheckboxButton
-          status={done ? "done" : "pending"}
-          category={null}
-          onClick={onToggleToday}
-        />
-      </span>
-      <Text
-        variant="body"
-        as="span"
+      <CheckboxButton
+        status={done ? "done" : "pending"}
+        category={null}
+        shape="circle"
+        onClick={onToggleToday}
+      />
+      <span
         className={`min-w-0 flex-1 truncate ${done ? "line-through" : ""}`}
         style={{
           color: done ? "var(--text-muted)" : "var(--text-primary)",
         }}
       >
         {routine.name}
-      </Text>
+      </span>
       {routine.frontmatter.time ? (
-        <Text
-          variant="caption"
-          color="muted"
-          as="span"
-          className="shrink-0 font-mono"
+        <span
+          className="shrink-0 text-[11px] tabular-nums"
+          style={{ color: "var(--text-muted)" }}
         >
           {routine.frontmatter.time}
-        </Text>
+        </span>
       ) : null}
     </div>
-  );
-}
-
-function TodosFilterItem({
-  item,
-  active,
-  onClick,
-  leading,
-}: {
-  item: { label: string };
-  active: boolean;
-  onClick: () => void;
-  leading?: ReactNode;
-}) {
-  return (
-    <Button
-      variant="ghost"
-      onClick={onClick}
-      className={`w-full justify-start px-3 py-2 ${
-        active ? "font-medium" : ""
-      }`}
-      style={{
-        backgroundColor: active ? "var(--bg-surface-active)" : undefined,
-        color: active ? "var(--text-primary)" : "var(--text-secondary)",
-      }}
-    >
-      <span className="inline-flex items-center gap-2">
-        {/* 12px fixed area — dot/icon 다 가운데 정렬 → 라벨 좌측 align 통일. */}
-        <span
-          aria-hidden
-          className="inline-flex h-3 w-3 shrink-0 items-center justify-center"
-        >
-          {leading}
-        </span>
-        {item.label}
-      </span>
-    </Button>
   );
 }
 

@@ -199,14 +199,24 @@ function AppContent() {
   }, [isReady]);
 
   // 자동 백업 — vault ready 후 10초 뒤 1회. interval/keepCount 설정에 따라 실행.
+  // 1초+ 걸리면 progress toast 로 freeze 같은 체감 차단.
   useEffect(() => {
     if (!isTauri || !isReady || autoBackupDone.current) return;
     autoBackupDone.current = true;
     const t = setTimeout(async () => {
+      let progressId: number | null = null;
+      const progressTimer = setTimeout(() => {
+        progressId = toast.show("vault 자동 백업 중… (크기에 따라 1-10초)", {
+          kind: "progress",
+        });
+      }, 1000);
       try {
         await maybeAutoBackup(adapter);
       } catch (err) {
         console.error("auto backup failed", err);
+      } finally {
+        clearTimeout(progressTimer);
+        if (progressId !== null) toast.dismiss(progressId);
       }
     }, 10000);
     return () => clearTimeout(t);
@@ -491,8 +501,6 @@ function AppContent() {
       <TodosSidePanel
         statusFilter={todoStatus}
         onStatusChange={setTodoStatus}
-        categoryFilter={todoCategory}
-        onCategoryChange={setTodoCategory}
         sortKey={todoSortKey}
         onSortKeyChange={setTodoSortKey}
         selectedRoutineName={selectedRoutineName}
@@ -504,9 +512,6 @@ function AppContent() {
         onFilterChange={setPortfolioFilter}
         sortKey={portfolioSortKey}
         onSortKeyChange={setPortfolioSortKey}
-        selectedCategories={portfolioCategoryFilter.selected}
-        onCategoryToggle={portfolioCategoryFilter.toggle}
-        onCategoryClear={portfolioCategoryFilter.clear}
         syncState={portfolioSync.state}
         onSyncRun={portfolioRunIncrementalSync}
         onSyncCancel={portfolioSync.cancel}
@@ -553,9 +558,8 @@ function AppContent() {
         <PortfolioPage
           activeFilter={portfolioFilter}
           sortKey={portfolioSortKey}
-          selectedCategories={portfolioCategoryFilter.selected}
-          onCategoryToggle={portfolioCategoryFilter.toggle}
-          onCategoryClear={portfolioCategoryFilter.clear}
+          selectedCategory={portfolioCategoryFilter.selected}
+          onCategoryChange={portfolioCategoryFilter.change}
           onSync={portfolioRunFullSync}
           syncRunning={portfolioSync.state.running}
         />
@@ -568,6 +572,7 @@ function AppContent() {
         <TodosPage
           statusFilter={todoStatus}
           categoryFilter={todoCategory}
+          onCategoryChange={setTodoCategory}
           sortKey={todoSortKey}
           scrollToTodoId={scrollToTodoId}
           onScrollHandled={() => setScrollToTodoId(null)}

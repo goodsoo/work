@@ -59,11 +59,6 @@ PR 단위로 묶음. 각 PR 의 **한 줄 임팩트** 는 카드 frontmatter `im
 - [ ] 갱신 카드 표시는 noise — 거의 매번 발생. skip.
 - [ ] (선택) 사이드바 "새 카드 N" 클릭 → 그 N 개만 임시 필터.
 
-### PR — 사이드바 FilterItem 통일 `ui_ux`
-한 줄 임팩트: 메모장/캘린더/할일/포트폴리오 사이드바 공통 컴포넌트화
-
-- [ ] 현재 PortfolioProjectList 의 FilterItem (px-2 py-1 text-[13px]) 과 SidePanel.tsx 의 TodosFilterItem (px-3 py-2 text-sm) 사이즈/패턴 차이. common/FilterItem 으로 추출 + 모든 사이드바 마이그레이트.
-
 ### PR — 가이드북 UIUX 다듬기 `ui_ux`
 한 줄 임팩트: 동기화 진행 표시 + 가독성 정돈
 
@@ -93,13 +88,6 @@ PR 단위로 묶음. 각 PR 의 **한 줄 임팩트** 는 카드 frontmatter `im
 - [ ] **종료일 < 시작일 차단** — 음수 기간 루틴 저장 차단.
 - [ ] **이름 빈 값 차단** — 빈 이름은 파일명도 안 잡힘.
 - [ ] **UI** — submit 버튼 비활성 + 인라인 에러 (toast 보다 즉시 인식). voice/tone "원인 + 해결" 2단 따름.
-
-### PR — 백업 가시성 강화 `ui_ux`
-한 줄 임팩트: spinner + 마지막 백업 시각 + 오래된 zip 정리 = 백업 영역 dogfood 폴리싱
-
-- [ ] **첫 zip spinner toast** — vault 크기 따라 첫 zip 1-10초 침묵. 1초+ 면 spinner toast.
-- [ ] **설정 모달에 마지막 백업 시각 + 백업 path 노출** — "마지막 백업: 2026-05-21 14:32 · 경로 ~/Backups/...". 클릭 = path 클립보드 또는 Finder 진입.
-- [ ] **오래된 zip 자동 정리** — 최근 N개 (default 30개) 만 유지, 그 외 삭제. 정책 = 설정 모달에서 조정 가능.
 
 ---
 

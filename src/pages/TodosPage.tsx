@@ -10,11 +10,18 @@ import {
   useTodoUndo,
   useTodoUndoShortcut,
 } from "../hooks/useTodoHistory";
-import type { Todo, TodoPriority, TodoCategory } from "../api/todos";
+import {
+  TODO_CATEGORIES,
+  type Todo,
+  type TodoPriority,
+  type TodoCategory,
+} from "../api/todos";
+import { categoryColor } from "../lib/todoCategory";
 import { TodoRow } from "../components/todos/TodoRow";
 import { PageHeaderBar } from "../components/common/PageHeaderBar";
 import { Button } from "../components/common/Button";
 import { Text } from "../components/common/Text";
+import { SelectableChip } from "../components/common/SelectableChip";
 import { EmptyState } from "../components/common/EmptyState";
 import type {
   TodosCategoryFilter,
@@ -25,6 +32,7 @@ import { type TodoSortKey } from "../hooks/useTodoSort";
 type Props = {
   statusFilter?: TodosStatusFilter;
   categoryFilter?: TodosCategoryFilter;
+  onCategoryChange?: (next: TodosCategoryFilter) => void;
   sortKey?: TodoSortKey;
   // 캘린더 사이드바 todo 클릭으로 진입 시 해당 row 로 scroll. 한 번 처리 후 clear.
   scrollToTodoId?: string | null;
@@ -34,6 +42,7 @@ type Props = {
 export function TodosPage({
   statusFilter = "all",
   categoryFilter = "all",
+  onCategoryChange,
   sortKey = "date_desc",
   scrollToTodoId = null,
   onScrollHandled,
@@ -41,6 +50,19 @@ export function TodosPage({
   const { data, isLoading, error, refetch } = useTodos();
   const updateMutation = useUpdateTodo();
   const deleteMutation = useDeleteTodo();
+
+  // 카테고리별 카운트 — cancelled/deleted 제외. 카테고리 chip 의 dim 처리에 사용.
+  const categoryCounts = useMemo(() => {
+    const map = new Map<TodoCategory | "uncategorized", number>();
+    let uncategorized = 0;
+    for (const t of data ?? []) {
+      if (t.deleted || t.cancelled) continue;
+      if (!t.category) uncategorized++;
+      else map.set(t.category, (map.get(t.category) ?? 0) + 1);
+    }
+    map.set("uncategorized", uncategorized);
+    return map;
+  }, [data]);
 
   const { canUndo, canRedo, undo, redo } = useTodoUndo();
 
@@ -193,6 +215,13 @@ export function TodosPage({
           </Text>
         }
       />
+      {onCategoryChange ? (
+        <CategoryChipRow
+          selected={categoryFilter}
+          counts={categoryCounts}
+          onChange={onCategoryChange}
+        />
+      ) : null}
       <div className="mx-auto w-full max-w-2xl px-5 pb-16 pt-5 lg:max-w-4xl">
       {error ? (
         <EmptyState
@@ -242,6 +271,61 @@ export function TodosPage({
       )}
       </div>
     </>
+  );
+}
+
+// 페이지 헤더 아래 sub-header — 카테고리 chip group (single radio). 작업 페이지의
+// 같은 자리와 동일 패턴. "전체 / 미분류 / 업무 / 일정 / 기타" 5개 chip 가로 wrap.
+function CategoryChipRow({
+  selected,
+  counts,
+  onChange,
+}: {
+  selected: TodosCategoryFilter;
+  counts: Map<TodoCategory | "uncategorized", number>;
+  onChange: (next: TodosCategoryFilter) => void;
+}) {
+  return (
+    <div
+      className="shrink-0 px-6 py-3"
+      style={{ borderBottom: "1px solid var(--border-default)" }}
+    >
+      <div className="flex flex-wrap gap-1">
+        <SelectableChip
+          active={selected === "all"}
+          onToggle={() => onChange("all")}
+          title="전체 카테고리"
+        >
+          전체
+        </SelectableChip>
+        <SelectableChip
+          active={selected === "uncategorized"}
+          count={counts.get("uncategorized") ?? 0}
+          color="var(--text-muted)"
+          onToggle={() => onChange("uncategorized")}
+          title="미분류"
+        >
+          미분류
+        </SelectableChip>
+        {TODO_CATEGORIES.map((c) => {
+          const active = selected === c.id;
+          const count = counts.get(c.id) ?? 0;
+          const color = categoryColor(c.id);
+          return (
+            <SelectableChip
+              key={c.id}
+              active={active}
+              count={count}
+              color={color}
+              onToggle={() => onChange(c.id)}
+              title={`${c.label} ${count > 0 ? `(${count})` : ""}`.trim()}
+            >
+              {c.label}
+            </SelectableChip>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
