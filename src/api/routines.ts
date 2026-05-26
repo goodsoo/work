@@ -65,6 +65,13 @@ export class RoutineConflictError extends Error {
   }
 }
 
+export class RoutineDateRangeError extends Error {
+  constructor() {
+    super("종료일은 시작일과 같거나 이후여야 합니다.");
+    this.name = "RoutineDateRangeError";
+  }
+}
+
 // ─── parser ────────────────────────────────────────────────────────────────
 
 const DONE_LINE_RE = /^\s*-\s*\[x\]\s*✅?\s*(\d{4}-\d{2}-\d{2})\s*$/i;
@@ -230,6 +237,7 @@ export async function createRoutine(
   if (!name) throw new InvalidRoutineNameError(name);
   if (FORBIDDEN_NAME.test(name)) throw new InvalidRoutineNameError(name);
   if (!input.started) throw new Error("시작일이 필요해요");
+  if (input.ends && input.ends < input.started) throw new RoutineDateRangeError();
   const path = routinePath(name);
   if (await adapter.exists(path)) {
     throw new RoutineConflictError(name);
@@ -298,6 +306,9 @@ export async function updateRoutine(
           ? patch.ends
           : routine.frontmatter.ends,
   };
+  if (nextFm.ends && nextFm.ends < nextFm.started) {
+    throw new RoutineDateRangeError();
+  }
   const next: Routine = {
     ...routine,
     slug: currentName,

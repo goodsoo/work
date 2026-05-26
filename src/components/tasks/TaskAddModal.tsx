@@ -314,6 +314,11 @@ function RoutineForm({ onDone }: { onDone: () => void }) {
     return next;
   }
 
+  // 클릭 못 누르는 게 1차 게이트 — 사용자가 비활성 이유를 빠르게 인지하도록 라벨의 `*` +
+  // started/ends onCommit 의 즉시 인라인 에러로 보강.
+  const canSubmit =
+    name.trim().length > 0 && !!started && (!ends || ends >= started);
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const next = validate();
@@ -338,6 +343,10 @@ function RoutineForm({ onDone }: { onDone: () => void }) {
 
   function clearError(field: keyof RoutineErrors) {
     setErrors((prev) => (prev[field] ? { ...prev, [field]: undefined } : prev));
+  }
+
+  function setError(field: keyof RoutineErrors, msg: string) {
+    setErrors((prev) => (prev[field] === msg ? prev : { ...prev, [field]: msg }));
   }
 
   return (
@@ -416,8 +425,15 @@ function RoutineForm({ onDone }: { onDone: () => void }) {
               value={started}
               onCommit={(next) => {
                 setStarted(next);
-                clearError("started");
-                if (next && ends && ends >= next) clearError("ends");
+                if (!next) {
+                  setError("started", "시작일을 입력하세요.");
+                } else {
+                  clearError("started");
+                }
+                if (next && ends) {
+                  if (ends >= next) clearError("ends");
+                  else setError("ends", "종료일은 시작일과 같거나 이후여야 합니다.");
+                }
               }}
               fullWidth
             />
@@ -438,7 +454,11 @@ function RoutineForm({ onDone }: { onDone: () => void }) {
               value={ends}
               onCommit={(next) => {
                 setEnds(next);
-                clearError("ends");
+                if (started && next && next < started) {
+                  setError("ends", "종료일은 시작일과 같거나 이후여야 합니다.");
+                } else {
+                  clearError("ends");
+                }
               }}
               fullWidth
             />
@@ -468,7 +488,7 @@ function RoutineForm({ onDone }: { onDone: () => void }) {
         <Button
           type="submit"
           variant="info"
-          disabled={createMutation.isPending}
+          disabled={!canSubmit || createMutation.isPending}
         >
           {createMutation.isPending ? "저장 중…" : "저장"}
         </Button>
