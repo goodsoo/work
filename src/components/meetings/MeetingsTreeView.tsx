@@ -6,15 +6,17 @@ import {
   type MeetingComparator,
   type MeetingsFolderNode,
 } from "../../lib/meetingsTree";
+import { useScopedKey } from "../../lib/vault/scopedStorage";
 import { Button } from "../common/Button";
 import { Text } from "../common/Text";
 
-const FOLDER_EXPAND_KEY = "goodsoob:meetingFolderExpand";
+const FOLDER_EXPAND_BASE_KEY = "goodsoob:meetingFolderExpand";
 // 트리 collapsed 상태를 localStorage 에 저장. "expanded" set 보다 "collapsed" set 으로
 // 보관 — 새 폴더는 default expanded (사용자가 명시적으로 collapse 한 폴더만 기억).
-function loadCollapsed(): Set<string> {
+// vault 별로 폴더 위계가 다르므로 useScopedKey 로 vault id namespace.
+function loadCollapsed(key: string): Set<string> {
   try {
-    const raw = window.localStorage.getItem(FOLDER_EXPAND_KEY);
+    const raw = window.localStorage.getItem(key);
     if (!raw) return new Set();
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return new Set();
@@ -24,9 +26,9 @@ function loadCollapsed(): Set<string> {
   }
 }
 
-function saveCollapsed(set: Set<string>): void {
+function saveCollapsed(key: string, set: Set<string>): void {
   try {
-    window.localStorage.setItem(FOLDER_EXPAND_KEY, JSON.stringify([...set]));
+    window.localStorage.setItem(key, JSON.stringify([...set]));
   } catch {
     // ignore — localStorage 막혀있어도 in-memory state 는 그대로 동작
   }
@@ -82,13 +84,19 @@ export function MeetingsTreeView({
   onFolderContextMenu,
   onMoveDrop,
 }: Props) {
-  const [collapsed, setCollapsed] = useState<Set<string>>(() => loadCollapsed());
+  const folderExpandKey = useScopedKey(FOLDER_EXPAND_BASE_KEY);
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => loadCollapsed(folderExpandKey));
   const [dropTarget, setDropTarget] = useState<string | null>(null); // 강조 중인 폴더 path
   const [dragUid, setDragUid] = useState<string | null>(null);
 
+  // vault 전환 시 새 vault 의 collapsed set 으로 갈아끼움.
   useEffect(() => {
-    saveCollapsed(collapsed);
-  }, [collapsed]);
+    setCollapsed(loadCollapsed(folderExpandKey));
+  }, [folderExpandKey]);
+
+  useEffect(() => {
+    saveCollapsed(folderExpandKey, collapsed);
+  }, [folderExpandKey, collapsed]);
 
   const tree = useMemo(
     () => buildMeetingsTree(meetings, sortMeetings, extraFolders ?? []),
