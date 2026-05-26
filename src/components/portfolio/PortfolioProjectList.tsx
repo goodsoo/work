@@ -91,13 +91,8 @@ export function PortfolioProjectList({
         onClick={() => onFilterChange({ kind: "uncategorized" })}
       />
 
-      {visibleProjects.length > 0 ? (
-        <>
-          <div
-            className="my-2"
-            style={{ borderTop: "1px solid var(--border-subtle)" }}
-          />
-          {visibleProjects.map((p) => {
+      {visibleProjects.length > 0
+        ? visibleProjects.map((p) => {
             const dot = p.color ? COLOR_DOT[p.color] ?? p.color : undefined;
             return (
               <FilterItem
@@ -121,22 +116,8 @@ export function PortfolioProjectList({
                 }
               />
             );
-          })}
-        </>
-      ) : null}
-
-      <div
-        className="mt-2 pt-2"
-        style={{ borderTop: "1px solid var(--border-default)" }}
-      >
-        <FilterItem
-          label="미사용"
-          count={counts.excluded}
-          muted
-          active={activeFilter.kind === "excluded"}
-          onClick={() => onFilterChange({ kind: "excluded" })}
-        />
-      </div>
+          })
+        : null}
     </nav>
   );
 }

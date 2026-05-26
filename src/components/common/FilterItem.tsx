@@ -41,12 +41,14 @@ export function FilterItem({
       }}
     >
       <span className="inline-flex min-w-0 items-center gap-2">
-        <span
-          aria-hidden
-          className="inline-flex h-3 w-3 shrink-0 items-center justify-center"
-        >
-          {leading}
-        </span>
+        {leading ? (
+          <span
+            aria-hidden
+            className="inline-flex h-3 w-3 shrink-0 items-center justify-center"
+          >
+            {leading}
+          </span>
+        ) : null}
         <span className="truncate">{label}</span>
       </span>
       {typeof count === "number" ? (

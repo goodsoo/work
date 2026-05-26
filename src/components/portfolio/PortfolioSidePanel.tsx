@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { ArrowUpDown, BookOpen, Check } from "lucide-react";
 import {
   usePortfolioProjects,
@@ -10,6 +10,7 @@ import { PortfolioProjectList, type ProjectFilter } from "./PortfolioProjectList
 import { PortfolioGuideModal } from "./PortfolioGuideModal";
 import { SyncButton } from "./SyncButton";
 import { Button } from "../common/Button";
+import { FilterItem } from "../common/FilterItem";
 import { Popover } from "../common/Popover";
 
 type Props = {
@@ -36,6 +37,13 @@ export function PortfolioSidePanel({
   const works = usePortfolioWorks();
   const projects = usePortfolioProjects();
   const [guideOpen, setGuideOpen] = useState(false);
+
+  // "미사용" entry 의 count — included=false 인 카드 수. 0 이어도 항상 노출
+  // (할일 사이드바 "취소됨" 패턴과 동일).
+  const excludedCount = useMemo(
+    () => (works.data ?? []).filter((w) => !w.frontmatter.included).length,
+    [works.data],
+  );
 
   return (
     <div className="relative flex h-full flex-col">
@@ -114,6 +122,21 @@ export function PortfolioSidePanel({
           works={works.data ?? []}
           activeFilter={activeFilter}
           onFilterChange={onFilterChange}
+        />
+      </div>
+
+      {/* 미사용 — 사이드바 하단 별도 entry. 할일 "취소됨" 패턴과 동일.
+          좌우 padding 1 = 메모장 트리 root + 할일 사이드바 와 동일. */}
+      <div
+        className="px-1 py-2"
+        style={{ borderTop: "1px solid var(--border-default)" }}
+      >
+        <FilterItem
+          label="미사용"
+          count={excludedCount}
+          muted
+          active={activeFilter.kind === "excluded"}
+          onClick={() => onFilterChange({ kind: "excluded" })}
         />
       </div>
 
