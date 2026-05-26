@@ -63,7 +63,13 @@ export function buildClaudePrompt(input: PromptInput): string {
 // ─────────────────────────────────────────────────────────────────────────────
 // V0.7 — PR (portfolio) prompt + response parser (design v2.3, step 8)
 
-const PR_PROMPT_HEADER = `다음 PR 정보를 보고 한 줄 임팩트 요약 + 카테고리를 정해주세요.
+function buildPRPromptHeader(categories: string[] | undefined): string {
+  // vault union 후보가 있으면 그것을 우선 노출. 매칭 없으면 새 슬러그 제안 가능 (옵시디안 tag).
+  // 후보가 비어있으면 (vault 첫 사용) "자유 입력" 안내.
+  const candidatesLine = categories && categories.length > 0
+    ? `현재 vault 의 카테고리 후보: ${categories.map((c) => `\`${c}\``).join(", ")}. 적절한 게 없으면 새 카테고리 슬러그 제안 가능 (영문/한글 단어 1-2개, 공백 X).`
+    : `현재 vault 에 카테고리가 없습니다. 자유 슬러그 1개 제안 (영문/한글 단어 1-2개, 공백 X). 예: \`ui_ux\`, \`backend\`, \`infra\`, \`fix\`, \`other\`.`;
+  return `다음 PR 정보를 보고 한 줄 임팩트 요약 + 카테고리를 정해주세요.
 
 ## 출력 형식
 \`\`\`
@@ -71,10 +77,13 @@ const PR_PROMPT_HEADER = `다음 PR 정보를 보고 한 줄 임팩트 요약 + 
 (한 문장, 비즈니스/사용자 임팩트 중심, 30자 이내. bullet 안 붙임)
 
 ### 카테고리
-ui_ux | backend | infra | fix | other 중 하나만
+(슬러그 1개만, 한 줄)
 \`\`\`
 
-규칙: PR title + body + 변경 파일 수/줄 수를 종합. 코드 변경 사실보다 "그래서 뭐가 좋아졌는지" 우선. "ui_ux" 같은 카테고리 값은 정확히 위 enum 그대로.`;
+규칙: PR title + body + 변경 파일 수/줄 수를 종합. 코드 변경 사실보다 "그래서 뭐가 좋아졌는지" 우선.
+
+${candidatesLine}`;
+}
 
 export interface PRPromptInput {
   title: string;
@@ -83,10 +92,12 @@ export interface PRPromptInput {
   changedFiles: number;
   additions: number;
   deletions: number;
+  // 옵션 — vault union 의 현재 카테고리 후보. AI 가 우선 후보로 노출.
+  categories?: string[];
 }
 
 export function buildPRPrompt(input: PRPromptInput): string {
-  const parts: string[] = [PR_PROMPT_HEADER];
+  const parts: string[] = [buildPRPromptHeader(input.categories)];
   parts.push("## PR 정보");
   parts.push(`제목: ${input.title}`);
   parts.push(`URL: ${input.url}`);
@@ -322,12 +333,14 @@ export function buildPRGuidePrompt(): string {
 const IMPACT_HEADER = /^#{2,3}\s+한\s*줄\s*임팩트\s*$/m;
 const CATEGORY_HEADER = /^#{2,3}\s+카테고리\s*$/m;
 const NEXT_HEADER = /^#{2,3}\s/m;
-const CATEGORY_ENUM = /^(ui_ux|backend|infra|fix|other)$/i;
-type PRCategory = "ui_ux" | "backend" | "infra" | "fix" | "other";
+// 슬러그 sanitize — 공백 / 백틱 / 따옴표 / 일반 markdown 노이즈 제거. underscore 와
+// 하이픈은 slug 의 valid char 라 유지 (예: `ui_ux`).
+// V0.7.3: 카테고리는 vault union 으로 풀려있어 enum 강제 X. 모델이 박은 슬러그를 그대로 받음.
+const CATEGORY_SANITIZE_RE = /[`"'*\s]/g;
 
 export function parsePRResponse(
   text: string,
-): { impact: string; category: PRCategory } | null {
+): { impact: string; category: string } | null {
   const impactSection = text.split(IMPACT_HEADER)[1]?.split(NEXT_HEADER)[0] ?? "";
   const categorySection =
     text.split(CATEGORY_HEADER)[1]?.split(NEXT_HEADER)[0] ?? "";
@@ -344,10 +357,9 @@ export function parsePRResponse(
     .map((l) => l.replace(/^[\s\-•*]+/, "").trim())
     .filter(Boolean)[0] ?? "";
 
-  const matched = categoryFirstLine.match(CATEGORY_ENUM);
-  const category: PRCategory = matched
-    ? (matched[1].toLowerCase() as PRCategory)
-    : "other";
+  // 자유 슬러그 — 노이즈 sanitize 후 첫 토큰. 빈 = "other" fallback.
+  const sanitized = categoryFirstLine.replace(CATEGORY_SANITIZE_RE, "").toLowerCase();
+  const category = sanitized || "other";
 
   if (!impact) return null; // 파싱 실패
   return { impact, category };

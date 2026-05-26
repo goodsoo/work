@@ -22,80 +22,40 @@ import { extractPRBodyImages, planImagePaths } from "../lib/portfolio/imageImpor
 import { patchFrontmatter } from "../lib/vault/parser";
 
 export const PORTFOLIO_DIR = "portfolio";
-export const CATEGORIES_FILE = "portfolio/categories.md";
 export const SYNCED_FILE = "portfolio/.synced.md";
 export const ATTACHMENTS_DIR = "portfolio/_attachments";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Enums / unions
+// Category model — vault union
 //
-// PortfolioCategory 는 string union 으로 풀려있음 — 사용자가 vault categories.md
-// 에 카테고리를 추가 가능. BUILTIN_CATEGORIES 5개는 기본 + 코드 곳곳 default 로
-// 사용. 사용자 정의 카테고리는 BUILTIN_CATEGORY_DEFS + categories.md merge 후
-// merged list 가 chip row / sort / 색·label lookup 의 source.
+// 카테고리는 vault 안 모든 portfolio 카드의 frontmatter.category 의 union 으로
+// 자연 발생. master list 파일·코드 상수 없음. 어떤 카드가 `category: design` 박으면
+// 그 카테고리가 존재하고, 마지막 카드에서 떼면 자동 소멸. typo 후 정정 = 잘못 적은
+// 카테고리 자동 사라짐. 색은 모두 단일 회색 chip (categoryLookup.ts).
+//
+// 빈 default 카테고리는 "other" — 사용자 PR template 의 가이드 enum (CLAUDE.md 의
+// ui_ux|backend|infra|fix|other) 과 일치하지만 앱이 강제하지 않음. parsePRResponse
+// 가 매칭 실패 시 "other" 반환하는 정도.
 
 export type PortfolioCategory = string;
 
-export const BUILTIN_CATEGORIES = [
-  "ui_ux",
-  "backend",
-  "infra",
-  "fix",
-  "other",
-] as const;
-
-export type BuiltinPortfolioCategory = (typeof BUILTIN_CATEGORIES)[number];
-
-// 옛 코드 호환 — UI 가 default order 로 5 enum 만 보이고 싶을 때 import.
-export const PORTFOLIO_CATEGORIES: readonly PortfolioCategory[] = BUILTIN_CATEGORIES;
-
-export interface PortfolioCategoryDef {
-  slug: string; // kebab-case, file·필터 호환
-  label: string;
-  color?: string; // CSS var 또는 hex. 빈 = 기본 muted
-  sort?: number;
-}
-
-// builtin 5개 — categories.md 없거나 비어도 사이드바·정렬 항상 작동.
-export const BUILTIN_CATEGORY_DEFS: readonly PortfolioCategoryDef[] = [
-  { slug: "ui_ux", label: "UI/UX", color: "var(--cat-uiux)", sort: 1 },
-  { slug: "backend", label: "Backend", color: "var(--cat-backend)", sort: 2 },
-  { slug: "infra", label: "Infra", color: "var(--cat-infra)", sort: 3 },
-  { slug: "fix", label: "Fix", color: "var(--cat-fix)", sort: 4 },
-  { slug: "other", label: "기타", color: "var(--cat-other)", sort: 5 },
-];
-
-// builtin + user 정의 + (선택) 카드 frontmatter 의 unique slug 들 merge.
-// 카드에 박힌 임의 slug 가 categories.md 에도 정의 안 되어 있어도 사이드바·정렬·관리
-// 모달에 자동 등장 — orphan 개념 없음. 사용자가 옵시디안에서 카드만 박은 카테고리도
-// chip row 에 보임. orphan 은 label = slug 그대로, color = default --cat-other.
-//
-// 우선순위: builtin (sort 1-5) < user 정의 (sort 999 default) < orphan (sort 9998).
-// user 정의가 builtin slug 와 같으면 label/color override, orphan 이 user 와 같으면
-// user 가 winner (user 정의가 더 권위).
-export function mergeCategoryDefs(
-  user: PortfolioCategoryDef[],
-  works?: { frontmatter: { category: string } }[],
-): PortfolioCategoryDef[] {
-  const map = new Map<string, PortfolioCategoryDef>();
-  for (const d of BUILTIN_CATEGORY_DEFS) map.set(d.slug, { ...d });
-  for (const d of user) {
-    const existing = map.get(d.slug);
-    map.set(d.slug, existing ? { ...existing, ...d } : { sort: 999, ...d });
+// vault scan 결과에서 카테고리 union 추출. 빈/누락은 제외, 정렬은 사용 카드 수 desc
+// → slug asc tiebreaker. 카드가 0 이면 빈 배열.
+export function deriveCategoryUnion(
+  works: { frontmatter: { category: string } }[],
+): string[] {
+  const counts = new Map<string, number>();
+  for (const w of works) {
+    const slug = w.frontmatter.category;
+    if (!slug) continue;
+    counts.set(slug, (counts.get(slug) ?? 0) + 1);
   }
-  if (works) {
-    for (const w of works) {
-      const slug = w.frontmatter.category;
-      if (!slug || map.has(slug)) continue;
-      map.set(slug, { slug, label: slug, sort: 9998 });
-    }
-  }
-  return Array.from(map.values()).sort((a, b) => {
-    const sa = a.sort ?? 999;
-    const sb = b.sort ?? 999;
-    if (sa !== sb) return sa - sb;
-    return a.label.localeCompare(b.label);
-  });
+  return Array.from(counts.entries())
+    .sort((a, b) => {
+      if (a[1] !== b[1]) return b[1] - a[1];
+      return a[0].localeCompare(b[0]);
+    })
+    .map(([slug]) => slug);
 }
 
 export type PortfolioState = "merged" | "closed";
@@ -377,8 +337,9 @@ export function fileToPortfolioWork(
 // 안 카드 + flat 의 github 카드 모두 한 list 로. _attachments / categories.md /
 // .synced.md / .trash/ 는 제외.
 
+// portfolio/categories.md 는 옛 master list 파일 — V0.7.3 부터 사용 안 함. 카드와 type
+// 다르므로 fileToPortfolioWork 가 자연 skip. 사용자가 옵시디안에서 직접 삭제 가능.
 const PORTFOLIO_SKIP = new Set<string>([
-  "portfolio/categories.md",
   "portfolio/.synced.md",
 ]);
 
@@ -984,59 +945,6 @@ export async function upsertPortfolioWork(
 
   const meta = await adapter.write(path, portfolioWorkToRaw(work));
   return { ...work, mtime: meta.mtime };
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Categories (categories.md frontmatter — 사용자 정의 카테고리 source).
-// 카드 frontmatter category 는 builtin 5개 + categories.md 에 추가된 사용자
-// 정의 slug 중 하나. 코드는 mergeCategoryDefs(user) 로 항상 합쳐서 사용.
-
-function parseCategoryEntry(item: unknown): PortfolioCategoryDef | null {
-  if (!item || typeof item !== "object") return null;
-  const obj = item as Record<string, unknown>;
-  const slug = fmStr(obj.slug);
-  const label = fmStr(obj.label);
-  if (!slug || !label) return null;
-  return {
-    slug,
-    label,
-    color: fmStr(obj.color) || undefined,
-    sort: typeof obj.sort === "number" ? obj.sort : undefined,
-  };
-}
-
-export async function readPortfolioCategories(
-  adapter: VaultAdapter,
-): Promise<PortfolioCategoryDef[]> {
-  if (!(await adapter.exists(CATEGORIES_FILE))) return [];
-  const raw = await adapter.read(CATEGORIES_FILE);
-  const { fm } = stripFrontmatter(raw);
-  if (!Array.isArray(fm.categories)) return [];
-  return fm.categories
-    .map(parseCategoryEntry)
-    .filter((c): c is PortfolioCategoryDef => c !== null);
-}
-
-export async function writePortfolioCategories(
-  adapter: VaultAdapter,
-  categories: PortfolioCategoryDef[],
-): Promise<void> {
-  await adapter.mkdir(PORTFOLIO_DIR);
-  const fm = yaml.dump(
-    { categories },
-    {
-      lineWidth: -1,
-      noRefs: true,
-      sortKeys: false,
-      schema: yaml.JSON_SCHEMA,
-    },
-  );
-  const body =
-    `---\n${fm.trimEnd()}\n---\n\n# Portfolio Categories\n\n` +
-    `사용자 정의 카테고리. builtin 5개 (\`ui_ux | backend | infra | fix | other\`) ` +
-    `와 합쳐서 사이드바·카드에 표시됩니다. slug 는 kebab-case, color 는 CSS var ` +
-    `또는 hex (빈 = 기본 회색).\n`;
-  await adapter.write(CATEGORIES_FILE, body);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

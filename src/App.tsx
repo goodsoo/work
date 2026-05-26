@@ -39,7 +39,6 @@ import type { SourceFilter } from "./components/portfolio/PortfolioSourceTree";
 import {
   useGhSync,
   useManualFolders,
-  usePortfolioCategories,
   usePortfolioWorks,
 } from "./hooks/usePortfolio";
 import { GhAuthError, GhNotInstalledError } from "./lib/portfolio/gh";
@@ -787,7 +786,6 @@ function PrefetchWarmup() {
   useTasks();
   usePortfolioWorks();
   useManualFolders();
-  usePortfolioCategories();
   return null;
 }
 

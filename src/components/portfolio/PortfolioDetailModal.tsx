@@ -35,6 +35,7 @@ import { buildPRPrompt, parsePRResponse } from "../../lib/clipboardPrompt";
 import { runClaude } from "../../lib/portfolio/claude";
 import { ResponsePasteArea } from "./ResponsePasteArea";
 import { ScreenshotDropzone } from "./ScreenshotDropzone";
+import { CategoryCombobox } from "./CategoryCombobox";
 import { Modal } from "../common/Modal";
 import { Button } from "../common/Button";
 import { Text } from "../common/Text";
@@ -70,8 +71,7 @@ export function PortfolioDetailModal({ work, onClose }: Props) {
     { impact: string; category: PortfolioCategory } | null
   >(null);
   const fullWork = usePortfolioWork(work.prSlug);
-  const categoriesQuery = usePortfolioCategories();
-  const categoryDefs = categoriesQuery.data ?? [];
+  const categories = usePortfolioCategories();
 
   const resetDraft = () => {
     setImpactDraft(fm.impact_summary);
@@ -106,8 +106,8 @@ export function PortfolioDetailModal({ work, onClose }: Props) {
   };
 
   const screenshotSrc = (path: string) => vaultAssetSrc(vaultRoot, path);
-  const categoryLabel = lookupCategoryLabel(fm.category, categoryDefs);
-  const categoryColor = lookupCategoryColor(fm.category, categoryDefs);
+  const categoryLabel = lookupCategoryLabel(fm.category);
+  const categoryColor = lookupCategoryColor(fm.category);
   // 카드 위치 라벨 — github 카드는 repo, 수동 카드는 vault folder path. 편집 X.
   const sourceDescription = isGithubCard(fm)
     ? `${fm.github_owner}/${fm.github_repo}`
@@ -166,6 +166,7 @@ export function PortfolioDetailModal({ work, onClose }: Props) {
       changedFiles: fm.github_changed_files,
       additions: fm.github_additions,
       deletions: fm.github_deletions,
+      categories,
     });
   };
 
@@ -508,24 +509,10 @@ export function PortfolioDetailModal({ work, onClose }: Props) {
 
             <Field label="카테고리">
               {editing ? (
-                <select
+                <CategoryCombobox
                   value={categoryDraft}
-                  onChange={(e) =>
-                    setCategoryDraft(e.target.value as PortfolioCategory)
-                  }
-                  className="w-full rounded-md px-2 py-1.5 text-sm"
-                  style={{
-                    backgroundColor: "var(--bg-surface)",
-                    border: "1px solid var(--border-default)",
-                    color: "var(--text-primary)",
-                  }}
-                >
-                  {categoryDefs.map((c) => (
-                    <option key={c.slug} value={c.slug}>
-                      {c.label}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(next) => setCategoryDraft(next)}
+                />
               ) : (
                 <Text
                   variant="body"
@@ -622,13 +609,10 @@ export function PortfolioDetailModal({ work, onClose }: Props) {
                     </Text>
                     <div className="flex items-center gap-2">
                       <Chip
-                        dot={lookupCategoryColor(
-                          suggestion.category,
-                          categoryDefs,
-                        )}
+                        dot={lookupCategoryColor(suggestion.category)}
                         style={{ backgroundColor: "var(--bg-surface)" }}
                       >
-                        {lookupCategoryLabel(suggestion.category, categoryDefs)}
+                        {lookupCategoryLabel(suggestion.category)}
                       </Chip>
                     </div>
                     <div className="flex items-center gap-2 pt-1">

@@ -2,15 +2,11 @@ import { useEffect, useState } from "react";
 import { GitBranch, RotateCcw, Trash2, X } from "lucide-react";
 import {
   useEmptyPortfolioTrash,
-  usePortfolioCategories,
   usePurgePortfolioWork,
   useRestorePortfolioWork,
   useTrashedPortfolioWorks,
 } from "../../hooks/usePortfolio";
-import type {
-  PortfolioCategoryDef,
-  TrashedPortfolioWork,
-} from "../../api/portfolio";
+import type { TrashedPortfolioWork } from "../../api/portfolio";
 import { useVault } from "../../lib/vault/useVault";
 import { vaultAssetSrc } from "../../lib/portfolio/assetUrl";
 import {
@@ -46,8 +42,6 @@ export function PortfolioTrashModal({ open, onClose }: Props) {
   );
   const [emptyConfirm, setEmptyConfirm] = useState(false);
   const confirmOpen = purgeTarget !== null || emptyConfirm;
-  const categoriesQuery = usePortfolioCategories();
-  const categoryDefs = categoriesQuery.data ?? [];
 
   useEffect(() => {
     if (!open) {
@@ -212,7 +206,6 @@ export function PortfolioTrashModal({ open, onClose }: Props) {
                     key={t.trashPath}
                     work={t}
                     vaultRoot={vaultRoot ?? ""}
-                    categoryDefs={categoryDefs}
                     onRestore={() => handleRestore(t.trashPath)}
                     onPurge={() => setPurgeTarget(t)}
                     busy={
@@ -260,20 +253,18 @@ function TrashListItem({
   onRestore,
   onPurge,
   busy,
-  categoryDefs,
 }: {
   work: TrashedPortfolioWork;
   vaultRoot: string;
   onRestore: () => void;
   onPurge: () => void;
   busy: boolean;
-  categoryDefs: PortfolioCategoryDef[];
 }) {
   const fm = work.frontmatter;
   const firstShot = fm.screenshots[0];
   const title = fm.impact_summary || fm.github_title;
-  const categoryLabel = lookupCategoryLabel(fm.category, categoryDefs);
-  const categoryColor = lookupCategoryColor(fm.category, categoryDefs);
+  const categoryLabel = lookupCategoryLabel(fm.category);
+  const categoryColor = lookupCategoryColor(fm.category);
   return (
     <li
       className="flex items-center gap-3 rounded-md px-3 py-2"

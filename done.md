@@ -6,6 +6,16 @@
 
 ## 2026-05-26
 
+### PR #52 — Portfolio 카테고리 vault union 모델 (master list 폐기)
+
+- **한 줄 임팩트**: 카테고리 추가/정정 마찰 0 — 옵시디안 tag 식 자유 슬러그
+- **vault union 모델** — 카테고리 = 카드 frontmatter.category union 으로 자연 발생. master list 파일 (`categories.md`) + builtin 5 (코드 상수 `BUILTIN_CATEGORY_DEFS`/`PORTFOLIO_CATEGORIES`/`mergeCategoryDefs`) 폐기. 카드가 박은 슬러그는 그 카테고리가 존재, 마지막 카드가 떼면 자동 소멸. typo 후 정정 = 잘못 적은 카테고리 자동 사라짐.
+- **콤보박스 UI** — `PortfolioDetailModal` / `PortfolioCreateModal` 의 카테고리 `<select>` → `CategoryCombobox` (typing + 자동완성 + 매치 없으면 "+ 새로 만들기: '{input}'" 행). popover 는 React portal 로 띄워 모달 우측 패널 scroll overflow clip 회피.
+- **chip 색 단일** — 모든 카테고리가 회색 하나로 통일. `KNOWN_COLORS` / 카테고리별 색 토큰 의존 제거. 색 욕구 발생 시점에 별도 `colors.md` 도입 (지금은 X). 카테고리 관리 모달 + 진입 톱니바퀴 제거.
+- **AI 추천 source 교체** — `buildPRPrompt` 가 vault union 후보를 prompt 에 노출, `parsePRResponse` 는 자유 슬러그 허용 (enum 강제 X). 사용자 PR template 가이드라인 (`CLAUDE.md` 의 `ui_ux | backend | infra | fix | other`) 은 본인 작성 가이드로만 — 앱이 강제하지 않음.
+- **race fix 2건** — (1) `useUpdatePortfolioFrontmatter` 가 cache 의 실제 `filePath` 직접 사용 — 폴더 안 수동 카드 / NFC·NFD 정규화 차이로 `portfolioWorkPath(slug)` 가 빗나가 read throw → optimistic rollback 으로 옛 값 복귀하던 race 차단. (2) `CategoryCombobox` 의 `onBlur` / outside-click handler 에 `draftRef` 도입 — `selectRow` 가 commit 후 input.blur() 발사하면 `onBlur` 의 stale closure 가 옛 draft 로 다시 commit 해서 새 값 덮어쓰던 race 차단.
+- **마이그레이션** — 기존 vault 의 `categories.md` 는 첫 사용 시 한 번 lookup 후 무시 → 사용자가 손으로 삭제. 카드 frontmatter 의 기존 `category` 값은 그대로 vault union 에 자연 포함.
+
 ### PR #51 — 루틴 만료 분리 + 휴지통 + 내부 코드 용어 통일
 
 - **한 줄 임팩트**: 만료 루틴 분리 + 삭제 복구 + 용어 정리
