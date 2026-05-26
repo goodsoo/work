@@ -35,6 +35,12 @@
 - **용어 정리** — "할 일" = 큰 집합(탭/모음), "태스크" + "루틴" = 하위. 사용자 라벨 (`TaskAddModal` 헤더, `TaskRow` "할일 삭제"/"할일 취소", `TasksPage` 빈 상태, `TodoTrashModal` chip) + 주석 ("할일 탭"→"할 일 탭", "todo→task" 등) 일관화.
 - **내부 코드 rename** — `Todo`/`TodoXxx` type → `Task`/`TaskXxx`, `useTodos`/`useCreateTodo`/`useUpdateTodo`/`useDeleteTodo`/`useTodoSort`/`useTodoHistory`/`useTodoUndo`/`useTodoFlash` → `useTasks`/`useCreateTask`/`...` 등 hook, `TodoRow`/`TodoBlock`/`TodosPage`/`TodoTrashModal` 컴포넌트, `extractTodos`/`scanAllTodos`/`toggleTodo`/`setTodoCheckChar`/`onAddTodoFromLine` 함수, `todoCategory.ts`/`todoSort.ts`/`todoHistory.ts` 파일, CSS `todo-card-*` / `@keyframes todoCard*` 일괄 변경. SearchDomain literal `"todo"` → `"task"`. 13 파일 git mv. 외부 인터페이스 (탭 id `"todos"`, URL hash `#todos`, 이벤트 `"todos:add-request"`, localStorage `goodsoob:todoSort`, React Query 키 `["todos"]`, vault `inbox.md`, `TodosSidePanel`/`TodosSidePanelFooter`) 는 유지.
 
+### 직커밋 — 루틴 추가 모달 validation 보강 (020468c, 32c7cd9)
+
+- **한 줄 임팩트**: 시작일/종료일/이름 빈 값·역전 입력 차단
+- **submit 게이트** — `name.trim() && started && (!ends || ends >= started)` 다 만족 안 하면 버튼 비활성 + 라벨에 `*` 표시. `listRoutinesActiveOn` 클램프 fail 로 루틴 사라지던 통증 차단.
+- **인라인 에러** — toast 대신 input 아래 caption + red border. "이름을 입력하세요" / "시작일을 입력하세요" / "종료일은 시작일과 같거나 이후여야 합니다" — voice/tone "원인 + 해결" 2단 따름.
+
 ### PR #50 — Portfolio vault 폴더 모델 + 수동 카드/카테고리 관리
 
 - **한 줄 임팩트**: GitHub PR + 오프라인 업무 한 곳에 + 옵시디안 자유 분류
