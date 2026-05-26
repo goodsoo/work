@@ -1,10 +1,10 @@
 // 메모 본문 (편집 모드 textarea) 안 이미지 paste / drag&drop 저장 helpers.
 //
-// 저장 경로: `{baseDir}/_attachments/{slug}/{N}.{ext}`. 메모는 baseDir="meetings",
+// 저장 경로: `{baseDir}/_attachments/{slug}/{N}.{ext}`. 메모는 baseDir="notes",
 // slug = 메모 title kebab-case (fallback uid). portfolio 카드의
 // `portfolio/_attachments/{slug}/before-N.{ext}` 와 같은 패턴 — 자산 위치 일관.
 //
-// 본문에는 vault root 기준 상대 path 로 `![](meetings/_attachments/{slug}/{N}.{ext})`
+// 본문에는 vault root 기준 상대 path 로 `![](notes/_attachments/{slug}/{N}.{ext})`
 // 박힘. MarkdownView 의 `resolveImageSrc` → `vaultAssetSrc` 가 그대로 처리.
 
 import type { VaultAdapter } from "./vault/adapter";
@@ -58,7 +58,7 @@ export async function nextAttachmentIndex(
 }
 
 export interface SaveAttachmentOpts {
-  baseDir: string; // 예: "meetings"
+  baseDir: string; // 예: "notes"
   slug: string; // 메모 단위 폴더명 — title kebab-case 또는 uid fallback
   file: File | Blob;
   // file.type 이 비어있을 때 (일부 clipboard 경로) override. 없으면 file.type 사용.

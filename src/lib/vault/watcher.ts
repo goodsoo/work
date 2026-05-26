@@ -6,7 +6,7 @@ import { isMeetingSidecar, meetingMainPath } from "./scan";
 // hooks 의 query key 와 일치해야 함.
 function affectedQueryKeys(path: string): unknown[][] {
   const keys: unknown[][] = [];
-  if (path.startsWith("meetings/")) {
+  if (path.startsWith("notes/")) {
     keys.push(["meetings"]);
     // sidecar (.transcript.md / .summary.md) 변경 시 메인 path key 로 invalidate.
     const mainPath = isMeetingSidecar(path) ? meetingMainPath(path) : path;

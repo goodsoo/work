@@ -47,7 +47,7 @@ type Props = {
   textareaRef?: React.Ref<HTMLTextAreaElement>;
   onBlur?: () => void;
   // 이미지 paste / drag&drop 핸들러. 파일 받아서 저장 후 vault root 기준 path 반환
-  // (예: "meetings/_attachments/{slug}/1.png"). null 반환 = 실패 (insert skip).
+  // (예: "notes/_attachments/{slug}/1.png"). null 반환 = 실패 (insert skip).
   // 부모가 지정 안 하면 paste/drop 인터셉트 자체를 안 함 — 기존 동작 유지.
   onImageAttach?: (file: File) => Promise<string | null>;
 };

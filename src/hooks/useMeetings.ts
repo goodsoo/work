@@ -96,7 +96,7 @@ export function useMeetings() {
 }
 
 
-// vault 의 meetings/ 안 모든 폴더 (빈 폴더 포함). queryKey prefix 가 ["meetings"]
+// vault 의 notes/ 안 모든 폴더 (빈 폴더 포함). queryKey prefix 가 ["meetings"]
 // 라 watcher 의 list invalidation 이 같이 trigger — 폴더 변경 시 자동 refetch.
 const meetingFoldersKey = ["meetings", "folders"] as const;
 export function useMeetingFolders() {

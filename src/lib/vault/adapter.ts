@@ -43,7 +43,7 @@ export interface VaultAdapter {
 
   list(subdir: string): Promise<string[]>;
   // 재귀 scan — subdir 아래 모든 깊이의 파일 path 를 vault root 기준 상대 path 로
-  // 반환. nested folder 지원하는 sidebar 트리 build 용 (`meetings/{folder}/x.md`).
+  // 반환. nested folder 지원하는 sidebar 트리 build 용 (`notes/{folder}/x.md`).
   // dot-prefix 폴더/파일은 skip (`.trash/`, `.icloud` placeholder 등).
   listRecursive(subdir: string): Promise<string[]>;
   // 폴더만 재귀 scan — subdir 자신 제외, 빈 폴더도 포함. 옵시디안 모델대로 메모

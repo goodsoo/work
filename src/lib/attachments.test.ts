@@ -44,35 +44,35 @@ describe("nextAttachmentIndex", () => {
   it("returns 1 for empty / missing dir", async () => {
     const a = createMemoryAdapter();
     a.setRoot("/vault");
-    expect(await nextAttachmentIndex(a, "meetings/_attachments/foo")).toBe(1);
+    expect(await nextAttachmentIndex(a, "notes/_attachments/foo")).toBe(1);
   });
 
   it("returns max(n)+1 from existing N.ext files", async () => {
     const a = createMemoryAdapter();
     a.setRoot("/vault");
     await a.writeBinary(
-      "meetings/_attachments/foo/1.png",
+      "notes/_attachments/foo/1.png",
       new Uint8Array([1]),
     );
     await a.writeBinary(
-      "meetings/_attachments/foo/2.jpg",
+      "notes/_attachments/foo/2.jpg",
       new Uint8Array([2]),
     );
     await a.writeBinary(
-      "meetings/_attachments/foo/5.gif",
+      "notes/_attachments/foo/5.gif",
       new Uint8Array([3]),
     );
-    expect(await nextAttachmentIndex(a, "meetings/_attachments/foo")).toBe(6);
+    expect(await nextAttachmentIndex(a, "notes/_attachments/foo")).toBe(6);
   });
 
   it("ignores non-numeric prefixed names", async () => {
     const a = createMemoryAdapter();
     a.setRoot("/vault");
     await a.writeBinary(
-      "meetings/_attachments/foo/before-1.png",
+      "notes/_attachments/foo/before-1.png",
       new Uint8Array([1]),
     );
-    expect(await nextAttachmentIndex(a, "meetings/_attachments/foo")).toBe(1);
+    expect(await nextAttachmentIndex(a, "notes/_attachments/foo")).toBe(1);
   });
 });
 
@@ -84,11 +84,11 @@ describe("saveAttachment", () => {
       type: "image/jpeg",
     });
     const path = await saveAttachment(a, {
-      baseDir: "meetings",
+      baseDir: "notes",
       slug: "회의록-2026-05-26",
       file: blob,
     });
-    expect(path).toBe("meetings/_attachments/회의록-2026-05-26/1.jpg");
+    expect(path).toBe("notes/_attachments/회의록-2026-05-26/1.jpg");
     const dump = a.__dumpBinary();
     expect(dump.has(path)).toBe(true);
     expect(dump.get(path)!.bytes.length).toBe(2);
@@ -99,17 +99,17 @@ describe("saveAttachment", () => {
     a.setRoot("/vault");
     const blob = () => new Blob([new Uint8Array([1])], { type: "image/png" });
     const p1 = await saveAttachment(a, {
-      baseDir: "meetings",
+      baseDir: "notes",
       slug: "foo",
       file: blob(),
     });
     const p2 = await saveAttachment(a, {
-      baseDir: "meetings",
+      baseDir: "notes",
       slug: "foo",
       file: blob(),
     });
-    expect(p1).toBe("meetings/_attachments/foo/1.png");
-    expect(p2).toBe("meetings/_attachments/foo/2.png");
+    expect(p1).toBe("notes/_attachments/foo/1.png");
+    expect(p2).toBe("notes/_attachments/foo/2.png");
   });
 
   it("throws on unsupported MIME", async () => {
@@ -119,7 +119,7 @@ describe("saveAttachment", () => {
       type: "application/pdf",
     });
     await expect(
-      saveAttachment(a, { baseDir: "meetings", slug: "foo", file: blob }),
+      saveAttachment(a, { baseDir: "notes", slug: "foo", file: blob }),
     ).rejects.toThrow(/unsupported image mime/);
   });
 
@@ -128,37 +128,37 @@ describe("saveAttachment", () => {
     a.setRoot("/vault");
     const blob = new Blob([new Uint8Array([1])]);
     const path = await saveAttachment(a, {
-      baseDir: "meetings",
+      baseDir: "notes",
       slug: "foo",
       file: blob,
       mime: "image/png",
     });
-    expect(path).toBe("meetings/_attachments/foo/1.png");
+    expect(path).toBe("notes/_attachments/foo/1.png");
   });
 });
 
 describe("extractAttachmentRefs", () => {
   it("picks vault-relative image paths", () => {
     const body =
-      "본문\n\n![first](meetings/_attachments/foo/1.png)\n\n다른\n\n![](meetings/_attachments/foo/2.jpg)";
+      "본문\n\n![first](notes/_attachments/foo/1.png)\n\n다른\n\n![](notes/_attachments/foo/2.jpg)";
     expect(extractAttachmentRefs(body)).toEqual([
-      "meetings/_attachments/foo/1.png",
-      "meetings/_attachments/foo/2.jpg",
+      "notes/_attachments/foo/1.png",
+      "notes/_attachments/foo/2.jpg",
     ]);
   });
 
   it("excludes external URLs and data/asset/blob", () => {
     const body =
-      "![](https://example.com/a.png)\n![](data:image/png;base64,xx)\n![](asset://x)\n![](meetings/_attachments/foo/1.png)";
+      "![](https://example.com/a.png)\n![](data:image/png;base64,xx)\n![](asset://x)\n![](notes/_attachments/foo/1.png)";
     expect(extractAttachmentRefs(body)).toEqual([
-      "meetings/_attachments/foo/1.png",
+      "notes/_attachments/foo/1.png",
     ]);
   });
 
   it("strips markdown title (path with quoted title)", () => {
     expect(
-      extractAttachmentRefs(`![](meetings/_attachments/foo/1.png "캡션")`),
-    ).toEqual(["meetings/_attachments/foo/1.png"]);
+      extractAttachmentRefs(`![](notes/_attachments/foo/1.png "캡션")`),
+    ).toEqual(["notes/_attachments/foo/1.png"]);
   });
 });
 
@@ -167,39 +167,39 @@ describe("findOrphanAttachments", () => {
     const a = createMemoryAdapter();
     a.setRoot("/vault");
     await a.write(
-      "meetings/foo.md",
-      "본문\n![](meetings/_attachments/foo/1.png)",
+      "notes/foo.md",
+      "본문\n![](notes/_attachments/foo/1.png)",
     );
     await a.writeBinary(
-      "meetings/_attachments/foo/1.png",
+      "notes/_attachments/foo/1.png",
       new Uint8Array([1]),
     );
-    expect(await findOrphanAttachments(a, "meetings")).toEqual([]);
+    expect(await findOrphanAttachments(a, "notes")).toEqual([]);
   });
 
   it("detects orphans not referenced by any meeting", async () => {
     const a = createMemoryAdapter();
     a.setRoot("/vault");
     await a.write(
-      "meetings/foo.md",
-      "본문\n![](meetings/_attachments/foo/1.png)",
+      "notes/foo.md",
+      "본문\n![](notes/_attachments/foo/1.png)",
     );
     await a.writeBinary(
-      "meetings/_attachments/foo/1.png",
+      "notes/_attachments/foo/1.png",
       new Uint8Array([1]),
     );
     await a.writeBinary(
-      "meetings/_attachments/foo/2.png",
+      "notes/_attachments/foo/2.png",
       new Uint8Array([2]),
     );
     await a.writeBinary(
-      "meetings/_attachments/orphan/1.png",
+      "notes/_attachments/orphan/1.png",
       new Uint8Array([3]),
     );
-    const orphans = await findOrphanAttachments(a, "meetings");
+    const orphans = await findOrphanAttachments(a, "notes");
     expect(orphans.sort()).toEqual([
-      "meetings/_attachments/foo/2.png",
-      "meetings/_attachments/orphan/1.png",
+      "notes/_attachments/foo/2.png",
+      "notes/_attachments/orphan/1.png",
     ]);
   });
 
@@ -208,20 +208,20 @@ describe("findOrphanAttachments", () => {
     a.setRoot("/vault");
     await a.write(
       ".trash/2026-05-26T10-00-00-foo.md",
-      "본문\n![](meetings/_attachments/foo/1.png)",
+      "본문\n![](notes/_attachments/foo/1.png)",
     );
     await a.writeBinary(
-      "meetings/_attachments/foo/1.png",
+      "notes/_attachments/foo/1.png",
       new Uint8Array([1]),
     );
-    expect(await findOrphanAttachments(a, "meetings")).toEqual([]);
+    expect(await findOrphanAttachments(a, "notes")).toEqual([]);
   });
 
   it("returns empty when attachments dir is missing", async () => {
     const a = createMemoryAdapter();
     a.setRoot("/vault");
-    await a.write("meetings/foo.md", "본문");
-    expect(await findOrphanAttachments(a, "meetings")).toEqual([]);
+    await a.write("notes/foo.md", "본문");
+    expect(await findOrphanAttachments(a, "notes")).toEqual([]);
   });
 });
 
@@ -230,19 +230,19 @@ describe("deleteAttachments", () => {
     const a = createMemoryAdapter();
     a.setRoot("/vault");
     await a.writeBinary(
-      "meetings/_attachments/foo/1.png",
+      "notes/_attachments/foo/1.png",
       new Uint8Array([1]),
     );
     await a.writeBinary(
-      "meetings/_attachments/foo/2.png",
+      "notes/_attachments/foo/2.png",
       new Uint8Array([2]),
     );
     const result = await deleteAttachments(a, [
-      "meetings/_attachments/foo/1.png",
+      "notes/_attachments/foo/1.png",
     ]);
-    expect(result.deleted).toEqual(["meetings/_attachments/foo/1.png"]);
+    expect(result.deleted).toEqual(["notes/_attachments/foo/1.png"]);
     expect(result.errors).toEqual([]);
-    expect(await a.exists("meetings/_attachments/foo/1.png")).toBe(false);
-    expect(await a.exists("meetings/_attachments/foo/2.png")).toBe(true);
+    expect(await a.exists("notes/_attachments/foo/1.png")).toBe(false);
+    expect(await a.exists("notes/_attachments/foo/2.png")).toBe(true);
   });
 });

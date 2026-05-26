@@ -391,7 +391,7 @@ export async function emptyTrash(adapter: VaultAdapter): Promise<void> {
   }
 }
 
-// 폴더 이동 — title 유지, 폴더만 swap. newFolder "" 은 root (meetings/{title}.md).
+// 폴더 이동 — title 유지, 폴더만 swap. newFolder "" 은 root (notes/{title}.md).
 // 같은 폴더 (no-op) 이면 read-only 로 현재 상태 반환. 충돌 시 TitleConflictError throw —
 // UI 가 toast 띄움 (rename 충돌과 동일 패턴).
 export async function moveMeeting(
@@ -410,7 +410,7 @@ export async function moveMeeting(
 }
 
 // 빈 폴더 list — 사이드바 트리가 메모 없는 폴더도 보여주도록.
-// vault root 기준 path (e.g. "meetings/work", "meetings/work/2026") 반환.
+// vault root 기준 path (e.g. "notes/work", "notes/work/2026") 반환.
 export async function listMeetingFolders(
   adapter: VaultAdapter,
 ): Promise<string[]> {
@@ -424,7 +424,7 @@ export async function countMeetingsInFolder(
 ): Promise<number> {
   const normalized = normalizeFolderPath(folderPath);
   if (normalized === "") return 0;
-  const full = `meetings/${normalized}`;
+  const full = `notes/${normalized}`;
   const files = await adapter.listRecursive(full);
   return files.filter(
     (p) => p.endsWith(".md") && !isMeetingSidecar(p),
@@ -443,7 +443,7 @@ export async function deleteMeetingFolder(
   if (normalized === "") {
     throw new Error("root 폴더는 삭제할 수 없습니다");
   }
-  const full = `meetings/${normalized}`;
+  const full = `notes/${normalized}`;
   if (!(await adapter.exists(full))) {
     return { trashed: 0 };
   }
@@ -479,7 +479,7 @@ export async function createMeetingFolder(
   if (normalized === "") {
     throw new Error("폴더 이름이 비어있습니다");
   }
-  const full = `meetings/${normalized}`;
+  const full = `notes/${normalized}`;
   await adapter.mkdir(full);
   return full;
 }

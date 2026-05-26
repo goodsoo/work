@@ -53,33 +53,33 @@ describe("slugify", () => {
 
 describe("sidecar path helpers", () => {
   it("transcriptPath / summaryPath", () => {
-    const main = "meetings/2026-05-18-test.md";
-    expect(transcriptPath(main)).toBe("meetings/2026-05-18-test.transcript.md");
-    expect(summaryPath(main)).toBe("meetings/2026-05-18-test.summary.md");
+    const main = "notes/2026-05-18-test.md";
+    expect(transcriptPath(main)).toBe("notes/2026-05-18-test.transcript.md");
+    expect(summaryPath(main)).toBe("notes/2026-05-18-test.summary.md");
   });
 
   it("isMeetingSidecar 인식", () => {
-    expect(isMeetingSidecar("meetings/x.md")).toBe(false);
-    expect(isMeetingSidecar("meetings/x.transcript.md")).toBe(true);
-    expect(isMeetingSidecar("meetings/x.summary.md")).toBe(true);
+    expect(isMeetingSidecar("notes/x.md")).toBe(false);
+    expect(isMeetingSidecar("notes/x.transcript.md")).toBe(true);
+    expect(isMeetingSidecar("notes/x.summary.md")).toBe(true);
   });
 
   it("meetingMainPath — sidecar → 메인 path 역변환", () => {
-    expect(meetingMainPath("meetings/x.transcript.md")).toBe("meetings/x.md");
-    expect(meetingMainPath("meetings/x.summary.md")).toBe("meetings/x.md");
-    expect(meetingMainPath("meetings/x.md")).toBe("meetings/x.md"); // 이미 메인
+    expect(meetingMainPath("notes/x.transcript.md")).toBe("notes/x.md");
+    expect(meetingMainPath("notes/x.summary.md")).toBe("notes/x.md");
+    expect(meetingMainPath("notes/x.md")).toBe("notes/x.md"); // 이미 메인
   });
 });
 
 describe("meetingFolder", () => {
   it("root 메모 → 빈 문자열", () => {
-    expect(meetingFolder("meetings/x.md")).toBe("");
+    expect(meetingFolder("notes/x.md")).toBe("");
   });
   it("1단 폴더", () => {
-    expect(meetingFolder("meetings/work/x.md")).toBe("work");
+    expect(meetingFolder("notes/work/x.md")).toBe("work");
   });
   it("중첩 폴더", () => {
-    expect(meetingFolder("meetings/work/2026/x.md")).toBe("work/2026");
+    expect(meetingFolder("notes/work/2026/x.md")).toBe("work/2026");
   });
   it("meetings 안 아니면 빈 문자열 (방어)", () => {
     expect(meetingFolder("journals/2026-01-01.md")).toBe("");
@@ -107,70 +107,70 @@ describe("computeMovedMeetingPath + moveMeetingToFolder", () => {
   it("root → 폴더 이동", async () => {
     const adapter = createMemoryAdapter();
     adapter.setRoot("/vault");
-    await adapter.write("meetings/note.md", "---\nid: u\n---\n\n# n\n");
+    await adapter.write("notes/note.md", "---\nid: u\n---\n\n# n\n");
     const target = await computeMovedMeetingPath(
       adapter,
-      "meetings/note.md",
+      "notes/note.md",
       "work",
     );
-    expect(target).toBe("meetings/work/note.md");
-    await moveMeetingToFolder(adapter, "meetings/note.md", target);
-    expect(await adapter.exists("meetings/work/note.md")).toBe(true);
-    expect(await adapter.exists("meetings/note.md")).toBe(false);
+    expect(target).toBe("notes/work/note.md");
+    await moveMeetingToFolder(adapter, "notes/note.md", target);
+    expect(await adapter.exists("notes/work/note.md")).toBe(true);
+    expect(await adapter.exists("notes/note.md")).toBe(false);
   });
 
   it("폴더 → root 이동 (newFolder = '')", async () => {
     const adapter = createMemoryAdapter();
     adapter.setRoot("/vault");
-    await adapter.write("meetings/work/note.md", "---\nid: u\n---\n\n# n\n");
+    await adapter.write("notes/work/note.md", "---\nid: u\n---\n\n# n\n");
     const target = await computeMovedMeetingPath(
       adapter,
-      "meetings/work/note.md",
+      "notes/work/note.md",
       "",
     );
-    expect(target).toBe("meetings/note.md");
+    expect(target).toBe("notes/note.md");
   });
 
   it("같은 폴더 → no-op (same path 반환)", async () => {
     const adapter = createMemoryAdapter();
     adapter.setRoot("/vault");
-    await adapter.write("meetings/work/note.md", "---\nid: u\n---\n\n# n\n");
+    await adapter.write("notes/work/note.md", "---\nid: u\n---\n\n# n\n");
     const target = await computeMovedMeetingPath(
       adapter,
-      "meetings/work/note.md",
+      "notes/work/note.md",
       "work",
     );
-    expect(target).toBe("meetings/work/note.md");
+    expect(target).toBe("notes/work/note.md");
   });
 
   it("target 에 같은 이름 메모 있으면 TitleConflictError", async () => {
     const adapter = createMemoryAdapter();
     adapter.setRoot("/vault");
-    await adapter.write("meetings/note.md", "---\nid: a\n---\n\n# n\n");
-    await adapter.write("meetings/work/note.md", "---\nid: b\n---\n\n# n\n");
+    await adapter.write("notes/note.md", "---\nid: a\n---\n\n# n\n");
+    await adapter.write("notes/work/note.md", "---\nid: b\n---\n\n# n\n");
     await expect(
-      computeMovedMeetingPath(adapter, "meetings/note.md", "work"),
+      computeMovedMeetingPath(adapter, "notes/note.md", "work"),
     ).rejects.toThrow(TitleConflictError);
   });
 
   it("이동 시 sidecar 도 같이 따라감", async () => {
     const adapter = createMemoryAdapter();
     adapter.setRoot("/vault");
-    await adapter.write("meetings/note.md", "---\nid: u\n---\n\n# n\n");
+    await adapter.write("notes/note.md", "---\nid: u\n---\n\n# n\n");
     await adapter.write(
-      "meetings/note.transcript.md",
+      "notes/note.transcript.md",
       "transcript content",
     );
-    await adapter.write("meetings/note.summary.md", "summary content");
+    await adapter.write("notes/note.summary.md", "summary content");
     await moveMeetingToFolder(
       adapter,
-      "meetings/note.md",
-      "meetings/work/note.md",
+      "notes/note.md",
+      "notes/work/note.md",
     );
-    expect(await adapter.exists("meetings/work/note.md")).toBe(true);
-    expect(await adapter.exists("meetings/work/note.transcript.md")).toBe(true);
-    expect(await adapter.exists("meetings/work/note.summary.md")).toBe(true);
-    expect(await adapter.exists("meetings/note.transcript.md")).toBe(false);
+    expect(await adapter.exists("notes/work/note.md")).toBe(true);
+    expect(await adapter.exists("notes/work/note.transcript.md")).toBe(true);
+    expect(await adapter.exists("notes/work/note.summary.md")).toBe(true);
+    expect(await adapter.exists("notes/note.transcript.md")).toBe(false);
   });
 });
 
@@ -178,27 +178,27 @@ describe("listFoldersRecursive (memory adapter)", () => {
   it("file path 에서 모든 조상 폴더 도출 + mkdir 된 빈 폴더 포함", async () => {
     const adapter = createMemoryAdapter();
     adapter.setRoot("/vault");
-    await adapter.write("meetings/a.md", "x");
-    await adapter.write("meetings/work/2026/jan.md", "x");
-    await adapter.mkdir("meetings/empty");
-    await adapter.mkdir("meetings/empty/nested");
-    const folders = (await adapter.listFoldersRecursive("meetings")).sort();
+    await adapter.write("notes/a.md", "x");
+    await adapter.write("notes/work/2026/jan.md", "x");
+    await adapter.mkdir("notes/empty");
+    await adapter.mkdir("notes/empty/nested");
+    const folders = (await adapter.listFoldersRecursive("notes")).sort();
     expect(folders).toEqual([
-      "meetings/empty",
-      "meetings/empty/nested",
-      "meetings/work",
-      "meetings/work/2026",
+      "notes/empty",
+      "notes/empty/nested",
+      "notes/work",
+      "notes/work/2026",
     ]);
   });
 
   it("subdir 자신 제외 + dot-prefix 폴더 skip", async () => {
     const adapter = createMemoryAdapter();
     adapter.setRoot("/vault");
-    await adapter.write("meetings/.trash/x.md", "x");
-    await adapter.mkdir("meetings/.hidden");
-    await adapter.mkdir("meetings/visible");
-    const folders = await adapter.listFoldersRecursive("meetings");
-    expect(folders).toEqual(["meetings/visible"]);
+    await adapter.write("notes/.trash/x.md", "x");
+    await adapter.mkdir("notes/.hidden");
+    await adapter.mkdir("notes/visible");
+    const folders = await adapter.listFoldersRecursive("notes");
+    expect(folders).toEqual(["notes/visible"]);
   });
 });
 
@@ -206,25 +206,25 @@ describe("listRecursive (memory adapter)", () => {
   it("중첩 폴더 안 파일까지 모두 반환", async () => {
     const adapter = createMemoryAdapter();
     adapter.setRoot("/vault");
-    await adapter.write("meetings/a.md", "x");
-    await adapter.write("meetings/work/b.md", "x");
-    await adapter.write("meetings/work/2026/c.md", "x");
-    const all = await adapter.listRecursive("meetings");
+    await adapter.write("notes/a.md", "x");
+    await adapter.write("notes/work/b.md", "x");
+    await adapter.write("notes/work/2026/c.md", "x");
+    const all = await adapter.listRecursive("notes");
     expect(all.sort()).toEqual([
-      "meetings/a.md",
-      "meetings/work/2026/c.md",
-      "meetings/work/b.md",
+      "notes/a.md",
+      "notes/work/2026/c.md",
+      "notes/work/b.md",
     ]);
   });
 
   it("dot-prefix 폴더/파일 skip", async () => {
     const adapter = createMemoryAdapter();
     adapter.setRoot("/vault");
-    await adapter.write("meetings/a.md", "x");
-    await adapter.write("meetings/.hidden/b.md", "x");
-    await adapter.write("meetings/.icloud/c.md", "x");
-    const all = await adapter.listRecursive("meetings");
-    expect(all).toEqual(["meetings/a.md"]);
+    await adapter.write("notes/a.md", "x");
+    await adapter.write("notes/.hidden/b.md", "x");
+    await adapter.write("notes/.icloud/c.md", "x");
+    const all = await adapter.listRecursive("notes");
+    expect(all).toEqual(["notes/a.md"]);
   });
 });
 
@@ -232,44 +232,44 @@ describe("adapter.delete recursive (memory)", () => {
   it("recursive=true → prefix 매치하는 file + dir 모두 삭제", async () => {
     const adapter = createMemoryAdapter();
     adapter.setRoot("/vault");
-    await adapter.write("meetings/work/a.md", "x");
-    await adapter.write("meetings/work/2026/b.md", "x");
-    await adapter.write("meetings/other.md", "x");
-    await adapter.mkdir("meetings/work/empty");
-    await adapter.delete("meetings/work", { recursive: true });
-    expect(await adapter.exists("meetings/work/a.md")).toBe(false);
-    expect(await adapter.exists("meetings/work/2026/b.md")).toBe(false);
-    expect(await adapter.exists("meetings/work/empty")).toBe(false);
-    expect(await adapter.exists("meetings/other.md")).toBe(true); // 다른 가지 보존
+    await adapter.write("notes/work/a.md", "x");
+    await adapter.write("notes/work/2026/b.md", "x");
+    await adapter.write("notes/other.md", "x");
+    await adapter.mkdir("notes/work/empty");
+    await adapter.delete("notes/work", { recursive: true });
+    expect(await adapter.exists("notes/work/a.md")).toBe(false);
+    expect(await adapter.exists("notes/work/2026/b.md")).toBe(false);
+    expect(await adapter.exists("notes/work/empty")).toBe(false);
+    expect(await adapter.exists("notes/other.md")).toBe(true); // 다른 가지 보존
   });
 
   it("recursive=false (default) → 단일 path 만 삭제, prefix 매치 X", async () => {
     const adapter = createMemoryAdapter();
     adapter.setRoot("/vault");
-    await adapter.write("meetings/a.md", "x");
-    await adapter.mkdir("meetings/empty");
-    await adapter.delete("meetings/empty"); // 빈 폴더만 즉시 삭제
-    expect(await adapter.exists("meetings/empty")).toBe(false);
-    expect(await adapter.exists("meetings/a.md")).toBe(true);
+    await adapter.write("notes/a.md", "x");
+    await adapter.mkdir("notes/empty");
+    await adapter.delete("notes/empty"); // 빈 폴더만 즉시 삭제
+    expect(await adapter.exists("notes/empty")).toBe(false);
+    expect(await adapter.exists("notes/a.md")).toBe(true);
   });
 });
 
 describe("scanMeetings — sub-folder 인식 (nav-restructure)", () => {
-  it("meetings/{folder}/x.md 도 list 에 잡힘 + id 가 폴더 path 포함", async () => {
+  it("notes/{folder}/x.md 도 list 에 잡힘 + id 가 폴더 path 포함", async () => {
     const adapter = createMemoryAdapter();
     adapter.setRoot("/vault");
     await adapter.write(
-      "meetings/inbox.md",
+      "notes/inbox.md",
       "---\nid: u-inbox\n---\n\n# inbox\n",
     );
     await adapter.write(
-      "meetings/work/q1.md",
+      "notes/work/q1.md",
       "---\nid: u-q1\n---\n\n# q1\n",
     );
     const list = await scanMeetings(adapter);
     expect(list.map((m) => m.id).sort()).toEqual([
-      "meetings/inbox.md",
-      "meetings/work/q1.md",
+      "notes/inbox.md",
+      "notes/work/q1.md",
     ]);
   });
 });
@@ -282,8 +282,8 @@ describe("scanMeetings — uid dedup", () => {
     const adapter = createMemoryAdapter();
     adapter.setRoot("/vault");
     // a 먼저 write → b 이후 write (mtime 더 큼). 같은 uid 박힘.
-    await adapter.write("meetings/a.md", "---\nid: shared-uid\n---\n\n# A\n");
-    await adapter.write("meetings/b.md", "---\nid: shared-uid\n---\n\n# B\n");
+    await adapter.write("notes/a.md", "---\nid: shared-uid\n---\n\n# A\n");
+    await adapter.write("notes/b.md", "---\nid: shared-uid\n---\n\n# B\n");
 
     const list = await scanMeetings(adapter);
 
@@ -295,37 +295,37 @@ describe("scanMeetings — uid dedup", () => {
     expect(a.uid).not.toBe("");
 
     // 디스크에도 새 uid 박혀야 — rewrite 확인
-    const aRaw = await adapter.read("meetings/a.md");
+    const aRaw = await adapter.read("notes/a.md");
     expect(parseVaultFile(aRaw).frontmatter.id).toBe(a.uid);
-    const bRaw = await adapter.read("meetings/b.md");
+    const bRaw = await adapter.read("notes/b.md");
     expect(parseVaultFile(bRaw).frontmatter.id).toBe("shared-uid");
   });
 
   it("unique uid 들은 변경 0 (idempotent)", async () => {
     const adapter = createMemoryAdapter();
     adapter.setRoot("/vault");
-    await adapter.write("meetings/a.md", "---\nid: uid-a\n---\n\n# A\n");
-    await adapter.write("meetings/b.md", "---\nid: uid-b\n---\n\n# B\n");
+    await adapter.write("notes/a.md", "---\nid: uid-a\n---\n\n# A\n");
+    await adapter.write("notes/b.md", "---\nid: uid-b\n---\n\n# B\n");
 
     const first = await scanMeetings(adapter);
-    const aRawBefore = await adapter.read("meetings/a.md");
-    const bRawBefore = await adapter.read("meetings/b.md");
+    const aRawBefore = await adapter.read("notes/a.md");
+    const bRawBefore = await adapter.read("notes/b.md");
 
     const second = await scanMeetings(adapter);
 
     expect(first.map((m) => m.uid).sort()).toEqual(["uid-a", "uid-b"]);
     expect(second.map((m) => m.uid).sort()).toEqual(["uid-a", "uid-b"]);
     // 디스크 내용 그대로 — rewrite 없었음
-    expect(await adapter.read("meetings/a.md")).toBe(aRawBefore);
-    expect(await adapter.read("meetings/b.md")).toBe(bRawBefore);
+    expect(await adapter.read("notes/a.md")).toBe(aRawBefore);
+    expect(await adapter.read("notes/b.md")).toBe(bRawBefore);
   });
 
   it("3-way 충돌 — 가장 최근 1개만 keeper, 나머지 둘 다 새 uid", async () => {
     const adapter = createMemoryAdapter();
     adapter.setRoot("/vault");
-    await adapter.write("meetings/a.md", "---\nid: shared\n---\n\n# A\n");
-    await adapter.write("meetings/b.md", "---\nid: shared\n---\n\n# B\n");
-    await adapter.write("meetings/c.md", "---\nid: shared\n---\n\n# C\n");
+    await adapter.write("notes/a.md", "---\nid: shared\n---\n\n# A\n");
+    await adapter.write("notes/b.md", "---\nid: shared\n---\n\n# B\n");
+    await adapter.write("notes/c.md", "---\nid: shared\n---\n\n# C\n");
 
     const list = await scanMeetings(adapter);
     const byTitle = Object.fromEntries(list.map((m) => [m.title, m.uid]));
@@ -341,26 +341,26 @@ describe("scanMeetings — uid dedup", () => {
     // dedupeUids 를 직접 호출. 실제 race 는 외부 복사 / 백업 복원 시 mtime 동률 가능.
     const adapter = createMemoryAdapter();
     adapter.setRoot("/vault");
-    await adapter.write("meetings/b.md", "---\nid: shared\n---\n\n# B\n");
-    await adapter.write("meetings/a.md", "---\nid: shared\n---\n\n# A\n");
+    await adapter.write("notes/b.md", "---\nid: shared\n---\n\n# B\n");
+    await adapter.write("notes/a.md", "---\nid: shared\n---\n\n# A\n");
 
     const sameMtime = 1_700_000_000_000;
     const results: MeetingMeta[] = [
-      makeMeta("meetings/a.md", "shared", sameMtime),
-      makeMeta("meetings/b.md", "shared", sameMtime),
+      makeMeta("notes/a.md", "shared", sameMtime),
+      makeMeta("notes/b.md", "shared", sameMtime),
     ];
     await dedupeUids(adapter, results);
 
     // path 알파벳 작은 a 가 keeper
-    expect(results.find((m) => m.id === "meetings/a.md")!.uid).toBe("shared");
-    expect(results.find((m) => m.id === "meetings/b.md")!.uid).not.toBe("shared");
+    expect(results.find((m) => m.id === "notes/a.md")!.uid).toBe("shared");
+    expect(results.find((m) => m.id === "notes/b.md")!.uid).not.toBe("shared");
   });
 
   it("write 실패 시 메모리 uid 만 분리해서 React key 충돌 차단", async () => {
     const adapter = createMemoryAdapter();
     adapter.setRoot("/vault");
-    await adapter.write("meetings/a.md", "---\nid: shared\n---\n\n# A\n");
-    await adapter.write("meetings/b.md", "---\nid: shared\n---\n\n# B\n");
+    await adapter.write("notes/a.md", "---\nid: shared\n---\n\n# A\n");
+    await adapter.write("notes/b.md", "---\nid: shared\n---\n\n# B\n");
 
     // read-only 시뮬레이션 — write throw
     const writeSpy = vi
@@ -369,13 +369,13 @@ describe("scanMeetings — uid dedup", () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
     const results: MeetingMeta[] = [
-      makeMeta("meetings/a.md", "shared", 1000),
-      makeMeta("meetings/b.md", "shared", 2000), // b 가 keeper
+      makeMeta("notes/a.md", "shared", 1000),
+      makeMeta("notes/b.md", "shared", 2000), // b 가 keeper
     ];
     await dedupeUids(adapter, results);
 
-    const a = results.find((m) => m.id === "meetings/a.md")!;
-    const b = results.find((m) => m.id === "meetings/b.md")!;
+    const a = results.find((m) => m.id === "notes/a.md")!;
+    const b = results.find((m) => m.id === "notes/b.md")!;
     expect(b.uid).toBe("shared");
     expect(a.uid).not.toBe("shared"); // 메모리 uid 만 분리
     expect(a.uid).not.toBe("");

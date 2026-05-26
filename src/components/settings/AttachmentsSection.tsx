@@ -34,7 +34,7 @@ export function AttachmentsSection() {
     setLoading(true);
     setError(null);
     try {
-      const paths = await findOrphanAttachments(adapter, "meetings");
+      const paths = await findOrphanAttachments(adapter, "notes");
       const withSize: OrphanRow[] = [];
       for (const p of paths) {
         try {
