@@ -93,14 +93,6 @@ PR 단위로 묶음. 각 PR 의 **한 줄 임팩트** 는 카드 frontmatter `im
 
 ## 💤 후순위 (dogfood 통증 부족)
 
-### PR — 본문 이미지 paste / drag&drop `ui_ux`
-한 줄 임팩트: 캡쳐 이미지 본문에 paste/drop → vault `_attachments/` 저장 + markdown 자동 insert
-
-- [ ] textarea (편집 모드) 안 이미지 paste / drag&drop 감지. `_attachments/{slug}/{n}.{ext}` 저장 + caret 위치에 `![](상대경로)` insert.
-- [ ] slug = 현재 메모 title kebab-case. 같은 메모 안 이미지 N 증가.
-- [ ] portfolio 카드의 `_attachments/{slug}/before-N.{ext}` 와 같은 패턴 — 자산 위치 일관.
-- [ ] PR #22 의 이미지 렌더링과 정합 — 저장 후 보기 모드 즉시 정상 표시.
-
 ### PR — 동적 카테고리 (사용자 정의 분류) `backend`
 한 줄 임팩트: 업무/미팅 외 본인 카테고리 자유 추가
 

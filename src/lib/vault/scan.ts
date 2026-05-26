@@ -498,14 +498,31 @@ export function journalPath(date: string): string {
 // ─────────────────────────────────────────────────────────────────────────────
 // Scan operations
 
+// 메모 도메인 안 시스템 폴더 — 사이드바 트리/메모 scan 양쪽에서 제외. underscore prefix
+// 는 옵시디안 convention 으로 메모와 구분되는 "자산/시스템" 표시 (`_attachments` 등).
+// dotfile 처럼 listRecursive 단에서 막진 않음 — 사용자 mkdir 한 일반 메모 폴더가
+// underscore 로 시작할 수 있어 (rare 지만), domain-specific 한 곳에서만 차단.
+function isMeetingSystemSegment(seg: string): boolean {
+  return seg === "_attachments";
+}
+
+function isInMeetingSystemFolder(relPath: string): boolean {
+  // relPath = "meetings/_attachments/..." 같은 형식. "meetings/" 떼고 첫 segment 검사.
+  if (!relPath.startsWith("meetings/")) return false;
+  const rest = relPath.slice("meetings/".length);
+  const firstSeg = rest.split("/")[0];
+  return isMeetingSystemSegment(firstSeg);
+}
+
 // meetings/ 안 모든 폴더 path 반환 (빈 폴더 포함, vault root 기준).
 // `["meetings/work", "meetings/work/2026", "meetings/personal"]` 처럼.
 // 메모 0개라도 옵시디안에서 mkdir 한 폴더는 보여야 — 사이드바 트리가 buildMeetingsTree
-// 에 이 list 를 extra 로 전달.
+// 에 이 list 를 extra 로 전달. `_attachments` 는 메모가 아니라 자산 폴더라 제외.
 export async function scanMeetingFolders(
   adapter: VaultAdapter,
 ): Promise<string[]> {
-  return adapter.listFoldersRecursive("meetings");
+  const all = await adapter.listFoldersRecursive("meetings");
+  return all.filter((p) => !isInMeetingSystemFolder(p));
 }
 
 export async function scanMeetings(adapter: VaultAdapter): Promise<MeetingMeta[]> {
@@ -515,6 +532,7 @@ export async function scanMeetings(adapter: VaultAdapter): Promise<MeetingMeta[]
   const results: MeetingMeta[] = [];
   for (const path of files) {
     if (!path.endsWith(".md")) continue;
+    if (isInMeetingSystemFolder(path)) continue; // _attachments 등 자산 폴더 제외
     if (isMeetingSidecar(path)) continue; // sidecar 는 scan 대상 X
     if (isSyncNoiseFile(path)) continue; // iCloud/Dropbox 충돌·placeholder skip
     try {

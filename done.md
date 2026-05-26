@@ -6,6 +6,17 @@
 
 ## 2026-05-26
 
+### PR #48 — 본문 이미지 paste/drop + 사용 안 하는 첨부 정리
+
+- **한 줄 임팩트**: 본문에 이미지 paste/드롭 — 옵시디안 흐름 + 명시 cleanup
+- **textarea paste/drag&drop** — 편집 모드 textarea 에 이미지 paste/drop → `meetings/_attachments/{uid}/{N}.{ext}` 저장 + caret 위치에 `![](path)` 자동 insert. 외부 도구로 vault 폴더 열고 직접 markdown 박던 흐름 제거.
+- **slug = uid** — 메모 title 자주 바뀌어 title-slug 폴더는 분기/orphan 비용 ↑. 영구 식별자 uid 로 통일 — V0.7.1 의 "client cache key uid 기반" 정책과 정합. Finder 가독성 X 대신 grep 으로 역추적 가능 (본인 1인 도구).
+- **window 레벨 dnd default 차단** — textarea 밖 drop 시 webview 가 이미지를 새 page 로 열어버려 뒤로가기도 안 되고 앱 닫을 수밖에 없던 함정 즉시 차단. `dragover` + `drop` global preventDefault.
+- **drag visual 강조** — OS Finder 에서 파일 drag 진입 즉시 textarea 박스에 파란 dashed outline + 옅은 강조색. 빈 메모 (1줄짜리) 는 drop target 좁아 보이던 통증 해결: drag 중에만 min-height 8rem 으로 일시 확장, drop 끝나면 원복.
+- **첨부 정리 (orphan cleanup)** — 본문에서 markdown 줄 지워도 vault 안 이미지 파일은 그대로 (옵시디안 default 와 동일). 자동 삭제는 undo 와 충돌 위험 → 설정 모달 새 섹션 "첨부 정리": 활성 메모 + 휴지통 메모 둘 다 검사 (복원 시 깨짐 방지) → orphan 카운트/사이즈/path 리스트 + 명시 정리 버튼.
+- **vault adapter writeBinary** — atomic tmp→rename + per-path lock 공유 (md 파일과 동시 쓰기 race 차단). 메모리 adapter 도 binary path 별도 storage.
+- **사이드바 트리 자산 폴더 제외** — `meetings/_attachments` 가 사이드바 폴더 트리에 노출되던 버그. `scanMeetingFolders` + `scanMeetings` 에서 `_attachments` 세그먼트 차단.
+
 ### PR #47 — gh onboarding 모달: 미설치/미로그인 분기 안내
 
 - **한 줄 임팩트**: 동기화 실패 이유와 해결법 안내
