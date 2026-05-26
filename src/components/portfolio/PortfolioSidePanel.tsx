@@ -1,5 +1,13 @@
 import { useMemo, useState } from "react";
-import { ArrowUpDown, BookOpen, Check, X } from "lucide-react";
+import {
+  AlertCircle,
+  ArrowUpDown,
+  BookOpen,
+  Check,
+  Download,
+  KeyRound,
+  X,
+} from "lucide-react";
 import {
   usePortfolioProjects,
   usePortfolioWorks,
@@ -9,6 +17,7 @@ import {
   PORTFOLIO_CATEGORIES,
   type PortfolioCategory,
 } from "../../api/portfolio";
+import { GhAuthError, GhNotInstalledError } from "../../lib/portfolio/gh";
 import type { PortfolioSortKey } from "../../hooks/usePortfolioSort";
 import { PortfolioProjectList, type ProjectFilter } from "./PortfolioProjectList";
 import { PortfolioGuideModal } from "./PortfolioGuideModal";
@@ -30,6 +39,11 @@ type Props = {
   onSyncRun: () => void;
   onSyncCancel: () => void;
   onFullSyncRun: () => void;
+  // 사용자가 모달 닫은 후 다시 열 수 있도록 사이드바 inline 에서 trigger.
+  onOpenInstallGuide: () => void;
+  onOpenAuthGuide: () => void;
+  // 사이드바 inline 에러 row 닫기.
+  onDismissSyncError: () => void;
 };
 
 const CATEGORY_LABEL: Record<PortfolioCategory, string> = {
@@ -60,6 +74,9 @@ export function PortfolioSidePanel({
   onSyncRun,
   onSyncCancel,
   onFullSyncRun,
+  onOpenInstallGuide,
+  onOpenAuthGuide,
+  onDismissSyncError,
 }: Props) {
   const works = usePortfolioWorks();
   const projects = usePortfolioProjects();
@@ -116,6 +133,14 @@ export function PortfolioSidePanel({
           onRun={onSyncRun}
           onCancel={onSyncCancel}
         />
+        {!syncState.running && syncState.error ? (
+          <SyncErrorRow
+            error={syncState.error}
+            onOpenInstallGuide={onOpenInstallGuide}
+            onOpenAuthGuide={onOpenAuthGuide}
+            onDismiss={onDismissSyncError}
+          />
+        ) : null}
         {!syncState.running && syncState.lastResult && !syncState.error ? (
           <div
             className="flex flex-wrap items-center gap-x-2 gap-y-0.5 rounded-md px-3 py-1.5 text-xs"
@@ -169,7 +194,88 @@ export function PortfolioSidePanel({
         onClose={() => setGuideOpen(false)}
         onFullSyncRun={onFullSyncRun}
         fullSyncRunning={syncState.running}
+        onOpenInstallGuide={onOpenInstallGuide}
+        onOpenAuthGuide={onOpenAuthGuide}
       />
+    </div>
+  );
+}
+
+// sync error 시 사이드바 inline — 모달이 자동 뜨지만 닫은 후 다시 열 수 있도록 사이드바에도
+// "어떤 에러였는지 + 다시 안내 열기" 트리거. 일반 (네트워크 등) 에러는 메시지만.
+function SyncErrorRow({
+  error,
+  onOpenInstallGuide,
+  onOpenAuthGuide,
+  onDismiss,
+}: {
+  error: Error;
+  onOpenInstallGuide: () => void;
+  onOpenAuthGuide: () => void;
+  onDismiss: () => void;
+}) {
+  let icon = <AlertCircle className="h-3.5 w-3.5 shrink-0" />;
+  let label = "동기화 실패";
+  let detail = "네트워크 연결을 확인하세요.";
+  let action: { label: string; onClick: () => void } | null = null;
+
+  if (error instanceof GhNotInstalledError) {
+    icon = <Download className="h-3.5 w-3.5 shrink-0" />;
+    label = "gh CLI 가 설치되지 않았습니다";
+    detail = "터미널에서 설치 후 다시 시도하세요.";
+    action = { label: "설치 가이드", onClick: onOpenInstallGuide };
+  } else if (error instanceof GhAuthError) {
+    icon = <KeyRound className="h-3.5 w-3.5 shrink-0" />;
+    label = "GitHub 로그인이 필요합니다";
+    detail = "gh auth login 후 다시 시도하세요.";
+    action = { label: "로그인 가이드", onClick: onOpenAuthGuide };
+  }
+
+  return (
+    <div
+      role="alert"
+      className="flex flex-col gap-1.5 rounded-md px-3 py-2 text-xs"
+      style={{
+        backgroundColor: "color-mix(in srgb, var(--accent-red) 10%, var(--bg-surface))",
+        border: "1px solid color-mix(in srgb, var(--accent-red) 35%, transparent)",
+        color: "var(--text-primary)",
+      }}
+    >
+      <div
+        className="flex items-start gap-1.5"
+        style={{ color: "var(--accent-red)" }}
+      >
+        {icon}
+        <span className="flex-1 font-medium">{label}</span>
+        <Button
+          variant="icon"
+          onClick={onDismiss}
+          title="알림 닫기"
+          aria-label="알림 닫기"
+          className="-mr-1 -mt-0.5 shrink-0 rounded-sm p-0.5"
+          style={{ color: "var(--accent-red)", minHeight: 0 }}
+        >
+          <X className="h-3 w-3" />
+        </Button>
+      </div>
+      <Text variant="caption" color="secondary" as="p" className="text-[11px] leading-snug">
+        {detail}
+      </Text>
+      {action ? (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={action.onClick}
+          className="self-start px-2 py-1 text-[11px]"
+          style={{
+            color: "var(--accent-red)",
+            textDecoration: "underline",
+            minHeight: 0,
+          }}
+        >
+          {action.label} 열기
+        </Button>
+      ) : null}
     </div>
   );
 }
