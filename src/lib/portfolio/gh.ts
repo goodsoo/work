@@ -61,10 +61,40 @@ export interface ShCommandResult {
   code: number | null;
 }
 
+// stderr 패턴으로 에러 분류 — 사용자 모달 분기용. 미설치는 sh 의 "command not found"
+// (code 127), 미로그인은 gh CLI 의 인증 안내 문구. 그 외 fallback = GhSyncError.
+export function classifyGhError(
+  stderr: string,
+  code: number | null,
+  host: string = "github.com",
+): GhError {
+  const s = stderr.toLowerCase();
+  if (
+    s.includes("gh: command not found") ||
+    s.includes("gh: not found") ||
+    code === 127
+  ) {
+    return new GhNotInstalledError(stderr);
+  }
+  if (
+    s.includes("not authenticated") ||
+    s.includes("gh auth login") ||
+    s.includes("authentication required") ||
+    s.includes("requires authentication") ||
+    s.includes("you are not logged")
+  ) {
+    return new GhAuthError(host, stderr);
+  }
+  return new GhSyncError(stderr, code);
+}
+
 export async function runGh(args: string[]): Promise<ShCommandResult> {
   const cmdStr = `gh ${args.map(shellSingleQuote).join(" ")}`;
   const cmd = Command.create("sh", ["-lc", cmdStr]);
   const output = await cmd.execute();
+  if (output.code !== 0) {
+    throw classifyGhError(output.stderr, output.code);
+  }
   return {
     stdout: output.stdout,
     stderr: output.stderr,
@@ -81,9 +111,9 @@ export async function runGh(args: string[]): Promise<ShCommandResult> {
 export async function ghAuthCheck(host: string = "github.com"): Promise<boolean> {
   try {
     const result = await runGh(["auth", "token", "--hostname", host]);
-    return result.code === 0 && result.stdout.trim().length > 0;
+    return result.stdout.trim().length > 0;
   } catch {
-    // shell 실행 자체 실패 = gh 미설치 가능성 (또는 sh 자체 부재)
+    // runGh 가 throw = code !== 0 (미설치 / 미로그인 / 그 외). 모두 false 로 단일화.
     return false;
   }
 }
@@ -147,7 +177,6 @@ export async function ghSearchMyPRs(
     args.push("--merged-at", `>=${opts.since}`);
   }
   const result = await runGh(args);
-  if (result.code !== 0) throw new GhSyncError(result.stderr, result.code);
   try {
     return JSON.parse(result.stdout) as GhSearchResult[];
   } catch (err) {
@@ -168,7 +197,6 @@ export async function ghEnrichPR(url: string): Promise<GhPRDetail> {
     "mergedAt,changedFiles,additions,deletions,body",
   ];
   const result = await runGh(args);
-  if (result.code !== 0) throw new GhSyncError(result.stderr, result.code);
   try {
     return JSON.parse(result.stdout) as GhPRDetail;
   } catch (err) {

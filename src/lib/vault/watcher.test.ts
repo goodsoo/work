@@ -7,7 +7,7 @@ describe("VaultWatcher", () => {
   it("vault 의 modified 이벤트 → 영향 query key invalidate", async () => {
     const adapter = createMemoryAdapter();
     adapter.setRoot("/vault");
-    await adapter.write("meetings/2026-05-16-test.md", "# 본문\n초기\n");
+    await adapter.write("notes/2026-05-16-test.md", "# 본문\n초기\n");
 
     const qc = new QueryClient();
     const invalidateSpy = vi.spyOn(qc, "invalidateQueries");
@@ -18,7 +18,7 @@ describe("VaultWatcher", () => {
     // 외부 변경 시뮬 (다른 source 가 modified 이벤트 발행)
     adapter.__trigger({
       type: "modified",
-      path: "meetings/2026-05-16-test.md",
+      path: "notes/2026-05-16-test.md",
     });
 
     // debounce 100ms 대기
@@ -68,7 +68,7 @@ describe("VaultWatcher", () => {
     await watcher.start();
 
     // 자기 write 등록 → 그 직후 modified 이벤트 발행
-    const path = "meetings/2026-05-16-test.md";
+    const path = "notes/2026-05-16-test.md";
     watcher.markSelfWrite(path);
     adapter.__trigger({ type: "modified", path });
 

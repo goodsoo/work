@@ -93,7 +93,7 @@ describe("extractTodos", () => {
 
   it("복합: bracket + due + time + tags (bracket 는 본문 일부)", () => {
     const raw = "- [ ] [홍길동] 보고서 작성 — 5/22 14:00 #meeting #event\n";
-    const items = extractTodos("meetings/foo.md", raw);
+    const items = extractTodos("notes/foo.md", raw);
     const t = items[0];
     expect(t.text).toBe("[홍길동] 보고서 작성");
     expect(t.due).toMatch(/-05-22$/);

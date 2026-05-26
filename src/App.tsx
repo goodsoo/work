@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { VaultGate } from "./components/vault/VaultGate";
 import { AppShell } from "./components/nav/AppShell";
 import { GlobalTooltip } from "./components/Tooltip";
@@ -32,10 +32,23 @@ import { TodosPage } from "./pages/TodosPage";
 import { PortfolioPage } from "./pages/PortfolioPage";
 import { StyleguidePage } from "./pages/StyleguidePage";
 import { PortfolioSidePanel } from "./components/portfolio/PortfolioSidePanel";
+import { InstallGuideModal } from "./components/portfolio/InstallGuideModal";
+import { AuthGuideModal } from "./components/portfolio/AuthGuideModal";
 import { RoutineDetail } from "./components/routines/RoutineDetail";
 import type { SourceFilter } from "./components/portfolio/PortfolioSourceTree";
-import { useGhSync } from "./hooks/usePortfolio";
+import {
+  useGhSync,
+  useManualFolders,
+  usePortfolioCategories,
+  usePortfolioWorks,
+} from "./hooks/usePortfolio";
+import { GhAuthError, GhNotInstalledError } from "./lib/portfolio/gh";
 import { useMeetings, useCreateMeeting, useDeleteMeeting } from "./hooks/useMeetings";
+import { useMeetingSort } from "./hooks/useMeetingSort";
+import { buildMeetingSortComparator } from "./lib/meetingSort";
+import { meetingFolder } from "./api/meetings";
+import { useJournals } from "./hooks/useJournals";
+import { useTodos } from "./hooks/useTodos";
 import { useVault } from "./lib/vault/useVault";
 import { maybeAutoBackup } from "./lib/backup";
 import { DrawerProvider, useDrawer } from "./hooks/useDrawer";
@@ -71,6 +84,20 @@ export default function App() {
     const onChange = () => setHash(window.location.hash);
     window.addEventListener("hashchange", onChange);
     return () => window.removeEventListener("hashchange", onChange);
+  }, []);
+
+  // Tauri webview default drop = 떨어진 이미지 파일을 새 page 로 열어버림 — 뒤로가기도
+  // 못 함 (history 0). textarea 밖에 잘못 drop 한 사용자가 앱을 닫을 수밖에 없는 함정.
+  // window 레벨에서 dragover/drop default 항상 차단 — textarea 의 onDrop 은 핸들러
+  // 단계에서 e.preventDefault 한 뒤 stopPropagation 없이 그대로 bubble (이중 차단).
+  useEffect(() => {
+    const block = (e: DragEvent) => e.preventDefault();
+    window.addEventListener("dragover", block);
+    window.addEventListener("drop", block);
+    return () => {
+      window.removeEventListener("dragover", block);
+      window.removeEventListener("drop", block);
+    };
   }, []);
 
   if (hash === "#styleguide") return <StyleguidePage />;
@@ -137,28 +164,50 @@ function AppContent() {
   const [quickSwitcherOpen, setQuickSwitcherOpen] = useState(false);
   const portfolioSync = useGhSync();
   const toast = useToast();
+  // gh 연결 가이드 모달 — 사용자 명시 동기화 클릭 시 에러 종류 보고 자동 open.
+  // background auto-sync 는 silent 유지 (5초마다 모달 뜨면 noise).
+  const [installGuideOpen, setInstallGuideOpen] = useState(false);
+  const [authGuideOpen, setAuthGuideOpen] = useState(false);
+
+  // 에러 종류 보고 적절 모달 trigger. toast 는 일반 에러 (네트워크 등) 만.
+  const handleSyncError = (err: unknown, label: string) => {
+    console.error(`[portfolio] ${label} failed:`, err);
+    if (err instanceof GhNotInstalledError) {
+      setInstallGuideOpen(true);
+      return;
+    }
+    if (err instanceof GhAuthError) {
+      setAuthGuideOpen(true);
+      return;
+    }
+    toast.show("동기화에 실패했습니다. 네트워크 연결을 확인하세요.");
+  };
 
   // last_sync - 1일 buffer 의 YYYY-MM-DD. 첫 sync (last_sync 없음) 면 undefined → 전체.
   // gh search 의 `merged:>=YYYY-MM-DD` 가 날짜 단위라 1일 buffer 충분.
-  // 사용자가 직접 트리거한 sync 실패는 toast 발사. background auto-sync 는 silent (5초마다 noise 회피).
   const portfolioRunIncrementalSync = async () => {
     try {
       await portfolioSync.run({ incremental: true });
     } catch (err) {
-      console.error("[portfolio] incremental sync failed:", err);
-      toast.show("동기화에 실패했습니다. 네트워크 연결을 확인하세요.");
+      handleSyncError(err, "incremental sync");
     }
   };
   const portfolioRunFullSync = async () => {
     try {
       await portfolioSync.run({});
     } catch (err) {
-      console.error("[portfolio] full sync failed:", err);
-      toast.show("전체 동기화에 실패했습니다. 네트워크 연결을 확인하세요.");
+      handleSyncError(err, "full sync");
     }
   };
   const { adapter, isReady } = useVault();
   const meetings = useMeetings();
+  // 사이드바와 같은 sortKey 공유 — 메모 삭제 후 자동 선택 / Cmd+↑/↓ 이동이
+  // 사이드바 시각 순서와 일치해야 직관 맞음. localStorage 통해 동기화.
+  const [meetingSortKey] = useMeetingSort();
+  const meetingSortComparator = useMemo(
+    () => buildMeetingSortComparator(meetingSortKey),
+    [meetingSortKey],
+  );
   const sidebar = useSidebarCollapsed();
   const createMeetingMutation = useCreateMeeting();
   const deleteMeetingMutation = useDeleteMeeting();
@@ -349,9 +398,17 @@ function AppContent() {
       if (!selectedMeetingId) return;
       if (deleteMeetingMutation.isPending) return;
       if (!window.confirm("이 메모를 휴지통으로 옮길까요?")) return;
+      // 삭제 전 옛 list 에서 다음 메모 capture. mutate 의 onSuccess 가 cache 의 list
+      // 에서 deleted 를 즉시 filter 하므로 await 후엔 idx 가 무의미 — pre-capture 필수.
+      // 같은 폴더 안 → 부모 폴더 재귀 (사이드바 정렬 적용).
+      const nextUid = findDeleteNeighbor(selectedMeetingId);
       try {
         await deleteMeetingMutation.mutateAsync(selectedMeetingId);
-        closeMeeting();
+        if (nextUid) {
+          openMeeting(nextUid);
+        } else {
+          closeMeeting();
+        }
       } catch {
         // ignore — TanStack Query mutation state 에 반영됨
       }
@@ -360,20 +417,17 @@ function AppContent() {
     function moveSelection(dir: 1 | -1) {
       const list = meetings.data;
       if (!list || list.length === 0) return;
-      const currIdx = selectedMeetingId
-        ? list.findIndex((m) => m.uid === selectedMeetingId)
-        : -1;
-      let nextIdx: number;
-      if (currIdx === -1) {
-        nextIdx = dir === 1 ? 0 : list.length - 1;
-      } else {
-        nextIdx =
-          dir === 1
-            ? Math.min(currIdx + 1, list.length - 1)
-            : Math.max(currIdx - 1, 0);
+      // 메모 미선택 상태 — raw list 의 첫/마지막 (옛 동작 유지). 폴더 정보 없으니
+      // 폴더 안 메커니즘 적용 불가, 진입 안내용 fallback.
+      if (!selectedMeetingId) {
+        openMeeting(list[dir === 1 ? 0 : list.length - 1].uid);
+        return;
       }
-      if (nextIdx === currIdx) return;
-      openMeeting(list[nextIdx].uid);
+      // 같은 폴더 안 (사이드바 정렬 적용) dir 방향만. 폴더 경계 안 넘어감 —
+      // 폴더 끝이면 no-op. 옵시디안 패턴.
+      const nextUid = findAdjacentInFolder(selectedMeetingId, dir);
+      if (!nextUid) return;
+      openMeeting(nextUid);
     }
 
     function onKeyDown(e: KeyboardEvent) {
@@ -460,6 +514,15 @@ function AppContent() {
     }
   }
 
+  function openRoutine(name: string) {
+    drawer.close();
+    setTab("todos");
+    setSelectedRoutineName(name);
+    if (window.location.hash !== "#todos") {
+      window.history.pushState({ tab: "todos" }, "", "#todos");
+    }
+  }
+
   function closeMeeting() {
     if (window.history.state?.meetingId) {
       window.history.back();
@@ -467,6 +530,64 @@ function AppContent() {
       setSelectedMeetingId(null);
     }
   }
+
+  // 폴더 경로의 부모. "work/2026" → "work", "work" → "", "" → null (root 의 부모 없음).
+  function parentFolderPath(folder: string): string | null {
+    if (folder === "") return null;
+    const idx = folder.lastIndexOf("/");
+    return idx === -1 ? "" : folder.slice(0, idx);
+  }
+
+  // 삭제 직후 자동 선택할 다음 메모 uid. 옵시디안 패턴:
+  //   1. 같은 폴더 안 (사이드바 정렬 적용) 다음 메모, 없으면 이전 메모
+  //   2. 같은 폴더 안 다른 메모 0개면 부모 폴더의 첫 메모 (정렬 적용) — root 까지 재귀
+  //   3. root 까지 다 비면 null (empty state)
+  // 사이드바 sortKey 와 동일 comparator 라 사용자 시각과 일치.
+  const findDeleteNeighbor = useCallback(
+    (uid: string): string | null => {
+      const list = meetings.data ?? [];
+      const target = list.find((m) => m.uid === uid);
+      if (!target) return null;
+      const folder = meetingFolder(target.id);
+      const inFolder = list
+        .filter((m) => meetingFolder(m.id) === folder)
+        .sort(meetingSortComparator);
+      const idx = inFolder.findIndex((m) => m.uid === uid);
+      if (idx >= 0) {
+        const sibling = inFolder[idx + 1] ?? inFolder[idx - 1];
+        if (sibling) return sibling.uid;
+      }
+      // 같은 폴더 안 다른 메모 없음 → 부모 폴더 재귀
+      let parent = parentFolderPath(folder);
+      while (parent !== null) {
+        const inParent = list
+          .filter((m) => m.uid !== uid && meetingFolder(m.id) === parent)
+          .sort(meetingSortComparator);
+        if (inParent.length > 0) return inParent[0].uid;
+        parent = parentFolderPath(parent);
+      }
+      return null;
+    },
+    [meetings.data, meetingSortComparator],
+  );
+
+  // Cmd+↑/↓ 이동용. 같은 폴더 안 (사이드바 정렬 적용) dir 방향만. 폴더 경계 안
+  // 넘어감 — 폴더 끝이면 no-op (옵시디안 패턴).
+  const findAdjacentInFolder = useCallback(
+    (uid: string, dir: 1 | -1): string | null => {
+      const list = meetings.data ?? [];
+      const target = list.find((m) => m.uid === uid);
+      if (!target) return null;
+      const folder = meetingFolder(target.id);
+      const inFolder = list
+        .filter((m) => meetingFolder(m.id) === folder)
+        .sort(meetingSortComparator);
+      const idx = inFolder.findIndex((m) => m.uid === uid);
+      if (idx < 0) return null;
+      return inFolder[idx + dir]?.uid ?? null;
+    },
+    [meetings.data, meetingSortComparator],
+  );
 
   // Side panel per tab (모바일에선 drawer, 데스크탑에선 3-pane 왼쪽 컬럼).
   const sidePanel =
@@ -480,6 +601,7 @@ function AppContent() {
         selectedDate={calendarDate}
         onOpenMeeting={openMeeting}
         onOpenTodo={openTodo}
+        onOpenRoutine={openRoutine}
       />
     ) : tab === "todos" ? (
       <TodosSidePanel
@@ -497,6 +619,9 @@ function AppContent() {
         syncState={portfolioSync.state}
         onSyncRun={portfolioRunIncrementalSync}
         onSyncCancel={portfolioSync.cancel}
+        onOpenInstallGuide={() => setInstallGuideOpen(true)}
+        onOpenAuthGuide={() => setAuthGuideOpen(true)}
+        onDismissSyncError={portfolioSync.dismissError}
       />
     ) : undefined;
 
@@ -522,9 +647,23 @@ function AppContent() {
       sidebarCollapsed={sidebar.collapsed}
       onOpenSearch={() => setQuickSwitcherOpen(true)}
     >
+      <PrefetchWarmup />
       {tab === "meetings" ? (
         selectedMeetingId ? (
-          <MeetingForm meetingId={selectedMeetingId} onBack={closeMeeting} />
+          <MeetingForm
+            // 메모 전환 시 강제 remount — titleDraft 등 useState 가 reconcile 로 옛
+            // 메모의 값으로 carryover 되며 commitTitle 가 옛 title 로 mutate → 충돌
+            // toast ("이미 같은 제목 'untitled'") 발사하던 race 차단. activeTab /
+            // docHistory 등은 module-level cache (uid 기반) 라 remount 후 복원.
+            key={selectedMeetingId}
+            meetingId={selectedMeetingId}
+            onBack={closeMeeting}
+            onAfterDelete={(nextUid) => {
+              if (nextUid) openMeeting(nextUid);
+              else closeMeeting();
+            }}
+            computeNextAfterDelete={findDeleteNeighbor}
+          />
         ) : (
           <MeetingsEmpty count={meetings.data?.length ?? 0} loading={meetings.isLoading} />
         )
@@ -575,6 +714,26 @@ function AppContent() {
         onClose={() => setPortfolioGuideOpen(false)}
         onFullSyncRun={portfolioRunFullSync}
         fullSyncRunning={portfolioSync.state.running}
+        onOpenInstallGuide={() => setInstallGuideOpen(true)}
+        onOpenAuthGuide={() => setAuthGuideOpen(true)}
+      />
+      <InstallGuideModal
+        open={installGuideOpen}
+        onClose={() => setInstallGuideOpen(false)}
+        onRetrySync={() => {
+          setInstallGuideOpen(false);
+          void portfolioRunIncrementalSync();
+        }}
+        retryRunning={portfolioSync.state.running}
+      />
+      <AuthGuideModal
+        open={authGuideOpen}
+        onClose={() => setAuthGuideOpen(false)}
+        onRetrySync={() => {
+          setAuthGuideOpen(false);
+          void portfolioRunIncrementalSync();
+        }}
+        retryRunning={portfolioSync.state.running}
       />
       <QuickSwitcher
         open={quickSwitcherOpen}
@@ -618,6 +777,18 @@ function AppContent() {
       />
     </AppShell>
   );
+}
+
+// vault ready 직후 캘린더/포트폴리오 진입에 필요한 쿼리들을 background 로 워밍.
+// 메모장 사이드바가 useMeetings 를 항상 띄워 메모장이 빠른 것과 같은 메커니즘.
+// 컴포넌트 mount 는 안 함 — query cache 만 채움 → 진입 시 cache hit, 메모리 부담 0.
+function PrefetchWarmup() {
+  useJournals();
+  useTodos();
+  usePortfolioWorks();
+  useManualFolders();
+  usePortfolioCategories();
+  return null;
 }
 
 function MeetingsEmpty({ count, loading }: { count: number; loading: boolean }) {

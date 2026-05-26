@@ -11,7 +11,7 @@ import { extractTodos, type TodoItem } from "./tasks";
 // Types — UI/hooks 가 다루는 형태
 
 export interface MeetingMeta {
-  id: string; // 메인 파일 path (e.g. "meetings/2026-05-16-팀-주간회의.md")
+  id: string; // 메인 파일 path (e.g. "notes/2026-05-16-팀-주간회의.md")
   uid: string; // frontmatter 의 영구 id (uuid). path 변해도 그대로. cache key 의 진실.
   title: string;
   date: string | null;
@@ -320,21 +320,21 @@ function filePathToDate(filePath: string): string {
   return m ? m[1] : "";
 }
 
-// 메모 경로에서 폴더 부분 추출. `meetings/foo.md` → `""`, `meetings/work/foo.md`
-// → `"work"`, `meetings/work/2026/foo.md` → `"work/2026"`. id 가 `meetings/` 로
+// 메모 경로에서 폴더 부분 추출. `notes/foo.md` → `""`, `notes/work/foo.md`
+// → `"work"`, `notes/work/2026/foo.md` → `"work/2026"`. id 가 `notes/` 로
 // 시작 안 하면 빈 문자열 (방어).
 export function meetingFolder(meetingPath: string): string {
-  if (!meetingPath.startsWith("meetings/")) return "";
-  const rest = meetingPath.slice("meetings/".length);
+  if (!meetingPath.startsWith("notes/")) return "";
+  const rest = meetingPath.slice("notes/".length);
   const lastSlash = rest.lastIndexOf("/");
   if (lastSlash === -1) return "";
   return rest.slice(0, lastSlash);
 }
 
-// `meetings/{folder?}/{slug}.md` 빌더. folder 가 빈 문자열이면 root.
+// `notes/{folder?}/{slug}.md` 빌더. folder 가 빈 문자열이면 root.
 function buildMeetingPath(folder: string, slug: string): string {
   const f = folder.replace(/^\/+|\/+$/g, "");
-  return f === "" ? `meetings/${slug}.md` : `meetings/${f}/${slug}.md`;
+  return f === "" ? `notes/${slug}.md` : `notes/${f}/${slug}.md`;
 }
 
 // 폴더 path 정규화 + 검증. 외부 슬래시 trim, `..` 차단, segment 별 slugify 적용
@@ -350,7 +350,7 @@ export function normalizeFolderPath(folder: string): string {
   return parts.map((p) => slugify(p)).join("/");
 }
 
-// meetings/{folder?}/{slug}.md — date 없음. date 는 순수 frontmatter optional.
+// notes/{folder?}/{slug}.md — date 없음. date 는 순수 frontmatter optional.
 // 새 메모 default ("untitled") 충돌 시만 -2 suffix. 사용자 명시 title 의 충돌은
 // computeRenamedMeetingPath 가 throw 로 처리 (자동 -2 안 함).
 export async function generateMeetingPath(
@@ -407,7 +407,7 @@ export async function computeMovedMeetingPath(
   currentId: string,
   newFolder: string,
 ): Promise<string> {
-  if (!currentId.startsWith("meetings/")) {
+  if (!currentId.startsWith("notes/")) {
     throw new Error(`not a meeting path: ${currentId}`);
   }
   const base = currentId.split("/").pop() ?? "";
@@ -428,7 +428,7 @@ export async function moveMeetingToFolder(
   newPath: string,
 ): Promise<void> {
   if (oldPath === newPath) return;
-  // newPath 의 부모 폴더 (`meetings/{folder}` 또는 `meetings`) mkdir 보장.
+  // newPath 의 부모 폴더 (`notes/{folder}` 또는 `notes`) mkdir 보장.
   // Tauri rename 은 부모가 없으면 실패.
   const parentSlash = newPath.lastIndexOf("/");
   if (parentSlash > 0) {
@@ -441,8 +441,8 @@ export async function moveMeetingToFolder(
 // 폴더 자체의 마지막 segment 이름만 바꿈. 부모 path 유지 — 위계 이동 X.
 // "work" → "프로젝트" (root 폴더 rename), "work/2026" → "work/2027" (sub-folder rename).
 // 안에 있는 메모는 디스크 rename 으로 자동 따라옴 (POSIX mv). 충돌 시 throw.
-// oldFolder 는 meetings-relative ("work" 또는 "work/2026"), newName 은 새 마지막 segment.
-// 반환: 새 vault-relative path ("meetings/프로젝트").
+// oldFolder 는 notes-relative ("work" 또는 "work/2026"), newName 은 새 마지막 segment.
+// 반환: 새 vault-relative path ("notes/프로젝트").
 export async function renameMeetingFolder(
   adapter: VaultAdapter,
   oldFolder: string,
@@ -459,14 +459,14 @@ export async function renameMeetingFolder(
   const lastSlash = normalized.lastIndexOf("/");
   const parent = lastSlash === -1 ? "" : normalized.slice(0, lastSlash);
   const newRel = parent === "" ? newSeg : `${parent}/${newSeg}`;
-  if (newRel === normalized) return `meetings/${normalized}`;
-  const oldFull = `meetings/${normalized}`;
-  const newFull = `meetings/${newRel}`;
+  if (newRel === normalized) return `notes/${normalized}`;
+  const oldFull = `notes/${normalized}`;
+  const newFull = `notes/${newRel}`;
   if (await adapter.exists(newFull)) {
     throw new TitleConflictError(newSeg, newFull);
   }
-  // 부모 폴더가 사라진 경우 (외부 삭제 등) 만 mkdir. parent === "" 이면 meetings/ 가 부모.
-  await adapter.mkdir(parent === "" ? "meetings" : `meetings/${parent}`);
+  // 부모 폴더가 사라진 경우 (외부 삭제 등) 만 mkdir. parent === "" 이면 notes/ 가 부모.
+  await adapter.mkdir(parent === "" ? "notes" : `notes/${parent}`);
   await adapter.rename(oldFull, newFull);
   return newFull;
 }
@@ -498,23 +498,41 @@ export function journalPath(date: string): string {
 // ─────────────────────────────────────────────────────────────────────────────
 // Scan operations
 
-// meetings/ 안 모든 폴더 path 반환 (빈 폴더 포함, vault root 기준).
-// `["meetings/work", "meetings/work/2026", "meetings/personal"]` 처럼.
+// 메모 도메인 안 시스템 폴더 — 사이드바 트리/메모 scan 양쪽에서 제외. underscore prefix
+// 는 옵시디안 convention 으로 메모와 구분되는 "자산/시스템" 표시 (`_attachments` 등).
+// dotfile 처럼 listRecursive 단에서 막진 않음 — 사용자 mkdir 한 일반 메모 폴더가
+// underscore 로 시작할 수 있어 (rare 지만), domain-specific 한 곳에서만 차단.
+function isMeetingSystemSegment(seg: string): boolean {
+  return seg === "_attachments";
+}
+
+function isInMeetingSystemFolder(relPath: string): boolean {
+  // relPath = "notes/_attachments/..." 같은 형식. "notes/" 떼고 첫 segment 검사.
+  if (!relPath.startsWith("notes/")) return false;
+  const rest = relPath.slice("notes/".length);
+  const firstSeg = rest.split("/")[0];
+  return isMeetingSystemSegment(firstSeg);
+}
+
+// notes/ 안 모든 폴더 path 반환 (빈 폴더 포함, vault root 기준).
+// `["notes/work", "notes/work/2026", "notes/personal"]` 처럼.
 // 메모 0개라도 옵시디안에서 mkdir 한 폴더는 보여야 — 사이드바 트리가 buildMeetingsTree
-// 에 이 list 를 extra 로 전달.
+// 에 이 list 를 extra 로 전달. `_attachments` 는 메모가 아니라 자산 폴더라 제외.
 export async function scanMeetingFolders(
   adapter: VaultAdapter,
 ): Promise<string[]> {
-  return adapter.listFoldersRecursive("meetings");
+  const all = await adapter.listFoldersRecursive("notes");
+  return all.filter((p) => !isInMeetingSystemFolder(p));
 }
 
 export async function scanMeetings(adapter: VaultAdapter): Promise<MeetingMeta[]> {
-  // listRecursive — nav-restructure 이후 `meetings/{folder}/...` 중첩 폴더 지원.
+  // listRecursive — nav-restructure 이후 `notes/{folder}/...` 중첩 폴더 지원.
   // sub-folder 안 메모도 사이드바 트리에 잡히도록.
-  const files = await adapter.listRecursive("meetings");
+  const files = await adapter.listRecursive("notes");
   const results: MeetingMeta[] = [];
   for (const path of files) {
     if (!path.endsWith(".md")) continue;
+    if (isInMeetingSystemFolder(path)) continue; // _attachments 등 자산 폴더 제외
     if (isMeetingSidecar(path)) continue; // sidecar 는 scan 대상 X
     if (isSyncNoiseFile(path)) continue; // iCloud/Dropbox 충돌·placeholder skip
     try {
@@ -705,14 +723,14 @@ export async function restoreFromTrash(
     /^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-/,
     "",
   );
-  // 원본 폴더 구조 추정. V0.7.1: 메모는 meetings/{title}.md (date prefix 없음).
+  // 원본 폴더 구조 추정. V0.7.1: 메모는 notes/{title}.md (date prefix 없음).
   // 순수 YYYY-MM-DD.md 만 일기, 그 외 (legacy date-prefix + V0.7.1 title-only)
   // 는 모두 메모로 복원.
   let target: string;
   if (base.match(/^\d{4}-\d{2}-\d{2}\.md$/)) {
     target = `journals/${base}`;
   } else {
-    target = `meetings/${base}`;
+    target = `notes/${base}`;
   }
   // 충돌 회피
   let n = 2;
@@ -752,7 +770,7 @@ export async function scanTrash(
 export async function ensureVaultStructure(
   adapter: VaultAdapter,
 ): Promise<void> {
-  await adapter.mkdir("meetings");
+  await adapter.mkdir("notes");
   await adapter.mkdir("journals");
   await adapter.mkdir("portfolio"); // V0.7
   if (!(await adapter.exists("inbox.md"))) {

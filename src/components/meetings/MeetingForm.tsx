@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   Trash2,
   Ban,
@@ -39,6 +39,8 @@ import { CopyButton } from "./CopyButton";
 import { EditableList } from "./EditableList";
 import { AttendeeTagInput } from "./AttendeeTagInput";
 import { SourceBodyEditor } from "./SourceBodyEditor";
+import { useVault } from "../../lib/vault/useVault";
+import { saveAttachment } from "../../lib/attachments";
 import { MarkdownView } from "./MarkdownView";
 import { TaskAddModal } from "../tasks/TaskAddModal";
 import type { TodoCategory, TodoInsert, TodoPriority } from "../../api/todos";
@@ -57,6 +59,12 @@ const TITLE_UNSAFE_RE = /[/\\:*?"<>|#^[\]]/;
 type Props = {
   meetingId: string;
   onBack: () => void;
+  // 삭제 직후 다음 메모 선택. caller 가 신선한 nextUid 받음 — null 이면 onBack 으로 fallback.
+  // pre-capture 가 caller 책임 (await 사이 list cache 가 invalidate 되므로).
+  onAfterDelete?: (nextUid: string | null) => void;
+  // 삭제 직전 다음 메모 uid 계산 (사이드바 정렬 / 폴더 위계 적용). 미제공 시
+  // raw list 의 idx+1/-1 fallback.
+  computeNextAfterDelete?: (uid: string) => string | null;
 };
 
 type SummaryDoc = {
@@ -150,13 +158,19 @@ const ACTIVE_TAB_CACHE = new Map<string, ActiveTab>();
 // 전환 시 outgoing 탭의 위치 저장 + incoming 탭의 위치 복원. 새로고침 시 초기화.
 const SCROLL_CACHE = new Map<string, number>();
 
-export function MeetingForm({ meetingId, onBack }: Props) {
+export function MeetingForm({
+  meetingId,
+  onBack,
+  onAfterDelete,
+  computeNextAfterDelete,
+}: Props) {
   const { data, isLoading, error, refetch } = useMeeting(meetingId);
   const meetingsQ = useMeetings();
   const updateMutation = useUpdateMeeting(meetingId);
   const deleteMutation = useDeleteMeeting();
   const createTodoMutation = useCreateTodo();
   const [viewMode, setViewMode] = useViewMode();
+  const { adapter } = useVault();
 
   const attendeeSuggestions = useMemo(() => {
     const set = new Set<string>();
@@ -177,6 +191,27 @@ export function MeetingForm({ meetingId, onBack }: Props) {
   const uid = data?.uid;
   const initialBody = data?.content ?? "";
   const initialTranscript = data?.transcript ?? "";
+
+  // 본문 textarea 안 이미지 paste/drop → vault `notes/_attachments/{uid}/{N}.{ext}`
+  // 저장 후 `![](path)` insert. slug 는 영구 식별자 uid — 메모 title 은 자주 바뀌니
+  // title 기반 폴더는 흩어짐/orphan 비용. V0.7.1 의 "모든 client cache key 는 uid 기반"
+  // 정책과 정합. Finder 가독성은 떨어지지만 본인 빌더 모드 + grep 으로 역추적 가능.
+  const onImageAttach = useCallback(
+    async (file: File): Promise<string | null> => {
+      if (!uid) return null;
+      try {
+        return await saveAttachment(adapter, {
+          baseDir: "notes",
+          slug: uid,
+          file,
+        });
+      } catch (err) {
+        console.error("image attach failed", err);
+        return null;
+      }
+    },
+    [adapter, uid],
+  );
   const initialSummary = useMemo<SummaryDoc>(
     () => ({
       discussion_items: data?.discussion_items ?? [],
@@ -467,9 +502,26 @@ export function MeetingForm({ meetingId, onBack }: Props) {
   async function handleDelete() {
     if (!data) return;
     if (!window.confirm("이 메모를 휴지통으로 옮길까요?")) return;
+    // 삭제 전 옛 list 에서 다음 메모 capture. mutate 의 onSuccess 가 cache 의 list
+    // 에서 deleted 를 즉시 filter 하므로 await 후엔 idx 가 무의미 — pre-capture 필수.
+    // caller 가 사이드바 정렬/폴더 위계 알아서 결정 (computeNextAfterDelete). 미제공
+    // 시 raw list idx+1/-1 fallback.
+    let nextUid: string | null;
+    if (computeNextAfterDelete) {
+      nextUid = computeNextAfterDelete(data.uid);
+    } else {
+      const list = meetingsQ.data ?? [];
+      const idx = list.findIndex((m) => m.uid === data.uid);
+      nextUid =
+        idx >= 0 ? (list[idx + 1]?.uid ?? list[idx - 1]?.uid ?? null) : null;
+    }
     try {
       await deleteMutation.mutateAsync(data.uid);
-      onBack();
+      if (onAfterDelete) {
+        onAfterDelete(nextUid);
+      } else {
+        onBack();
+      }
     } catch (e) {
       setActionError(formatError(e));
     }
@@ -960,6 +1012,7 @@ export function MeetingForm({ meetingId, onBack }: Props) {
                   setTaskModalPrefill(lineToTaskPrefill(lineText, meetingId));
                   setTaskModalOpen(true);
                 }}
+                onImageAttach={onImageAttach}
               />
             ) : body.trim() === "" ? (
               <EmptyBodyCTA onStartEdit={startEditing} />

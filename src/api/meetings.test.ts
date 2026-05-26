@@ -17,7 +17,7 @@ describe("createMeetingFolder", () => {
     adapter.setRoot("/vault");
     await createMeetingFolder(adapter, "work");
     const folders = await listMeetingFolders(adapter);
-    expect(folders).toContain("meetings/work");
+    expect(folders).toContain("notes/work");
   });
 
   it("빈 입력 → throw", async () => {
@@ -31,7 +31,7 @@ describe("createMeetingFolder", () => {
     adapter.setRoot("/vault");
     await createMeetingFolder(adapter, "work/2026");
     const folders = await listMeetingFolders(adapter);
-    expect(folders.sort()).toEqual(["meetings/work", "meetings/work/2026"]);
+    expect(folders.sort()).toEqual(["notes/work", "notes/work/2026"]);
   });
 
   it("path traversal 차단", async () => {
@@ -66,10 +66,10 @@ describe("renameMeetingFolder", () => {
     const m = await createMeeting(adapter, { title: "note" });
     await moveMeeting(adapter, m.id, "work");
     const newFull = await renameMeetingFolder(adapter, "work", "프로젝트");
-    expect(newFull).toBe("meetings/프로젝트");
+    expect(newFull).toBe("notes/프로젝트");
     const list = await listMeetings(adapter);
-    expect(list[0].id).toBe("meetings/프로젝트/note.md");
-    expect(await adapter.exists("meetings/work/note.md")).toBe(false);
+    expect(list[0].id).toBe("notes/프로젝트/note.md");
+    expect(await adapter.exists("notes/work/note.md")).toBe(false);
   });
 
   it("sub-folder 이름 변경 — 부모 path 유지", async () => {
@@ -78,9 +78,9 @@ describe("renameMeetingFolder", () => {
     const m = await createMeeting(adapter, { title: "x" });
     await moveMeeting(adapter, m.id, "work/2026");
     const newFull = await renameMeetingFolder(adapter, "work/2026", "2027");
-    expect(newFull).toBe("meetings/work/2027");
+    expect(newFull).toBe("notes/work/2027");
     const list = await listMeetings(adapter);
-    expect(list[0].id).toBe("meetings/work/2027/x.md");
+    expect(list[0].id).toBe("notes/work/2027/x.md");
   });
 
   it("같은 부모 안 다른 폴더와 충돌 → throw", async () => {
@@ -112,8 +112,8 @@ describe("renameMeetingFolder", () => {
     await createMeetingFolder(adapter, "old");
     await renameMeetingFolder(adapter, "old", "new");
     const folders = await listMeetingFolders(adapter);
-    expect(folders).toContain("meetings/new");
-    expect(folders).not.toContain("meetings/old");
+    expect(folders).toContain("notes/new");
+    expect(folders).not.toContain("notes/old");
   });
 });
 
@@ -125,7 +125,7 @@ describe("deleteMeetingFolder", () => {
     const result = await deleteMeetingFolder(adapter, "empty");
     expect(result.trashed).toBe(0);
     const folders = await listMeetingFolders(adapter);
-    expect(folders).not.toContain("meetings/empty");
+    expect(folders).not.toContain("notes/empty");
   });
 
   it("메모 있는 폴더 → 메모 휴지통 이동 + 디스크 dir 삭제", async () => {
@@ -144,7 +144,7 @@ describe("deleteMeetingFolder", () => {
     expect(active).toHaveLength(0);
     // 폴더도 사라짐
     const folders = await listMeetingFolders(adapter);
-    expect(folders).not.toContain("meetings/work");
+    expect(folders).not.toContain("notes/work");
     // .trash 안에 stamped 파일 존재
     const trashFiles = await adapter.list(".trash");
     expect(trashFiles.length).toBeGreaterThanOrEqual(1);

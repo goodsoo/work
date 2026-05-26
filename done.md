@@ -19,6 +19,52 @@
 - **빈 썸네일 분기** — github 카드 = GithubMark (Octocat), 수동 카드 = Briefcase.
 - **부수**: voice/tone placeholder 정책을 명령형 안내 (`{필드}을 입력하세요`) 로 통일 (옛 `예: ...` 예시형 폐기). vite 가 VITE_PORT env 받게 — 동시 worktree dev 지원.
 
+### 직커밋 — vault 기본 폴더명 meetings/ → notes/ (2429502)
+
+- **한 줄 임팩트**: UI "메모장" 과 vault 폴더명 의미 일치
+- **파일시스템 경로만 rename** — `notes/{title}.md` 로 신규 vault 부트스트랩. 내부 코드명 (`Meeting` type, `useMeeting` hook, `MeetingForm` component, tab `"meetings"`, URL hash `#meetings`, React Query key `["meetings"]`, 소스 폴더 `src/components/meetings/`) 은 그대로 — CLAUDE.md 의 "UI 리네이밍은 했어도 내부 코드는 meetings 유지" 패턴 따름.
+- 16 파일 234줄 (test 5개 포함). typecheck + 336 tests pass.
+- 기존 vault 자동 마이그레이션 0 — 본인이 아직 실제 사용 전. Finder/옵시디안에서 `meetings/` 폴더 직접 rename 또는 그대로 두고 `notes/` 새로 시작.
+
+### 직커밋 — 할일 체크박스 hit zone 30x30 확장 + 캘린더 사이드바 루틴 row click 활성화 (96f3b2d)
+
+- **한 줄 임팩트**: 체크박스 밖 살짝 빗나간 클릭이 페이지 이동/편집 모드로 새던 통증 차단
+- **`CheckboxButton` hit zone** — 시각 18x18 유지, 버튼 `p-1.5 -m-1.5` 로 클릭 영역만 30x30 확장. negative margin 으로 layout footprint 는 18x18 유지 → 행 높이·정렬 변동 0. 부모 행의 click navigate/edit 보다 먼저 catch.
+- **캘린더 사이드바 루틴 row click 활성화** — todo row 처럼 `onOpenRoutine` prop + role=button + Enter/Space + hover bg. App.tsx 의 `openRoutine(name)` 이 todos 탭 + RoutineDetail 진입까지 처리. todo/루틴 간 인터랙션 일관성.
+
+### 직커밋 — 캘린더·포트폴리오 background prefetch (628f9e4)
+
+- **한 줄 임팩트**: 다른 탭 진입 시 cache hit — 첫 페인트 즉시
+- 부팅 후 `useMeetings` 이후 background 으로 `useTodos` / `useJournals` / `useRoutines` / `usePortfolio` prefetch. 첫 클릭 시 skeleton 안 보임. React Query staleTime 활용.
+
+### PR #49 — 메모장 폴더·삭제·생성 흐름 안정화 (dogfood 4건)
+
+- **한 줄 임팩트**: 메모장 일상 흐름 안 끊기는 디테일 4건 정리
+- **폴더 삭제 confirm** — Tauri WebView 에서 `window.confirm` 이 noop 통과되어 폴더가 그냥 삭제되던 이슈. ConfirmDialog 모달 (danger, 멀티라인) 로 교체. 폴더 영구 삭제 + 안 메모 N개 휴지통 이동 안내 + 폴더 안 고정 메모 N개 빨간 경고 줄. ConfirmDialog 의 `message` prop 을 `string` → `ReactNode` 확장.
+- **고정 메모 중복 표시** — 옵시디안 bookmarks 패턴 (트리에서 제외) 거스르고 상단 PinnedSection + 트리 양쪽 표시. 트리에서 사라지는 게 "고정한 메모 어디 갔지" 헷갈림 더 큼.
+- **삭제 후 자동 선택 = 옵시디안 패턴** — 같은 폴더 안 다음 (사이드바 정렬 적용) → 없으면 이전 → 폴더 안 다 비면 부모 폴더 첫 메모 (root 까지 재귀) → root 도 비면 empty. raw mtime desc 옛 로직은 사용자 시각 순서와 mismatch ("왔다갔다") 였음. Cmd+↑/↓ 도 같은 메커니즘으로 통일 — 폴더 경계 안 넘어감.
+- **sortComparator helper 추출** — `src/lib/meetingSort.ts` 의 `buildMeetingSortComparator(sortKey)` 를 SidePanel + App.tsx 가 공유. localStorage (`goodsoob:meetingSort`) 통해 자동 동기화.
+- **메모 생성 race fix** — 사이드바 + 버튼 빠르게 연달아 누르면 "이미 같은 제목 'untitled'" 토스트가 떴음. 원인: `MeetingForm` 이 다른 `meetingId` 로 reconcile 될 때 `titleDraft` useState 가 옛 메모 값으로 carryover → blur 시 `commitTitle` 이 옛 "untitled" 로 mutate → 새 메모 path 와 충돌. `key={meetingId}` 추가로 강제 remount. `activeTab` / `docHistory` 는 module-level cache (uid 기반) 라 remount 후 복원.
+
+### PR #48 — 본문 이미지 paste/drop + 사용 안 하는 첨부 정리
+
+- **한 줄 임팩트**: 본문에 이미지 paste/드롭 — 옵시디안 흐름 + 명시 cleanup
+- **textarea paste/drag&drop** — 편집 모드 textarea 에 이미지 paste/drop → `meetings/_attachments/{uid}/{N}.{ext}` 저장 + caret 위치에 `![](path)` 자동 insert. 외부 도구로 vault 폴더 열고 직접 markdown 박던 흐름 제거.
+- **slug = uid** — 메모 title 자주 바뀌어 title-slug 폴더는 분기/orphan 비용 ↑. 영구 식별자 uid 로 통일 — V0.7.1 의 "client cache key uid 기반" 정책과 정합. Finder 가독성 X 대신 grep 으로 역추적 가능 (본인 1인 도구).
+- **window 레벨 dnd default 차단** — textarea 밖 drop 시 webview 가 이미지를 새 page 로 열어버려 뒤로가기도 안 되고 앱 닫을 수밖에 없던 함정 즉시 차단. `dragover` + `drop` global preventDefault.
+- **drag visual 강조** — OS Finder 에서 파일 drag 진입 즉시 textarea 박스에 파란 dashed outline + 옅은 강조색. 빈 메모 (1줄짜리) 는 drop target 좁아 보이던 통증 해결: drag 중에만 min-height 8rem 으로 일시 확장, drop 끝나면 원복.
+- **첨부 정리 (orphan cleanup)** — 본문에서 markdown 줄 지워도 vault 안 이미지 파일은 그대로 (옵시디안 default 와 동일). 자동 삭제는 undo 와 충돌 위험 → 설정 모달 새 섹션 "첨부 정리": 활성 메모 + 휴지통 메모 둘 다 검사 (복원 시 깨짐 방지) → orphan 카운트/사이즈/path 리스트 + 명시 정리 버튼.
+- **vault adapter writeBinary** — atomic tmp→rename + per-path lock 공유 (md 파일과 동시 쓰기 race 차단). 메모리 adapter 도 binary path 별도 storage.
+- **사이드바 트리 자산 폴더 제외** — `meetings/_attachments` 가 사이드바 폴더 트리에 노출되던 버그. `scanMeetingFolders` + `scanMeetings` 에서 `_attachments` 세그먼트 차단.
+
+### PR #47 — gh onboarding 모달: 미설치/미로그인 분기 안내
+
+- **한 줄 임팩트**: 동기화 실패 이유와 해결법 안내
+- **에러 분류** — `runGh` 가 stderr 분석해서 `GhNotInstalledError` (`command not found: gh`) / `GhAuthError` (`auth status`, `not logged in`, `gh auth login`) 던지도록 보강. 기존엔 클래스만 정의되고 throw 안 됨 → 사이드바 toast "동기화 실패. 네트워크 확인" 한 줄로 합쳐져 사용자가 무엇이 문제인지 판단 불가.
+- **InstallGuideModal** — macOS `brew install gh` / Windows `winget install ...` + 검증 단계 (`gh --version`) 카드. CommandBlock 공용 컴포넌트 (커맨드 + 클립보드 복사 버튼) 분리.
+- **AuthGuideModal** — `gh auth login` 단계 + 계정 변경 시나리오 (`gh auth logout` 후 재로그인) 안내.
+- **에러 종류별 모달 분기** — 사이드바 SyncButton 의 lastResult 에서 GhNotInstalledError / GhAuthError 식별 → App.tsx 가 적절한 모달 트리거. 한 화면 한 액션 원칙 (inline expand 대신 모달) — 정보 밀도 폭증 회피.
+
 ### PR #46 — 사이드바·헤더 필터 자리 통일
 
 - **한 줄 임팩트**: 작업/할일 두 페이지 필터 정신 모델 일치

@@ -64,7 +64,7 @@ PR 단위로 묶음. 각 PR 의 **한 줄 임팩트** 는 카드 frontmatter `im
 ### PR — gh 호출 인프라 강화 `backend`
 한 줄 임팩트: gh 인증/네트워크 실패도 매끄럽게
 
-- [ ] gh 미설치 / 미로그인 별도 모달 (현재는 sidebar inline)
+- [x] gh 미설치 / 미로그인 별도 모달 (현재는 sidebar inline)
 - [ ] 회사 HTTPS outbound 차단 감지 + 자동 sync off 설정 (매일 토스트 떠야 발견)
 
 ### PR — commit cluster 카드 (Plan B) `backend`
@@ -88,14 +88,6 @@ PR 단위로 묶음. 각 PR 의 **한 줄 임팩트** 는 카드 frontmatter `im
 
 ## 💤 후순위 (dogfood 통증 부족)
 
-### PR — 본문 이미지 paste / drag&drop `ui_ux`
-한 줄 임팩트: 캡쳐 이미지 본문에 paste/drop → vault `_attachments/` 저장 + markdown 자동 insert
-
-- [ ] textarea (편집 모드) 안 이미지 paste / drag&drop 감지. `_attachments/{slug}/{n}.{ext}` 저장 + caret 위치에 `![](상대경로)` insert.
-- [ ] slug = 현재 메모 title kebab-case. 같은 메모 안 이미지 N 증가.
-- [ ] portfolio 카드의 `_attachments/{slug}/before-N.{ext}` 와 같은 패턴 — 자산 위치 일관.
-- [ ] PR #22 의 이미지 렌더링과 정합 — 저장 후 보기 모드 즉시 정상 표시.
-
 ### PR — 동적 카테고리 (사용자 정의 분류) `backend`
 한 줄 임팩트: 업무/미팅 외 본인 카테고리 자유 추가
 
@@ -111,7 +103,6 @@ PR 단위로 묶음. 각 PR 의 **한 줄 임팩트** 는 카드 frontmatter `im
 - [ ] V0.7 dogfood 매일 사용 — 다음 분기 평가 시 portfolio 탭만 띄워서 5분 내 펼쳐보일 수 있는지 검증
 - [ ] 다른 owner repo legacy 카드 backfill — "Legacy 카드 프롬프트" 복사 → 각 repo Claude Code 에 paste
 - [ ] 회사 owner repo PR 워크플로 전환 시도 — branch + 셀프 PR + auto-merge alias (5초)
-- [ ] backup-pre-pr-split branch 삭제 결정 (dogfood 며칠 후 안전 확인)
 
 ---
 

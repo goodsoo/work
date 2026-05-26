@@ -46,6 +46,10 @@ type Props = {
   className?: string;
   textareaRef?: React.Ref<HTMLTextAreaElement>;
   onBlur?: () => void;
+  // 이미지 paste / drag&drop 핸들러. 파일 받아서 저장 후 vault root 기준 path 반환
+  // (예: "notes/_attachments/{slug}/1.png"). null 반환 = 실패 (insert skip).
+  // 부모가 지정 안 하면 paste/drop 인터셉트 자체를 안 함 — 기존 동작 유지.
+  onImageAttach?: (file: File) => Promise<string | null>;
 };
 
 // textarea의 한 줄 높이 (line-height = 1.625rem, text-base 기준).
@@ -71,10 +75,14 @@ export function SourceBodyEditor({
   className,
   textareaRef: externalTextareaRef,
   onBlur,
+  onImageAttach,
 }: Props) {
   const [draft, setDraft] = useState(content);
   const [caretLine, setCaretLine] = useState<number | null>(null);
   const [slashState, setSlashState] = useState<SlashState | null>(null);
+  // window 레벨로 OS 파일 drag 진입 감지 — textarea 가 짧을 때 (빈 메모) 어디 떨어뜨려야
+  // 할지 안 보이던 통증. drag 중에만 textarea 외곽 강조 + min-height 일시 확장.
+  const [isDraggingFiles, setIsDraggingFiles] = useState(false);
   // mirror div 가 측정한 source line 별 actual visual height (wrap 포함, px).
   // 초기엔 빈 배열 — 그 동안 GutterMarker 는 LINE_HEIGHT fallback.
   const [lineHeights, setLineHeights] = useState<number[]>([]);
@@ -221,6 +229,40 @@ export function SourceBodyEditor({
       ro.disconnect();
     };
   }, []);
+
+  // OS Finder 등에서 파일 drag 시작/종료 감지 → textarea 시각 강조 토글.
+  // dragenter/dragleave 는 자식 element 통과 시 마다 발화해서 counter 패턴 필요.
+  // Files type 만 인식 — 텍스트 selection drag 같은 일반 dnd 는 무시.
+  useEffect(() => {
+    if (!onImageAttach) return;
+    let counter = 0;
+    const isFileDrag = (e: DragEvent) =>
+      Array.from(e.dataTransfer?.types ?? []).includes("Files");
+    const onEnter = (e: DragEvent) => {
+      if (!isFileDrag(e)) return;
+      counter++;
+      if (counter === 1) setIsDraggingFiles(true);
+    };
+    const onLeave = (e: DragEvent) => {
+      if (!isFileDrag(e)) return;
+      counter = Math.max(0, counter - 1);
+      if (counter === 0) setIsDraggingFiles(false);
+    };
+    const onDropOrEnd = () => {
+      counter = 0;
+      setIsDraggingFiles(false);
+    };
+    window.addEventListener("dragenter", onEnter);
+    window.addEventListener("dragleave", onLeave);
+    window.addEventListener("drop", onDropOrEnd);
+    window.addEventListener("dragend", onDropOrEnd);
+    return () => {
+      window.removeEventListener("dragenter", onEnter);
+      window.removeEventListener("dragleave", onLeave);
+      window.removeEventListener("drop", onDropOrEnd);
+      window.removeEventListener("dragend", onDropOrEnd);
+    };
+  }, [onImageAttach]);
 
   // macOS 의 "스마트 인용 부호와 줄표" 가 -- → — 자동 치환을 emit 할 때,
   // beforeinput inputType "insertReplacementText" 로 들어옴 — preventDefault.
@@ -431,6 +473,24 @@ export function SourceBodyEditor({
   }
 
   function onPaste(e: React.ClipboardEvent<HTMLTextAreaElement>) {
+    // 이미지 paste — onImageAttach 가 있을 때만 가로채기. clipboardData.items 안
+    // file kind 의 image/* 가 한 개라도 있으면 그것만 처리 (텍스트 부분 무시).
+    if (onImageAttach) {
+      const items = e.clipboardData.items;
+      const imageFiles: File[] = [];
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (item.kind === "file" && item.type.startsWith("image/")) {
+          const f = item.getAsFile();
+          if (f) imageFiles.push(f);
+        }
+      }
+      if (imageFiles.length > 0) {
+        e.preventDefault();
+        void insertAttachments(imageFiles);
+        return;
+      }
+    }
     const text = e.clipboardData.getData("text/plain");
     if (!text) return;
     const ta = e.currentTarget;
@@ -439,6 +499,50 @@ export function SourceBodyEditor({
       e.preventDefault();
       commitEdit(r);
     }
+  }
+
+  function onDragOver(e: React.DragEvent<HTMLTextAreaElement>) {
+    if (!onImageAttach) return;
+    if (!Array.from(e.dataTransfer.types).includes("Files")) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+  }
+
+  function onDrop(e: React.DragEvent<HTMLTextAreaElement>) {
+    if (!onImageAttach) return;
+    const files = Array.from(e.dataTransfer.files).filter((f) =>
+      f.type.startsWith("image/"),
+    );
+    if (files.length === 0) return;
+    e.preventDefault();
+    void insertAttachments(files);
+  }
+
+  // 여러 이미지 동시 처리 — 모두 vault 에 저장 후 한 번에 commitEdit 으로 caret 위치에
+  // 줄바꿈 join 해서 insert. 부분 실패 (slug 없음 등) 는 skip. 빈 결과면 no-op.
+  // ta.value / selection 은 함수 진입 시점 snapshot — async 중 사용자가 typing 하면
+  // 그 변경분이 묻힐 수 있지만 paste/drop 직후엔 보통 가만히 있어서 실측 race 위험 낮음.
+  async function insertAttachments(files: File[]) {
+    if (!onImageAttach) return;
+    const ta = textareaRef.current;
+    if (!ta) return;
+    const start = ta.selectionStart;
+    const end = ta.selectionEnd;
+    const baseValue = ta.value;
+    const paths: string[] = [];
+    for (const file of files) {
+      try {
+        const p = await onImageAttach(file);
+        if (p) paths.push(p);
+      } catch (err) {
+        console.error("image attach failed", err);
+      }
+    }
+    if (paths.length === 0) return;
+    const snippet = paths.map((p) => `![](${p})`).join("\n");
+    const next = baseValue.slice(0, start) + snippet + baseValue.slice(end);
+    const caret = start + snippet.length;
+    commitEdit({ value: next, start: caret, end: caret });
   }
 
   // textarea 아래/우측 빈 영역 클릭 → textarea focus + caret 끝.
@@ -519,6 +623,8 @@ export function SourceBodyEditor({
           }}
           onKeyDown={onKeyDown}
           onPaste={onPaste}
+          onDragOver={onDragOver}
+          onDrop={onDrop}
           onSelect={updateCaretLine}
           onKeyUp={updateCaretLine}
           onClick={updateCaretLine}
@@ -548,6 +654,20 @@ export function SourceBodyEditor({
             overflowX: "hidden", // wrap=soft 라 가로 scroll 발생 X — 명시
             overscrollBehavior: "none",
             wordBreak: "break-word", // 긴 영문 단어/URL 도 강제 wrap (CJK 는 어차피 char-단위)
+            // drag 강조 — outline 은 inset 으로 textarea 박스 안쪽 (드롭 가능 영역
+            // 정확 시각화). min-height 는 빈 메모 (1줄짜리) 에서 drop target 좁아 보이는
+            // 통증 해결 — drag 중에만 8rem 으로 일시 확장, drag 끝나면 다시 autoresize.
+            minHeight: isDraggingFiles ? "8rem" : undefined,
+            outline: isDraggingFiles
+              ? "2px dashed var(--accent-blue)"
+              : undefined,
+            outlineOffset: isDraggingFiles ? "-2px" : undefined,
+            backgroundColor: isDraggingFiles
+              ? "var(--accent-blue-bg)"
+              : "transparent",
+            borderRadius: isDraggingFiles ? "0.375rem" : undefined,
+            transition:
+              "min-height 120ms ease, outline-color 120ms ease, background-color 120ms ease",
           }}
           wrap="soft"
         />

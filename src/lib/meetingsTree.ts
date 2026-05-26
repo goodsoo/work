@@ -39,10 +39,10 @@ function ensureFolder(
   return node;
 }
 
-// flat list 의 메모를 폴더 트리로 변환. meetings/{folder}/{title}.md 경로의
+// flat list 의 메모를 폴더 트리로 변환. notes/{folder}/{title}.md 경로의
 // folder 부분으로 grouping. folder 없는 메모는 rootMeetings 로.
 // extraFolders — disk 에 mkdir 된 빈 폴더까지 보여주기 위해 추가 path list.
-// path 는 vault-relative ("meetings/work") 또는 meetings-relative ("work") 둘 다 허용.
+// path 는 vault-relative ("notes/work") 또는 notes-relative ("work") 둘 다 허용.
 // sortMeetings 가 없으면 입력 순서 유지 (사용처에서 미리 정렬해서 넘기는 패턴 OK).
 // 폴더는 segment 별 alphabetic (ko) — 정렬 popover 와 무관 (폴더는 위계, 메모만 정렬).
 export function buildMeetingsTree(
@@ -57,11 +57,11 @@ export function buildMeetingsTree(
     meetings: [],
   };
 
-  // extra folder path 정규화 — "meetings/" prefix 떼고 빈 segment 거름.
+  // extra folder path 정규화 — "notes/" prefix 떼고 빈 segment 거름.
   for (const raw of extraFolders) {
     let p = raw.replace(/^\/+|\/+$/g, "");
-    if (p.startsWith("meetings/")) p = p.slice("meetings/".length);
-    if (p === "" || p === "meetings") continue;
+    if (p.startsWith("notes/")) p = p.slice("notes/".length);
+    if (p === "" || p === "notes") continue;
     if (p.split("/").some((s) => s.startsWith(".") || s === "")) continue;
     ensureFolder(rootNode, p);
   }
