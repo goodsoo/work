@@ -2,13 +2,21 @@ import { useEffect, useState } from "react";
 import { GitBranch, RotateCcw, Trash2, X } from "lucide-react";
 import {
   useEmptyPortfolioTrash,
+  usePortfolioCategories,
   usePurgePortfolioWork,
   useRestorePortfolioWork,
   useTrashedPortfolioWorks,
 } from "../../hooks/usePortfolio";
-import type { TrashedPortfolioWork } from "../../api/portfolio";
+import type {
+  PortfolioCategoryDef,
+  TrashedPortfolioWork,
+} from "../../api/portfolio";
 import { useVault } from "../../lib/vault/useVault";
 import { vaultAssetSrc } from "../../lib/portfolio/assetUrl";
+import {
+  categoryColor as lookupCategoryColor,
+  categoryLabel as lookupCategoryLabel,
+} from "../../lib/portfolio/categoryLookup";
 import { formatDateTimeKo } from "../../lib/dates";
 import { formatError } from "../../lib/errors";
 import { ConfirmDialog } from "../ConfirmDialog";
@@ -16,21 +24,6 @@ import { Modal } from "../common/Modal";
 import { Button } from "../common/Button";
 import { Text } from "../common/Text";
 import { Chip } from "../common/Chip";
-
-const CATEGORY_LABEL: Record<string, string> = {
-  ui_ux: "UI/UX",
-  backend: "Backend",
-  infra: "Infra",
-  fix: "Fix",
-  other: "기타",
-};
-const CATEGORY_COLOR: Record<string, string> = {
-  ui_ux: "var(--cat-uiux)",
-  backend: "var(--cat-backend)",
-  infra: "var(--cat-infra)",
-  fix: "var(--cat-fix)",
-  other: "var(--cat-other)",
-};
 
 // stamp → 표시용 ISO ms (TrashedPortfolioWork.deletedAt 에 이미 ms 변환되어 있음).
 
@@ -53,6 +46,8 @@ export function PortfolioTrashModal({ open, onClose }: Props) {
   );
   const [emptyConfirm, setEmptyConfirm] = useState(false);
   const confirmOpen = purgeTarget !== null || emptyConfirm;
+  const categoriesQuery = usePortfolioCategories();
+  const categoryDefs = categoriesQuery.data ?? [];
 
   useEffect(() => {
     if (!open) {
@@ -217,6 +212,7 @@ export function PortfolioTrashModal({ open, onClose }: Props) {
                     key={t.trashPath}
                     work={t}
                     vaultRoot={vaultRoot ?? ""}
+                    categoryDefs={categoryDefs}
                     onRestore={() => handleRestore(t.trashPath)}
                     onPurge={() => setPurgeTarget(t)}
                     busy={
@@ -264,18 +260,20 @@ function TrashListItem({
   onRestore,
   onPurge,
   busy,
+  categoryDefs,
 }: {
   work: TrashedPortfolioWork;
   vaultRoot: string;
   onRestore: () => void;
   onPurge: () => void;
   busy: boolean;
+  categoryDefs: PortfolioCategoryDef[];
 }) {
   const fm = work.frontmatter;
   const firstShot = fm.screenshots[0];
   const title = fm.impact_summary || fm.github_title;
-  const categoryLabel = CATEGORY_LABEL[fm.category] ?? fm.category;
-  const categoryColor = CATEGORY_COLOR[fm.category] ?? "var(--cat-other)";
+  const categoryLabel = lookupCategoryLabel(fm.category, categoryDefs);
+  const categoryColor = lookupCategoryColor(fm.category, categoryDefs);
   return (
     <li
       className="flex items-center gap-3 rounded-md px-3 py-2"

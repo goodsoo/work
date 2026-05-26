@@ -1,38 +1,31 @@
 import { useState } from "react";
-import { Eye, GitBranch, Trash2 } from "lucide-react";
+import { Briefcase, Eye, Trash2 } from "lucide-react";
+import { GithubMark } from "./GithubMark";
 import { Button } from "../common/Button";
 import { Text } from "../common/Text";
 import { Chip } from "../common/Chip";
-import type { PortfolioProject, PortfolioWorkMeta } from "../../api/portfolio";
+import {
+  folderPathOfCard,
+  isGithubCard,
+  type PortfolioWorkMeta,
+} from "../../api/portfolio";
 import { formatDateShort } from "../../lib/dates";
 import { useVault } from "../../lib/vault/useVault";
 import { vaultAssetSrc } from "../../lib/portfolio/assetUrl";
 import {
   useDeletePortfolioWork,
+  usePortfolioCategories,
   useUpdatePortfolioFrontmatter,
 } from "../../hooks/usePortfolio";
+import {
+  categoryColor as lookupCategoryColor,
+  categoryLabel as lookupCategoryLabel,
+} from "../../lib/portfolio/categoryLookup";
 import { PortfolioCardMenu } from "./PortfolioCardMenu";
 import { PortfolioDetailModal } from "./PortfolioDetailModal";
 
-const CATEGORY_LABEL: Record<string, string> = {
-  ui_ux: "UI/UX",
-  backend: "Backend",
-  infra: "Infra",
-  fix: "Fix",
-  other: "기타",
-};
-
-const CATEGORY_COLOR: Record<string, string> = {
-  ui_ux: "var(--cat-uiux)",
-  backend: "var(--cat-backend)",
-  infra: "var(--cat-infra)",
-  fix: "var(--cat-fix)",
-  other: "var(--cat-other)",
-};
-
 type Props = {
   work: PortfolioWorkMeta;
-  projects: PortfolioProject[];
 };
 
 // F-1 카드 시각 위계 (portfolio-card-redesign):
@@ -42,24 +35,30 @@ type Props = {
 //   4) 메타 row: 카테고리 dot chip + +N -M · n일 전
 // 카드 본체 클릭 = PortfolioDetailModal — 큰 viewer + 모든 편집 통합.
 // 우상단 "..." 메뉴 = 빠른 액션 (프로젝트 변경 / included 토글 / 영구 삭제 / Claude 프롬프트).
-export function PortfolioWorkCard({ work, projects }: Props) {
+export function PortfolioWorkCard({ work }: Props) {
   const fm = work.frontmatter;
   const firstScreenshot = fm.screenshots[0];
   const dateLabel = fm.github_merged_at
     ? formatDateShort(fm.github_merged_at.slice(0, 10))
     : "";
-  const categoryLabel = CATEGORY_LABEL[fm.category] ?? fm.category;
-  const categoryColor = CATEGORY_COLOR[fm.category] ?? "var(--cat-other)";
-  // 프로젝트 chip = projects.md 의 name 에서 "owner/" prefix 제거 (repo 부분만).
-  // 본인이 한국어로 rename 했으면 그대로 (slash 없으니).
-  const fullProjectName = fm.project
-    ? projects.find((p) => p.slug === fm.project)?.name ?? fm.project
-    : null;
-  const projectLabel = fullProjectName
-    ? fullProjectName.includes("/")
-      ? fullProjectName.slice(fullProjectName.indexOf("/") + 1)
-      : fullProjectName
-    : null;
+  const categoriesQuery = usePortfolioCategories();
+  const categoryDefs = categoriesQuery.data ?? [];
+  const categoryLabel = lookupCategoryLabel(fm.category, categoryDefs);
+  const categoryColor = lookupCategoryColor(fm.category, categoryDefs);
+  const isGithub = isGithubCard(fm);
+  // source chip: github 카드 = repo 이름 (owner/repo 의 repo 부분), 수동 카드 = 폴더 path.
+  // 수동 카드 root 면 chip 안 표시.
+  const sourceChip = (() => {
+    if (isGithub) {
+      const repo = fm.github_repo;
+      const full = `${fm.github_owner}/${fm.github_repo}`;
+      return { label: repo, full };
+    }
+    const folder = folderPathOfCard(work.filePath);
+    if (!folder) return null;
+    const lastSeg = folder.split("/").pop() ?? folder;
+    return { label: lastSeg, full: folder };
+  })();
   const { adapter } = useVault();
   const vaultRoot = adapter.getRoot();
   const [modalOpen, setModalOpen] = useState(false);
@@ -105,11 +104,7 @@ export function PortfolioWorkCard({ work, projects }: Props) {
               className="h-full w-full object-cover"
             />
           ) : (
-            <GitBranch
-              className="h-5 w-5"
-              strokeWidth={1.5}
-              style={{ color: "var(--text-muted)" }}
-            />
+            <EmptyThumb githubCard={isGithub} />
           )}
         </div>
         <div className="flex min-w-0 flex-1 flex-col gap-1">
@@ -142,8 +137,8 @@ export function PortfolioWorkCard({ work, projects }: Props) {
                 {dateLabel}
               </Chip>
             ) : null}
-            {projectLabel ? (
-              <Chip title={fullProjectName ?? ""}>{projectLabel}</Chip>
+            {sourceChip ? (
+              <Chip title={sourceChip.full}>{sourceChip.label}</Chip>
             ) : null}
             <Chip dot={categoryColor} title={`카테고리: ${categoryLabel}`}>
               {categoryLabel}
@@ -226,11 +221,7 @@ export function PortfolioWorkCard({ work, projects }: Props) {
               className="h-full w-full object-cover"
             />
           ) : (
-            <GitBranch
-              className="h-5 w-5"
-              strokeWidth={1.5}
-              style={{ color: "var(--text-muted)" }}
-            />
+            <EmptyThumb githubCard={isGithub} />
           )}
         </div>
 
@@ -264,8 +255,8 @@ export function PortfolioWorkCard({ work, projects }: Props) {
                 {dateLabel}
               </Chip>
             ) : null}
-            {projectLabel ? (
-              <Chip title={fullProjectName ?? ""}>{projectLabel}</Chip>
+            {sourceChip ? (
+              <Chip title={sourceChip.full}>{sourceChip.label}</Chip>
             ) : null}
             <Chip dot={categoryColor} title={`카테고리: ${categoryLabel}`}>
               {categoryLabel}
@@ -291,10 +282,28 @@ export function PortfolioWorkCard({ work, projects }: Props) {
       {modalOpen ? (
         <PortfolioDetailModal
           work={work}
-          projects={projects}
           onClose={() => setModalOpen(false)}
         />
       ) : null}
     </>
+  );
+}
+
+// 빈 썸네일 자리 아이콘 — github 카드는 Mark 로고, 수동 카드는 file 아이콘.
+function EmptyThumb({ githubCard }: { githubCard: boolean }) {
+  if (githubCard) {
+    return (
+      <GithubMark
+        className="h-5 w-5"
+        style={{ color: "var(--text-muted)" }}
+      />
+    );
+  }
+  return (
+    <Briefcase
+      className="h-5 w-5"
+      strokeWidth={1.5}
+      style={{ color: "var(--text-muted)" }}
+    />
   );
 }
