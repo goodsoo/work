@@ -369,5 +369,11 @@ export function useGhSync() {
     setState((s) => ({ ...s, running: false }));
   }, []);
 
-  return { state, run, cancel };
+  // 사이드바 inline 에러 row 의 X 닫기. run() 시작 시 error: null 로 자동 reset 되므로
+  // 다음 sync 시 같은 에러는 다시 표시됨.
+  const dismissError = useCallback(() => {
+    setState((s) => (s.error ? { ...s, error: null } : s));
+  }, []);
+
+  return { state, run, cancel, dismissError };
 }

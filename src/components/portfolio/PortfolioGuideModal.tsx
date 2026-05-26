@@ -1,5 +1,8 @@
 import {
   BookOpen,
+  Download,
+  KeyRound,
+  Plug,
   RefreshCcw,
   Sparkles,
   Wand2,
@@ -22,6 +25,8 @@ type Props = {
   onClose: () => void;
   onFullSyncRun: () => void;
   fullSyncRunning: boolean;
+  onOpenInstallGuide: () => void;
+  onOpenAuthGuide: () => void;
 };
 
 // 포트폴리오 탭의 가이드북 — 동기화 방식, Claude 자동 채움, 프롬프트 도구.
@@ -31,6 +36,8 @@ export function PortfolioGuideModal({
   onClose,
   onFullSyncRun,
   fullSyncRunning,
+  onOpenInstallGuide,
+  onOpenAuthGuide,
 }: Props) {
   const { vaultRoot } = useVault();
 
@@ -62,6 +69,39 @@ export function PortfolioGuideModal({
 
         {/* 본문 — 스크롤 */}
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+          {/* GitHub 연결 — 셋업 단계 가장 위. 처음 사용자가 vault 만 보고 카드 안 떠 당황하지
+              않도록 "왜 안 보일 수 있는지 + 어떻게 푸는지" 진입 */}
+          <Section icon={<Plug className="h-4 w-4" />} title="GitHub 연결">
+            <p>
+              포트폴리오는 본인 머신의{" "}
+              <Code>gh</Code> CLI 가 본인 GitHub 토큰을 들고 PR 을 가져오는 구조.
+              앱 자체는 GitHub 토큰을 저장하지 않습니다 — gh 가 OS keychain 에 보관한
+              걸 빌립니다. 셋업은 두 단계.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={onOpenInstallGuide}
+                leftIcon={<Download className="h-3.5 w-3.5" />}
+              >
+                gh CLI 설치
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={onOpenAuthGuide}
+                leftIcon={<KeyRound className="h-3.5 w-3.5" />}
+              >
+                GitHub 로그인 / 계정 변경
+              </Button>
+            </div>
+            <p className="muted mt-2 text-[11px]">
+              회사 GitHub Enterprise 면 로그인 가이드 안에{" "}
+              <Code>--hostname github.your-company.com</Code> 옵션 안내.
+            </p>
+          </Section>
+
           {/* 동기화 */}
           <Section icon={<RefreshCcw className="h-4 w-4" />} title="동기화">
             <p>
