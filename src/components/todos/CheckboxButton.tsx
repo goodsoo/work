@@ -7,10 +7,14 @@ import { categoryColor } from "../../lib/todoCategory";
 export function CheckboxButton({
   status,
   category,
+  shape = "square",
   onClick,
 }: {
   status: "pending" | "done" | "cancelled";
   category: TodoCategory | null;
+  // 루틴 row 에서는 "circle" — 원형 체크박스. 할 일/일회성 작업은 default "square".
+  // 같은 사이드바에 두 종류가 섞일 때 시각으로만 type 구분 가능 (라벨 X).
+  shape?: "square" | "circle";
   onClick: () => void;
 }) {
   const catColor = status === "pending" ? categoryColor(category) : "";
@@ -35,7 +39,9 @@ export function CheckboxButton({
         e.stopPropagation();
         onClick();
       }}
-      className={`group/check flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-md border transition ${
+      className={`group/check flex h-[18px] w-[18px] shrink-0 items-center justify-center border transition ${
+        shape === "circle" ? "rounded-full" : "rounded-md"
+      } ${
         status === "done"
           ? "bg-[var(--text-secondary)]"
           : status === "cancelled"
