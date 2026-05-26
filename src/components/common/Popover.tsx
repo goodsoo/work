@@ -22,7 +22,7 @@ type Props = {
 };
 
 // 외부 클릭 / ESC 자동 닫기 boilerplate 흡수. 6 자리 (SidePanel SortMenu /
-// MeetingContextMenu / FolderContextMenu / TodoRow 연결 메모 / MeetingPicker /
+// MeetingContextMenu / FolderContextMenu / TaskRow 연결 메모 / MeetingPicker /
 // CategoryPicker) 의 useEffect + mousedown + keydown listener 통합.
 //
 // trigger 는 wrapper 안 렌더, panel 은 open 일 때만 trigger 아래 절대 위치.

@@ -3,26 +3,22 @@ import { createMemoryAdapter } from "../lib/vault/adapter";
 import type { GhPRDetail, GhSearchResult } from "../lib/portfolio/gh";
 import {
   ATTACHMENTS_DIR,
-  PORTFOLIO_CATEGORIES,
   PORTFOLIO_DIR,
   attachmentsDirFor,
-  buildBootstrapProjects,
   defaultUserFields,
+  deriveCategoryUnion,
   fileToPortfolioWork,
   parsePortfolioFrontmatter,
   portfolioWorkPath,
   portfolioWorkToRaw,
-  projectSlugForRepo,
   prSlug,
   prSlugFromNameWithOwner,
-  readPortfolioProjects,
   readPortfolioWork,
   readSyncState,
   scanPortfolio,
   splitPortfolioBody,
   syncPortfolio,
   upsertPortfolioWork,
-  writePortfolioProjects,
   writeSyncState,
 } from "./portfolio";
 
@@ -47,41 +43,23 @@ describe("portfolio schema (step 1 lock-in)", () => {
     const fields = defaultUserFields();
     expect(fields.included).toBe(true);
     expect(fields.category).toBe("other");
-    expect(fields.project).toBe("");
     expect(fields.impact_summary).toBe("");
     expect(fields.screenshots).toEqual([]);
   });
 
-  it("PORTFOLIO_CATEGORIES 는 5종", () => {
-    expect(PORTFOLIO_CATEGORIES).toEqual([
-      "ui_ux",
-      "backend",
-      "infra",
-      "fix",
-      "other",
-    ]);
-  });
-
-  it("projectSlugForRepo — matching repo → slug, 미매칭 → 빈 문자열", () => {
-    const projects = [
-      { slug: "company", name: "X", sort: 1, repos: ["a/repo1", "b/repo2"] },
-      { slug: "side", name: "Y", sort: 2, repos: ["zz/personal"] },
+  it("deriveCategoryUnion — 카드 frontmatter.category 의 union (사용 수 desc, slug asc tiebreaker)", () => {
+    const works = [
+      { frontmatter: { category: "ui_ux" } },
+      { frontmatter: { category: "backend" } },
+      { frontmatter: { category: "ui_ux" } },
+      { frontmatter: { category: "design" } },
+      { frontmatter: { category: "" } }, // 빈 = 제외
     ];
-    expect(projectSlugForRepo(projects, "a/repo1")).toBe("company");
-    expect(projectSlugForRepo(projects, "zz/personal")).toBe("side");
-    expect(projectSlugForRepo(projects, "x/unknown")).toBe("");
-    expect(projectSlugForRepo([], "a/b")).toBe("");
+    expect(deriveCategoryUnion(works)).toEqual(["ui_ux", "backend", "design"]);
   });
 
-  it("buildBootstrapProjects — unique nameWithOwner 마다 1 project", () => {
-    const projects = buildBootstrapProjects([
-      "a/repo1",
-      "b/repo2",
-      "a/repo1", // 중복
-    ]);
-    expect(projects).toHaveLength(2);
-    expect(projects.map((p) => p.slug).sort()).toEqual(["a-repo1", "b-repo2"]);
-    expect(projects[0].repos).toEqual([projects[0].name]);
+  it("deriveCategoryUnion — 빈 카드 → 빈 배열", () => {
+    expect(deriveCategoryUnion([])).toEqual([]);
   });
 });
 
@@ -134,7 +112,6 @@ describe("portfolio body parsing (step 2)", () => {
       github_changed_files: 3,
       github_additions: 10,
       github_deletions: 2,
-      project: "prj-a",
       included: false,
       category: "fix",
       impact_summary: "test",
@@ -197,13 +174,25 @@ describe("portfolio body parsing (step 2)", () => {
     expect(parsePortfolioFrontmatter(fm)).toBeNull();
   });
 
-  it("parsePortfolioFrontmatter — 잘못된 category → other fallback", () => {
+  it("parsePortfolioFrontmatter — 사용자 정의 category 그대로 통과", () => {
+    // 카테고리는 string 으로 풀려있어 builtin 5 외 vault categories.md 추가분도 OK.
+    // 빈 string 만 default "other" 로 fallback.
     const fm = {
       type: "portfolio-work",
       github_owner: "o",
       github_repo: "r",
       github_pr_number: 1,
-      category: "weird",
+      category: "design-review",
+    };
+    expect(parsePortfolioFrontmatter(fm)?.category).toBe("design-review");
+  });
+
+  it("parsePortfolioFrontmatter — 빈/누락 category → other fallback", () => {
+    const fm = {
+      type: "portfolio-work",
+      github_owner: "o",
+      github_repo: "r",
+      github_pr_number: 1,
     };
     expect(parsePortfolioFrontmatter(fm)?.category).toBe("other");
   });
@@ -231,7 +220,6 @@ describe("portfolio body parsing (step 2)", () => {
     expect(work).not.toBeNull();
     expect(work?.prSlug).toBe("zzompang2-goodsoob-work-42");
     expect(work?.frontmatter.github_pr_number).toBe(42);
-    expect(work?.frontmatter.project).toBe("prj-renewal");
     expect(work?.frontmatter.screenshots).toHaveLength(2);
     expect(work?.description).toContain("색 대비");
     expect(work?.notes).toContain("평가 미팅");
@@ -502,7 +490,7 @@ describe("syncPortfolio — 본인 수정 필드 보존 (v2.2 3A, design test #8
     const adapter = createMemoryAdapter();
     adapter.setRoot("/vault");
 
-    // 기존 카드: 사용자가 included=false / project=prj-x / category=ui_ux 로 토글
+    // 기존 카드: 사용자가 included=false / category=ui_ux / 본인 임팩트 작성
     await upsertPortfolioWork(adapter, {
       search: mkSearchResult({ number: 1, url: "https://github.com/owner/repo/pull/1" }),
       detail: mkDetail(),
@@ -517,7 +505,6 @@ describe("syncPortfolio — 본인 수정 필드 보존 (v2.2 3A, design test #8
         frontmatter: {
           ...existing!.frontmatter,
           included: false,
-          project: "prj-x",
           category: "ui_ux",
           impact_summary: "본인이 작성한 임팩트",
         },
@@ -539,7 +526,6 @@ describe("syncPortfolio — 본인 수정 필드 보존 (v2.2 3A, design test #8
 
     const preserved = await readPortfolioWork(adapter, "owner-repo-1");
     expect(preserved?.frontmatter.included).toBe(false);
-    expect(preserved?.frontmatter.project).toBe("prj-x");
     expect(preserved?.frontmatter.category).toBe("ui_ux");
     expect(preserved?.frontmatter.impact_summary).toBe("본인이 작성한 임팩트");
     expect(preserved?.notes).toBe("본인 메모");
@@ -548,9 +534,6 @@ describe("syncPortfolio — 본인 수정 필드 보존 (v2.2 3A, design test #8
 
     const fresh = await readPortfolioWork(adapter, "owner-repo-2");
     expect(fresh?.frontmatter.included).toBe(true); // default
-    // bootstrap 으로 "owner-repo" project 가 만들어졌고 owner/repo nameWithOwner
-    // 가 그 project 의 repos 에 들어가 자동 분류.
-    expect(fresh?.frontmatter.project).toBe("owner-repo");
 
     // .synced.md 갱신
     const state = await readSyncState(adapter);
@@ -577,146 +560,11 @@ describe("syncPortfolio — 본인 수정 필드 보존 (v2.2 3A, design test #8
     expect(progress.at(-1)).toEqual([2, 2]);
   });
 
-  it("projects.md 비었으면 bootstrap + 신규 카드 자동 분류", async () => {
-    const adapter = createMemoryAdapter();
-    adapter.setRoot("/vault");
-    const searchFn = async () => [
-      mkSearchResult({
-        number: 1,
-        url: "https://github.com/a/repo1/pull/1",
-        repository: { nameWithOwner: "a/repo1" },
-      }),
-      mkSearchResult({
-        number: 2,
-        url: "https://github.com/b/repo2/pull/2",
-        repository: { nameWithOwner: "b/repo2" },
-      }),
-    ];
-    const enrichFn = async () => mkDetail();
-    await syncPortfolio(adapter, { searchFn, enrichFn });
+  // v0.7.3 부터 projects.md 부트스트랩/매핑 폐기 — 사이드바 [GitHub] 그룹은 카드
+  // frontmatter 의 github_owner/github_repo 에서 derive. 옛 bootstrap / project
+  // 자동 매핑 / re-sync 보존 시나리오는 모두 삭제됨.
 
-    // projects.md 자동 생성
-    const projects = await readPortfolioProjects(adapter);
-    expect(projects).toHaveLength(2);
-    expect(projects[0].slug).toBe("a-repo1");
-    expect(projects[0].repos).toEqual(["a/repo1"]);
-    expect(projects[1].slug).toBe("b-repo2");
-
-    // 카드 frontmatter 의 project 자동 부여
-    const card1 = await readPortfolioWork(adapter, "a-repo1-1");
-    expect(card1?.frontmatter.project).toBe("a-repo1");
-    const card2 = await readPortfolioWork(adapter, "b-repo2-2");
-    expect(card2?.frontmatter.project).toBe("b-repo2");
-  });
-
-  it("projects.md 이미 있으면 bootstrap 안 함 + 매칭되는 repo 만 자동 분류", async () => {
-    const adapter = createMemoryAdapter();
-    adapter.setRoot("/vault");
-    // 본인이 미리 정의: "company" project 가 a/repo1 + b/repo2 모두 묶음
-    await writePortfolioProjects(adapter, [
-      {
-        slug: "company",
-        name: "회사 작업",
-        sort: 1,
-        repos: ["a/repo1", "b/repo2"],
-      },
-    ]);
-    const searchFn = async () => [
-      mkSearchResult({
-        number: 1,
-        url: "https://github.com/a/repo1/pull/1",
-        repository: { nameWithOwner: "a/repo1" },
-      }),
-      mkSearchResult({
-        number: 2,
-        url: "https://github.com/b/repo2/pull/2",
-        repository: { nameWithOwner: "b/repo2" },
-      }),
-      mkSearchResult({
-        number: 3,
-        url: "https://github.com/c/unmapped/pull/3",
-        repository: { nameWithOwner: "c/unmapped" },
-      }),
-    ];
-    const enrichFn = async () => mkDetail();
-    await syncPortfolio(adapter, { searchFn, enrichFn });
-
-    // bootstrap 안 함 (이미 있어서)
-    const projects = await readPortfolioProjects(adapter);
-    expect(projects).toHaveLength(1);
-    expect(projects[0].slug).toBe("company");
-
-    // 매칭된 repo 카드는 자동 분류
-    const card1 = await readPortfolioWork(adapter, "a-repo1-1");
-    expect(card1?.frontmatter.project).toBe("company");
-    // 미매칭 repo 는 분류안됨
-    const card3 = await readPortfolioWork(adapter, "c-unmapped-3");
-    expect(card3?.frontmatter.project).toBe("");
-  });
-
-  it("re-sync 시 분류안됨 (project=빈) 기존 카드 → 자동 매핑이 채움", async () => {
-    const adapter = createMemoryAdapter();
-    adapter.setRoot("/vault");
-    // 첫 sync 시점: projects.md 없고 단순 카드만 생성됨 (project=빈)
-    const searchFn = async () => [
-      mkSearchResult({
-        number: 1,
-        url: "https://github.com/a/repo1/pull/1",
-        repository: { nameWithOwner: "a/repo1" },
-      }),
-    ];
-    const enrichFn = async () => mkDetail();
-    // 첫 sync (projects.md 자동 부트스트랩됨)
-    await syncPortfolio(adapter, { searchFn, enrichFn });
-    const first = await readPortfolioWork(adapter, "a-repo1-1");
-    expect(first?.frontmatter.project).toBe("a-repo1"); // bootstrap 매핑 결과
-
-    // 본인이 옵시디안에서 project 를 빈 값으로 reset (e.g. "분류 다시 결정 중")
-    await adapter.write(
-      portfolioWorkPath("a-repo1-1"),
-      portfolioWorkToRaw({
-        ...first!,
-        frontmatter: { ...first!.frontmatter, project: "" },
-      }),
-    );
-
-    // re-sync → 분류안됨 카드는 자동 매핑이 다시 채움
-    await syncPortfolio(adapter, { searchFn, enrichFn });
-    const after = await readPortfolioWork(adapter, "a-repo1-1");
-    expect(after?.frontmatter.project).toBe("a-repo1");
-  });
-
-  it("re-sync 시 기존 카드의 본인 수정 project 는 보존 (매핑이 덮어쓰지 않음)", async () => {
-    const adapter = createMemoryAdapter();
-    adapter.setRoot("/vault");
-    // 첫 sync: 자동 분류로 "a-repo1" project 부여
-    const searchFn = async () => [
-      mkSearchResult({
-        number: 1,
-        url: "https://github.com/a/repo1/pull/1",
-        repository: { nameWithOwner: "a/repo1" },
-      }),
-    ];
-    const enrichFn = async () => mkDetail();
-    await syncPortfolio(adapter, { searchFn, enrichFn });
-
-    // 본인이 다른 project 로 재분류
-    const card = await readPortfolioWork(adapter, "a-repo1-1");
-    await adapter.write(
-      portfolioWorkPath("a-repo1-1"),
-      portfolioWorkToRaw({
-        ...card!,
-        frontmatter: { ...card!.frontmatter, project: "manual-override" },
-      }),
-    );
-
-    // re-sync — 본인 수정 보존
-    await syncPortfolio(adapter, { searchFn, enrichFn });
-    const after = await readPortfolioWork(adapter, "a-repo1-1");
-    expect(after?.frontmatter.project).toBe("manual-override");
-  });
-
-  it("github_pr_id 매칭 → owner/repo rename 자동 감지 + 파일 이동 + projects.md repos 갱신", async () => {
+  it("github_pr_id 매칭 → owner/repo rename 자동 감지 + 파일 이동", async () => {
     const adapter = createMemoryAdapter();
     adapter.setRoot("/vault");
     // 첫 sync: old-owner/repo 로 PR 1개. 명시적 PR id 사용 (rename 후에도 같음).
@@ -741,10 +589,8 @@ describe("syncPortfolio — 본인 수정 필드 보존 (v2.2 3A, design test #8
     // 첫 sync 결과 확인
     const first = await readPortfolioWork(adapter, "old-owner-repo-5");
     expect(first?.frontmatter.github_pr_id).toBe(PR_ID);
-    const firstProjects = await readPortfolioProjects(adapter);
-    expect(firstProjects[0].repos).toEqual(["old-owner/repo"]);
 
-    // 본인이 그 카드에 명시 분류 + impact_summary 작성 (사용자 수정 보존 검증)
+    // 본인이 그 카드에 impact_summary 작성 (사용자 수정 보존 검증)
     await adapter.write(
       portfolioWorkPath("old-owner-repo-5"),
       portfolioWorkToRaw({
@@ -752,7 +598,6 @@ describe("syncPortfolio — 본인 수정 필드 보존 (v2.2 3A, design test #8
         frontmatter: {
           ...first!.frontmatter,
           impact_summary: "본인이 작성한 임팩트",
-          project: "old-owner-repo", // bootstrap 으로 부여된 그대로
         },
       }),
     );
@@ -786,9 +631,6 @@ describe("syncPortfolio — 본인 수정 필드 보존 (v2.2 3A, design test #8
     expect(renamed?.frontmatter.github_owner).toBe("new-owner");
     expect(renamed?.frontmatter.github_repo).toBe("repo");
     expect(renamed?.frontmatter.impact_summary).toBe("본인이 작성한 임팩트");
-    // projects.md 의 repos 도 자동 갱신
-    const afterProjects = await readPortfolioProjects(adapter);
-    expect(afterProjects[0].repos).toEqual(["new-owner/repo"]);
   });
 
   it("AbortSignal — 중단 시 AbortError throw + 추가 enrich 안 호출", async () => {

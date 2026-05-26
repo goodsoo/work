@@ -22,22 +22,41 @@ import { extractPRBodyImages, planImagePaths } from "../lib/portfolio/imageImpor
 import { patchFrontmatter } from "../lib/vault/parser";
 
 export const PORTFOLIO_DIR = "portfolio";
-export const PROJECTS_FILE = "portfolio/projects.md";
 export const SYNCED_FILE = "portfolio/.synced.md";
 export const ATTACHMENTS_DIR = "portfolio/_attachments";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Enums / unions
+// Category model — vault union
+//
+// 카테고리는 vault 안 모든 portfolio 카드의 frontmatter.category 의 union 으로
+// 자연 발생. master list 파일·코드 상수 없음. 어떤 카드가 `category: design` 박으면
+// 그 카테고리가 존재하고, 마지막 카드에서 떼면 자동 소멸. typo 후 정정 = 잘못 적은
+// 카테고리 자동 사라짐. 색은 모두 단일 회색 chip (categoryLookup.ts).
+//
+// 빈 default 카테고리는 "other" — 사용자 PR template 의 가이드 enum (CLAUDE.md 의
+// ui_ux|backend|infra|fix|other) 과 일치하지만 앱이 강제하지 않음. parsePRResponse
+// 가 매칭 실패 시 "other" 반환하는 정도.
 
-export type PortfolioCategory = "ui_ux" | "backend" | "infra" | "fix" | "other";
+export type PortfolioCategory = string;
 
-export const PORTFOLIO_CATEGORIES: readonly PortfolioCategory[] = [
-  "ui_ux",
-  "backend",
-  "infra",
-  "fix",
-  "other",
-] as const;
+// vault scan 결과에서 카테고리 union 추출. 빈/누락은 제외, 정렬은 사용 카드 수 desc
+// → slug asc tiebreaker. 카드가 0 이면 빈 배열.
+export function deriveCategoryUnion(
+  works: { frontmatter: { category: string } }[],
+): string[] {
+  const counts = new Map<string, number>();
+  for (const w of works) {
+    const slug = w.frontmatter.category;
+    if (!slug) continue;
+    counts.set(slug, (counts.get(slug) ?? 0) + 1);
+  }
+  return Array.from(counts.entries())
+    .sort((a, b) => {
+      if (a[1] !== b[1]) return b[1] - a[1];
+      return a[0].localeCompare(b[0]);
+    })
+    .map(([slug]) => slug);
+}
 
 export type PortfolioState = "merged" | "closed";
 
@@ -59,7 +78,7 @@ export interface PortfolioWorkFrontmatter {
   // GitHub 원본 (gh sync 가 read-only 로 채움 — 본인 수정해도 다음 sync 덮어씀)
   // github_pr_id = GitHub 내부 PR ID (영구 불변). owner/repo rename 후에도 같음.
   // sync 가 이 id 로 vault 카드 매칭 → rename 자동 감지.
-  // optional = 옛 V0.7 카드 (id 없이 만들어진 카드) 호환.
+  // optional — 수동 카드 / pr_number=0 직커밋 카드는 PR 자체가 없어 id 도 없음.
   github_pr_id?: number;
   github_owner: string;
   github_repo: string;
@@ -73,7 +92,6 @@ export interface PortfolioWorkFrontmatter {
   github_deletions: number;
 
   // 본인 수정 가능 (sync 가 보존 — 다음 sync 가 덮어쓰지 않음)
-  project: string; // projects.md 의 slug. 빈 문자열 = "분류안됨".
   included: boolean; // 평가 자료 포함 여부. 신규 카드 default true.
   category: PortfolioCategory;
   impact_summary: string; // 한 줄 임팩트. ClipPromptButton paste 시 채움. 빈 문자열 OK.
@@ -89,17 +107,6 @@ export interface PortfolioWork {
   notes: string; // body 의 "## Notes" 섹션
   filePath: string; // "portfolio/{pr-slug}.md"
   mtime: number; // optimistic concurrency
-}
-
-export interface PortfolioProject {
-  slug: string; // kebab-case
-  name: string;
-  description?: string;
-  color?: string;
-  sort: number;
-  // repo nameWithOwner ("owner/repo") 리스트. sync 시 신규 카드를 이 project 로 자동 분류.
-  // 비면 자동 분류 X (본인이 카드 메뉴 "프로젝트 변경" 으로 수동).
-  repos?: string[];
 }
 
 export interface PortfolioSyncState {
@@ -138,12 +145,11 @@ export function attachmentsDirFor(slug: string): string {
 
 export type PortfolioUserFields = Pick<
   PortfolioWorkFrontmatter,
-  "project" | "included" | "category" | "impact_summary" | "screenshots"
+  "included" | "category" | "impact_summary" | "screenshots"
 >;
 
 export function defaultUserFields(): PortfolioUserFields {
   return {
-    project: "",
     included: true,
     category: "other",
     impact_summary: "",
@@ -174,11 +180,9 @@ function isPortfolioState(v: unknown): v is PortfolioState {
   return v === "merged" || v === "closed";
 }
 
+// 사용자 정의 카테고리 허용 — string non-empty 면 OK. 검증은 빈 값만 default ("other") fallback.
 function isCategory(v: unknown): v is PortfolioCategory {
-  return (
-    typeof v === "string" &&
-    (PORTFOLIO_CATEGORIES as readonly string[]).includes(v)
-  );
+  return typeof v === "string" && v.length > 0;
 }
 
 function fmStr(v: unknown, fallback = ""): string {
@@ -245,7 +249,6 @@ export function parsePortfolioFrontmatter(
     github_changed_files: fmNum(fm.github_changed_files),
     github_additions: fmNum(fm.github_additions),
     github_deletions: fmNum(fm.github_deletions),
-    project: fmStr(fm.project),
     included: fmBool(fm.included, true), // 누락 시 default true (v2.2 T4-NEW)
     category: isCategory(fm.category) ? fm.category : "other",
     impact_summary: fmStr(fm.impact_summary),
@@ -330,26 +333,54 @@ export function fileToPortfolioWork(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Scan portfolio dir (v2.2 flat — projects.md / .synced.md skip,
-// _attachments/ 는 dir 라 adapter.list 의 isFile 필터로 자동 제외).
+// Scan portfolio dir — vault 디렉토리 트리 재귀. 수동 폴더 (사용자 만든 실제 디렉토리)
+// 안 카드 + flat 의 github 카드 모두 한 list 로. _attachments / categories.md /
+// .synced.md / .trash/ 는 제외.
 
+// portfolio/categories.md 는 옛 master list 파일 — V0.7.3 부터 사용 안 함. 카드와 type
+// 다르므로 fileToPortfolioWork 가 자연 skip. 사용자가 옵시디안에서 직접 삭제 가능.
 const PORTFOLIO_SKIP = new Set<string>([
-  "portfolio/projects.md",
   "portfolio/.synced.md",
 ]);
 
 export const PORTFOLIO_TRASH_DIR = "portfolio/.trash";
 
+// portfolio/_attachments/... 는 카드가 아니므로 scan 제외. 옛 layout 호환.
+function isAttachmentPath(path: string): boolean {
+  if (path === `${PORTFOLIO_DIR}/${ATTACHMENTS_DIR.split("/")[1]}`) return true;
+  return path.startsWith(`${ATTACHMENTS_DIR}/`);
+}
+
+// portfolio/folder/sub/card.md → "folder/sub"
+// portfolio/card.md → ""
+// portfolio 외 path → ""
+export function folderPathOfCard(filePath: string): string {
+  if (!filePath.startsWith(`${PORTFOLIO_DIR}/`)) return "";
+  const rest = filePath.slice(PORTFOLIO_DIR.length + 1);
+  const lastSlash = rest.lastIndexOf("/");
+  if (lastSlash < 0) return "";
+  return rest.slice(0, lastSlash);
+}
+
+// GitHub 출처 카드 판별 — [GitHub] 그룹 vs [내가 만든 폴더] 분류 기준.
+//   1) PR 있는 정상 카드: github_pr_number > 0
+//   2) legacy 직커밋 카드: pr_number=0 + owner/repo 가 진짜 repo (이름 = claude 가 git log 로 생성).
+// 수동 추가 카드만 owner="local" repo="manual" sentinel 박힘 → 그 경우만 false.
+export function isGithubCard(fm: PortfolioWorkFrontmatter): boolean {
+  if (fm.github_pr_number > 0) return true;
+  return !(fm.github_owner === "local" && fm.github_repo === "manual");
+}
+
 export async function scanPortfolio(
   adapter: VaultAdapter,
 ): Promise<PortfolioWorkMeta[]> {
-  const files = await adapter.list(PORTFOLIO_DIR);
+  const files = await adapter.listRecursive(PORTFOLIO_DIR);
   const results: PortfolioWorkMeta[] = [];
   for (const path of files) {
     if (!path.endsWith(".md")) continue;
     if (PORTFOLIO_SKIP.has(path)) continue;
-    // portfolio 도메인 휴지통 (메모장 vault `.trash/` 와 분리)
     if (path.startsWith(`${PORTFOLIO_TRASH_DIR}/`)) continue;
+    if (isAttachmentPath(path)) continue;
     try {
       const raw = await adapter.read(path);
       const meta = await adapter.readMeta(path);
@@ -372,6 +403,159 @@ export async function scanPortfolio(
     if (da !== db) return db.localeCompare(da);
     return b.mtime - a.mtime;
   });
+  return results;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Manual folders — portfolio/ 아래 실제 디렉토리 트리. .trash, _attachments,
+// dot-prefix 모두 제외. nested 폴더 지원 ("회사/2026/Q1" 같은).
+
+export interface PortfolioFolder {
+  path: string; // portfolio root 기준 상대 (예: "사내 발표" 또는 "회사/2026")
+  parent: string; // 빈 = top level
+  name: string; // last segment
+}
+
+// 사용자 입력 폴더 이름 → 파일시스템 안전 이름. 한글 OK, 금지 문자만 -.
+export function sanitizeFolderName(name: string): string {
+  return name
+    .trim()
+    .replace(/[\\/:*?"<>|]/g, "-")
+    .replace(/\s+/g, " ")
+    .replace(/-{2,}/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80);
+}
+
+// 새 폴더 생성. parent 빈 = top level. 충돌 시 throw.
+// 옵시디안 폴더 패턴: 빈 폴더 OK (안 카드 0 이어도 사이드바 노출).
+export async function createPortfolioFolder(
+  adapter: VaultAdapter,
+  parent: string,
+  name: string,
+): Promise<string> {
+  const safe = sanitizeFolderName(name);
+  if (!safe) throw new Error("폴더 이름이 비어있습니다.");
+  const path = parent ? `${parent}/${safe}` : safe;
+  const abs = `${PORTFOLIO_DIR}/${path}`;
+  if (await adapter.exists(abs)) {
+    throw new Error(`같은 이름의 폴더가 이미 있습니다: ${path}`);
+  }
+  await adapter.mkdir(abs);
+  return path;
+}
+
+// 폴더 이름 변경 — disk rename. 안 카드 모두 새 path 로. parent 는 그대로.
+export async function renamePortfolioFolder(
+  adapter: VaultAdapter,
+  fromPath: string,
+  newName: string,
+): Promise<string> {
+  const safe = sanitizeFolderName(newName);
+  if (!safe) throw new Error("폴더 이름이 비어있습니다.");
+  const lastSlash = fromPath.lastIndexOf("/");
+  const parent = lastSlash < 0 ? "" : fromPath.slice(0, lastSlash);
+  const toPath = parent ? `${parent}/${safe}` : safe;
+  if (toPath === fromPath) return fromPath;
+  const fromAbs = `${PORTFOLIO_DIR}/${fromPath}`;
+  const toAbs = `${PORTFOLIO_DIR}/${toPath}`;
+  if (await adapter.exists(toAbs)) {
+    throw new Error(`같은 이름의 폴더가 이미 있습니다: ${toPath}`);
+  }
+  await adapter.rename(fromAbs, toAbs);
+  return toPath;
+}
+
+// 수동 카드의 폴더 이동 — fromPath 의 파일을 newFolder 안으로 disk rename.
+// 메모장 폴더 이동 패턴 동형. github 카드 (sync 관리) 는 root flat 유지 — 이 함수는
+// 수동 카드 전용 (호출처에서 isGithubCard 가드).
+export async function moveManualCard(
+  adapter: VaultAdapter,
+  fromPath: string,
+  newFolder: string,
+): Promise<string> {
+  const base = fromPath.split("/").pop() ?? fromPath;
+  const cleanFolder = newFolder.trim().replace(/^\/+|\/+$/g, "");
+  const newDir = cleanFolder
+    ? `${PORTFOLIO_DIR}/${cleanFolder}`
+    : PORTFOLIO_DIR;
+  const newPath = `${newDir}/${base}`;
+  if (newPath === fromPath) return fromPath;
+  if (await adapter.exists(newPath)) {
+    throw new Error(
+      `같은 이름의 카드가 그 폴더에 이미 있습니다. 카드 이름을 바꾸고 다시 시도하세요.`,
+    );
+  }
+  await adapter.mkdir(newDir);
+  await adapter.rename(fromPath, newPath);
+  return newPath;
+}
+
+// 폴더 삭제 — 안 모든 카드 (md) 를 휴지통으로 이동, 빈 폴더는 삭제. 메모장 패턴.
+// 폴더 안 sub-folder 도 재귀. _attachments 는 안 옮김 (카드와 함께 휴지통 stamp 디렉토리).
+export async function deletePortfolioFolder(
+  adapter: VaultAdapter,
+  folderPath: string,
+): Promise<{ deletedCards: number }> {
+  const abs = `${PORTFOLIO_DIR}/${folderPath}`;
+  const files = await adapter.listRecursive(abs);
+  await adapter.mkdir(PORTFOLIO_TRASH_DIR);
+  let deletedCards = 0;
+  for (const path of files) {
+    if (!path.endsWith(".md")) continue;
+    if (isAttachmentPath(path)) continue;
+    try {
+      const base = path.split("/").pop() ?? path;
+      const slug = base.replace(/\.md$/, "");
+      const stamp = new Date()
+        .toISOString()
+        .replace(/[:.]/g, "-")
+        .slice(0, 19);
+      await adapter.rename(path, `${PORTFOLIO_TRASH_DIR}/${stamp}-${slug}.md`);
+      deletedCards++;
+    } catch {
+      // skip 개별 실패
+    }
+  }
+  // 빈 폴더들 정리 — listFoldersRecursive 결과를 깊은 순서로 삭제.
+  try {
+    const inner = await adapter.listFoldersRecursive(abs);
+    const sorted = inner
+      .filter((p) => p.startsWith(`${PORTFOLIO_DIR}/`))
+      .sort((a, b) => b.split("/").length - a.split("/").length);
+    for (const folder of sorted) {
+      try {
+        await adapter.delete(folder, { recursive: true });
+      } catch {
+        // 폴더 안에 _attachments 남았을 수 있음
+      }
+    }
+    await adapter.delete(abs, { recursive: true });
+  } catch {
+    // adapter 가 빈 디렉토리 삭제 실패하는 경우 — vault watcher 가 다음 sync 때 정리 가능
+  }
+  return { deletedCards };
+}
+
+export async function listManualFolders(
+  adapter: VaultAdapter,
+): Promise<PortfolioFolder[]> {
+  const all = await adapter.listFoldersRecursive(PORTFOLIO_DIR);
+  const results: PortfolioFolder[] = [];
+  for (const rel of all) {
+    // rel 은 vault root 기준 (예: "portfolio/사내 발표")
+    if (!rel.startsWith(`${PORTFOLIO_DIR}/`)) continue;
+    const portfolioRel = rel.slice(PORTFOLIO_DIR.length + 1);
+    if (!portfolioRel) continue;
+    // _attachments / .trash 제외 (listFoldersRecursive 는 dot-prefix 만 자동 skip)
+    const top = portfolioRel.split("/")[0];
+    if (top === "_attachments") continue;
+    const lastSlash = portfolioRel.lastIndexOf("/");
+    const parent = lastSlash < 0 ? "" : portfolioRel.slice(0, lastSlash);
+    const name = lastSlash < 0 ? portfolioRel : portfolioRel.slice(lastSlash + 1);
+    results.push({ path: portfolioRel, parent, name });
+  }
+  results.sort((a, b) => a.path.localeCompare(b.path));
   return results;
 }
 
@@ -563,6 +747,81 @@ export function portfolioWorkToRaw(work: PortfolioWork): string {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Manual portfolio cards — PR 무관 카드 (오프라인 업무, 회의 발표, 외부 협업 등).
+// 메모장 패턴 동형: vault 의 실제 디렉토리 트리에 md 파일로 존재. sync 가
+// github_pr_number === 0 (= 수동) 인 카드는 매칭 X → 자동 보존.
+
+export interface CreateManualPortfolioInput {
+  title: string; // github_title 저장 + 파일명 시드.
+  date: string; // YYYY-MM-DD. 빈 = 오늘. github_merged_at 저장.
+  category: PortfolioCategory;
+  impact_summary: string;
+  folder: string; // 수동 폴더 vault path (예: "사내 발표" 또는 "회사/2026"). 빈 = root.
+}
+
+// 파일시스템 금지 문자 + 공백만 정리. 한글/영문/숫자/하이픈은 그대로.
+function slugifyManualTitle(title: string): string {
+  return title
+    .trim()
+    .replace(/[\\/:*?"<>|]/g, "-")
+    .replace(/\s+/g, "-")
+    .replace(/-{2,}/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60);
+}
+
+export async function createManualPortfolioWork(
+  adapter: VaultAdapter,
+  input: CreateManualPortfolioInput,
+): Promise<PortfolioWork> {
+  const folder = input.folder.trim().replace(/^\/+|\/+$/g, "");
+  const dirRel = folder ? `${PORTFOLIO_DIR}/${folder}` : PORTFOLIO_DIR;
+  await adapter.mkdir(dirRel);
+
+  const titlePart = slugifyManualTitle(input.title) || "untitled";
+  let slug = titlePart;
+  let n = 2;
+  while (await adapter.exists(`${dirRel}/${slug}.md`)) {
+    slug = `${titlePart}-${n++}`;
+  }
+
+  // YYYY-MM-DD → ISO 8601 (UTC midnight). 빈 입력은 오늘.
+  const dateStr = input.date || new Date().toISOString().slice(0, 10);
+  const mergedAt = `${dateStr}T00:00:00.000Z`;
+
+  const frontmatter: PortfolioWorkFrontmatter = {
+    type: "portfolio-work",
+    github_owner: "local",
+    github_repo: "manual",
+    github_pr_number: 0,
+    github_pr_url: "",
+    github_state: "merged",
+    github_merged_at: mergedAt,
+    github_title: input.title,
+    github_changed_files: 0,
+    github_additions: 0,
+    github_deletions: 0,
+    included: true,
+    category: input.category,
+    impact_summary: input.impact_summary,
+    screenshots: [],
+    synced_at: "",
+  };
+
+  const filePath = `${dirRel}/${slug}.md`;
+  const work: PortfolioWork = {
+    prSlug: slug,
+    frontmatter,
+    description: "",
+    notes: "",
+    filePath,
+    mtime: 0,
+  };
+  const meta = await adapter.write(filePath, portfolioWorkToRaw(work));
+  return { ...work, mtime: meta.mtime };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Sync state (.synced.md) — last_sync 만 (tombstone 폐기, v2.2 T4-NEW)
 
 export async function readSyncState(
@@ -608,9 +867,6 @@ export interface UpsertPortfolioWorkInput {
   detail: GhPRDetail;
   // 기존 카드 — 있으면 본인 수정 필드 보존, 없으면 default.
   existing?: PortfolioWork | null;
-  // projects.md 의 entries — 신규 카드의 project 자동 매핑에 사용.
-  // 기존 카드는 본인 수정 보존 (v2.2 3A) — 매핑이 덮어쓰지 않음.
-  projects?: PortfolioProject[];
   // V0.7.x — PR body 이미지에서 자동 추출/다운로드한 스크린샷.
   // existing.screenshots 가 비었을 때만 사용 (본인 dropzone 박은 거 보존).
   importedScreenshots?: PortfolioScreenshot[];
@@ -620,14 +876,10 @@ export async function upsertPortfolioWork(
   adapter: VaultAdapter,
   input: UpsertPortfolioWorkInput,
 ): Promise<PortfolioWork> {
-  const { search, detail, existing, projects, importedScreenshots } = input;
+  const { search, detail, existing, importedScreenshots } = input;
   const [owner, repo] = search.repository.nameWithOwner.split("/");
   const slug = prSlug(owner, repo, search.number);
   const path = portfolioWorkPath(slug);
-
-  const autoProject = projects
-    ? projectSlugForRepo(projects, search.repository.nameWithOwner)
-    : "";
 
   // PR body 이미지 자동 import: existing.screenshots 가 비었을 때만 사용.
   // 본인이 옵시디안에서 박은 거 (length > 0) 는 sync 가 덮어쓰지 않음 (보존).
@@ -642,14 +894,10 @@ export async function upsertPortfolioWork(
 
   // PR body 의 7섹션 양식에서 한 줄 임팩트 + 카테고리 자동 추출.
   // 신규 카드 + 빈 default 필드 채움. 본인이 한 번이라도 수정한 필드는 보존 (3A).
-  // - impact_summary 빈 문자열 = 본인 미작성 → parsed.impact 로 채움
-  // - category "other" = default = 본인 미분류 → parsed.category 로 채움
   const parsed = parsePRResponse(rawDescription);
 
   const userFields: PortfolioUserFields = existing
     ? {
-        // 본인이 명시 분류한 project 는 보존, "분류안됨" (빈) 이면 자동 매핑.
-        project: existing.frontmatter.project || autoProject,
         included: existing.frontmatter.included,
         category:
           existing.frontmatter.category !== "other"
@@ -663,7 +911,6 @@ export async function upsertPortfolioWork(
       }
     : {
         ...defaultUserFields(),
-        project: autoProject,
         screenshots,
         ...(parsed
           ? { impact_summary: parsed.impact, category: parsed.category }
@@ -698,102 +945,6 @@ export async function upsertPortfolioWork(
 
   const meta = await adapter.write(path, portfolioWorkToRaw(work));
   return { ...work, mtime: meta.mtime };
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Projects (projects.md frontmatter — 사이드바 그룹 source of truth)
-
-function parseProjectEntry(item: unknown): PortfolioProject | null {
-  if (!item || typeof item !== "object") return null;
-  const obj = item as Record<string, unknown>;
-  const slug = fmStr(obj.slug);
-  const name = fmStr(obj.name);
-  if (!slug || !name) return null;
-  const repos = Array.isArray(obj.repos)
-    ? obj.repos.filter((r): r is string => typeof r === "string" && r.includes("/"))
-    : undefined;
-  return {
-    slug,
-    name,
-    description: fmStr(obj.description) || undefined,
-    color: fmStr(obj.color) || undefined,
-    sort: fmNum(obj.sort, 0),
-    repos: repos && repos.length > 0 ? repos : undefined,
-  };
-}
-
-// repo nameWithOwner → project slug 룩업. 매칭 없으면 빈 문자열 (분류안됨).
-export function projectSlugForRepo(
-  projects: PortfolioProject[],
-  nameWithOwner: string,
-): string {
-  for (const p of projects) {
-    if (p.repos?.includes(nameWithOwner)) return p.slug;
-  }
-  return "";
-}
-
-// repo → slug 자동 생성 (부트스트랩 용). nameWithOwner 의 "/" 를 "-" 로.
-// "company-org/dashboard" → "company-org-dashboard"
-function slugFromRepo(nameWithOwner: string): string {
-  return nameWithOwner
-    .toLowerCase()
-    .replace(/[^a-z0-9/-]/g, "-")
-    .replace(/\//g, "-")
-    .replace(/-{2,}/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
-
-// 첫 sync 후 projects.md 가 비었을 때 1회 부트스트랩.
-// 가져온 PR 들의 unique nameWithOwner 마다 1 project 씩 생성 (slug = kebab-case).
-// 본인이 이후 옵시디안/UI 에서 merge/split 가능 (회사 멀티-repo 프로젝트는 본인이 묶기).
-export function buildBootstrapProjects(
-  repos: string[],
-): PortfolioProject[] {
-  const unique = Array.from(new Set(repos)).sort();
-  return unique.map((r, i) => ({
-    slug: slugFromRepo(r),
-    name: r, // 일단 nameWithOwner 그대로 — 본인이 옵시디안에서 한국어로 rename
-    sort: i + 1,
-    repos: [r],
-  }));
-}
-
-export async function readPortfolioProjects(
-  adapter: VaultAdapter,
-): Promise<PortfolioProject[]> {
-  if (!(await adapter.exists(PROJECTS_FILE))) return [];
-  const raw = await adapter.read(PROJECTS_FILE);
-  const { fm } = stripFrontmatter(raw);
-  if (!Array.isArray(fm.projects)) return [];
-  const list = fm.projects
-    .map(parseProjectEntry)
-    .filter((p): p is PortfolioProject => p !== null);
-  list.sort((a, b) => {
-    if (a.sort !== b.sort) return a.sort - b.sort;
-    return a.name.localeCompare(b.name);
-  });
-  return list;
-}
-
-export async function writePortfolioProjects(
-  adapter: VaultAdapter,
-  projects: PortfolioProject[],
-): Promise<void> {
-  const fm = yaml.dump(
-    { projects },
-    {
-      lineWidth: -1,
-      noRefs: true,
-      sortKeys: false,
-      schema: yaml.JSON_SCHEMA,
-    },
-  );
-  const body =
-    `---\n${fm.trimEnd()}\n---\n\n# Portfolio Projects\n\n` +
-    `V0.7 포트폴리오 탭 사이드바의 source. frontmatter \`projects\` 배열을 ` +
-    `수정하면 사이드바 반영. slug 는 kebab-case (폴더명 호환).\n`;
-  await adapter.write(PROJECTS_FILE, body);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -911,16 +1062,6 @@ export async function syncPortfolio(
     return s === "CLOSED" || s === "MERGED";
   });
 
-  // 부트스트랩: projects.md 가 비었고 가져온 PR 이 있으면 unique repo 별로
-  // default project 1개씩 자동 생성 (1 repo = 1 project, slug = kebab nameWithOwner).
-  // 본인이 옵시디안/UI 에서 이후 merge/split 가능.
-  let projects = await readPortfolioProjects(adapter);
-  if (projects.length === 0 && closed.length > 0) {
-    const uniqueRepos = closed.map((pr) => pr.repository.nameWithOwner);
-    projects = buildBootstrapProjects(uniqueRepos);
-    await writePortfolioProjects(adapter, projects);
-  }
-
   // vault scan → github_pr_id + slug 인덱스. rename 자동 감지 + 본인 screenshots 보존에 사용.
   const allWorks = await scanPortfolio(adapter);
   const byId = new Map<number, PortfolioWorkMeta>();
@@ -980,7 +1121,6 @@ export async function syncPortfolio(
   // Phase B: vault write 는 직렬 — file rename / write 충돌 / id 매칭 race 회피.
   let added = 0;
   let preserved = 0;
-  let projectsMutated = false;
   for (let i = 0; i < closed.length; i++) {
     throwIfAborted(opts.signal);
     const pr = closed[i];
@@ -990,17 +1130,7 @@ export async function syncPortfolio(
     // 1) id 매칭 — owner/repo rename 감지. slug 다르면 옛 파일을 새 slug 로 이동.
     const idMatch = byId.get(pr.id);
     if (idMatch && idMatch.prSlug !== newSlug) {
-      const oldNameWithOwner = `${idMatch.frontmatter.github_owner}/${idMatch.frontmatter.github_repo}`;
       await renamePortfolioCard(adapter, idMatch.prSlug, newSlug);
-      // projects.md repos 자동 갱신 (옛 nameWithOwner → 새)
-      for (const p of projects) {
-        if (p.repos?.includes(oldNameWithOwner)) {
-          p.repos = p.repos.map((r) =>
-            r === oldNameWithOwner ? pr.repository.nameWithOwner : r,
-          );
-          projectsMutated = true;
-        }
-      }
     }
 
     // 2) existing fetch (rename 후 새 slug 또는 같은 slug)
@@ -1009,17 +1139,12 @@ export async function syncPortfolio(
       search: pr,
       detail: phaseA[i].detail,
       existing,
-      projects, // 신규 카드 자동 매핑
       importedScreenshots: phaseA[i].imported,
     });
     if (existing) preserved++;
     else added++;
   }
   opts.onProgress?.(closed.length, closed.length);
-
-  if (projectsMutated) {
-    await writePortfolioProjects(adapter, projects);
-  }
 
   await writeSyncState(adapter, {
     last_sync: new Date().toISOString(),

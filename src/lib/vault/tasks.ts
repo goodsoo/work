@@ -1,6 +1,6 @@
 import { parseLooseDate, parseLooseTime } from "../dates";
 
-export interface TodoItem {
+export interface TaskItem {
   id: string;
   text: string;
   done: boolean;
@@ -23,9 +23,9 @@ const ISO_DATE_RE = /(\d{4})-(\d{2})-(\d{2})/;
 const MD_DATE_RE = /(?:^|\s)(\d{1,2})\/(\d{1,2})(?=\s|$)/;
 const TIME_RE = /(?:^|\s)(\d{1,2}):(\d{2})(?=\s|$)/;
 
-export function extractTodos(filePath: string, raw: string): TodoItem[] {
+export function extractTasks(filePath: string, raw: string): TaskItem[] {
   const lines = raw.split("\n");
-  const items: TodoItem[] = [];
+  const items: TaskItem[] = [];
   let inCodeFence = false;
   let codeFenceMarker = "";
 
@@ -51,7 +51,7 @@ export function extractTodos(filePath: string, raw: string): TodoItem[] {
     const deleted = checkChar === "D";
     const content = m[3].trim();
 
-    const parsed = parseTodoContent(content);
+    const parsed = parseTaskContent(content);
     items.push({
       id: stableId(filePath, content),
       text: parsed.text,
@@ -75,7 +75,7 @@ interface ParsedContent {
   tags: string[];
 }
 
-function parseTodoContent(content: string): ParsedContent {
+function parseTaskContent(content: string): ParsedContent {
   let remaining = content;
   let due: string | undefined;
   let time: string | undefined;
@@ -171,7 +171,7 @@ function stableId(filePath: string, content: string): string {
 
 // 체크박스 status patch: ` ` / `x` / `-` 중 하나로 set. 텍스트 부분은 건드리지 않음.
 // 외부 편집으로 라인 이동했어도 라인 내 패턴만 일치하면 OK.
-export function setTodoCheckChar(
+export function setTaskCheckChar(
   raw: string,
   line: number,
   char: " " | "x" | "-" | "D",
@@ -179,12 +179,12 @@ export function setTodoCheckChar(
   const lines = raw.split("\n");
   const target = lines[line];
   if (target === undefined) {
-    throw new Error(`setTodoCheckChar: line ${line} out of range (total ${lines.length})`);
+    throw new Error(`setTaskCheckChar: line ${line} out of range (total ${lines.length})`);
   }
   const m = target.match(CHECKBOX_RE);
   if (!m) {
     throw new Error(
-      `setTodoCheckChar: line ${line} is not a checkbox: ${target}`,
+      `setTaskCheckChar: line ${line} is not a checkbox: ${target}`,
     );
   }
   lines[line] = `${m[1]}- [${char}] ${m[3]}`;
@@ -192,10 +192,10 @@ export function setTodoCheckChar(
 }
 
 // 호환 — done boolean only path. cancelled 는 별도 호출 또는 라인 reconstruct.
-export function toggleTodo(
+export function toggleTask(
   raw: string,
   line: number,
   done: boolean,
 ): string {
-  return setTodoCheckChar(raw, line, done ? "x" : " ");
+  return setTaskCheckChar(raw, line, done ? "x" : " ");
 }

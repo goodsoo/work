@@ -76,7 +76,6 @@ function buildMeeting(input: MeetingInsert, id: string, uid: string): Meeting {
 }
 
 // 한 회의 sidecar 까지 read 해서 합쳐 반환. sidecar 없으면 그 필드는 빈 값.
-// uid 없는 옛 메모는 lazy 발급 + frontmatter rewrite (scanMeetings 가 못 잡은 경로 보완).
 //
 // iCloud sync footgun: `adapter.exists` 가 false 라도 throw 하지 null 반환 X.
 // 이유: iCloud 가 파일을 잠시 evict / 새 버전 download 중이면 exists 가 일시
@@ -91,8 +90,8 @@ async function readFullMeeting(
   if (!(await adapter.exists(id))) {
     throw new Error(`meeting file unavailable: ${id}`);
   }
-  let mainRaw = await adapter.read(id);
-  let meta = await adapter.readMeta(id);
+  const mainRaw = await adapter.read(id);
+  const meta = await adapter.readMeta(id);
   const tPath = transcriptPath(id);
   const sPath = summaryPath(id);
   const transcriptRaw = (await adapter.exists(tPath))
@@ -101,21 +100,7 @@ async function readFullMeeting(
   const summaryRaw = (await adapter.exists(sPath))
     ? await adapter.read(sPath)
     : "";
-  let m = fileToMeeting(id, mainRaw, transcriptRaw, summaryRaw, meta.mtime);
-  if (m.uid === "") {
-    const uid = crypto.randomUUID();
-    const updated = { ...m, uid };
-    try {
-      const newRaw = meetingToMainRaw(updated);
-      const newMeta = await adapter.write(id, newRaw, meta.mtime);
-      mainRaw = newRaw;
-      meta = newMeta;
-      m = fileToMeeting(id, mainRaw, transcriptRaw, summaryRaw, meta.mtime);
-    } catch {
-      m = { ...m, uid };
-    }
-  }
-  return m;
+  return fileToMeeting(id, mainRaw, transcriptRaw, summaryRaw, meta.mtime);
 }
 
 export async function listMeetings(adapter: VaultAdapter): Promise<Meeting[]> {
@@ -142,9 +127,7 @@ export async function listDeletedMeetings(
       /^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-/,
       "",
     );
-    // V0.7.1: 메모 파일명은 임의 title (date prefix 없음). 순수 YYYY-MM-DD.md
-    // 만 일기로 보고 skip. 그 외 (legacy YYYY-MM-DD-{title}.md + V0.7.1
-    // {title}.md) 는 모두 메모.
+    // 순수 YYYY-MM-DD.md 는 일기 → skip, 그 외는 메모.
     if (base.match(/^\d{4}-\d{2}-\d{2}\.md$/)) {
       continue;
     }

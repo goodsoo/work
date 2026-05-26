@@ -1,17 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
-import {
-  PORTFOLIO_CATEGORIES,
-  type PortfolioCategory,
-} from "../api/portfolio";
 import { useScopedKey } from "../lib/vault/scopedStorage";
 
 // 작업 카드 카테고리 chip 필터. single radio. "all" = 전체 (필터 X).
-// 할일 카테고리 필터와 동일한 정신 모델 — 한 번에 하나만 본다.
+// 할 일 카테고리 필터와 동일한 정신 모델 — 한 번에 하나만 본다.
 // vault id namespace 적용 — 개인/회사 vault 별 필터 분리 (PR #45 흡수).
 // localStorage 에 직렬화. 옛 multi (string[]) 도 lazy 흡수 — 첫 값만 채용.
+// 카테고리는 builtin 5 + categories.md user-defined 라 enum check 없이 string 그대로
+// 받음. 매칭 안 되는 slug 가 들어와도 UI 가 chip row 에서 안 보일 뿐 (위험 0).
 const BASE_KEY = "goodsoob:portfolioCategoryFilter";
 
-export type PortfolioCategoryFilter = "all" | PortfolioCategory;
+export type PortfolioCategoryFilter = "all" | string;
 
 function readKey(key: string): PortfolioCategoryFilter {
   if (typeof localStorage === "undefined") return "all";
@@ -22,19 +20,12 @@ function readKey(key: string): PortfolioCategoryFilter {
     // 옛 multi 형식 (string[]) — 첫 값만 single 로 흡수, 비어있으면 "all".
     if (Array.isArray(parsed)) {
       const first = parsed.find(
-        (v) =>
-          typeof v === "string" &&
-          (PORTFOLIO_CATEGORIES as readonly string[]).includes(v),
+        (v) => typeof v === "string" && v.length > 0,
       );
-      return (first as PortfolioCategory | undefined) ?? "all";
+      return (first as string | undefined) ?? "all";
     }
     if (parsed === "all") return "all";
-    if (
-      typeof parsed === "string" &&
-      (PORTFOLIO_CATEGORIES as readonly string[]).includes(parsed)
-    ) {
-      return parsed as PortfolioCategory;
-    }
+    if (typeof parsed === "string" && parsed.length > 0) return parsed;
     return "all";
   } catch {
     return "all";

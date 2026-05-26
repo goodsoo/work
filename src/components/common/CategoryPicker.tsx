@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { Hash } from "lucide-react";
-import { TODO_CATEGORIES, type TodoCategory } from "../../api/todos";
+import { TASK_CATEGORIES, type TaskCategory } from "../../api/tasks";
 import { Button } from "./Button";
 import { Popover } from "./Popover";
 
 type Props = {
-  value: TodoCategory | null;
-  onChange: (next: TodoCategory | null) => void;
+  value: TaskCategory | null;
+  onChange: (next: TaskCategory | null) => void;
   // 부모 wrap 너비에 맞춰 button 100% — 카테고리 라벨 길이 변해도 흔들림 X.
   fullWidth?: boolean;
 };
@@ -16,11 +16,11 @@ type Props = {
 export function CategoryPicker({ value, onChange, fullWidth }: Props) {
   const [open, setOpen] = useState(false);
   const label =
-    TODO_CATEGORIES.find((c) => c.id === value)?.label ?? "미분류";
+    TASK_CATEGORIES.find((c) => c.id === value)?.label ?? "미분류";
 
-  const options: Array<{ id: TodoCategory | null; label: string }> = [
+  const options: Array<{ id: TaskCategory | null; label: string }> = [
     { id: null, label: "미분류" },
-    ...TODO_CATEGORIES.map((c) => ({ id: c.id, label: c.label })),
+    ...TASK_CATEGORIES.map((c) => ({ id: c.id, label: c.label })),
   ];
 
   return (

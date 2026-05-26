@@ -85,7 +85,7 @@
 - **날짜 형식**: 정밀 `YYYY.MM.DD`. 목록은 상대 (`5분 전`, `어제`) 또는 짧은 (`5월 23일`).
 - **시간 형식**: `오전·오후 h:mm` 12시간 (소비자 톤).
 - **숫자 · 단위**: 천 단위 `,`. 단위 한글, 붙임 (`30분`, `1MB`).
-- **placeholder**: 한글 예시형 (`예: 홍길동`). 명령형/영문 X.
+- **placeholder**: 명령형 안내 (`{필드}을 입력하세요`). `예: ...` 예시형 X (사용자 입력 좁힘), 영문/축약 X, 빈 placeholder X.
 - **empty state**: heading + body + CTA 3단. 어미는 종결어미 정책 따름.
 - **wrap**: `word-break: keep-all` 전역. chip · 날짜는 `whitespace-nowrap`, 영문 URL · 해시는 `break-all`, 한 줄 ellipsis 는 `truncate`.
 - **문장부호**: 한국어 본문 em dash (`—`) 금지. 쉼표 · 괄호 · 마침표 사용 (영문 문맥은 OK).

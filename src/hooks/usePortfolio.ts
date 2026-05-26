@@ -2,23 +2,29 @@
 // useMeetings 패턴 그대로. useGhSync 는 별도 (mutable run state 보유).
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
   ATTACHMENTS_DIR,
+  PORTFOLIO_DIR,
   PORTFOLIO_TRASH_DIR,
-  PROJECTS_FILE,
+  createManualPortfolioWork,
+  createPortfolioFolder,
+  deletePortfolioFolder,
+  deriveCategoryUnion,
   emptyPortfolioTrash,
+  fileToPortfolioWork,
+  listManualFolders,
   listTrashedPortfolioWorks,
+  moveManualCard,
   portfolioWorkPath,
   purgePortfolioWork,
-  readPortfolioProjects,
   readSyncState,
   readPortfolioWork,
+  renamePortfolioFolder,
   restorePortfolioWork,
   scanPortfolio,
   syncPortfolio,
-  writePortfolioProjects,
-  type PortfolioProject,
+  type CreateManualPortfolioInput,
   type PortfolioWork,
   type PortfolioWorkFrontmatter,
   type PortfolioWorkMeta,
@@ -31,7 +37,7 @@ import { patchFrontmatter } from "../lib/vault/parser";
 
 const worksKey = ["portfolio"] as const;
 const workKey = (slug: string) => ["portfolio", "work", slug] as const;
-const projectsKey = ["portfolio-projects"] as const;
+const foldersKey = ["portfolio-folders"] as const;
 const trashKey = ["portfolio", "trash"] as const;
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -60,7 +66,7 @@ export function usePortfolioWork(slug: string | undefined) {
 export type PortfolioFrontmatterPatch = Partial<
   Pick<
     PortfolioWorkFrontmatter,
-    "project" | "included" | "category" | "impact_summary" | "screenshots"
+    "included" | "category" | "impact_summary" | "screenshots"
   >
 >;
 
@@ -69,14 +75,19 @@ export function useUpdatePortfolioFrontmatter(slug: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (patch: PortfolioFrontmatterPatch) => {
-      const path = portfolioWorkPath(slug);
+      // cache 의 list 에서 slug 매칭되는 work 의 실제 filePath 사용.
+      // portfolioWorkPath(slug) 만 가정하면 폴더 안 수동 카드 / NFC·NFD 정규화 차이 카드
+      // 에서 read throw → optimistic rollback 으로 옛 값 복귀하던 race 차단.
+      const list = qc.getQueryData<PortfolioWorkMeta[]>(worksKey);
+      const found = list?.find((w) => w.prSlug === slug);
+      const path = found?.filePath ?? portfolioWorkPath(slug);
       const raw = await adapter.read(path);
       const newRaw = patchFrontmatter(raw, patch as Record<string, unknown>);
       const meta = await adapter.write(path, newRaw);
       watcher.markSelfWrite(path);
-      return readPortfolioWork(adapter, slug).then((w) =>
-        w ? { ...w, mtime: meta.mtime } : null,
-      );
+      // readPortfolioWork 도 같은 path 로 직접 — slug→path 추정 회피.
+      const updatedRaw = await adapter.read(path);
+      return fileToPortfolioWork(path, updatedRaw, meta.mtime);
     },
     onMutate: async (patch) => {
       await qc.cancelQueries({ queryKey: workKey(slug) });
@@ -105,6 +116,22 @@ export function useUpdatePortfolioFrontmatter(slug: string) {
       if (updated) {
         qc.setQueryData(workKey(slug), updated);
       }
+      qc.invalidateQueries({ queryKey: worksKey });
+    },
+  });
+}
+
+// 수동 카드 생성 — PR 무관 (오프라인 업무, 회의 발표 등). legacy schema 로 저장.
+export function useCreateManualPortfolioWork() {
+  const { adapter, watcher } = useVault();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: CreateManualPortfolioInput) => {
+      const work = await createManualPortfolioWork(adapter, input);
+      watcher.markSelfWrite(work.filePath);
+      return work;
+    },
+    onSuccess: () => {
       qc.invalidateQueries({ queryKey: worksKey });
     },
   });
@@ -214,30 +241,101 @@ export function useEmptyPortfolioTrash() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Projects
+// Manual folders — vault 실제 디렉토리 트리. 메모장 폴더 패턴 동형.
 
-export function usePortfolioProjects() {
+export function useManualFolders() {
   const { adapter, isReady } = useVault();
   return useQuery({
-    queryKey: projectsKey,
-    queryFn: () => readPortfolioProjects(adapter),
+    queryKey: foldersKey,
+    queryFn: () => listManualFolders(adapter),
     enabled: isReady,
   });
 }
 
-export function useWritePortfolioProjects() {
+export function useCreatePortfolioFolder() {
   const { adapter, watcher } = useVault();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (projects: PortfolioProject[]) => {
-      await writePortfolioProjects(adapter, projects);
-      watcher.markSelfWrite(PROJECTS_FILE);
-      return projects;
+    mutationFn: async (input: { parent: string; name: string }) => {
+      const path = await createPortfolioFolder(adapter, input.parent, input.name);
+      watcher.markSelfWrite(`${PORTFOLIO_DIR}/${path}`);
+      return path;
     },
-    onSuccess: (projects) => {
-      qc.setQueryData(projectsKey, projects);
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: foldersKey });
     },
   });
+}
+
+export function useRenamePortfolioFolder() {
+  const { adapter, watcher } = useVault();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { fromPath: string; newName: string }) => {
+      const toPath = await renamePortfolioFolder(
+        adapter,
+        input.fromPath,
+        input.newName,
+      );
+      watcher.markSelfWrite(`${PORTFOLIO_DIR}/${input.fromPath}`);
+      watcher.markSelfWrite(`${PORTFOLIO_DIR}/${toPath}`);
+      return { fromPath: input.fromPath, toPath };
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: foldersKey });
+      qc.invalidateQueries({ queryKey: worksKey });
+    },
+  });
+}
+
+// 수동 카드의 폴더 이동 — disk rename. 카드 frontmatter 안 만짐 (vault path 가 진실).
+export function useMoveManualCard() {
+  const { adapter, watcher } = useVault();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { fromPath: string; toFolder: string }) => {
+      const newPath = await moveManualCard(
+        adapter,
+        input.fromPath,
+        input.toFolder,
+      );
+      watcher.markSelfWrite(input.fromPath);
+      watcher.markSelfWrite(newPath);
+      return newPath;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: worksKey });
+      qc.invalidateQueries({ queryKey: foldersKey });
+    },
+  });
+}
+
+export function useDeletePortfolioFolder() {
+  const { adapter, watcher } = useVault();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (folderPath: string) => {
+      const result = await deletePortfolioFolder(adapter, folderPath);
+      watcher.markSelfWrite(`${PORTFOLIO_DIR}/${folderPath}`);
+      return result;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: foldersKey });
+      qc.invalidateQueries({ queryKey: worksKey });
+      qc.invalidateQueries({ queryKey: trashKey });
+    },
+  });
+}
+
+// 카테고리는 vault 카드의 frontmatter union 으로 자연 발생 (V0.7.3 — design-derived).
+// master list 파일·코드 상수 없음. 호출처는 string[] 받아서 자동완성·필터·정렬에 사용.
+// 빈 카드 (sync default) 가 만든 "other" 도 vault union 에 자연 포함됨.
+export function usePortfolioCategories(): string[] {
+  const worksQuery = usePortfolioWorks();
+  return useMemo(
+    () => deriveCategoryUnion(worksQuery.data ?? []),
+    [worksQuery.data],
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

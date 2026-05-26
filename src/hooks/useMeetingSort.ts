@@ -8,10 +8,7 @@ const BASE_KEY = "goodsoob:meetingSort";
 function readKey(key: string): MeetingSortKey {
   if (typeof localStorage === "undefined") return "date_desc";
   const v = localStorage.getItem(key);
-  // backward compat — 옛 "date" 는 "date_desc" (최신순) 로 마이그레이트.
-  if (v === "date" || v === "date_desc") return "date_desc";
-  if (v === "date_asc") return "date_asc";
-  if (v === "name") return "name";
+  if (v === "date_desc" || v === "date_asc" || v === "name") return v;
   return "date_desc";
 }
 

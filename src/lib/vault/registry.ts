@@ -5,11 +5,9 @@
 // key 구조:
 //  - goodsoob:vaults         → VaultEntry[]
 //  - goodsoob:activeVaultId  → string | null
-//  - vaultRoot (legacy)      → string | null — 첫 부팅에서만 흡수하고 그 뒤 무시.
 
 const VAULTS_KEY = "goodsoob:vaults";
 const ACTIVE_VAULT_KEY = "goodsoob:activeVaultId";
-const LEGACY_VAULT_ROOT_KEY = "vaultRoot";
 
 export type VaultEntry = {
   id: string;
@@ -104,19 +102,8 @@ export function renameVault(id: string, name: string): void {
   writeVaults(getVaults().map((v) => (v.id === id ? { ...v, name: trimmed } : v)));
 }
 
-// 기존 단일 vaultRoot 사용자를 vaults list 1개로 부드럽게 흡수.
-// list 가 이미 있으면 no-op — 첫 부팅에서만 실행되는 게 의도.
-export function bootstrapFromLegacy(): void {
-  if (getVaults().length > 0) return;
-  const legacy = localStorage.getItem(LEGACY_VAULT_ROOT_KEY);
-  if (!legacy) return;
-  const entry = addVault(folderName(legacy), legacy);
-  setActiveVaultId(entry.id);
-}
-
 // test 전용 — production code 에선 직접 호출하지 말 것.
 export const __testing = {
   VAULTS_KEY,
   ACTIVE_VAULT_KEY,
-  LEGACY_VAULT_ROOT_KEY,
 };

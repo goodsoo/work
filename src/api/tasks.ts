@@ -1,16 +1,16 @@
 import type { VaultAdapter } from "../lib/vault/adapter";
-import { extractTodos, toggleTodo, type TodoItem } from "../lib/vault/tasks";
-import { scanAllTodos } from "../lib/vault/scan";
+import { extractTasks, toggleTask, type TaskItem } from "../lib/vault/tasks";
+import { scanAllTasks } from "../lib/vault/scan";
 
-export type TodoPriority = "high" | "medium" | "low";
-export type TodoCategory = "work" | "schedule" | "other";
-export const TODO_CATEGORIES: Array<{ id: TodoCategory; label: string }> = [
+export type TaskPriority = "high" | "medium" | "low";
+export type TaskCategory = "work" | "schedule" | "other";
+export const TASK_CATEGORIES: Array<{ id: TaskCategory; label: string }> = [
   { id: "work", label: "업무" },
   { id: "schedule", label: "일정" },
   { id: "other", label: "기타" },
 ];
 
-export interface Todo {
+export interface Task {
   id: string; // `${file}#L${line}`
   title: string;
   done: boolean;
@@ -20,11 +20,11 @@ export interface Todo {
   // done/cancelled 와 mutually exclusive.
   deleted: boolean;
   done_at: string | null;
-  priority: TodoPriority;
-  category: TodoCategory | null;
+  priority: TaskPriority;
+  category: TaskCategory | null;
   due_date: string | null;
   due_time: string | null;
-  // 메모 → 할일 ⌘⏎ 로 만든 todo 면 원본 메모 uid. vault 라인엔
+  // 메모 → 태스크 ⌘⏎ 로 만든 태스크면 원본 메모 uid. vault 라인엔
   // `#from-<uid>` tag 로 직렬화. uid 영구라 메모 rename 후에도 안 깨짐.
   source_meeting_uid: string | null;
   // V0.5.3 호환 — UI 가 의존. vault 에선 파일 mtime / "now" 로 대체.
@@ -34,15 +34,15 @@ export interface Todo {
   _source: { file: string; line: number };
 }
 
-export interface TodoInsert {
+export interface TaskInsert {
   title: string;
   done?: boolean;
   cancelled?: boolean;
   deleted?: boolean;
-  category?: TodoCategory | null;
+  category?: TaskCategory | null;
   due_date?: string | null;
   due_time?: string | null;
-  priority?: TodoPriority;
+  priority?: TaskPriority;
   source_meeting_uid?: string | null;
 }
 
@@ -55,10 +55,10 @@ export interface TodoUpdate {
   cancelled?: boolean;
   deleted?: boolean;
   done_at?: string | null;
-  category?: TodoCategory | null;
+  category?: TaskCategory | null;
   due_date?: string | null;
   due_time?: string | null;
-  priority?: TodoPriority;
+  priority?: TaskPriority;
   source_meeting_uid?: string | null;
 }
 
@@ -70,21 +70,21 @@ export function makeTodoId(file: string, line: number): string {
 
 export function parseTodoId(id: string): { file: string; line: number } {
   const m = id.match(/^(.+)#L(\d+)$/);
-  if (!m) throw new Error(`invalid todo id: ${id}`);
+  if (!m) throw new Error(`invalid task id: ${id}`);
   return { file: m[1], line: Number(m[2]) };
 }
 
-// ─── TodoItem (vault parser 결과) → Todo (API 노출) ─────────────────────────
+// ─── TaskItem (vault parser 결과) → Task (API 노출) ─────────────────────────
 
-function isCategory(t: string): t is TodoCategory {
+function isCategory(t: string): t is TaskCategory {
   return t === "work" || t === "schedule" || t === "other";
 }
 
-function isPriority(t: string): t is TodoPriority {
+function isPriority(t: string): t is TaskPriority {
   return t === "high" || t === "medium" || t === "low";
 }
 
-function todoFromItem(item: TodoItem, mtimeIso?: string): Todo {
+function todoFromItem(item: TaskItem, mtimeIso?: string): Task {
   const categoryTag = item.tags.find(isCategory);
   const priorityTag = item.tags.find(isPriority);
   const fromTag = item.tags.find((t) => t.startsWith(FROM_TAG_PREFIX));
@@ -120,10 +120,10 @@ export function buildTodoLine(input: {
   done?: boolean;
   cancelled?: boolean;
   deleted?: boolean;
-  category?: TodoCategory | null;
+  category?: TaskCategory | null;
   due_date?: string | null;
   due_time?: string | null;
-  priority?: TodoPriority;
+  priority?: TaskPriority;
   source_meeting_uid?: string | null;
   extra_tags?: string[];
 }): string {
@@ -161,26 +161,26 @@ export function buildTodoLine(input: {
 
 // ─── API ───────────────────────────────────────────────────────────────────
 
-export async function listTodos(adapter: VaultAdapter): Promise<Todo[]> {
-  const items = await scanAllTodos(adapter);
-  const todos = items.map((item) => todoFromItem(item));
+export async function listTodos(adapter: VaultAdapter): Promise<Task[]> {
+  const items = await scanAllTasks(adapter);
+  const tasks = items.map((item) => todoFromItem(item));
   // 미완료 먼저, due_date 가까운 순, 그다음 최근
-  todos.sort((a, b) => {
+  tasks.sort((a, b) => {
     if (a.done !== b.done) return a.done ? 1 : -1;
     const da = a.due_date ?? "9999";
     const db = b.due_date ?? "9999";
     if (da !== db) return da.localeCompare(db);
     return b._source.line - a._source.line;
   });
-  return todos;
+  return tasks;
 }
 
 const INBOX_PATH = "inbox.md";
 
 export async function createTodo(
   adapter: VaultAdapter,
-  input: TodoInsert,
-): Promise<Todo> {
+  input: TaskInsert,
+): Promise<Task> {
   const line = buildTodoLine(input);
   const raw = (await adapter.exists(INBOX_PATH))
     ? await adapter.read(INBOX_PATH)
@@ -211,27 +211,27 @@ export async function createTodo(
   };
 }
 
-export async function updateTodo(
+export async function updateTask(
   adapter: VaultAdapter,
   id: string,
   patch: TodoUpdate,
-): Promise<Todo> {
+): Promise<Task> {
   const { file, line } = parseTodoId(id);
   const raw = await adapter.read(file);
   const meta = await adapter.readMeta(file);
 
-  // 단순 done toggle 만 있으면 toggleTodo 사용 (다른 텍스트 보존)
+  // 단순 done toggle 만 있으면 toggleTask 사용 (다른 텍스트 보존)
   const onlyDone =
     Object.keys(patch).length === 1 && "done" in patch && patch.done !== undefined;
   let updated: string;
   if (onlyDone) {
-    updated = toggleTodo(raw, line, patch.done!);
+    updated = toggleTask(raw, line, patch.done!);
   } else {
     // 라인 reconstruct (현재 inline syntax 다시 추출 + patch merge)
-    const items = extractTodos(file, raw);
+    const items = extractTasks(file, raw);
     const existing = items.find((i) => i.source.line === line);
     if (!existing) {
-      throw new Error(`todo not found at line ${line} of ${file}`);
+      throw new Error(`task not found at line ${line} of ${file}`);
     }
     const existingFromTag = existing.tags.find((t) =>
       t.startsWith(FROM_TAG_PREFIX),
@@ -269,15 +269,15 @@ export async function updateTodo(
 
   const newMeta = await adapter.write(file, updated, meta.mtime);
   // 재추출해서 최신 객체 반환
-  const items = extractTodos(file, updated);
+  const items = extractTasks(file, updated);
   const after = items.find((i) => i.source.line === line);
   if (!after) {
-    throw new Error(`todo disappeared after update at ${file}:${line}`);
+    throw new Error(`task disappeared after update at ${file}:${line}`);
   }
   return todoFromItem(after, new Date(newMeta.mtime).toISOString());
 }
 
-export async function deleteTodo(
+export async function deleteTask(
   adapter: VaultAdapter,
   id: string,
 ): Promise<void> {

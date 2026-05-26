@@ -42,7 +42,7 @@ export function RoutineDetail({ name, onClose }: Props) {
 
   const routine = routineQ.data ?? null;
 
-  // 폼 영역 click-to-edit. 태스크 카드 (TodoRow) 와 동일 패턴 — 폼 클러스터 클릭 시
+  // 폼 영역 click-to-edit. 태스크 카드 (TaskRow) 와 동일 패턴 — 폼 클러스터 클릭 시
   // editing 진입, 외부 mousedown/Enter/Escape 로 종료. 종료 시 한 patch 로 diff commit.
   const [editing, setEditing] = useState(false);
   const initialDraft: RoutineDraft = {
@@ -99,7 +99,7 @@ export function RoutineDetail({ name, onClose }: Props) {
   }, [editing]);
 
   // 외부 mousedown / Enter = commit, Escape = revert. LooseDate/Time 의 blur→onCommit
-  // 가 draftRef 동기 갱신 → microtask 안 commitAndClose 가 최신 ref 사용 (TodoRow 패턴).
+  // 가 draftRef 동기 갱신 → microtask 안 commitAndClose 가 최신 ref 사용 (TaskRow 패턴).
   useEffect(() => {
     if (!editing) return;
     function onMouseDown(e: MouseEvent) {
@@ -187,7 +187,7 @@ export function RoutineDetail({ name, onClose }: Props) {
     if (!routine) return;
     if (
       !window.confirm(
-        `'${routine.name}' 루틴을 삭제할까요? 체크 이력도 함께 사라집니다.`,
+        `'${routine.name}' 루틴을 휴지통으로 옮길까요? 나중에 복원할 수 있습니다.`,
       )
     )
       return;
@@ -249,7 +249,7 @@ export function RoutineDetail({ name, onClose }: Props) {
       />
 
       <div className="mx-auto w-full max-w-xl px-5 pb-16 pt-5">
-        {/* 폼 카드 — TodoRow 와 동일 패턴. 읽기 = title + meta chips, 편집 = title input + inline meta. */}
+        {/* 폼 카드 — TaskRow 와 동일 패턴. 읽기 = title + meta chips, 편집 = title input + inline meta. */}
         <div
           ref={formWrapperRef}
           onClick={() => {
@@ -353,7 +353,7 @@ export function RoutineDetail({ name, onClose }: Props) {
   );
 }
 
-// 읽기 메타 row — TodoRow.ReadOnlyMeta 패턴. 시간 · 시작일 (~ 종료일) chip 들.
+// 읽기 메타 row — TaskRow.ReadOnlyMeta 패턴. 시간 · 시작일 (~ 종료일) chip 들.
 function RoutineReadMeta({
   time,
   started,

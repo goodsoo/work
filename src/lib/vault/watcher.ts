@@ -11,7 +11,7 @@ function affectedQueryKeys(path: string): unknown[][] {
     // sidecar (.transcript.md / .summary.md) 변경 시 메인 path key 로 invalidate.
     const mainPath = isMeetingSidecar(path) ? meetingMainPath(path) : path;
     keys.push(["meetings", mainPath]);
-    keys.push(["todos"]); // 메모 안 todo 가 통합 뷰에 영향
+    keys.push(["todos"]); // 메모 안 task 가 통합 뷰에 영향
   } else if (path.startsWith("journals/")) {
     keys.push(["journals"]);
     keys.push(["journals", path]);
@@ -24,9 +24,11 @@ function affectedQueryKeys(path: string): unknown[][] {
   } else if (path.startsWith("portfolio/")) {
     keys.push(["portfolio"]);
     keys.push(["portfolio", path]);
-    if (path === "portfolio/projects.md") {
-      keys.push(["portfolio-projects"]);
+    if (path === "portfolio/categories.md") {
+      keys.push(["portfolio-categories"]);
     }
+    // 폴더 변경 (rename/create/delete) 도 사이드바 트리 새로고침 필요
+    keys.push(["portfolio-folders"]);
     // _attachments/* 변경도 카드 새로고침 필요 (썸네일 캐시)
   } else if (path === "inbox.md" || !path.includes("/")) {
     // root level *.md (inbox 등)

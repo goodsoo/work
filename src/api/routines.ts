@@ -6,12 +6,19 @@
 //   - body: 체크 로그 — `- [x] ✅ YYYY-MM-DD` 만. 옵시디안 Tasks plugin 호환.
 //
 // "자동 등장" = ends 가 없거나 today <= ends 면 사이드바/캘린더 사이드바에 매일 표시.
-// 체크 라인은 사용자가 체크할 때만 추가. todo 카테고리와 완전 별개 도메인 — 태스크와 섞이지 않음.
+// 체크 라인은 사용자가 체크할 때만 추가. 태스크 카테고리와 완전 별개 도메인 — 태스크와 섞이지 않음.
 
 import yaml from "js-yaml";
 import type { VaultAdapter } from "../lib/vault/adapter";
+import { freshStamp } from "../lib/vault/scan";
 
 export const ROUTINES_DIR = "routines";
+// 휴지통은 routines 도메인 안 별도 폴더 — 메모 `.trash/` / 포트폴리오 `portfolio/.trash`
+// 와 격리. 도메인별 분리는 복원 라우팅 단순화 (origin 추적 불필요).
+export const ROUTINE_TRASH_DIR = "routines/.trash";
+// stamp prefix: `YYYY-MM-DDTHH-MM-SS-{name}.md` — portfolio trash 패턴과 동일.
+const TRASH_STAMP_RE =
+  /^routines\/\.trash\/(\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2})-(.+)\.md$/;
 
 export interface RoutineFrontmatter {
   id: string; // uuid (영구 식별자)
@@ -168,6 +175,16 @@ export function isActiveOn(routine: RoutineFrontmatter, dateIso: string): boolea
   return true;
 }
 
+// 종료일이 오늘 이전 — 활성 list 에서 자동 분리되어 "지난 루틴" 영역에 노출.
+// started 가 오늘 이후인 (아직 시작 전) 케이스는 active 가 아니지만 archive 도 아님 —
+// "예정"은 별도 분기. 현재 UX 는 expired only.
+export function isArchivedOn(
+  routine: RoutineFrontmatter,
+  dateIso: string,
+): boolean {
+  return !!routine.ends && routine.ends < dateIso;
+}
+
 // 시간순 + 이름순 정렬. 시간 없는 routine 은 시간 있는 것 뒤로.
 export function sortRoutines(routines: Routine[]): Routine[] {
   return [...routines].sort((a, b) => {
@@ -321,12 +338,118 @@ export async function updateRoutine(
   return { ...next, mtime: meta.mtime };
 }
 
+// soft delete — 휴지통(`routines/.trash/`)으로 이동. 메모/포트폴리오와 같은 패턴.
+// 본인이 메모를 실수로 삭제했다가 복구한 경험이 있어 루틴도 같은 안전망 필요.
+export async function trashRoutine(
+  adapter: VaultAdapter,
+  name: string,
+): Promise<string> {
+  const path = routinePath(name);
+  if (!(await adapter.exists(path))) {
+    throw new Error(`routine not found: ${name}`);
+  }
+  await adapter.mkdir(ROUTINE_TRASH_DIR);
+  const trashPath = `${ROUTINE_TRASH_DIR}/${freshStamp()}-${name}.md`;
+  await adapter.rename(path, trashPath);
+  return trashPath;
+}
+
+// 옛 API 호환 — UI 에서는 trashRoutine 직접 사용. 남겨두면 다음 작업이 모르고
+// 사용할 위험이 있어 시그니처만 유지 + 내부적으로 soft delete.
 export async function deleteRoutine(
   adapter: VaultAdapter,
   name: string,
 ): Promise<void> {
-  const path = routinePath(name);
-  if (await adapter.exists(path)) await adapter.delete(path);
+  await trashRoutine(adapter, name);
+}
+
+export interface TrashedRoutine {
+  name: string; // 원본 name (stamp 제거)
+  trashPath: string;
+  stamp: string;
+  deletedAt: number; // stamp → ms
+  frontmatter: RoutineFrontmatter;
+  log: Set<string>;
+  mtime: number;
+}
+
+function parseStampToMs(stamp: string): number {
+  const iso = stamp.replace(
+    /^(\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})-(\d{2})$/,
+    "$1T$2:$3:$4",
+  );
+  const t = Date.parse(iso);
+  return Number.isFinite(t) ? t : 0;
+}
+
+export async function listTrashedRoutines(
+  adapter: VaultAdapter,
+): Promise<TrashedRoutine[]> {
+  const files = await adapter.list(ROUTINE_TRASH_DIR);
+  const results: TrashedRoutine[] = [];
+  for (const path of files) {
+    if (!path.endsWith(".md")) continue;
+    const m = path.match(TRASH_STAMP_RE);
+    if (!m) continue;
+    const [, stamp, name] = m;
+    try {
+      const raw = await adapter.read(path);
+      const meta = await adapter.readMeta(path);
+      const r = fileToRoutine(path, raw, meta.mtime);
+      if (!r) continue;
+      const deletedAt = parseStampToMs(stamp) || meta.mtime;
+      results.push({
+        name,
+        trashPath: path,
+        stamp,
+        deletedAt,
+        frontmatter: r.frontmatter,
+        log: r.log,
+        mtime: meta.mtime,
+      });
+    } catch {
+      // 손상 skip
+    }
+  }
+  // 최근 삭제 위
+  results.sort((a, b) => b.deletedAt - a.deletedAt);
+  return results;
+}
+
+// 복원 — `routines/.trash/{stamp}-{name}.md` → `routines/{name}.md`.
+// 같은 name 이 다시 생성되어 있으면 throw (사용자에게 충돌 안내).
+export async function restoreRoutine(
+  adapter: VaultAdapter,
+  trashPath: string,
+): Promise<string> {
+  const m = trashPath.match(TRASH_STAMP_RE);
+  if (!m) throw new Error(`휴지통 경로 형식이 다릅니다: ${trashPath}`);
+  const [, , name] = m;
+  const target = routinePath(name);
+  if (await adapter.exists(target)) {
+    throw new RoutineConflictError(name);
+  }
+  await adapter.rename(trashPath, target);
+  return target;
+}
+
+export async function purgeRoutine(
+  adapter: VaultAdapter,
+  trashPath: string,
+): Promise<void> {
+  if (await adapter.exists(trashPath)) await adapter.delete(trashPath);
+}
+
+export async function emptyRoutineTrash(adapter: VaultAdapter): Promise<void> {
+  const files = await adapter.list(ROUTINE_TRASH_DIR);
+  for (const p of files) {
+    if (!p.endsWith(".md")) continue;
+    try {
+      await adapter.delete(p);
+    } catch {
+      // 한 항목 실패해도 진행
+    }
+  }
 }
 
 // 특정 날짜의 체크 토글. 활성 기간 안에서만 의미가 있지만 caller 가 검증.

@@ -1,15 +1,15 @@
 import { useMemo } from "react";
 import { LayoutGrid } from "lucide-react";
 import {
-  usePortfolioProjects,
+  usePortfolioCategories,
   usePortfolioWorks,
 } from "../hooks/usePortfolio";
 import { PortfolioWorkCard } from "../components/portfolio/PortfolioWorkCard";
-import type { ProjectFilter } from "../components/portfolio/PortfolioProjectList";
+import { PortfolioSortMenu } from "../components/portfolio/PortfolioSortMenu";
+import type { SourceFilter } from "../components/portfolio/PortfolioSourceTree";
 import {
-  PORTFOLIO_CATEGORIES,
-  type PortfolioCategory,
-  type PortfolioProject,
+  folderPathOfCard,
+  isGithubCard,
   type PortfolioWorkMeta,
 } from "../api/portfolio";
 import type { PortfolioSortKey } from "../hooks/usePortfolioSort";
@@ -19,46 +19,39 @@ import { Text } from "../components/common/Text";
 import { Button } from "../components/common/Button";
 import { SelectableChip } from "../components/common/SelectableChip";
 import { EmptyState } from "../components/common/EmptyState";
-
-const CATEGORY_LABEL: Record<PortfolioCategory, string> = {
-  ui_ux: "UI/UX",
-  backend: "Backend",
-  infra: "Infra",
-  fix: "Fix",
-  other: "기타",
-};
-
-const CATEGORY_COLOR: Record<PortfolioCategory, string> = {
-  ui_ux: "var(--cat-uiux)",
-  backend: "var(--cat-backend)",
-  infra: "var(--cat-infra)",
-  fix: "var(--cat-fix)",
-  other: "var(--cat-other)",
-};
+import { CATEGORY_CHIP_COLOR } from "../lib/portfolio/categoryLookup";
 
 type Props = {
-  activeFilter: ProjectFilter;
+  activeFilter: SourceFilter;
   sortKey: PortfolioSortKey;
+  onSortKeyChange: (next: PortfolioSortKey) => void;
   selectedCategory: PortfolioCategoryFilter;
   onCategoryChange: (next: PortfolioCategoryFilter) => void;
   onSync: () => void;
   syncRunning: boolean;
 };
 
-function applyProjectFilter(
+function applySourceFilter(
   works: PortfolioWorkMeta[],
-  filter: ProjectFilter,
+  filter: SourceFilter,
 ): PortfolioWorkMeta[] {
   switch (filter.kind) {
     case "all":
       return works.filter((w) => w.frontmatter.included);
-    case "uncategorized":
+    case "github":
       return works.filter(
-        (w) => w.frontmatter.included && !w.frontmatter.project,
+        (w) =>
+          w.frontmatter.included &&
+          isGithubCard(w.frontmatter) &&
+          `${w.frontmatter.github_owner}/${w.frontmatter.github_repo}` ===
+            filter.repo,
       );
-    case "project":
+    case "folder":
       return works.filter(
-        (w) => w.frontmatter.included && w.frontmatter.project === filter.slug,
+        (w) =>
+          w.frontmatter.included &&
+          !isGithubCard(w.frontmatter) &&
+          folderPathOfCard(w.filePath) === filter.path,
       );
     case "excluded":
       return works.filter((w) => !w.frontmatter.included);
@@ -74,15 +67,22 @@ function applyCategoryFilter(
 }
 
 // 정렬 — sort 옵션에 따라 비교. 안정 정렬 보장 위해 동률은 mtime desc tiebreaker.
+// 카테고리 정렬은 vault union 의 순서 (사용 카드 수 desc → slug asc) 를 그대로 사용.
+// "project" 정렬은 github 카드 = repo nameWithOwner, 수동 카드 = vault folder path
+// (root = 빈) 기준 — 즉 사이드바 트리 분류 자리와 1:1.
 function applySort(
   works: PortfolioWorkMeta[],
   sortKey: PortfolioSortKey,
-  projects: PortfolioProject[],
+  categories: string[],
 ): PortfolioWorkMeta[] {
-  const projectOrder = new Map<string, number>();
-  projects.forEach((p, i) => projectOrder.set(p.slug, p.sort * 1000 + i));
-  const categoryOrder = new Map<PortfolioCategory, number>();
-  PORTFOLIO_CATEGORIES.forEach((c, i) => categoryOrder.set(c, i));
+  const categoryOrder = new Map<string, number>();
+  categories.forEach((slug, i) => categoryOrder.set(slug, i));
+  const sourceKey = (w: PortfolioWorkMeta): string => {
+    if (isGithubCard(w.frontmatter)) {
+      return `g:${w.frontmatter.github_owner}/${w.frontmatter.github_repo}`;
+    }
+    return `f:${folderPathOfCard(w.filePath)}`;
+  };
 
   const cmpMergedDesc = (a: PortfolioWorkMeta, b: PortfolioWorkMeta): number => {
     const da = a.frontmatter.github_merged_at;
@@ -106,25 +106,17 @@ function applySort(
       break;
     case "category":
       arr.sort((a, b) => {
-        const oa = categoryOrder.get(a.frontmatter.category) ?? 999;
-        const ob = categoryOrder.get(b.frontmatter.category) ?? 999;
+        const oa = categoryOrder.get(a.frontmatter.category) ?? 9999;
+        const ob = categoryOrder.get(b.frontmatter.category) ?? 9999;
         if (oa !== ob) return oa - ob;
         return cmpMergedDesc(a, b);
       });
       break;
     case "project":
       arr.sort((a, b) => {
-        // 분류안됨 (빈 string) 은 맨 뒤
-        const pa = a.frontmatter.project;
-        const pb = b.frontmatter.project;
-        if (!pa && pb) return 1;
-        if (pa && !pb) return -1;
-        if (pa !== pb) {
-          const oa = projectOrder.get(pa) ?? 999999;
-          const ob = projectOrder.get(pb) ?? 999999;
-          if (oa !== ob) return oa - ob;
-          return pa.localeCompare(pb);
-        }
+        const ka = sourceKey(a);
+        const kb = sourceKey(b);
+        if (ka !== kb) return ka.localeCompare(kb);
         return cmpMergedDesc(a, b);
       });
       break;
@@ -149,23 +141,23 @@ function applySort(
 export function PortfolioPage({
   activeFilter,
   sortKey,
+  onSortKeyChange,
   selectedCategory,
   onCategoryChange,
   onSync,
   syncRunning,
 }: Props) {
   const worksQuery = usePortfolioWorks();
-  const projectsQuery = usePortfolioProjects();
+  const categories = usePortfolioCategories();
 
   const filtered = useMemo(() => {
-    const projects = projectsQuery.data ?? [];
     const all = worksQuery.data ?? [];
-    const afterProject = applyProjectFilter(all, activeFilter);
-    const afterCategory = applyCategoryFilter(afterProject, selectedCategory);
-    return applySort(afterCategory, sortKey, projects);
+    const afterSource = applySourceFilter(all, activeFilter);
+    const afterCategory = applyCategoryFilter(afterSource, selectedCategory);
+    return applySort(afterCategory, sortKey, categories);
   }, [
     worksQuery.data,
-    projectsQuery.data,
+    categories,
     activeFilter,
     selectedCategory,
     sortKey,
@@ -173,7 +165,7 @@ export function PortfolioPage({
 
   // 카테고리별 카운트 — included 만 (chip 의 dim 처리에 사용).
   const categoryCounts = useMemo(() => {
-    const map = new Map<PortfolioCategory, number>();
+    const map = new Map<string, number>();
     for (const w of worksQuery.data ?? []) {
       if (!w.frontmatter.included) continue;
       const c = w.frontmatter.category;
@@ -191,7 +183,10 @@ export function PortfolioPage({
         <CategoryChipRow
           selected={selectedCategory}
           counts={categoryCounts}
+          categories={categories}
           onChange={onCategoryChange}
+          sortKey={sortKey}
+          onSortKeyChange={onSortKeyChange}
         />
       ) : null}
       {worksQuery.isLoading ? (
@@ -204,14 +199,10 @@ export function PortfolioPage({
           hasCategoryFilter={selectedCategory !== "all"}
         />
       ) : (
-        <div className="px-6 pt-6">
+        <div className="px-6 pt-6 pb-8">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
             {filtered.map((w) => (
-              <PortfolioWorkCard
-                key={w.prSlug}
-                work={w}
-                projects={projectsQuery.data ?? []}
-              />
+              <PortfolioWorkCard key={w.prSlug} work={w} />
             ))}
           </div>
         </div>
@@ -221,23 +212,29 @@ export function PortfolioPage({
 }
 
 // 페이지 헤더 아래 sub-header — 카테고리 chip group (single radio). 옛 사이드바
-// CategoryChipRow 를 본문 헤더로 옮긴 자리. 할일 페이지의 같은 자리와 통일.
-// "전체" chip 1개 + 카테고리 5개 = 6개 chip 가로 wrap.
+// CategoryChipRow 를 본문 헤더로 옮긴 자리. 할 일 페이지의 같은 자리와 통일.
+// 카테고리는 vault union (V0.7.3) — 카드가 박은 slug 만 등장. 색은 모두 단일 회색.
 function CategoryChipRow({
   selected,
   counts,
+  categories,
   onChange,
+  sortKey,
+  onSortKeyChange,
 }: {
   selected: PortfolioCategoryFilter;
-  counts: Map<PortfolioCategory, number>;
+  counts: Map<string, number>;
+  categories: string[];
   onChange: (next: PortfolioCategoryFilter) => void;
+  sortKey: PortfolioSortKey;
+  onSortKeyChange: (next: PortfolioSortKey) => void;
 }) {
   return (
     <div
       className="shrink-0 px-6 py-3"
       style={{ borderBottom: "1px solid var(--border-default)" }}
     >
-      <div className="flex flex-wrap gap-1">
+      <div className="flex flex-wrap items-center gap-1">
         <SelectableChip
           active={selected === "all"}
           onToggle={() => onChange("all")}
@@ -245,23 +242,25 @@ function CategoryChipRow({
         >
           전체
         </SelectableChip>
-        {PORTFOLIO_CATEGORIES.map((cat) => {
-          const active = selected === cat;
-          const count = counts.get(cat) ?? 0;
-          const color = CATEGORY_COLOR[cat];
+        {categories.map((slug) => {
+          const active = selected === slug;
+          const count = counts.get(slug) ?? 0;
           return (
             <SelectableChip
-              key={cat}
+              key={slug}
               active={active}
               count={count}
-              color={color}
-              onToggle={() => onChange(cat)}
-              title={`${CATEGORY_LABEL[cat]} ${count > 0 ? `(${count})` : ""}`.trim()}
+              color={CATEGORY_CHIP_COLOR}
+              onToggle={() => onChange(slug)}
+              title={`${slug} ${count > 0 ? `(${count})` : ""}`.trim()}
             >
-              {CATEGORY_LABEL[cat]}
+              {slug}
             </SelectableChip>
           );
         })}
+        <div className="ml-auto">
+          <PortfolioSortMenu value={sortKey} onChange={onSortKeyChange} />
+        </div>
       </div>
     </div>
   );
@@ -335,17 +334,19 @@ function EmptyFilter({
   filter,
   hasCategoryFilter,
 }: {
-  filter: ProjectFilter;
+  filter: SourceFilter;
   hasCategoryFilter: boolean;
 }) {
   // 카테고리 필터가 같이 걸려 있으면 그쪽 메시지를 우선 — 사용자가 가장 최근 만진 필터.
   const message = hasCategoryFilter
-    ? "선택한 카테고리에 해당하는 PR이 없습니다"
-    : filter.kind === "uncategorized"
-    ? "분류안됨 PR이 없습니다"
+    ? "선택한 카테고리에 해당하는 카드가 없습니다"
     : filter.kind === "excluded"
-    ? "미사용으로 표시된 PR이 없습니다"
-    : "이 프로젝트에는 PR이 없습니다";
+    ? "미사용으로 표시된 카드가 없습니다"
+    : filter.kind === "github"
+    ? "이 repo 의 카드가 없습니다"
+    : filter.kind === "folder"
+    ? "이 폴더에는 카드가 없습니다"
+    : "카드가 없습니다";
   return (
     <EmptyState
       className="flex h-[calc(100svh-3rem)] flex-col items-center justify-center gap-3 px-6"

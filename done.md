@@ -16,6 +16,38 @@
 - **state 별 hierarchy** — 요약 빈 상태 = 큰 primary CTA, 채워진 상태 = 메타 칩 우측 아이콘만.
 - 13 파일 +625 / -434. typecheck + 336 tests pass.
 
+### PR #52 — Portfolio 카테고리 vault union 모델 (master list 폐기)
+
+- **한 줄 임팩트**: 카테고리 추가/정정 마찰 0 — 옵시디안 tag 식 자유 슬러그
+- **vault union 모델** — 카테고리 = 카드 frontmatter.category union 으로 자연 발생. master list 파일 (`categories.md`) + builtin 5 (코드 상수 `BUILTIN_CATEGORY_DEFS`/`PORTFOLIO_CATEGORIES`/`mergeCategoryDefs`) 폐기. 카드가 박은 슬러그는 그 카테고리가 존재, 마지막 카드가 떼면 자동 소멸. typo 후 정정 = 잘못 적은 카테고리 자동 사라짐.
+- **콤보박스 UI** — `PortfolioDetailModal` / `PortfolioCreateModal` 의 카테고리 `<select>` → `CategoryCombobox` (typing + 자동완성 + 매치 없으면 "+ 새로 만들기: '{input}'" 행). popover 는 React portal 로 띄워 모달 우측 패널 scroll overflow clip 회피.
+- **chip 색 단일** — 모든 카테고리가 회색 하나로 통일. `KNOWN_COLORS` / 카테고리별 색 토큰 의존 제거. 색 욕구 발생 시점에 별도 `colors.md` 도입 (지금은 X). 카테고리 관리 모달 + 진입 톱니바퀴 제거.
+- **AI 추천 source 교체** — `buildPRPrompt` 가 vault union 후보를 prompt 에 노출, `parsePRResponse` 는 자유 슬러그 허용 (enum 강제 X). 사용자 PR template 가이드라인 (`CLAUDE.md` 의 `ui_ux | backend | infra | fix | other`) 은 본인 작성 가이드로만 — 앱이 강제하지 않음.
+- **race fix 2건** — (1) `useUpdatePortfolioFrontmatter` 가 cache 의 실제 `filePath` 직접 사용 — 폴더 안 수동 카드 / NFC·NFD 정규화 차이로 `portfolioWorkPath(slug)` 가 빗나가 read throw → optimistic rollback 으로 옛 값 복귀하던 race 차단. (2) `CategoryCombobox` 의 `onBlur` / outside-click handler 에 `draftRef` 도입 — `selectRow` 가 commit 후 input.blur() 발사하면 `onBlur` 의 stale closure 가 옛 draft 로 다시 commit 해서 새 값 덮어쓰던 race 차단.
+- **마이그레이션** — 기존 vault 의 `categories.md` 는 첫 사용 시 한 번 lookup 후 무시 → 사용자가 손으로 삭제. 카드 frontmatter 의 기존 `category` 값은 그대로 vault union 에 자연 포함.
+
+### PR #51 — 루틴 만료 분리 + 휴지통 + 내부 코드 용어 통일
+
+- **한 줄 임팩트**: 만료 루틴 분리 + 삭제 복구 + 용어 정리
+- **만료 루틴 사이드바 분리** — 종료일 < 오늘 인 루틴은 활성 list 에서 자동 빠지고 "지난 루틴 (N)" 별도 collapsible 섹션 (default 접힘). 종료일 chip 만 표시. 클릭 시 RoutineDetail 진입 → 종료일을 미래로 옮기면 자동 복귀.
+- **루틴 soft delete** — `deleteRoutine` 이 즉시 파일 삭제하던 거 → `routines/.trash/{stamp}-{name}.md` 로 이동 (메모/포트폴리오와 같은 패턴). `restoreRoutine` / `purgeRoutine` / `emptyRoutineTrash` API + 같은 이름 충돌 시 `RoutineConflictError` toast. RoutineDetail confirm 문구도 "휴지통으로 옮길까요? 나중에 복원할 수 있습니다." 로 변경.
+- **할 일 탭 통합 휴지통** — 옛 `TodoTrashModal` 을 `TodosTrashModal` 로 확장 + 태스크/루틴 한 flat 리스트, chip (`태스크` / `루틴`) + 아이콘 (✓ / Repeat) 으로 시각 구분. 헤더에 전체 "비우기" 하나. 사이드바 푸터 휴지통 1 아이콘 유지 (탭별 1 trash 원칙). 모달 size `md`→`lg` (포트폴리오와 동일 고정 크기 통일).
+- **용어 정리** — "할 일" = 큰 집합(탭/모음), "태스크" + "루틴" = 하위. 사용자 라벨 (`TaskAddModal` 헤더, `TaskRow` "할일 삭제"/"할일 취소", `TasksPage` 빈 상태, `TodoTrashModal` chip) + 주석 ("할일 탭"→"할 일 탭", "todo→task" 등) 일관화.
+- **내부 코드 rename** — `Todo`/`TodoXxx` type → `Task`/`TaskXxx`, `useTodos`/`useCreateTodo`/`useUpdateTodo`/`useDeleteTodo`/`useTodoSort`/`useTodoHistory`/`useTodoUndo`/`useTodoFlash` → `useTasks`/`useCreateTask`/`...` 등 hook, `TodoRow`/`TodoBlock`/`TodosPage`/`TodoTrashModal` 컴포넌트, `extractTodos`/`scanAllTodos`/`toggleTodo`/`setTodoCheckChar`/`onAddTodoFromLine` 함수, `todoCategory.ts`/`todoSort.ts`/`todoHistory.ts` 파일, CSS `todo-card-*` / `@keyframes todoCard*` 일괄 변경. SearchDomain literal `"todo"` → `"task"`. 13 파일 git mv. 외부 인터페이스 (탭 id `"todos"`, URL hash `#todos`, 이벤트 `"todos:add-request"`, localStorage `goodsoob:todoSort`, React Query 키 `["todos"]`, vault `inbox.md`, `TodosSidePanel`/`TodosSidePanelFooter`) 는 유지.
+
+### PR #50 — Portfolio vault 폴더 모델 + 수동 카드/카테고리 관리
+
+- **한 줄 임팩트**: GitHub PR + 오프라인 업무 한 곳에 + 옵시디안 자유 분류
+- **데이터 모델 재설계** — 옛 `projects.md` 메타 + frontmatter `project` 필드 폐기. 사이드바 source = (a) 카드 frontmatter github_owner/github_repo derive 한 [GitHub] 그룹 (b) vault 실제 디렉토리 트리 = [내가 만든 폴더] 그룹. 두 그룹 시각 분리 + chevron 접힘 (vault 별 localStorage).
+- **수동 카드 추가** — 사이드바 [Plus] → 모달 (제목/한 줄 임팩트/날짜/카테고리/폴더). vault `portfolio/{folder}/{title}.md` 로 저장. github 카드 (PR 또는 직커밋 legacy) 와 sentinel (`owner=local repo=manual`) 로 구분 — sync 안 건드림.
+- **수동 폴더 = 메모장 패턴** — 사이드바 [FolderPlus] → "새 폴더" default + 인라인 rename 자동 진입. 우클릭 = 이름변경/삭제. nested 지원. 폴더 삭제 시 안 카드 휴지통 이동. 카드 ⋮ 메뉴 "폴더로 이동..." 으로 이동 모달 (선택 폴더 → disk rename).
+- **카테고리 관리 모달** — 카테고리 chip row 끝 톱니 → 모달. builtin 5 (ui_ux/backend/infra/fix/other) 는 label/color override 만 (slug 고정·삭제 불가), 사용자 정의는 추가/수정/삭제. 색상 swatch 8개 (cat-* + accent). 삭제 시 해당 카드 "기타" 자동 마이그레이션. PortfolioCategory string union 으로 풀어 카드 frontmatter 임의 slug 도 union 에 자동 포함 (orphan 개념 0).
+- **legacy 직커밋 카드 분류** — 옛 `pr_number=0` 만 봐서 수동 카드와 섞이던 거 → `owner/repo === "local"/"manual"` sentinel 가드 추가. 직커밋 자동화 카드들이 [GitHub] 그룹에 정확히 분류.
+- **사이드바 헤더 정리** — [새 폴더 / 새 카드] 2 아이콘만, 가이드북 + 휴지통은 사이드바 footer 우측 하단 (휴지통과 크기 통일). SortMenu 는 본문 카테고리 chip row 오른쪽 끝.
+- **DetailModal dropzone read mode 노출** — 옛 편집 모드 가드 제거. 수동 카드 빈 카드 만들고 detail 들어가도 즉시 스크린샷 추가 가능.
+- **빈 썸네일 분기** — github 카드 = GithubMark (Octocat), 수동 카드 = Briefcase.
+- **부수**: voice/tone placeholder 정책을 명령형 안내 (`{필드}을 입력하세요`) 로 통일 (옛 `예: ...` 예시형 폐기). vite 가 VITE_PORT env 받게 — 동시 worktree dev 지원.
+
 ### 직커밋 — vault 기본 폴더명 meetings/ → notes/ (2429502)
 
 - **한 줄 임팩트**: UI "메모장" 과 vault 폴더명 의미 일치

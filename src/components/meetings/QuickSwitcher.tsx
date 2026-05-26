@@ -15,7 +15,7 @@ import {
 import { Text } from "../common/Text";
 
 // 옵시디안 quick switcher (Cmd+P) 패턴 — vault 4 도메인 통합 검색.
-// meeting / todo / portfolio / journal 결과 한 list, 행에 도메인 chip + 매칭 highlight.
+// meeting / task / portfolio / journal 결과 한 list, 행에 도메인 chip + 매칭 highlight.
 // 선택 시 도메인별 라우팅 콜백 발사. 모달은 어디서든 발사 가능.
 
 type Props = {
@@ -292,11 +292,11 @@ function domainMeta(d: SearchDomain): {
         color: "var(--accent-blue-text)",
         bg: "var(--accent-blue-bg)",
       };
-    case "todo":
+    case "task":
       return {
         label: "할 일",
         icon: CheckSquare,
-        // todos 의 work category 와 같은 톤 (주황). 시각 통일.
+        // tasks 의 work category 와 같은 톤 (주황). 시각 통일.
         color: "var(--cat-work)",
         bg: "var(--bg-surface)",
       };
@@ -361,7 +361,7 @@ function search(entries: SearchEntry[], query: string): Result[] {
 const DOMAIN_ORDER: Record<SearchDomain, number> = {
   meeting: 0,
   journal: 1,
-  todo: 2,
+  task: 2,
   portfolio: 3,
 };
 

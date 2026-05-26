@@ -6,11 +6,11 @@ import {
   FileText,
   Hash,
 } from "lucide-react";
-import type { Todo, TodoPriority, TodoCategory } from "../../api/todos";
-import { TODO_CATEGORIES } from "../../api/todos";
+import type { Task, TaskPriority, TaskCategory } from "../../api/tasks";
+import { TASK_CATEGORIES } from "../../api/tasks";
 import { useMeetings } from "../../hooks/useMeetings";
-import { useUpdateTodo } from "../../hooks/useTodos";
-import { useTodoFlash } from "../../hooks/useTodoHistory";
+import { useUpdateTask } from "../../hooks/useTasks";
+import { useTaskFlash } from "../../hooks/useTaskHistory";
 import {
   daysFromToday,
   formatDateShort,
@@ -28,54 +28,54 @@ import { CategoryPicker } from "../common/CategoryPicker";
 import { CheckboxButton } from "./CheckboxButton";
 
 type Props = {
-  todo: Todo;
-  onToggle: (todo: Todo) => void;
+  task: Task;
+  onToggle: (task: Task) => void;
   onUpdate: (
-    todo: Todo,
+    task: Task,
     patch: {
       title?: string;
-      priority?: TodoPriority;
+      priority?: TaskPriority;
       due_date?: string | null;
       due_time?: string | null;
-      category?: TodoCategory | null;
+      category?: TaskCategory | null;
       source_meeting_uid?: string | null;
       done?: boolean;
       cancelled?: boolean;
       deleted?: boolean;
     },
   ) => void;
-  onDelete: (todo: Todo) => void;
+  onDelete: (task: Task) => void;
 };
 
 type Draft = {
   title: string;
   due_date: string;
   due_time: string;
-  category: TodoCategory | null;
+  category: TaskCategory | null;
   source_meeting_uid: string | null;
   cancelled: boolean;
   done: boolean;
 };
 
-function draftFromTodo(todo: Todo): Draft {
+function draftFromTask(task: Task): Draft {
   return {
-    title: todo.title,
-    due_date: todo.due_date ?? "",
-    due_time: todo.due_time ?? "",
-    category: todo.category,
-    source_meeting_uid: todo.source_meeting_uid,
-    cancelled: todo.cancelled,
-    done: todo.done,
+    title: task.title,
+    due_date: task.due_date ?? "",
+    due_time: task.due_time ?? "",
+    category: task.category,
+    source_meeting_uid: task.source_meeting_uid,
+    cancelled: task.cancelled,
+    done: task.done,
   };
 }
 
-export function TodoRow({ todo, onToggle, onUpdate, onDelete }: Props) {
+export function TaskRow({ task, onToggle, onUpdate, onDelete }: Props) {
   const [editing, setEditing] = useState(false);
-  const flashing = useTodoFlash(todo.id);
-  // edit 모드 진입 시 todo 의 모든 편집 가능한 값을 draft 로 복사. 사용자가
+  const flashing = useTaskFlash(task.id);
+  // edit 모드 진입 시 task 의 모든 편집 가능한 값을 draft 로 복사. 사용자가
   // 모든 input 다듬는 동안 mutation 호출 X → 리스트 정렬 안 흔들림.
   // 확인 / 외부 클릭 / Enter (title) 시점에 diff 만 단일 patch 로 commit.
-  const [draft, setDraft] = useState<Draft>(() => draftFromTodo(todo));
+  const [draft, setDraft] = useState<Draft>(() => draftFromTask(task));
   // draftRef = 최신 draft. setDraft 는 React state 라 비동기 — 외부 클릭 시
   // microtask 안에서 commit 시 closure stale 위험. ref 로 동기 동기화.
   const draftRef = useRef(draft);
@@ -90,7 +90,7 @@ export function TodoRow({ todo, onToggle, onUpdate, onDelete }: Props) {
 
   useEffect(() => {
     if (editing) {
-      const fresh = draftFromTodo(todo);
+      const fresh = draftFromTask(task);
       draftRef.current = fresh;
       setDraft(fresh);
       requestAnimationFrame(() => {
@@ -103,7 +103,7 @@ export function TodoRow({ todo, onToggle, onUpdate, onDelete }: Props) {
       });
     }
     // editing false 일 때 draft 는 stale 이지만 다음 entering 시 reset 됨.
-  }, [editing, todo]);
+  }, [editing, task]);
 
   // 외부 클릭 시 commit + close. LooseDate/Time 처럼 blur 시 onCommit 하는 input
   // 의 경우 — mousedown 시점엔 아직 focus 라 onCommit 미발생. blur() 강제 호출
@@ -152,7 +152,7 @@ export function TodoRow({ todo, onToggle, onUpdate, onDelete }: Props) {
   // delete + cancel 신규 시 (view 에서 사라지는 경우) 만 적용.
   function fadeOutThen(fn: () => void) {
     if (cardRef.current) {
-      cardRef.current.style.animation = "todoCardExit 180ms ease forwards";
+      cardRef.current.style.animation = "taskCardExit 180ms ease forwards";
       setTimeout(fn, 180);
     } else {
       fn();
@@ -163,33 +163,33 @@ export function TodoRow({ todo, onToggle, onUpdate, onDelete }: Props) {
     const d = draftRef.current;
     const patch: Parameters<typeof onUpdate>[1] = {};
     const titleTrimmed = d.title.trim();
-    if (titleTrimmed && titleTrimmed !== todo.title) {
+    if (titleTrimmed && titleTrimmed !== task.title) {
       patch.title = titleTrimmed;
     }
     const nextDate = d.due_date || null;
-    if (nextDate !== todo.due_date) patch.due_date = nextDate;
+    if (nextDate !== task.due_date) patch.due_date = nextDate;
     const nextTime = d.due_time || null;
-    if (nextTime !== todo.due_time) patch.due_time = nextTime;
-    if (d.category !== todo.category) patch.category = d.category;
-    if (d.source_meeting_uid !== todo.source_meeting_uid)
+    if (nextTime !== task.due_time) patch.due_time = nextTime;
+    if (d.category !== task.category) patch.category = d.category;
+    if (d.source_meeting_uid !== task.source_meeting_uid)
       patch.source_meeting_uid = d.source_meeting_uid;
-    if (d.cancelled !== todo.cancelled) patch.cancelled = d.cancelled;
-    if (d.done !== todo.done) patch.done = d.done;
+    if (d.cancelled !== task.cancelled) patch.cancelled = d.cancelled;
+    if (d.done !== task.done) patch.done = d.done;
     if (Object.keys(patch).length === 0) {
       setEditing(false);
       return;
     }
     // cancelled / deleted 신규 true = view 에서 사라짐. fadeOut.
     const willDisappear =
-      (patch.cancelled === true && !todo.cancelled) ||
-      (patch.deleted === true && !todo.deleted);
+      (patch.cancelled === true && !task.cancelled) ||
+      (patch.deleted === true && !task.deleted);
     if (willDisappear) {
       fadeOutThen(() => {
-        onUpdate(todo, patch);
+        onUpdate(task, patch);
         setEditing(false);
       });
     } else {
-      onUpdate(todo, patch);
+      onUpdate(task, patch);
       setEditing(false);
     }
   }
@@ -199,18 +199,18 @@ export function TodoRow({ todo, onToggle, onUpdate, onDelete }: Props) {
   }
 
   function handleDeleteWithFade() {
-    fadeOutThen(() => onDelete(todo));
+    fadeOutThen(() => onDelete(task));
   }
 
 
   return (
     <li
       ref={cardRef}
-      data-todoid={todo.id}
+      data-todoid={task.id}
       onClick={() => {
         if (!editing) setEditing(true);
       }}
-      className={`rounded-lg border transition ${editing ? "" : "cursor-pointer hover:bg-[var(--bg-surface)]"} ${flashing ? "todo-card-flash" : "todo-card-enter"}`}
+      className={`rounded-lg border transition ${editing ? "" : "cursor-pointer hover:bg-[var(--bg-surface)]"} ${flashing ? "task-card-flash" : "task-card-enter"}`}
       style={{
         borderColor: editing ? "var(--border-default)" : "var(--border-subtle)",
         backgroundColor: editing ? "var(--bg-surface)" : undefined,
@@ -301,7 +301,7 @@ export function TodoRow({ todo, onToggle, onUpdate, onDelete }: Props) {
                     ...(!draft.cancelled && draft.done ? { done: false } : {}),
                   })
                 }
-                title={draft.cancelled ? "취소 해제" : "할일 취소"}
+                title={draft.cancelled ? "취소 해제" : "태스크 취소"}
                 style={{
                   color: draft.cancelled
                     ? "var(--text-primary)"
@@ -315,7 +315,7 @@ export function TodoRow({ todo, onToggle, onUpdate, onDelete }: Props) {
                 variant="ghost"
                 size="sm"
                 onClick={handleDeleteWithFade}
-                title="할일 삭제"
+                title="태스크 삭제"
                 style={{
                   color: "var(--text-secondary)",
                   border: "1px solid var(--border-subtle)",
@@ -339,34 +339,34 @@ export function TodoRow({ todo, onToggle, onUpdate, onDelete }: Props) {
         <div className="flex items-center gap-3 px-3 py-2.5">
           <CheckboxButton
             status={
-              todo.cancelled ? "cancelled" : todo.done ? "done" : "pending"
+              task.cancelled ? "cancelled" : task.done ? "done" : "pending"
             }
-            category={todo.category}
-            onClick={() => onToggle(todo)}
+            category={task.category}
+            onClick={() => onToggle(task)}
           />
           <div className="min-w-0 flex-1">
             <Text
               variant="h4"
               weight="normal"
               as="div"
-              className={`min-w-0 break-words ${todo.done || todo.cancelled ? "line-through" : ""}`}
+              className={`min-w-0 break-words ${task.done || task.cancelled ? "line-through" : ""}`}
               style={{
                 color:
-                  todo.done || todo.cancelled
+                  task.done || task.cancelled
                     ? "var(--text-muted)"
                     : "var(--text-primary)",
               }}
             >
-              {todo.title || (
+              {task.title || (
                 <Text variant="body" color="muted" as="span">
                   (제목 없음)
                 </Text>
               )}
             </Text>
-            <ReadOnlyMeta todo={todo} />
+            <ReadOnlyMeta task={task} />
           </div>
           {/* DueChip — 카드 우측 끝. items-center 라 vertical 가운데 align. */}
-          <DueChip todo={todo} />
+          <DueChip task={task} />
         </div>
       )}
     </li>
@@ -377,9 +377,9 @@ export function TodoRow({ todo, onToggle, onUpdate, onDelete }: Props) {
 // chip 없음 (메타 row 의 날짜로 충분). done / cancelled 도 X.
 // 체크박스 가 카테고리 색 tint 를 들고 있어 chip 까지 bg 색이면 layer 충돌
 // → bg 제거, outline + text 색만. 시그널 (오늘/지남) 은 색 그대로 유지.
-function DueChip({ todo }: { todo: Todo }) {
-  if (todo.done || todo.cancelled || !todo.due_date) return null;
-  const diff = daysFromToday(todo.due_date);
+function DueChip({ task }: { task: Task }) {
+  if (task.done || task.cancelled || !task.due_date) return null;
+  const diff = daysFromToday(task.due_date);
   const base = "shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium";
   if (diff === 0) {
     // "오늘 = 마감 D-day" → 지남과 같은 빨강 시그널. 색 가짓수 줄임.
@@ -426,13 +426,13 @@ function DueChip({ todo }: { todo: Todo }) {
 }
 
 // read-only: 값이 있는 메타만 chip 으로 표시. 모두 비어있으면 아무것도 렌더 X.
-function ReadOnlyMeta({ todo }: { todo: Todo }) {
-  const hasDate = !!todo.due_date;
-  const hasTime = !!todo.due_time;
-  const categoryLabel = TODO_CATEGORIES.find((c) => c.id === todo.category)?.label;
-  const hasSource = !!todo.source_meeting_uid;
+function ReadOnlyMeta({ task }: { task: Task }) {
+  const hasDate = !!task.due_date;
+  const hasTime = !!task.due_time;
+  const categoryLabel = TASK_CATEGORIES.find((c) => c.id === task.category)?.label;
+  const hasSource = !!task.source_meeting_uid;
   if (!hasDate && !hasTime && !categoryLabel && !hasSource) return null;
-  const wd = todo.due_date ? weekdayShort(todo.due_date) : null;
+  const wd = task.due_date ? weekdayShort(task.due_date) : null;
   return (
     <div
       className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs"
@@ -442,16 +442,16 @@ function ReadOnlyMeta({ todo }: { todo: Todo }) {
         <span>
           {(() => {
             const sameYear =
-              parseIsoDate(todo.due_date!).getFullYear() ===
+              parseIsoDate(task.due_date!).getFullYear() ===
               new Date().getFullYear();
             const dateLabel = sameYear
-              ? formatDateShort(todo.due_date!)
-              : todo.due_date;
+              ? formatDateShort(task.due_date!)
+              : task.due_date;
             return `${dateLabel}${wd ? ` (${wd})` : ""}`;
           })()}
         </span>
       ) : null}
-      {hasTime ? <span>{todo.due_time}</span> : null}
+      {hasTime ? <span>{task.due_time}</span> : null}
       {categoryLabel ? (
         <span className="inline-flex items-center gap-0.5">
           <Hash className="h-3 w-3 shrink-0 opacity-70" aria-hidden />
@@ -459,7 +459,7 @@ function ReadOnlyMeta({ todo }: { todo: Todo }) {
         </span>
       ) : null}
       {hasSource ? (
-        <SourceMeetingLink uid={todo.source_meeting_uid!} todoId={todo.id} />
+        <SourceMeetingLink uid={task.source_meeting_uid!} todoId={task.id} />
       ) : null}
     </div>
   );
@@ -472,7 +472,7 @@ function ReadOnlyMeta({ todo }: { todo: Todo }) {
 function SourceMeetingLink({ uid, todoId }: { uid: string; todoId: string }) {
   const [open, setOpen] = useState(false);
   const meetingsQ = useMeetings();
-  const updateMutation = useUpdateTodo();
+  const updateMutation = useUpdateTask();
   const meeting = meetingsQ.data?.find((m) => m.uid === uid) ?? null;
   // list 가 fetched (isSuccess) 인데도 없으면 진짜 사라진 메모.
   const disconnected = meetingsQ.isSuccess && !meeting;
