@@ -6,6 +6,24 @@
 
 ## 2026-05-26
 
+### 직커밋 — vault 기본 폴더명 meetings/ → notes/ (2429502)
+
+- **한 줄 임팩트**: UI "메모장" 과 vault 폴더명 의미 일치
+- **파일시스템 경로만 rename** — `notes/{title}.md` 로 신규 vault 부트스트랩. 내부 코드명 (`Meeting` type, `useMeeting` hook, `MeetingForm` component, tab `"meetings"`, URL hash `#meetings`, React Query key `["meetings"]`, 소스 폴더 `src/components/meetings/`) 은 그대로 — CLAUDE.md 의 "UI 리네이밍은 했어도 내부 코드는 meetings 유지" 패턴 따름.
+- 16 파일 234줄 (test 5개 포함). typecheck + 336 tests pass.
+- 기존 vault 자동 마이그레이션 0 — 본인이 아직 실제 사용 전. Finder/옵시디안에서 `meetings/` 폴더 직접 rename 또는 그대로 두고 `notes/` 새로 시작.
+
+### 직커밋 — 할일 체크박스 hit zone 30x30 확장 + 캘린더 사이드바 루틴 row click 활성화 (96f3b2d)
+
+- **한 줄 임팩트**: 체크박스 밖 살짝 빗나간 클릭이 페이지 이동/편집 모드로 새던 통증 차단
+- **`CheckboxButton` hit zone** — 시각 18x18 유지, 버튼 `p-1.5 -m-1.5` 로 클릭 영역만 30x30 확장. negative margin 으로 layout footprint 는 18x18 유지 → 행 높이·정렬 변동 0. 부모 행의 click navigate/edit 보다 먼저 catch.
+- **캘린더 사이드바 루틴 row click 활성화** — todo row 처럼 `onOpenRoutine` prop + role=button + Enter/Space + hover bg. App.tsx 의 `openRoutine(name)` 이 todos 탭 + RoutineDetail 진입까지 처리. todo/루틴 간 인터랙션 일관성.
+
+### 직커밋 — 캘린더·포트폴리오 background prefetch (628f9e4)
+
+- **한 줄 임팩트**: 다른 탭 진입 시 cache hit — 첫 페인트 즉시
+- 부팅 후 `useMeetings` 이후 background 으로 `useTodos` / `useJournals` / `useRoutines` / `usePortfolio` prefetch. 첫 클릭 시 skeleton 안 보임. React Query staleTime 활용.
+
 ### PR #49 — 메모장 폴더·삭제·생성 흐름 안정화 (dogfood 4건)
 
 - **한 줄 임팩트**: 메모장 일상 흐름 안 끊기는 디테일 4건 정리
