@@ -6,6 +6,16 @@
 
 ## 2026-05-26
 
+### PR #52 — 메모장 요약 흐름 모달화 + 본문과 동일 에디터로 통합
+
+- **한 줄 임팩트**: Claude 응답을 한 번에 요약 본문으로 박는 흐름
+- **두 진입점만 노출** — 요약 탭에 "Claude 한테 자동 요약" (CLI 직접 호출) / "직접 붙여넣기" (외부 Claude.ai fallback) 두 버튼. 나머지 호출/응답/적용 흐름은 각 모달 안에서 완결. 메인 탭 깔끔.
+- **summary 데이터 모델 array 3개 → 단일 마크다운 string** — `discussion_items / decisions / action_items` 폐기. `.summary.md` sidecar 가 옵시디안에서 자연스러운 마크다운 노트로 보임. parseSummaryResponse / buildSummaryBody 변환 함수 제거.
+- **요약 탭 본문 = SourceBodyEditor + MarkdownView** — 메모 탭과 동일 UI/UX. 슬래시 명령, line gutter, 라인 → todo dispatch, undo/redo 모두 자연 적용.
+- **음성 기록 / 요약 탭에 메타 칩** — monospace + 음영 배경 (본문 inline code 와 같은 시각 어휘). trailing 자리에 액션 아이콘 (요약 = Sparkles/Clipboard, 음성 기록 = Upload) → 위치 + 스타일 통일.
+- **state 별 hierarchy** — 요약 빈 상태 = 큰 primary CTA, 채워진 상태 = 메타 칩 우측 아이콘만.
+- 13 파일 +625 / -434. typecheck + 336 tests pass.
+
 ### 직커밋 — vault 기본 폴더명 meetings/ → notes/ (2429502)
 
 - **한 줄 임팩트**: UI "메모장" 과 vault 폴더명 의미 일치

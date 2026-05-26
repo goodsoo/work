@@ -114,6 +114,5 @@ PR 단위로 묶음. 각 PR 의 **한 줄 임팩트** 는 카드 frontmatter `im
 ## 🔮 V0.7+ 후보 (dogfood 결과로 진입 결정)
 
 - [ ] Tauri 2 Mobile (read-only viewer 부터) — Tauri 2 Mobile 학습/탐색이 동기. 1단계 = vault read + 메모 list/detail 만 모바일 UI 로. write 는 conflict/watcher race 영역이라 학습 단계엔 보류. 옵시디안 모바일 대체보다는 프레임워크 학습 + 본인 stack 모바일 가능성 증명 용도.
-- [ ] "Claude 응답 paste → 자동 callout" 회의록 영역
 - [ ] 녹음 파일 직접 업로드 → 자동 STT
 - [ ] Tauri 데스크탑 `.dmg` 빌드 + 코드 사인
