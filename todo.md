@@ -69,7 +69,7 @@ PR 단위로 묶음. 각 PR 의 **한 줄 임팩트** 는 카드 frontmatter `im
 ### PR — gh 호출 인프라 강화 `backend`
 한 줄 임팩트: gh 인증/네트워크 실패도 매끄럽게
 
-- [ ] gh 미설치 / 미로그인 별도 모달 (현재는 sidebar inline)
+- [x] gh 미설치 / 미로그인 별도 모달 (현재는 sidebar inline)
 - [ ] 회사 HTTPS outbound 차단 감지 + 자동 sync off 설정 (매일 토스트 떠야 발견)
 
 ### PR — commit cluster 카드 (Plan B) `backend`

@@ -31,10 +31,15 @@ import { TodosPage } from "./pages/TodosPage";
 import { PortfolioPage } from "./pages/PortfolioPage";
 import { StyleguidePage } from "./pages/StyleguidePage";
 import { PortfolioSidePanel } from "./components/portfolio/PortfolioSidePanel";
+import { InstallGuideModal } from "./components/portfolio/InstallGuideModal";
+import { AuthGuideModal } from "./components/portfolio/AuthGuideModal";
 import { RoutineDetail } from "./components/routines/RoutineDetail";
 import type { ProjectFilter } from "./components/portfolio/PortfolioProjectList";
-import { useGhSync } from "./hooks/usePortfolio";
+import { useGhSync, usePortfolioWorks, usePortfolioProjects } from "./hooks/usePortfolio";
+import { GhAuthError, GhNotInstalledError } from "./lib/portfolio/gh";
 import { useMeetings, useCreateMeeting, useDeleteMeeting } from "./hooks/useMeetings";
+import { useJournals } from "./hooks/useJournals";
+import { useTodos } from "./hooks/useTodos";
 import { useVault } from "./lib/vault/useVault";
 import { maybeAutoBackup } from "./lib/backup";
 import { DrawerProvider, useDrawer } from "./hooks/useDrawer";
@@ -149,24 +154,39 @@ function AppContent() {
   const [quickSwitcherOpen, setQuickSwitcherOpen] = useState(false);
   const portfolioSync = useGhSync();
   const toast = useToast();
+  // gh 연결 가이드 모달 — 사용자 명시 동기화 클릭 시 에러 종류 보고 자동 open.
+  // background auto-sync 는 silent 유지 (5초마다 모달 뜨면 noise).
+  const [installGuideOpen, setInstallGuideOpen] = useState(false);
+  const [authGuideOpen, setAuthGuideOpen] = useState(false);
+
+  // 에러 종류 보고 적절 모달 trigger. toast 는 일반 에러 (네트워크 등) 만.
+  const handleSyncError = (err: unknown, label: string) => {
+    console.error(`[portfolio] ${label} failed:`, err);
+    if (err instanceof GhNotInstalledError) {
+      setInstallGuideOpen(true);
+      return;
+    }
+    if (err instanceof GhAuthError) {
+      setAuthGuideOpen(true);
+      return;
+    }
+    toast.show("동기화에 실패했습니다. 네트워크 연결을 확인하세요.");
+  };
 
   // last_sync - 1일 buffer 의 YYYY-MM-DD. 첫 sync (last_sync 없음) 면 undefined → 전체.
   // gh search 의 `merged:>=YYYY-MM-DD` 가 날짜 단위라 1일 buffer 충분.
-  // 사용자가 직접 트리거한 sync 실패는 toast 발사. background auto-sync 는 silent (5초마다 noise 회피).
   const portfolioRunIncrementalSync = async () => {
     try {
       await portfolioSync.run({ incremental: true });
     } catch (err) {
-      console.error("[portfolio] incremental sync failed:", err);
-      toast.show("동기화에 실패했습니다. 네트워크 연결을 확인하세요.");
+      handleSyncError(err, "incremental sync");
     }
   };
   const portfolioRunFullSync = async () => {
     try {
       await portfolioSync.run({});
     } catch (err) {
-      console.error("[portfolio] full sync failed:", err);
-      toast.show("전체 동기화에 실패했습니다. 네트워크 연결을 확인하세요.");
+      handleSyncError(err, "full sync");
     }
   };
   const { adapter, isReady } = useVault();
@@ -512,6 +532,9 @@ function AppContent() {
         onSyncRun={portfolioRunIncrementalSync}
         onSyncCancel={portfolioSync.cancel}
         onFullSyncRun={portfolioRunFullSync}
+        onOpenInstallGuide={() => setInstallGuideOpen(true)}
+        onOpenAuthGuide={() => setAuthGuideOpen(true)}
+        onDismissSyncError={portfolioSync.dismissError}
       />
     ) : undefined;
 
@@ -536,6 +559,7 @@ function AppContent() {
       sidebarCollapsed={sidebar.collapsed}
       onOpenSearch={() => setQuickSwitcherOpen(true)}
     >
+      <PrefetchWarmup />
       {tab === "meetings" ? (
         selectedMeetingId ? (
           <MeetingForm meetingId={selectedMeetingId} onBack={closeMeeting} />
@@ -583,6 +607,24 @@ function AppContent() {
         open={portfolioTrashOpen}
         onClose={() => setPortfolioTrashOpen(false)}
       />
+      <InstallGuideModal
+        open={installGuideOpen}
+        onClose={() => setInstallGuideOpen(false)}
+        onRetrySync={() => {
+          setInstallGuideOpen(false);
+          void portfolioRunIncrementalSync();
+        }}
+        retryRunning={portfolioSync.state.running}
+      />
+      <AuthGuideModal
+        open={authGuideOpen}
+        onClose={() => setAuthGuideOpen(false)}
+        onRetrySync={() => {
+          setAuthGuideOpen(false);
+          void portfolioRunIncrementalSync();
+        }}
+        retryRunning={portfolioSync.state.running}
+      />
       <QuickSwitcher
         open={quickSwitcherOpen}
         onClose={() => setQuickSwitcherOpen(false)}
@@ -625,6 +667,17 @@ function AppContent() {
       />
     </AppShell>
   );
+}
+
+// vault ready 직후 캘린더/포트폴리오 진입에 필요한 쿼리들을 background 로 워밍.
+// 메모장 사이드바가 useMeetings 를 항상 띄워 메모장이 빠른 것과 같은 메커니즘.
+// 컴포넌트 mount 는 안 함 — query cache 만 채움 → 진입 시 cache hit, 메모리 부담 0.
+function PrefetchWarmup() {
+  useJournals();
+  useTodos();
+  usePortfolioWorks();
+  usePortfolioProjects();
+  return null;
 }
 
 function MeetingsEmpty({ count, loading }: { count: number; loading: boolean }) {
