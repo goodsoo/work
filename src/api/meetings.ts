@@ -1,6 +1,5 @@
 import type { VaultAdapter } from "../lib/vault/adapter";
 import {
-  buildSummaryBody,
   computeMovedMeetingPath,
   computeRenamedMeetingPath,
   fileToMeeting,
@@ -39,9 +38,8 @@ export interface MeetingInsert {
   attendees?: string[] | string | null;
   content?: string | null;
   transcript?: string | null;
-  discussion_items?: string[] | null;
-  decisions?: string[] | null;
-  action_items?: string[] | null;
+  // 마크다운 텍스트 통째. 빈 string / null 이면 sidecar 삭제. V0.7.3 부터 array 3개 → 단일 string.
+  summary?: string | null;
   tags?: string[] | null;
   pinned?: boolean | null;
 }
@@ -73,9 +71,7 @@ function buildMeeting(input: MeetingInsert, id: string, uid: string): Meeting {
     deleted_at: null,
     content: input.content ?? "",
     transcript: input.transcript ?? "",
-    discussion_items: input.discussion_items ?? [],
-    decisions: input.decisions ?? [],
-    action_items: input.action_items ?? [],
+    summary: input.summary ?? "",
   };
 }
 
@@ -115,9 +111,7 @@ export async function listMeetings(adapter: VaultAdapter): Promise<Meeting[]> {
     ...m,
     content: "",
     transcript: "",
-    discussion_items: [],
-    decisions: [],
-    action_items: [],
+    summary: "",
   }));
 }
 
@@ -255,33 +249,19 @@ export async function updateMeeting(
     }
   }
 
-  // Summary sidecar
-  if (
-    patch.discussion_items !== undefined ||
-    patch.decisions !== undefined ||
-    patch.action_items !== undefined
-  ) {
+  // Summary sidecar — 마크다운 텍스트 통째.
+  if (patch.summary !== undefined) {
     const sPath = summaryPath(currentId);
-    // 현재 상태 read (sidecar 가 있으면 그 H2 list 보존)
-    const current = await readFullMeeting(adapter, currentId);
-    const merged = {
-      discussion_items: patch.discussion_items ?? current.discussion_items,
-      decisions: patch.decisions ?? current.decisions,
-      action_items: patch.action_items ?? current.action_items,
-    };
-    const isEmpty =
-      merged.discussion_items.length === 0 &&
-      merged.decisions.length === 0 &&
-      merged.action_items.length === 0;
-
-    if (isEmpty) {
+    const next = (patch.summary ?? "").trim();
+    if (next.length === 0) {
       if (await adapter.exists(sPath)) {
         await adapter.delete(sPath);
       }
     } else {
       const exists = await adapter.exists(sPath);
       const prevMtime = exists ? (await adapter.readMeta(sPath)).mtime : undefined;
-      await adapter.write(sPath, `${buildSummaryBody(merged)}\n`, prevMtime);
+      const body = next.endsWith("\n") ? next : `${next}\n`;
+      await adapter.write(sPath, body, prevMtime);
     }
   }
 

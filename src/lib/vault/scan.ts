@@ -31,9 +31,9 @@ export interface MeetingMeta {
 export interface Meeting extends MeetingMeta {
   content: string;
   transcript: string;
-  discussion_items: string[];
-  decisions: string[];
-  action_items: string[];
+  // 요약 sidecar (`.summary.md`) 의 raw 마크다운 본문. 외부 Claude 응답이 그대로 들어옴.
+  // UI 에서 본문과 동일한 SourceBodyEditor 로 편집. 빈 string 면 sidecar 파일 없음.
+  summary: string;
 }
 
 export interface JournalMeta {
@@ -114,51 +114,6 @@ function fmBoolean(value: unknown): boolean {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Summary body — `## 논의 사항` / `## 결정 사항` / `## 액션 아이템` H2 list 형식.
-// summary sidecar 파일 안 markdown.
-
-export function extractH2List(summaryBody: string, h2Label: string): string[] {
-  const lines = summaryBody.split("\n");
-  let inSection = false;
-  const items: string[] = [];
-  for (const line of lines) {
-    const h2 = line.match(/^## (.+?)\s*$/);
-    if (h2) {
-      inSection = h2[1] === h2Label;
-      continue;
-    }
-    if (!inSection) continue;
-    const bullet = line.match(/^\s*- (?:\[[ x]\]\s+)?(.+?)\s*$/);
-    if (bullet) items.push(bullet[1]);
-  }
-  return items;
-}
-
-export function buildH2List(
-  h2Label: string,
-  items: string[],
-  withCheckbox = false,
-): string {
-  if (items.length === 0) return `## ${h2Label}\n`;
-  const lines = items
-    .map((it) => (withCheckbox ? `- [ ] ${it}` : `- ${it}`))
-    .join("\n");
-  return `## ${h2Label}\n${lines}\n`;
-}
-
-export function buildSummaryBody(parts: {
-  discussion_items: string[];
-  decisions: string[];
-  action_items: string[];
-}): string {
-  return [
-    buildH2List("논의 사항", parts.discussion_items),
-    buildH2List("결정 사항", parts.decisions),
-    buildH2List("액션 아이템", parts.action_items, true),
-  ].join("\n");
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // File → Meeting/Journal
 
 // 메인 파일 + 두 sidecar raw 받아서 합쳐서 Meeting 객체. sidecar 가 없으면 빈 string.
@@ -174,7 +129,6 @@ export function fileToMeeting(
   const isoMtime = new Date(mtime || Date.now()).toISOString();
   const isInTrash = filePath.startsWith(".trash/");
 
-  const summary = transcriptOrSummaryBody(summaryRaw);
   const uid = fmString(fm.id);
   if (!uid) throw new Error(`missing frontmatter id: ${filePath}`);
 
@@ -193,9 +147,7 @@ export function fileToMeeting(
     deleted_at: isInTrash ? isoMtime : null,
     content: main.body,
     transcript: transcriptOrSummaryBody(transcriptRaw),
-    discussion_items: extractH2List(summary, "논의 사항"),
-    decisions: extractH2List(summary, "결정 사항"),
-    action_items: extractH2List(summary, "액션 아이템"),
+    summary: transcriptOrSummaryBody(summaryRaw),
   };
 }
 
@@ -254,20 +206,10 @@ export function meetingToTranscriptRaw(meeting: Meeting): string {
 }
 
 export function meetingToSummaryRaw(meeting: Meeting): string {
-  const body = buildSummaryBody({
-    discussion_items: meeting.discussion_items,
-    decisions: meeting.decisions,
-    action_items: meeting.action_items,
-  });
-  // 모두 비어있으면 빈 string — sidecar 파일 자체를 안 만듦.
-  if (
-    meeting.discussion_items.length === 0 &&
-    meeting.decisions.length === 0 &&
-    meeting.action_items.length === 0
-  ) {
-    return "";
-  }
-  return body;
+  // summary 가 비어있으면 sidecar 파일 자체를 안 만듦.
+  if (meeting.summary.length === 0) return "";
+  // trailing newline 1개 보장 (POSIX style + 옵시디안 자동 추가 호환).
+  return meeting.summary.endsWith("\n") ? meeting.summary : `${meeting.summary}\n`;
 }
 
 export function journalToRaw(journal: Journal): string {

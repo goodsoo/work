@@ -18,9 +18,7 @@ function fakeMeeting(id: string, title: string, mtime = 1000): Meeting {
     deleted_at: null,
     content: "",
     transcript: "",
-    discussion_items: [],
-    decisions: [],
-    action_items: [],
+    summary: "",
   };
 }
 

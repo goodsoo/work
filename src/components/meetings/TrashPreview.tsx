@@ -34,10 +34,7 @@ export function TrashPreview({ selectedId }: { selectedId: string | null }) {
   const attendees = Array.isArray(meeting.attendees)
     ? meeting.attendees.filter(Boolean).join(", ")
     : meeting.attendees ?? "";
-  const hasSummary =
-    meeting.discussion_items.length > 0 ||
-    meeting.decisions.length > 0 ||
-    meeting.action_items.length > 0;
+  const hasSummary = (meeting.summary ?? "").trim().length > 0;
 
   return (
     <article className="h-full overflow-y-auto">
@@ -102,30 +99,22 @@ export function TrashPreview({ selectedId }: { selectedId: string | null }) {
         ) : null}
 
         {hasSummary ? (
-          <section className="space-y-3">
+          <section className="mb-8">
             <Text
               variant="body"
               color="secondary"
               as="h2"
               weight="medium"
+              className="mb-2"
             >
               요약
             </Text>
-            {meeting.discussion_items.length > 0 ? (
-              <SummaryCallout
-                title="논의 사항"
-                items={meeting.discussion_items}
-              />
-            ) : null}
-            {meeting.decisions.length > 0 ? (
-              <SummaryCallout title="결정 사항" items={meeting.decisions} />
-            ) : null}
-            {meeting.action_items.length > 0 ? (
-              <SummaryCallout
-                title="액션 아이템"
-                items={meeting.action_items}
-              />
-            ) : null}
+            <div
+              className="rounded-lg px-4 py-3"
+              style={{ backgroundColor: "var(--bg-surface)" }}
+            >
+              <MarkdownView content={meeting.summary} />
+            </div>
           </section>
         ) : null}
 
@@ -138,33 +127,6 @@ export function TrashPreview({ selectedId }: { selectedId: string | null }) {
         ) : null}
       </div>
     </article>
-  );
-}
-
-function SummaryCallout({ title, items }: { title: string; items: string[] }) {
-  return (
-    <div
-      className="rounded-lg px-4 py-3"
-      style={{ backgroundColor: "var(--bg-surface)" }}
-    >
-      <Text
-        variant="caption"
-        color="secondary"
-        as="div"
-        weight="medium"
-        className="mb-1.5"
-      >
-        {title}
-      </Text>
-      <ul
-        className="list-disc space-y-1 pl-5 text-sm"
-        style={{ color: "var(--text-primary)" }}
-      >
-        {items.map((it, i) => (
-          <li key={i}>{it}</li>
-        ))}
-      </ul>
-    </div>
   );
 }
 

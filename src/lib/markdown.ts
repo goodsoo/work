@@ -5,9 +5,7 @@ export interface MeetingMarkdownInput {
   date: Meeting["date"];
   time: Meeting["time"];
   attendees: Meeting["attendees"] | string | null;
-  discussion_items: Meeting["discussion_items"] | null;
-  decisions: Meeting["decisions"] | null;
-  action_items: Meeting["action_items"] | null;
+  summary: Meeting["summary"] | null;
 }
 
 const isNonEmpty = (s: string | null | undefined): s is string =>
@@ -23,10 +21,6 @@ export function formatMeetingDate(date: string | null | undefined): string | nul
   const parsed = new Date(Number(y), Number(mo) - 1, Number(d));
   if (Number.isNaN(parsed.getTime())) return `${y}.${mo}.${d}`;
   return `${y}.${mo}.${d} (${WEEKDAYS[parsed.getDay()]})`;
-}
-
-function nonEmptyList(items: string[] | null | undefined): string[] {
-  return (items ?? []).map((s) => (typeof s === "string" ? s.trim() : "")).filter(Boolean);
 }
 
 export function meetingToMarkdown(meeting: MeetingMarkdownInput): string {
@@ -49,20 +43,10 @@ export function meetingToMarkdown(meeting: MeetingMarkdownInput): string {
   if (isNonEmpty(attendeesStr)) meta.push(`참석: ${attendeesStr.trim()}`);
   if (meta.length > 0) parts.push(meta.join("\n"));
 
-  const discussion = nonEmptyList(meeting.discussion_items);
-  if (discussion.length > 0) {
-    parts.push(`### 논의 사항\n${discussion.map((s) => `- ${s}`).join("\n")}`);
-  }
-
-  const decisions = nonEmptyList(meeting.decisions);
-  if (decisions.length > 0) {
-    parts.push(`### 결정 사항\n${decisions.map((s) => `- ${s}`).join("\n")}`);
-  }
-
-  const actions = nonEmptyList(meeting.action_items);
-  if (actions.length > 0) {
-    parts.push(`### 액션 아이템\n${actions.map((s) => `- ${s}`).join("\n")}`);
-  }
+  // V0.7.3 — summary 가 마크다운 텍스트 통째. 외부 출력 시 그대로 박음 (이미
+  // `### 논의 사항 / 결정 사항 / 액션 아이템` 같은 헤더 구조를 가짐).
+  const summary = isNonEmpty(meeting.summary) ? meeting.summary.trim() : null;
+  if (summary) parts.push(summary);
 
   return parts.join("\n\n") + "\n";
 }

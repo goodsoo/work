@@ -3,7 +3,6 @@ import {
   Trash2,
   Ban,
   Copy,
-  ListPlus,
   Check,
   Undo2,
   Redo2,
@@ -16,6 +15,9 @@ import {
   Loader2,
   Circle,
   AlertCircle,
+  Sparkles,
+  Clipboard,
+  Upload,
 } from "lucide-react";
 
 import {
@@ -26,17 +28,15 @@ import {
   useDeleteMeeting,
 } from "../../hooks/useMeetings";
 import { useStateHistory } from "../../hooks/useStateHistory";
-import { useCreateTask } from "../../hooks/useTasks";
 import type { MeetingUpdate } from "../../api/meetings";
-import { ClipPromptButton } from "../common/ClipPromptButton";
 import { Button } from "../common/Button";
 import { Text } from "../common/Text";
 import { PageHeaderBar } from "../common/PageHeaderBar";
 import { Kbd } from "../common/Kbd";
 import { EmptyState } from "../common/EmptyState";
-import { buildClaudePrompt } from "../../lib/clipboardPrompt";
+import { ClaudeAutoSummaryModal } from "./ClaudeAutoSummaryModal";
+import { PasteSummaryModal } from "./PasteSummaryModal";
 import { CopyButton } from "./CopyButton";
-import { EditableList } from "./EditableList";
 import { AttendeeTagInput } from "./AttendeeTagInput";
 import { SourceBodyEditor } from "./SourceBodyEditor";
 import { useVault } from "../../lib/vault/useVault";
@@ -67,12 +67,6 @@ type Props = {
   computeNextAfterDelete?: (uid: string) => string | null;
 };
 
-type SummaryDoc = {
-  discussion_items: string[];
-  decisions: string[];
-  action_items: string[];
-};
-
 // title 은 history 미참여 (별도 commitTitle 가 직접 mutation).
 type MetaDoc = {
   date: string;
@@ -81,41 +75,18 @@ type MetaDoc = {
 };
 
 // 전체 메모 도큐먼트 = 1 history stack (옵시디안/notion 패턴).
-// __source = 마지막 set 의 출처 ("body"/"transcript"/"summary:*"/"meta:*"). undo/redo 시
+// __source = 마지막 set 의 출처 ("body"/"transcript"/"summary"/"meta:*"). undo/redo 시
 // 자동으로 그 탭으로 setActiveTab 하는 UX 용 metadata. docsEqual / docToPatch 에서 무시.
 type DocSnapshot = {
   body: string;
   transcript: string;
-  summary: SummaryDoc;
+  summary: string; // V0.7.3 — 마크다운 텍스트 통째. 본문과 동일 모델.
   meta: MetaDoc;
   __source?: string;
 };
 
-function arraysEqual(a: string[], b: string[]): boolean {
-  if (a === b) return true;
-  if (a.length !== b.length) return false;
-  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
-  return true;
-}
-
-function summariesEqual(a: SummaryDoc, b: SummaryDoc): boolean {
-  return (
-    arraysEqual(a.discussion_items, b.discussion_items) &&
-    arraysEqual(a.decisions, b.decisions) &&
-    arraysEqual(a.action_items, b.action_items)
-  );
-}
-
 function trimNewlines(s: string): string {
   return s.replace(/^\n+/, "").replace(/\n+$/, "");
-}
-
-function summaryToPatch(s: SummaryDoc): MeetingUpdate {
-  return {
-    discussion_items: s.discussion_items.length === 0 ? null : s.discussion_items,
-    decisions: s.decisions.length === 0 ? null : s.decisions,
-    action_items: s.action_items.length === 0 ? null : s.action_items,
-  };
 }
 
 function metasEqual(a: MetaDoc, b: MetaDoc): boolean {
@@ -134,7 +105,7 @@ function docsEqual(a: DocSnapshot, b: DocSnapshot): boolean {
   return (
     a.body === b.body &&
     a.transcript === b.transcript &&
-    summariesEqual(a.summary, b.summary) &&
+    trimNewlines(a.summary) === trimNewlines(b.summary) &&
     metasEqual(a.meta, b.meta)
   );
 }
@@ -143,7 +114,7 @@ function docToPatch(d: DocSnapshot): MeetingUpdate {
   return {
     content: d.body,
     transcript: d.transcript || null,
-    ...summaryToPatch(d.summary),
+    summary: d.summary || null,
     ...metaToPatch(d.meta),
   };
 }
@@ -168,7 +139,6 @@ export function MeetingForm({
   const meetingsQ = useMeetings();
   const updateMutation = useUpdateMeeting(meetingId);
   const deleteMutation = useDeleteMeeting();
-  const createTodoMutation = useCreateTask();
   const [viewMode, setViewMode] = useViewMode();
   const { adapter } = useVault();
 
@@ -212,14 +182,7 @@ export function MeetingForm({
     },
     [adapter, uid],
   );
-  const initialSummary = useMemo<SummaryDoc>(
-    () => ({
-      discussion_items: data?.discussion_items ?? [],
-      decisions: data?.decisions ?? [],
-      action_items: data?.action_items ?? [],
-    }),
-    [data?.discussion_items, data?.decisions, data?.action_items],
-  );
+  const initialSummary = data?.summary ?? "";
   const initialMeta = useMemo<MetaDoc>(
     () => ({
       date: data?.date ?? "",
@@ -275,6 +238,9 @@ export function MeetingForm({
 
   const [actionError, setActionError] = useState<string | null>(null);
   const [copiedToast, setCopiedToast] = useState<string | null>(null);
+  // 요약 흐름 — 두 진입점 모두 모달로 분리 (자동 호출 / 외부 paste).
+  const [autoSummaryOpen, setAutoSummaryOpen] = useState(false);
+  const [pasteSummaryOpen, setPasteSummaryOpen] = useState(false);
   async function copyToastMessage(text: string, id: string) {
     try {
       await navigator.clipboard.writeText(text);
@@ -362,15 +328,6 @@ export function MeetingForm({
   const [taskModalPrefill, setTaskModalPrefill] = useState<
     Partial<TaskInsert>
   >({});
-  const [addedTodoIndices, setAddedTodoIndices] = useState<Set<number>>(
-    () => new Set(),
-  );
-  const addedKey = `${meetingId}|${summary.action_items.join("\n")}`;
-  const [trackedAddedKey, setTrackedAddedKey] = useState(addedKey);
-  if (trackedAddedKey !== addedKey) {
-    setTrackedAddedKey(addedKey);
-    setAddedTodoIndices(new Set());
-  }
 
   // beforeunload — 페이지 닫기 직전 모든 pending 변경 flush.
   // unmount 시 cleanup 은 useStateHistory 가 자체 처리하므로 여기선 listener 정리만.
@@ -527,24 +484,6 @@ export function MeetingForm({
     }
   }
 
-  async function addActionItemAsTask(index: number, text: string) {
-    if (addedTodoIndices.has(index)) return;
-    try {
-      await createTodoMutation.mutateAsync({
-        title: text,
-        priority: "medium",
-        due_date: null,
-      });
-      setAddedTodoIndices((prev) => {
-        const next = new Set(prev);
-        next.add(index);
-        return next;
-      });
-    } catch (e) {
-      setActionError(formatError(e));
-    }
-  }
-
   function retrySave() {
     if (updateMutation.isPending) return;
     updateMutation.mutate({
@@ -588,37 +527,44 @@ export function MeetingForm({
     );
   }
 
-  const hasAnySummary =
-    summary.discussion_items.length + summary.decisions.length + summary.action_items.length > 0;
+  const hasAnySummary = summary.trim().length > 0;
 
   // 미저장 변경 여부 — memory state vs query data (optimistic update 후엔 sync).
   // typing 직후 ~ commit timer (1초) 까진 true, optimistic update 시점에 false.
-  // body/transcript 는 disk write 시 앞뒤 newline trim 되므로 비교도 normalize.
+  // body/transcript/summary 는 disk write 시 앞뒤 newline trim 되므로 비교도 normalize.
   // attendees 는 textarea string vs disk-roundtrip 의 ", " join 차이 회피 위해 parseAttendees 로 array 비교.
   // title 은 별도 (titleDraft) — typing 중 일치 안 해도 spinner 표시 X (blur/Enter 만 mutation).
   // meta 4 field 는 draft 라 typing 중 spinner X — commit 후 initialMeta 갱신.
   const hasUnsavedChange =
     trimNewlines(body) !== trimNewlines(initialBody) ||
     trimNewlines(transcript) !== trimNewlines(initialTranscript) ||
-    !summariesEqual(summary, initialSummary);
+    trimNewlines(summary) !== trimNewlines(initialSummary);
 
   const meetingForCopy = {
     title: titleDraft.trim() || initialTitle || null,
     date: meta.date || null,
     time: meta.time || null,
     attendees: meta.attendees || null,
-    discussion_items: summary.discussion_items,
-    decisions: summary.decisions,
-    action_items: summary.action_items,
+    summary,
   };
 
-  function setSummaryField<K extends keyof SummaryDoc>(
-    key: K,
-    value: SummaryDoc[K],
-  ) {
-    // summary list 변경은 명시 intent (Enter, 삭제 등) — 즉시 entry.
-    setDoc(`summary:${key}`, { ...doc, summary: { ...summary, [key]: value } }, true);
+  // 요약 적용 — 두 모달 공용 콜백. summary 텍스트 통째 교체 (단일 history entry).
+  // 기존 내용은 덮어쓰지만 Cmd+Z 로 복원 가능 (docHistory 통합 stack).
+  function applySummaryFromModal(next: string) {
+    setDoc("summary:apply", { ...doc, summary: next }, true);
   }
+
+  const summaryDisabled =
+    (body ?? "").trim().length === 0 && (transcript ?? "").trim().length === 0;
+
+  const summaryPromptInput = {
+    title: titleDraft.trim() || initialTitle || null,
+    date: meta.date || null,
+    time: meta.time || null,
+    attendees: meta.attendees || null,
+    content: body,
+    transcript: transcript || null,
+  };
 
   // 빈 메모 CTA 클릭 — 편집 모드 전환 + 다음 frame 에 본문 textarea focus.
   // 본문 탭 active 일 때 transcript textarea 는 unmount → 활성 textarea 는 SourceBodyEditor 의 것 1개.
@@ -936,12 +882,10 @@ export function MeetingForm({
                   ? body.length
                   : activeTab === "transcript"
                     ? transcript.length
-                    : summary.discussion_items.reduce((s, i) => s + i.length, 0) +
-                      summary.decisions.reduce((s, i) => s + i.length, 0) +
-                      summary.action_items.reduce((s, i) => s + i.length, 0)
+                    : summary.length
               }
             />
-            {activeTab === "body" ? (
+            {activeTab === "body" || activeTab === "summary" ? (
               <ModeChip
                 viewMode={viewMode}
                 onToggle={() =>
@@ -1034,9 +978,25 @@ export function MeetingForm({
           </div>
         ) : null}
 
-        {/* Transcript tab */}
+        {/* Transcript tab — 메타는 본문 탭에서만 편집 가능. 여기선 readOnly 만.
+            파일 업로드는 메타 칩 trailing 으로 (요약 탭 아이콘 버튼 패턴과 통일). */}
         {activeTab === "transcript" ? (
           <div>
+            <MetaInlineChip
+              meta={meta}
+              trailing={
+                <TranscriptUploadButton
+                  transcript={transcript}
+                  onChange={(v) => {
+                    const prevLines = (doc.transcript.match(/\n/g)?.length ?? 0);
+                    const newLines = (v.match(/\n/g)?.length ?? 0);
+                    if (newLines > prevLines) docHistory.flush();
+                    setDoc("transcript", { ...doc, transcript: v });
+                  }}
+                  onError={setActionError}
+                />
+              }
+            />
             <TranscriptArea
               key={`${meetingId}:transcript`}
               transcript={transcript}
@@ -1046,101 +1006,103 @@ export function MeetingForm({
                 if (newLines > prevLines) docHistory.flush();
                 setDoc("transcript", { ...doc, transcript: v });
               }}
-              onError={setActionError}
             />
           </div>
         ) : null}
 
-        {/* Summary tab */}
+        {/* Summary tab — 메타는 본문 탭에서만 편집 가능. 여기선 readOnly 만.
+            요약 있음 = 메타 행 우측에 아이콘 버튼 (compact, 재실행/덮어쓰기 의도).
+            요약 없음 = 큰 primary 버튼 (onboarding CTA). */}
         {activeTab === "summary" ? (
           <div className="space-y-4">
-            <ClipPromptButton
-              buildPrompt={() =>
-                buildClaudePrompt({
-                  title: titleDraft.trim() || initialTitle || null,
-                  date: meta.date || null,
-                  time: meta.time || null,
-                  attendees: meta.attendees || null,
-                  content: body,
-                  transcript: transcript || null,
-                })
+            <MetaInlineChip
+              meta={meta}
+              trailing={
+                hasAnySummary ? (
+                  <>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => setAutoSummaryOpen(true)}
+                      disabled={summaryDisabled}
+                      title="Claude 한테 자동 요약"
+                      leftIcon={<Sparkles className="h-4 w-4" />}
+                      className="px-2 py-1 disabled:opacity-40"
+                    />
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => setPasteSummaryOpen(true)}
+                      disabled={summaryDisabled}
+                      title="직접 붙여넣기"
+                      leftIcon={<Clipboard className="h-4 w-4" />}
+                      className="px-2 py-1 disabled:opacity-40"
+                    />
+                  </>
+                ) : null
               }
-              disabled={
-                (body ?? "").trim().length === 0 &&
-                (transcript ?? "").trim().length === 0
-              }
-              title="메모와 음성 기록을 묶어 Claude 프롬프트로 복사"
-              onError={setActionError}
             />
+            {!hasAnySummary ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  variant="primary"
+                  onClick={() => setAutoSummaryOpen(true)}
+                  disabled={summaryDisabled}
+                  leftIcon={<Sparkles className="h-4 w-4" />}
+                  className="px-3 py-2 disabled:opacity-60"
+                >
+                  Claude 한테 자동 요약
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={() => setPasteSummaryOpen(true)}
+                  disabled={summaryDisabled}
+                  leftIcon={<Clipboard className="h-4 w-4" />}
+                  className="px-3 py-2 disabled:opacity-60"
+                >
+                  직접 붙여넣기
+                </Button>
+              </div>
+            ) : null}
+
             {hasAnySummary ? (
-              <div className="space-y-3">
-                {summary.discussion_items.length > 0 ? (
-                  <div
-                    className="rounded-lg px-4 py-3"
-                    style={{ backgroundColor: "var(--bg-surface)" }}
-                  >
-                    <EditableList
-                      title="논의 사항"
-                      items={summary.discussion_items}
-                      onSave={(next) => setSummaryField("discussion_items", next)}
-                      bullet="dot"
-                    />
-                  </div>
-                ) : null}
-                {summary.decisions.length > 0 ? (
-                  <div
-                    className="rounded-lg px-4 py-3"
-                    style={{ backgroundColor: "var(--bg-surface)" }}
-                  >
-                    <EditableList
-                      title="결정 사항"
-                      items={summary.decisions}
-                      onSave={(next) => setSummaryField("decisions", next)}
-                      bullet="dot"
-                    />
-                  </div>
-                ) : null}
-                {summary.action_items.length > 0 ? (
-                  <div
-                    className="rounded-lg px-4 py-3"
-                    style={{ backgroundColor: "var(--bg-surface)" }}
-                  >
-                    <EditableList
-                      title="액션 아이템"
-                      items={summary.action_items}
-                      bullet="redCheckbox"
-                      onSave={(next) => setSummaryField("action_items", next)}
-                      itemActions={(i, text) =>
-                        addedTodoIndices.has(i) ? (
-                          <Text
-                            variant="caption"
-                            color="muted"
-                            as="span"
-                            className="inline-flex items-center gap-1"
-                          >
-                            <Check className="h-3 w-3" /> 추가됨
-                          </Text>
-                        ) : (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => addActionItemAsTask(i, text)}
-                            disabled={createTodoMutation.isPending}
-                            className="px-1.5 py-0.5 disabled:opacity-40"
-                            style={{ color: "var(--text-secondary)" }}
-                            leftIcon={<ListPlus className="h-3 w-3" />}
-                          >
-                            할 일로
-                          </Button>
-                        )
-                      }
-                    />
-                  </div>
-                ) : null}
+              <div
+                key={`summary:${viewMode}`}
+                className="lg:flex lg:flex-1 lg:flex-col"
+                style={{ animation: "meetingViewFade 140ms ease" }}
+              >
+                {viewMode === "edit" ? (
+                  <SourceBodyEditor
+                    key={`${meetingId}:summary`}
+                    content={summary}
+                    onChange={(v) => {
+                      const prevLines = (doc.summary.match(/\n/g)?.length ?? 0);
+                      const newLines = (v.match(/\n/g)?.length ?? 0);
+                      if (newLines > prevLines) docHistory.flush();
+                      setDoc("summary", { ...doc, summary: v });
+                    }}
+                    onSendLineToInbox={(lineText) => {
+                      setTaskModalPrefill(lineToTaskPrefill(lineText, meetingId));
+                      setTaskModalOpen(true);
+                    }}
+                    onImageAttach={onImageAttach}
+                  />
+                ) : (
+                  <MarkdownView
+                    content={summary}
+                    onChange={(v) => {
+                      setDoc("summary", { ...doc, summary: v }, true);
+                    }}
+                    onAddTaskFromLine={(lineText: string) => {
+                      setTaskModalPrefill(lineToTaskPrefill(lineText, meetingId));
+                      setTaskModalOpen(true);
+                    }}
+                  />
+                )}
               </div>
             ) : (
               <Text variant="body" color="muted" as="p">
-                메모나 음성 기록을 적은 뒤 위 버튼을 눌러 AI 요약을 만들어요.
+                위 버튼을 눌러 메모와 음성 기록을 정리해보세요.
               </Text>
             )}
           </div>
@@ -1153,6 +1115,18 @@ export function MeetingForm({
         open={taskModalOpen}
         onClose={() => setTaskModalOpen(false)}
         prefill={taskModalPrefill}
+      />
+      <ClaudeAutoSummaryModal
+        open={autoSummaryOpen}
+        onClose={() => setAutoSummaryOpen(false)}
+        promptInput={summaryPromptInput}
+        onApply={applySummaryFromModal}
+      />
+      <PasteSummaryModal
+        open={pasteSummaryOpen}
+        onClose={() => setPasteSummaryOpen(false)}
+        promptInput={summaryPromptInput}
+        onApply={applySummaryFromModal}
       />
     </div>
   );
@@ -1264,6 +1238,43 @@ function MetaRow({
         </span>
         {children}
       </div>
+    </div>
+  );
+}
+
+// 음성기록 / 요약 탭용 — 한 줄 칩 형태로 메타 노출 (참고용). 편집은 본문 탭에서만.
+// 마크다운 inline code 와 같은 시각 어휘 (monospace + bg-surface-hover + rounded) →
+// "메모 텍스트가 아니라 메타데이터 값" 이라는 의미를 시선 부담 없이 전달.
+// trailing — 같은 행 우측 끝에 보조 액션 (예: 요약 탭의 아이콘 버튼 모음).
+function MetaInlineChip({
+  meta,
+  trailing,
+}: {
+  meta: MetaDoc;
+  trailing?: React.ReactNode;
+}) {
+  const wd = weekdayShort(meta.date);
+  const parts: string[] = [];
+  if (meta.date) parts.push(wd ? `${meta.date} (${wd})` : meta.date);
+  if (meta.time) parts.push(meta.time);
+  if (meta.attendees) parts.push(meta.attendees);
+  if (parts.length === 0 && !trailing) return null;
+  return (
+    <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+      {parts.length > 0 ? (
+        <code
+          className="inline-block rounded px-2 py-1 font-mono text-xs"
+          style={{
+            backgroundColor: "var(--bg-surface-hover)",
+            color: "var(--text-secondary)",
+          }}
+        >
+          {parts.join(" · ")}
+        </code>
+      ) : (
+        <span />
+      )}
+      {trailing ? <div className="flex items-center gap-1">{trailing}</div> : null}
     </div>
   );
 }
@@ -1425,7 +1436,9 @@ function TabBtn({
   );
 }
 
-function TranscriptArea({
+// 음성 기록 파일 업로드 — 메타 칩 trailing 자리에 들어가는 컴팩트 아이콘 버튼.
+// 요약 탭의 자동/직접 아이콘 버튼과 같은 visual 어휘 (secondary-sm + 툴팁).
+function TranscriptUploadButton({
   transcript,
   onChange,
   onError,
@@ -1435,6 +1448,50 @@ function TranscriptArea({
   onError: (msg: string) => void;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const text = reader.result;
+      if (typeof text !== "string") {
+        onError("파일을 텍스트로 읽지 못했어요");
+        return;
+      }
+      onChange(transcript ? `${transcript}\n\n${text}` : text);
+    };
+    reader.onerror = () => onError("파일 읽기 실패");
+    reader.readAsText(file);
+  }
+  return (
+    <>
+      <Button
+        variant="secondary"
+        size="sm"
+        onClick={() => fileInputRef.current?.click()}
+        title="파일 업로드 (txt / md / vtt / srt)"
+        leftIcon={<Upload className="h-4 w-4" />}
+        className="px-2 py-1"
+      />
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".txt,.md,.vtt,.srt,text/*"
+        onChange={handleFile}
+        className="hidden"
+      />
+    </>
+  );
+}
+
+function TranscriptArea({
+  transcript,
+  onChange,
+}: {
+  transcript: string;
+  onChange: (v: string) => void;
+}) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   // 메모탭 SourceBodyEditor 와 같은 auto-resize 패턴 — 자체 scroll X, outer scroll
   useLayoutEffect(() => {
@@ -1472,45 +1529,8 @@ function TranscriptArea({
     }
   }
 
-  function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      const text = reader.result;
-      if (typeof text !== "string") {
-        onError("파일을 텍스트로 읽지 못했어요");
-        return;
-      }
-      // 기존 내용 뒤에 이어붙이기 (덮어쓰기 방지). 비어있으면 그대로.
-      onChange(transcript ? `${transcript}\n\n${text}` : text);
-    };
-    reader.onerror = () => onError("파일 읽기 실패");
-    reader.readAsText(file);
-  }
-
   return (
     <div>
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <Text variant="caption" color="muted" as="span">
-          녹음을 STT로 변환한 텍스트를 붙여넣거나 파일 업로드
-        </Text>
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={() => fileInputRef.current?.click()}
-        >
-          파일 업로드
-        </Button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".txt,.md,.vtt,.srt,text/*"
-          onChange={handleFile}
-          className="hidden"
-        />
-      </div>
       <div onMouseDown={onContainerMouseDown} style={{ minHeight: "60vh" }}>
         <textarea
           ref={textareaRef}

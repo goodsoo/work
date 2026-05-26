@@ -76,13 +76,7 @@ function applyOptimisticPatch(prev: Meeting, patch: MeetingUpdate): Meeting {
   if (patch.pinned !== undefined) out.pinned = patch.pinned ?? false;
   if (patch.content !== undefined) out.content = patch.content ?? "";
   if (patch.transcript !== undefined) out.transcript = patch.transcript ?? "";
-  if (patch.discussion_items !== undefined) {
-    out.discussion_items = patch.discussion_items ?? [];
-  }
-  if (patch.decisions !== undefined) out.decisions = patch.decisions ?? [];
-  if (patch.action_items !== undefined) {
-    out.action_items = patch.action_items ?? [];
-  }
+  if (patch.summary !== undefined) out.summary = patch.summary ?? "";
   return out;
 }
 

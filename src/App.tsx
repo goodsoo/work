@@ -383,9 +383,7 @@ function AppContent() {
           time: null,
           attendees: null,
           content: "",
-          discussion_items: null,
-          decisions: null,
-          action_items: null,
+          summary: null,
         });
         openMeeting(created.uid);
       } catch {
