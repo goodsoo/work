@@ -5,7 +5,10 @@ pub fn run() {
     .plugin(tauri_plugin_dialog::init())
     .plugin(tauri_plugin_shell::init())
     .setup(|app| {
-      if cfg!(debug_assertions) {
+      // dev 모드 전용 메뉴 + 로깅. release 에선 devtools API 가 없어 컴파일 자체에서 제거 필요
+      // (런타임 if cfg!(debug_assertions) 로는 코드가 compile path 에 남아 release build 실패).
+      #[cfg(debug_assertions)]
+      {
         app.handle().plugin(
           tauri_plugin_log::Builder::default()
             .level(log::LevelFilter::Info)
