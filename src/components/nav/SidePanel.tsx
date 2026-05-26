@@ -134,9 +134,7 @@ export function MeetingsSidePanel({
         time: null,
         attendees: null,
         content: "",
-        discussion_items: null,
-        decisions: null,
-        action_items: null,
+        summary: null,
       });
       onSelect(created.uid);
     } catch (e) {

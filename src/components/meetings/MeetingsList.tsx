@@ -134,9 +134,7 @@ function MeetingCard({ meeting, onClick }: { meeting: Meeting; onClick: () => vo
         ) : null}
         {(() => {
           const first =
-            meeting.discussion_items?.[0] ??
-            meeting.decisions?.[0] ??
-            meeting.action_items?.[0] ??
+            (meeting.summary?.trim() || null) ??
             meeting.content ??
             null;
           return first ? (
