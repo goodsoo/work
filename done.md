@@ -4,6 +4,18 @@
 
 ---
 
+## 2026-05-26
+
+### PR #47 — gh onboarding 모달: 미설치/미로그인 분기 안내
+
+- **한 줄 임팩트**: 동기화 실패 이유와 해결법 안내
+- **에러 분류** — `runGh` 가 stderr 분석해서 `GhNotInstalledError` (`command not found: gh`) / `GhAuthError` (`auth status`, `not logged in`, `gh auth login`) 던지도록 보강. 기존엔 클래스만 정의되고 throw 안 됨 → 사이드바 toast "동기화 실패. 네트워크 확인" 한 줄로 합쳐져 사용자가 무엇이 문제인지 판단 불가.
+- **InstallGuideModal** — macOS `brew install gh` / Windows `winget install ...` + 검증 단계 (`gh --version`) 카드. CommandBlock 공용 컴포넌트 (커맨드 + 클립보드 복사 버튼) 분리.
+- **AuthGuideModal** — `gh auth login` 단계 + 계정 변경 시나리오 (`gh auth logout` 후 재로그인) 안내.
+- **에러 종류별 모달 분기** — 사이드바 SyncButton 의 lastResult 에서 GhNotInstalledError / GhAuthError 식별 → App.tsx 가 적절한 모달 트리거. 한 화면 한 액션 원칙 (inline expand 대신 모달) — 정보 밀도 폭증 회피.
+
+---
+
 ## 2026-05-25
 
 ### PR #45 — Multi-vault: 개인 / 회사 vault 전환
