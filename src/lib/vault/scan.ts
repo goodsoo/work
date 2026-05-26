@@ -175,10 +175,12 @@ export function fileToMeeting(
   const isInTrash = filePath.startsWith(".trash/");
 
   const summary = transcriptOrSummaryBody(summaryRaw);
+  const uid = fmString(fm.id);
+  if (!uid) throw new Error(`missing frontmatter id: ${filePath}`);
 
   return {
     id: filePath,
-    uid: fmString(fm.id) ?? "", // 빈 string 면 lazy migration (scanMeetings / getMeeting 가 발급).
+    uid,
     title: filePathToTitle(filePath),
     date: fmString(fm.date),
     time: fmString(fm.time),
@@ -211,9 +213,11 @@ export function fileToJournal(
 ): Journal {
   const file = parseVaultFile(raw);
   const fm = file.frontmatter;
+  const uid = fmString(fm.id);
+  if (!uid) throw new Error(`missing frontmatter id: ${filePath}`);
   return {
     id: filePath,
-    uid: fmString(fm.id) ?? "", // 빈 string 면 lazy migration (scanJournals / upsertJournal).
+    uid,
     date: fmString(fm.date) ?? filePathToDate(filePath),
     mtime,
     content: file.body,
@@ -536,26 +540,9 @@ export async function scanMeetings(adapter: VaultAdapter): Promise<MeetingMeta[]
     if (isMeetingSidecar(path)) continue; // sidecar 는 scan 대상 X
     if (isSyncNoiseFile(path)) continue; // iCloud/Dropbox 충돌·placeholder skip
     try {
-      let raw = await adapter.read(path);
-      let meta = await adapter.readMeta(path);
-      let m = fileToMeeting(path, raw, "", "", meta.mtime);
-      // Lazy migration — 옛 V0.6 메모 (frontmatter id 없음) 처음 만나면 uuid 발급 + rewrite.
-      // 한 번만 발생. 옵시디안 community 표준 (frontmatter `id` 영구 식별자) 으로 통일.
-      if (m.uid === "") {
-        const uid = crypto.randomUUID();
-        const updated = { ...m, uid };
-        try {
-          const newRaw = meetingToMainRaw(updated);
-          const newMeta = await adapter.write(path, newRaw, meta.mtime);
-          raw = newRaw;
-          meta = newMeta;
-          m = fileToMeeting(path, raw, "", "", meta.mtime);
-        } catch {
-          // write 실패 시 (권한 / sync conflict) — 메모리 uid 만 채워서 list 표시.
-          // 다음 scan 또는 사용자 edit 시 다시 시도.
-          m = { ...m, uid };
-        }
-      }
+      const raw = await adapter.read(path);
+      const meta = await adapter.readMeta(path);
+      const m = fileToMeeting(path, raw, "", "", meta.mtime);
       results.push({
         id: m.id,
         uid: m.uid,
@@ -601,7 +588,6 @@ export async function dedupeUids(
 ): Promise<void> {
   const groups = new Map<string, MeetingMeta[]>();
   for (const m of results) {
-    if (!m.uid) continue; // lazy migration 실패한 entry — skip
     const existing = groups.get(m.uid);
     if (existing) existing.push(m);
     else groups.set(m.uid, [m]);
@@ -646,25 +632,9 @@ export async function scanJournals(adapter: VaultAdapter): Promise<JournalMeta[]
     if (!path.endsWith(".md")) continue;
     if (isSyncNoiseFile(path)) continue;
     try {
-      let raw = await adapter.read(path);
-      let meta = await adapter.readMeta(path);
-      let j = fileToJournal(path, raw, meta.mtime);
-      // Lazy migration — 옛 일기 (frontmatter id 없음) 첫 만나면 uuid 발급 + rewrite.
-      // 메모 (scanMeetings) 패턴 동일. 한 번만 발생.
-      if (j.uid === "") {
-        const uid = crypto.randomUUID();
-        const updated = { ...j, uid };
-        try {
-          const newRaw = journalToRaw(updated);
-          const newMeta = await adapter.write(path, newRaw, meta.mtime);
-          raw = newRaw;
-          meta = newMeta;
-          j = fileToJournal(path, raw, meta.mtime);
-        } catch {
-          // write 실패 — 메모리 uid 만 채워 list 표시. 다음 scan 시 재시도.
-          j = { ...j, uid };
-        }
-      }
+      const raw = await adapter.read(path);
+      const meta = await adapter.readMeta(path);
+      const j = fileToJournal(path, raw, meta.mtime);
       results.push({ id: j.id, uid: j.uid, date: j.date, mtime: j.mtime });
     } catch (err) {
       console.warn(`[scanJournals] skip ${path}:`, err);
@@ -723,9 +693,7 @@ export async function restoreFromTrash(
     /^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-/,
     "",
   );
-  // 원본 폴더 구조 추정. V0.7.1: 메모는 notes/{title}.md (date prefix 없음).
-  // 순수 YYYY-MM-DD.md 만 일기, 그 외 (legacy date-prefix + V0.7.1 title-only)
-  // 는 모두 메모로 복원.
+  // 원본 폴더 구조 추정: 순수 YYYY-MM-DD.md 는 일기, 그 외는 메모.
   let target: string;
   if (base.match(/^\d{4}-\d{2}-\d{2}\.md$/)) {
     target = `journals/${base}`;

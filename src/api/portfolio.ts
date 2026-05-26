@@ -118,7 +118,7 @@ export interface PortfolioWorkFrontmatter {
   // GitHub 원본 (gh sync 가 read-only 로 채움 — 본인 수정해도 다음 sync 덮어씀)
   // github_pr_id = GitHub 내부 PR ID (영구 불변). owner/repo rename 후에도 같음.
   // sync 가 이 id 로 vault 카드 매칭 → rename 자동 감지.
-  // optional = 옛 V0.7 카드 (id 없이 만들어진 카드) 호환.
+  // optional — 수동 카드 / pr_number=0 직커밋 카드는 PR 자체가 없어 id 도 없음.
   github_pr_id?: number;
   github_owner: string;
   github_repo: string;
@@ -148,9 +148,6 @@ export interface PortfolioWork {
   filePath: string; // "portfolio/{pr-slug}.md"
   mtime: number; // optimistic concurrency
 }
-
-// PortfolioProject 는 옛 projects.md 메타 모델. v0.7.3 부터 사이드바 source 는
-// github = 카드 frontmatter derive, 수동 = vault 디렉토리 트리. 이 type 은 폐기됨.
 
 export interface PortfolioSyncState {
   last_sync: string | null; // ISO 8601. null = 한 번도 sync 안 함.
@@ -377,11 +374,10 @@ export function fileToPortfolioWork(
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Scan portfolio dir — vault 디렉토리 트리 재귀. 수동 폴더 (사용자 만든 실제 디렉토리)
-// 안 카드 + flat 의 github 카드 모두 한 list 로. _attachments / projects.md /
-// categories.md / .synced.md / .trash/ 는 제외.
+// 안 카드 + flat 의 github 카드 모두 한 list 로. _attachments / categories.md /
+// .synced.md / .trash/ 는 제외.
 
 const PORTFOLIO_SKIP = new Set<string>([
-  "portfolio/projects.md", // 옛 v0.7 메타 파일 — 폐기됨, 잔여 vault 에 있으면 그냥 skip
   "portfolio/categories.md",
   "portfolio/.synced.md",
 ]);
@@ -990,9 +986,6 @@ export async function upsertPortfolioWork(
   return { ...work, mtime: meta.mtime };
 }
 
-// Projects (옛 projects.md) — v0.7.3 부터 폐기. 사이드바 source 는 카드 frontmatter
-// 의 github_owner/github_repo derive (github 그룹) + vault 디렉토리 트리 (수동 그룹).
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Categories (categories.md frontmatter — 사용자 정의 카테고리 source).
 // 카드 frontmatter category 는 builtin 5개 + categories.md 에 추가된 사용자
@@ -1160,9 +1153,6 @@ export async function syncPortfolio(
     const s = (pr.state || "").toUpperCase();
     return s === "CLOSED" || s === "MERGED";
   });
-
-  // v0.7.3 부터 projects.md 부트스트랩/매핑은 폐기 — 사이드바 [GitHub] 그룹은
-  // 카드 frontmatter 의 github_owner/github_repo 에서 derive.
 
   // vault scan → github_pr_id + slug 인덱스. rename 자동 감지 + 본인 screenshots 보존에 사용.
   const allWorks = await scanPortfolio(adapter);

@@ -1,8 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
-  __testing,
   addVault,
-  bootstrapFromLegacy,
   getActiveVault,
   getActiveVaultId,
   getVaults,
@@ -74,23 +72,5 @@ describe("vault registry", () => {
     const entry = addVault("개인", "/p");
     renameVault(entry.id, "   ");
     expect(getVaults()[0].name).toBe("개인");
-  });
-
-  it("bootstrapFromLegacy — vaultRoot 발견 시 1개 vault 로 흡수 + 활성화", () => {
-    localStorage.setItem(__testing.LEGACY_VAULT_ROOT_KEY, "/Users/me/my-vault");
-    bootstrapFromLegacy();
-    const vs = getVaults();
-    expect(vs).toHaveLength(1);
-    expect(vs[0].path).toBe("/Users/me/my-vault");
-    expect(vs[0].name).toBe("my-vault");
-    expect(getActiveVaultId()).toBe(vs[0].id);
-  });
-
-  it("bootstrapFromLegacy — 이미 vaults 있으면 no-op", () => {
-    addVault("개인", "/p");
-    localStorage.setItem(__testing.LEGACY_VAULT_ROOT_KEY, "/legacy");
-    bootstrapFromLegacy();
-    expect(getVaults()).toHaveLength(1);
-    expect(getVaults()[0].path).toBe("/p");
   });
 });

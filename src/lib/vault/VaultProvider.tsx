@@ -12,7 +12,6 @@ import { createVaultWatcher, type VaultWatcher } from "./watcher";
 import { ensureVaultStructure } from "./scan";
 import {
   addVault as registryAddVault,
-  bootstrapFromLegacy,
   getActiveVaultId,
   getVaults,
   removeVault as registryRemoveVault,
@@ -54,11 +53,7 @@ export function VaultProvider({ children }: { children: ReactNode }) {
     createVaultWatcher(adapter, queryClient),
   );
 
-  // 첫 마운트에서 legacy vaultRoot 흡수 (vaults list 비어있을 때만).
-  const [vaults, setVaultsState] = useState<VaultEntry[]>(() => {
-    bootstrapFromLegacy();
-    return getVaults();
-  });
+  const [vaults, setVaultsState] = useState<VaultEntry[]>(() => getVaults());
   const [activeVaultId, setActiveVaultIdState] = useState<string | null>(() =>
     getActiveVaultId(),
   );

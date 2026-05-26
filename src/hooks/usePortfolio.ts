@@ -426,11 +426,6 @@ export function useDeletePortfolioCategory() {
   });
 }
 
-// 옛 projects.md 기반 hook (useWritePortfolioProjects / useAddPortfolioProject /
-// useDeletePortfolioProject / useRenamePortfolioProject) 은 vault path 기반 폴더
-// 모델로 대체되어 제거됨. github 그룹은 카드 frontmatter 에서 derive, 수동 폴더는
-// 실제 vault 디렉토리 — useManualFolders / useCreatePortfolioFolder / 등 사용.
-
 // ─────────────────────────────────────────────────────────────────────────────
 // useGhSync — local mutable run state. design 1B: 시작/완료/중단 상태 노출.
 
