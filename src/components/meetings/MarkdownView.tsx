@@ -34,7 +34,7 @@ type Props = {
   // task 라인 우측 hover 시 노출되는 "할 일 추가" 버튼 콜백. 라인 raw 텍스트
   // (`- [ ] foo --- 내일 #work` 형식) 그대로 넘김 — 편집 모드 ⌘Enter 와 동일
   // 시그니처라 부모는 같은 핸들러 (lineToTaskPrefill → TaskAddModal) 로 연결한다.
-  onAddTodoFromLine?: (lineText: string) => void;
+  onAddTaskFromLine?: (lineText: string) => void;
 };
 
 // pre 안쪽 code 인지 추적 — 4-space indented block 은 language class 가 없어
@@ -81,7 +81,7 @@ function visitForCheckbox(
   return node;
 }
 
-export function MarkdownView({ content, onChange, onAddTodoFromLine }: Props) {
+export function MarkdownView({ content, onChange, onAddTaskFromLine }: Props) {
   // VaultContext 는 provider 밖에서도 null 로 안전 — 테스트 환경 (jsdom) 호환.
   const vaultCtx = useContext(VaultContext);
   const vaultRoot = vaultCtx?.vaultRoot ?? null;
@@ -176,13 +176,13 @@ export function MarkdownView({ content, onChange, onAddTodoFromLine }: Props) {
               // before:* — invisible hit-area 24px 좌측 확장. li 와 + 버튼 사이 갭에서
               //   마우스가 group-hover off 되던 깜빡임 차단.
               <li className="task-list-item group relative -ml-6 flex list-none items-start gap-2 [&>span>p]:my-0 before:absolute before:left-[-1.5rem] before:top-0 before:h-full before:w-6 before:content-['']">
-                {onAddTodoFromLine ? (
+                {onAddTaskFromLine ? (
                   <button
                     type="button"
                     onClick={() => {
                       const end = content.indexOf("\n", offset);
                       const lineText = content.slice(offset, end === -1 ? undefined : end);
-                      onAddTodoFromLine(lineText);
+                      onAddTaskFromLine(lineText);
                     }}
                     title="할 일로 추가"
                     aria-label="할 일로 추가"

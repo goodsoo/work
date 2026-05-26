@@ -1,25 +1,25 @@
 import { describe, it, expect } from "vitest";
-import { extractTodos } from "./tasks";
+import { extractTasks } from "./tasks";
 
-describe("extractTodos", () => {
+describe("extractTasks", () => {
   it("기본 - [ ] 체크박스 추출", () => {
-    const raw = "- [ ] 단순 todo\n";
-    const items = extractTodos("inbox.md", raw);
+    const raw = "- [ ] 단순 task\n";
+    const items = extractTasks("inbox.md", raw);
     expect(items).toHaveLength(1);
-    expect(items[0].text).toBe("단순 todo");
+    expect(items[0].text).toBe("단순 task");
     expect(items[0].done).toBe(false);
     expect(items[0].source).toEqual({ file: "inbox.md", line: 0 });
   });
 
   it("[담당자] 같은 bracket 도 본문 일부 — assignee 추출 폐기 (UI 기능 없음)", () => {
     const raw = "- [ ] [홍길동] 보고서 작성\n";
-    const items = extractTodos("inbox.md", raw);
+    const items = extractTasks("inbox.md", raw);
     expect(items[0].text).toBe("[홍길동] 보고서 작성");
   });
 
   it("— M/D → due (현재 연도)", () => {
     const raw = "- [ ] 보고서 — 5/22\n";
-    const items = extractTodos("inbox.md", raw);
+    const items = extractTasks("inbox.md", raw);
     const year = new Date().getFullYear();
     expect(items[0].due).toBe(`${year}-05-22`);
     expect(items[0].text).toBe("보고서");
@@ -27,19 +27,19 @@ describe("extractTodos", () => {
 
   it("— ISO date 형식 인식", () => {
     const raw = "- [ ] 회의 — 2026-05-22\n";
-    const items = extractTodos("inbox.md", raw);
+    const items = extractTasks("inbox.md", raw);
     expect(items[0].due).toBe("2026-05-22");
   });
 
   it("— HH:MM 시간 → time", () => {
     const raw = "- [ ] 발표 — 14:00\n";
-    const items = extractTodos("inbox.md", raw);
+    const items = extractTasks("inbox.md", raw);
     expect(items[0].time).toBe("14:00");
   });
 
   it("--- (triple hyphen) 도 em dash 와 동일 매칭 (키보드 친화)", () => {
     const raw = "- [ ] 보고서 --- 5/22 14:00\n";
-    const items = extractTodos("inbox.md", raw);
+    const items = extractTasks("inbox.md", raw);
     expect(items[0].text).toBe("보고서");
     expect(items[0].due).toMatch(/-05-22$/);
     expect(items[0].time).toBe("14:00");
@@ -49,7 +49,7 @@ describe("extractTodos", () => {
     // 외부 편집 / 사용자 실수로 --- 뒤 패턴 망가진 케이스. parser 가
     // graceful 해야 본문 손실 X.
     const raw = "- [ ] 보고서 --- 망가진뒤\n";
-    const items = extractTodos("inbox.md", raw);
+    const items = extractTasks("inbox.md", raw);
     expect(items[0].text).toBe("보고서 --- 망가진뒤");
     expect(items[0].due).toBeUndefined();
     expect(items[0].time).toBeUndefined();
@@ -57,21 +57,21 @@ describe("extractTodos", () => {
 
   it("자연어 날짜 (내일, 월) → due 매칭 + title 에서 제거", () => {
     const raw = "- [ ] 회의 --- 내일\n";
-    const items = extractTodos("inbox.md", raw);
+    const items = extractTasks("inbox.md", raw);
     expect(items[0].text).toBe("회의");
     expect(items[0].due).toBeDefined();
   });
 
   it("자연어 시간 (오후 2시) → time 매칭", () => {
     const raw = "- [ ] 발표 --- 오후 2시\n";
-    const items = extractTodos("inbox.md", raw);
+    const items = extractTasks("inbox.md", raw);
     expect(items[0].text).toBe("발표");
     expect(items[0].time).toBe("14:00");
   });
 
   it("M/D + 한글 시간 (6/07 18시) → due + time 분리 매칭 (date-like time false positive 차단)", () => {
     const raw = "- [ ] 보고서 --- 6/07 18시\n";
-    const items = extractTodos("inbox.md", raw);
+    const items = extractTasks("inbox.md", raw);
     expect(items[0].text).toBe("보고서");
     expect(items[0].due).toMatch(/-06-07$/);
     expect(items[0].time).toBe("18:00");
@@ -79,7 +79,7 @@ describe("extractTodos", () => {
 
   it("#tag 다수 추출", () => {
     const raw = "- [ ] 보고서 #work #urgent\n";
-    const items = extractTodos("inbox.md", raw);
+    const items = extractTasks("inbox.md", raw);
     expect(items[0].tags).toContain("work");
     expect(items[0].tags).toContain("urgent");
     expect(items[0].text).toBe("보고서");
@@ -87,13 +87,13 @@ describe("extractTodos", () => {
 
   it("- [x] → done=true", () => {
     const raw = "- [x] 완료한 항목\n";
-    const items = extractTodos("inbox.md", raw);
+    const items = extractTasks("inbox.md", raw);
     expect(items[0].done).toBe(true);
   });
 
   it("복합: bracket + due + time + tags (bracket 는 본문 일부)", () => {
     const raw = "- [ ] [홍길동] 보고서 작성 — 5/22 14:00 #meeting #event\n";
-    const items = extractTodos("notes/foo.md", raw);
+    const items = extractTasks("notes/foo.md", raw);
     const t = items[0];
     expect(t.text).toBe("[홍길동] 보고서 작성");
     expect(t.due).toMatch(/-05-22$/);
@@ -104,7 +104,7 @@ describe("extractTodos", () => {
 
   it("코드블록 안의 체크박스는 무시", () => {
     const raw = "```\n- [ ] 코드 안\n```\n- [ ] 진짜\n";
-    const items = extractTodos("inbox.md", raw);
+    const items = extractTasks("inbox.md", raw);
     expect(items).toHaveLength(1);
     expect(items[0].text).toBe("진짜");
   });

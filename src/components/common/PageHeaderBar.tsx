@@ -12,10 +12,10 @@ type Props = {
   sticky?: boolean;
 };
 
-// 본문 페이지 헤더 — 메모/할일/내작업/캘린더 4 페이지 공통 패턴.
+// 본문 페이지 헤더 — 메모/할 일/내 작업/캘린더 4 페이지 공통 패턴.
 // height = var(--page-header-h) (52px, 사이드바 헤더와 통일).
 // grid 3-col (1fr / auto / 1fr) — 좌/우 그룹 너비 변해도 가운데 viewport-center 유지.
-// sticky top-0 z-20 (default) — fragment 부모 (PortfolioPage / TodosPage) 에서
+// sticky top-0 z-20 (default) — fragment 부모 (PortfolioPage / TasksPage) 에서
 //   유일한 고정 방법. flex-col 부모 (MeetingForm) 는 sticky=false + lg:shrink-0
 //   조합으로 flex item 자동 고정.
 export function PageHeaderBar({
