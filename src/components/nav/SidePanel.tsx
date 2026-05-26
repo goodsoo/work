@@ -28,6 +28,7 @@ import {
 } from "../../hooks/useMeetings";
 import { meetingFolder } from "../../api/meetings";
 import { useMeetingSort, type MeetingSortKey } from "../../hooks/useMeetingSort";
+import { buildMeetingSortComparator } from "../../lib/meetingSort";
 import { type TodoSortKey } from "../../hooks/useTodoSort";
 import { useJournals } from "../../hooks/useJournals";
 import { useTodos, useUpdateTodo } from "../../hooks/useTodos";
@@ -46,6 +47,7 @@ import { Button } from "../common/Button";
 import { Text } from "../common/Text";
 import { FilterItem } from "../common/FilterItem";
 import { Popover } from "../common/Popover";
+import { ConfirmDialog } from "../ConfirmDialog";
 import { useToast } from "../Toast";
 
 /* ── Meetings Side Panel ── */
@@ -85,37 +87,18 @@ export function MeetingsSidePanel({
   const [editingFolder, setEditingFolder] = useState<
     { folder: string; value: string } | null
   >(null);
+  // 폴더 삭제 confirm 모달 target. null = 닫힘. window.confirm 은 Tauri WebView 에서
+  // noop 통과되어 안전하지 않아 ConfirmDialog 모달로 대체.
+  const [deleteFolderTarget, setDeleteFolderTarget] = useState<
+    { folder: string; total: number; pinned: number } | null
+  >(null);
 
   // 메모 정렬 — 폴더 안에서만 적용. 폴더 위계는 alphabetic 고정 (정렬 popover 무관).
-  // 키 우선순위: date → time → mtime. date 없는 메모는 같은 그룹 안 맨 아래.
-  const sortComparator = useMemo(() => {
-    return (a: Meeting, b: Meeting): number => {
-      if (sortKey === "name") {
-        const ta = (a.title ?? "").trim();
-        const tb = (b.title ?? "").trim();
-        if (!ta && !tb) return b.mtime - a.mtime;
-        if (!ta) return 1;
-        if (!tb) return -1;
-        return ta.localeCompare(tb, "ko");
-      }
-      const asc = sortKey === "date_asc";
-      const da = a.date ?? "";
-      const db = b.date ?? "";
-      if (da !== db) {
-        if (!da) return 1;
-        if (!db) return -1;
-        return asc ? da.localeCompare(db) : db.localeCompare(da);
-      }
-      const ta = a.time ?? "";
-      const tb = b.time ?? "";
-      if (ta !== tb) {
-        if (!ta) return 1;
-        if (!tb) return -1;
-        return asc ? ta.localeCompare(tb) : tb.localeCompare(ta);
-      }
-      return asc ? a.mtime - b.mtime : b.mtime - a.mtime;
-    };
-  }, [sortKey]);
+  // App.tsx (삭제 후 자동 선택, Cmd+↑/↓) 와 같은 comparator 공유 — buildMeetingSortComparator.
+  const sortComparator = useMemo(
+    () => buildMeetingSortComparator(sortKey),
+    [sortKey],
+  );
 
   // 컨텍스트 메뉴 닫기 — 바깥 클릭 / ESC / scroll. 메모 + 폴더 컨텍스트 메뉴 공통.
   useEffect(() => {
@@ -202,6 +185,17 @@ export function MeetingsSidePanel({
     }).length;
   }
 
+  // 같은 범위 안 고정 메모 카운트. 사용자가 폴더 삭제 시 pinned 메모가 그 안에
+  // 들어있는 걸 까먹는 케이스 방어 — confirm 모달에 별도 줄로 강조.
+  function countPinnedInFolder(folder: string): number {
+    if (!data) return 0;
+    return data.filter((m) => {
+      if (!m.pinned) return false;
+      const f = meetingFolder(m.id);
+      return f === folder || f.startsWith(folder + "/");
+    }).length;
+  }
+
   function openRenameInput(folder: string) {
     const lastSeg = folder.split("/").pop() ?? folder;
     setEditingFolder({ folder, value: lastSeg });
@@ -227,15 +221,20 @@ export function MeetingsSidePanel({
     }
   }
 
-  async function handleDeleteFolder(folder: string) {
-    const n = countInFolder(folder);
-    const msg =
-      n === 0
-        ? `폴더 '${folder}' 를 삭제할까요?`
-        : `폴더 '${folder}' 와 안에 있는 메모 ${n}개를 휴지통으로 옮길까요?`;
-    if (!window.confirm(msg)) return;
+  function handleDeleteFolder(folder: string) {
+    setDeleteFolderTarget({
+      folder,
+      total: countInFolder(folder),
+      pinned: countPinnedInFolder(folder),
+    });
+  }
+
+  async function performDeleteFolder() {
+    if (!deleteFolderTarget) return;
+    const target = deleteFolderTarget;
+    setDeleteFolderTarget(null);
     try {
-      await deleteFolderMutation.mutateAsync(folder);
+      await deleteFolderMutation.mutateAsync(target.folder);
     } catch (e) {
       toast.show(formatError(e));
     }
@@ -278,13 +277,11 @@ export function MeetingsSidePanel({
     return data.find((m) => m.id === contextMenu.meetingId) ?? null;
   }, [contextMenu, data]);
 
-  // pinned 메모는 트리에서 제외 (옵시디안 bookmarks 패턴) — 같은 메모가 두 곳에 보이지 않음.
-  // 정렬은 일반 트리와 동일 comparator 적용 — 사용자가 이름순 바꾸면 pinned 도 따라감.
-  const { pinnedMeetings, unpinnedMeetings } = useMemo(() => {
-    const all = data ?? [];
-    const pinned = all.filter((m) => m.pinned).sort(sortComparator);
-    const unpinned = all.filter((m) => !m.pinned);
-    return { pinnedMeetings: pinned, unpinnedMeetings: unpinned };
+  // pinned 메모는 상단 PinnedSection + 트리 둘 다에 표시 (중복). 트리에서 빼면
+  // 사용자가 "고정한 메모가 폴더에서 사라진 느낌" 으로 헷갈림. 옵시디안 bookmarks
+  // 와 다른 선택. 정렬은 PinnedSection 만 별도 comparator 적용.
+  const pinnedMeetings = useMemo(() => {
+    return (data ?? []).filter((m) => m.pinned).sort(sortComparator);
   }, [data, sortComparator]);
 
   return (
@@ -359,7 +356,7 @@ export function MeetingsSidePanel({
               />
             ) : null}
             <MeetingsTreeView
-              meetings={unpinnedMeetings}
+              meetings={data ?? []}
               extraFolders={folders ?? []}
               selectedUid={selectedId}
               sortMeetings={sortComparator}
@@ -421,6 +418,41 @@ export function MeetingsSidePanel({
         meetingTitle={moveModalMeeting?.title ?? ""}
         onClose={() => setMoveModalFor(null)}
         onMove={handleMoveFromModal}
+      />
+
+      <ConfirmDialog
+        open={deleteFolderTarget !== null}
+        title={
+          deleteFolderTarget
+            ? `폴더 '${deleteFolderTarget.folder}' 를 삭제할까요?`
+            : ""
+        }
+        message={
+          deleteFolderTarget ? (
+            <div className="space-y-2">
+              <p>폴더는 영구 삭제됩니다 (복원 불가).</p>
+              {deleteFolderTarget.total > 0 ? (
+                <p>
+                  안에 있는 메모 {deleteFolderTarget.total}개는 휴지통으로
+                  이동합니다 (복원 시 폴더 밖으로 이동).
+                </p>
+              ) : null}
+              {deleteFolderTarget.pinned > 0 ? (
+                <p
+                  className="font-medium"
+                  style={{ color: "var(--accent-red-text)" }}
+                >
+                  이 폴더에 고정한 메모 {deleteFolderTarget.pinned}개가 있어요.
+                </p>
+              ) : null}
+            </div>
+          ) : undefined
+        }
+        confirmLabel="삭제"
+        danger
+        busy={deleteFolderMutation.isPending}
+        onConfirm={() => void performDeleteFolder()}
+        onCancel={() => setDeleteFolderTarget(null)}
       />
     </div>
   );
