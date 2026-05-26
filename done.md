@@ -4,6 +4,39 @@
 
 ---
 
+## 2026-05-27
+
+### 🚀 milestone — 데스크탑 앱 첫 배포 (V0.7.x 안정화 단계 진입)
+
+- **한 줄 임팩트**: 본인 매일 실사용 시작 — 이제 vault 안 데이터가 production
+- 옛 lazy migration 잔재 정리 (`f601cec`) + release 빌드 컴파일 통과 (`01444bf`) + UI 잔재 "회의" 용어 정리 (`e0514c0`) 묶음 끝낸 직후 첫 배포. 지금까지의 "본인 미사용 전제" 룰 폐기.
+- **이후 정책**: vault schema 변경 시 lazy migration 코드 박는 게 default. 예전처럼 "데이터 가능성 0 이라 마이그레이션 생략" 안 됨. CLAUDE.md 의 V0.6/V0.7 섹션의 "본인 미사용" 문구 정리 필요 (별도 todo).
+- **앞으로 dogfood 통증** = 다음 우선순위. 매일 사용 → 발견 → todo.md 입력 → 묶어서 PR 단위로 처리.
+
+### 직커밋 — 실사용 전 옛 버전 마이그레이션/호환 잔재 정리 (f601cec)
+
+- **한 줄 임팩트**: 데스크탑 첫 배포 전 dead code 정리 — schema 변경 코드 path 명확화
+- **제거된 lazy migration** — V0.6→V0.7.1 frontmatter `id` lazy 발급 (5 지점: `fileToMeeting`/`fileToJournal` throw 로 단순화, `scanMeetings`/`scanJournals` 안 uuid 발급+rewrite 블록 제거, dedupe 빈 uid skip 제거). `readFullMeeting` 의 lazy migration 블록도 제거.
+- **registry bootstrap 제거** — V0.5→V0.6 단일 `vaultRoot` localStorage 흡수 (`bootstrapFromLegacy` + `LEGACY_VAULT_ROOT_KEY`) + 관련 테스트 2개. 부팅 시 옛 단일 vault 키 lookup 자체 사라짐.
+- **소소한 잔재** — `useMeetingSort` 의 옛 `"date"` → `"date_desc"` 변환 (옵션 5개 시절 잔재) 단순화. `usePortfolio` / `portfolio.ts` 의 옛 `projects.md` skip + `PortfolioProject` 타입 흔적 주석 제거. github_pr_id optional 사유 주석 "legacy" → "수동 카드 명시" 로 갱신.
+- 8 파일 +22 / -127. 실사용 전이라 legacy 데이터 가능성 0 가정으로 진행.
+
+### 직커밋 — Tauri release 빌드 dev 메뉴 컴파일타임 cfg 전환 (01444bf)
+
+- **한 줄 임팩트**: 데스크탑 release 빌드 통과 — 첫 배포 차단 해제
+- **`if cfg!(debug_assertions)` → `#[cfg(debug_assertions)]`** — 런타임 if 면 release 에도 코드가 compile path 에 남음. `tauri_plugin_log` / `app.handle().plugin(...)` 블록이 release 에선 devtools API 가 없어 컴파일 자체 fail. attribute cfg 로 전환해 release 빌드에선 블록 통째로 strip.
+- 5 lines 변경 (1 파일).
+
+### 직커밋 — 잔재 "회의" 용어 정리 (e0514c0)
+
+- **한 줄 임팩트**: UI 라벨에 남은 "회의" 어휘 메모/음성 기록으로 통일
+- `MeetingsList` 빈 상태 "첫 회의를 기록" → "첫 메모를 작성"
+- `TrashPreview` transcript 라벨 "회의 내용" → "음성 기록" (MeetingForm 탭과 일치)
+- `StyleguidePage` `--accent-blue` 토큰 설명 "회의 칩" → "primary 액션, 편집 모드" (실 사용처 반영)
+- 내부 코드 (`Meeting` 타입 / `useMeeting` 등) 는 그대로 — CLAUDE.md "UI 리네이밍은 했어도 내부 코드는 meetings 유지" 패턴.
+
+---
+
 ## 2026-05-26
 
 ### PR #53 — 메모장 요약 흐름 모달화 + 본문과 동일 에디터로 통합

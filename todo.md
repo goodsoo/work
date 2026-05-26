@@ -16,6 +16,12 @@ PR 단위로 묶음. 각 PR 의 **한 줄 임팩트** 는 카드 frontmatter `im
 - [ ] ActivityBar 새 탭 또는 portfolio 탭 안 별 view. 후순위 — dogfood 통증 작음, 평가 시즌 근접에 진입 결정.
 - [ ] vault scan 기반 — meetings 수 (월별), journals streak, todos 완료율 (이번 달 / 분기). 외부 의존 0.
 
+### PR — 포커스 모드 (방해 요소 hide) `ui_ux` 🟡
+한 줄 임팩트: 한 키로 chrome 다 숨기고 본문 한 컬럼 집중
+
+- [ ] 사이드바 collapse (`Cmd+\`) 는 이미 있음. ActivityBar + 헤더까지 한 키로 hide → 본문만. 옵시디안 "포커스 모드" 패턴.
+- [ ] 토글 단축키 + localStorage persist. Tauri only. dogfood 중 "지금은 메모만 보고 싶어" 순간 자주 오는지 1주 관찰 후 진입.
+
 ---
 
 ## 🎨 폴리시
@@ -36,12 +42,36 @@ PR 단위로 묶음. 각 PR 의 **한 줄 임팩트** 는 카드 frontmatter `im
 
 ---
 
-## 🛡️ Vault 안정성 (V0.6.1 후속)
+## 🚨 V0.7.x — 데스크탑 첫 배포 이후 (2026-05-27 ~)
 
-### PR — Conflict resolution 모달 `backend`
+> 실사용 데이터 누적 시작. 지금까지의 "본인 미사용 → legacy 데이터 가능성 0" 전제 폐기.
+
+### CLAUDE.md 문구 정리 `other`
+한 줄 임팩트: 옛 "미사용" 가정 문구 정리 — 향후 schema 변경 시 마이그레이션 default 룰 명시
+
+- [ ] V0.6/V0.7 섹션 안 "본인 미사용 전" / "마이그레이션 0" / "정교한 migration 코드 생략" 표현 일괄 정정
+- [ ] 새 룰 명시: vault schema 변경 시 lazy migration 코드 박기 (frontmatter 필드 추가/이름 변경/structural 변경 모두). 단순 신규 필드는 default 값 fallback 으로 흡수, 의미 변경은 versioned tag (`frontmatter.schema: N` 등) 검토.
+- [ ] V0.6 design doc 안 마이그레이션 노트도 함께 정리
+
+### PR — 마이그레이션 헬퍼 추상화 `backend` 🟡
+한 줄 임팩트: schema 변경 시 versioned migration 한 곳에서 — 호출처 산재 X
+
+- [ ] `src/lib/vault/migrations/` 폴더 + `runMigrations(currentVersion)` runner. frontmatter `schema: N` 박고 N 미만이면 N→N+1 변환 함수 차례로 적용 후 rewrite.
+- [ ] 첫 진입점 = `scanMeetings` / `readFullMeeting` (옛 lazy migration 자리). f601cec 로 지운 패턴을 versioned 형태로 부활 — 이번엔 실데이터 있으니 필요.
+- [ ] 첫 실제 schema 변경 PR 박을 때 같이 도입 (지금 빈 runner 만 박으면 over-engineering). 트리거 = 다음 frontmatter 필드 추가/이름 변경.
+
+### PR — Conflict resolution 모달 `backend` 🔥
 한 줄 임팩트: 옵시디안 모바일과 동시 편집 충돌 시 보존/덮어쓰기 선택
 
 - [ ] ConflictError throw → UI 모달 (내 변경 보존 / 외부 변경 가져오기 / `.conflict-*.md` 파일 생성)
+- [ ] 모바일 viewer (read-only) 진입 전 우선 처리 — 동시 편집 발생 빈도 ↑
+
+### PR — vault 무결성 검사 + 백업 복원 `backend` 🟡
+한 줄 임팩트: 정기 자가 검사 + 백업 zip 한 클릭 복원
+
+- [ ] 설정 모달 "vault 검사" — uid 중복 / frontmatter 깨짐 / orphan attachment / 휴지통 size 한 화면 진단. 발견 시 자동 복구 가능한 것 (uid dedupe) 은 그 자리에서.
+- [ ] 백업 zip 복원 흐름 — 현재는 백업만 생성, 복원 시 사용자가 직접 Finder 에서 unzip → 새 vault 선택해야 함. 1 클릭 "이 zip 으로 복원" → 임시 폴더 unzip + vault 전환 prompt.
+- [ ] crash / silent fail 진단 — adapter.read/readMeta 실패 카운터 + 설정 패널 노출. dogfood 중 누락 발견 시 원인 추적.
 
 ---
 
@@ -88,6 +118,7 @@ PR 단위로 묶음. 각 PR 의 **한 줄 임팩트** 는 카드 frontmatter `im
 
 ## 📅 매일 사용 / dogfood (작업 X, routine)
 
+- [ ] **첫 배포 후 1주 dogfood 통증 수집** (2026-05-27 ~ 06-03) — 매일 사용 중 발견되는 마찰을 todo.md 의 신규 섹션 / 적합한 PR 묶음으로 즉시 입력. 한 주 묶어서 PR 단위 정리.
 - [ ] V0.7 dogfood 매일 사용 — 다음 분기 평가 시 portfolio 탭만 띄워서 5분 내 펼쳐보일 수 있는지 검증
 - [ ] 다른 owner repo legacy 카드 backfill — "Legacy 카드 프롬프트" 복사 → 각 repo Claude Code 에 paste
 - [ ] 회사 owner repo PR 워크플로 전환 시도 — branch + 셀프 PR + auto-merge alias (5초)
