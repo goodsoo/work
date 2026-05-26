@@ -4,49 +4,52 @@ import {
   type PortfolioCategory,
 } from "../api/portfolio";
 
-// 내 작업 카드 카테고리 chip 필터. 다중 OR. 빈 Set = 전체 (필터 X).
-// localStorage 에 string[] 직렬화 — 빈 배열도 보존 (사용자가 의도적으로 다 끄고 빈 상태로 둘 수도 있음).
+// 내 작업 카드 카테고리 chip 필터. single radio. "all" = 전체 (필터 X).
+// 할일 카테고리 필터와 동일한 정신 모델 — 한 번에 하나만 본다.
+// localStorage 에 직렬화. 옛 multi (string[]) 도 lazy 흡수 — 첫 값만 채용.
 const STORAGE_KEY = "goodsoob:portfolioCategoryFilter";
 
-function read(): Set<PortfolioCategory> {
-  if (typeof localStorage === "undefined") return new Set();
+export type PortfolioCategoryFilter = "all" | PortfolioCategory;
+
+function read(): PortfolioCategoryFilter {
+  if (typeof localStorage === "undefined") return "all";
   const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) return new Set();
+  if (!raw) return "all";
   try {
     const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return new Set();
-    const out = new Set<PortfolioCategory>();
-    for (const v of parsed) {
-      if (typeof v === "string" && (PORTFOLIO_CATEGORIES as readonly string[]).includes(v)) {
-        out.add(v as PortfolioCategory);
-      }
+    // 옛 multi 형식 (string[]) — 첫 값만 single 로 흡수, 비어있으면 "all".
+    if (Array.isArray(parsed)) {
+      const first = parsed.find(
+        (v) =>
+          typeof v === "string" &&
+          (PORTFOLIO_CATEGORIES as readonly string[]).includes(v),
+      );
+      return (first as PortfolioCategory | undefined) ?? "all";
     }
-    return out;
+    if (parsed === "all") return "all";
+    if (
+      typeof parsed === "string" &&
+      (PORTFOLIO_CATEGORIES as readonly string[]).includes(parsed)
+    ) {
+      return parsed as PortfolioCategory;
+    }
+    return "all";
   } catch {
-    return new Set();
+    return "all";
   }
 }
 
 export function usePortfolioCategoryFilter() {
-  const [selected, setSelected] = useState<Set<PortfolioCategory>>(read);
+  const [selected, setSelected] = useState<PortfolioCategoryFilter>(read);
 
   useEffect(() => {
     if (typeof localStorage === "undefined") return;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(selected)));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(selected));
   }, [selected]);
 
-  const toggle = useCallback((cat: PortfolioCategory) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(cat)) next.delete(cat);
-      else next.add(cat);
-      return next;
-    });
+  const change = useCallback((next: PortfolioCategoryFilter) => {
+    setSelected(next);
   }, []);
 
-  const clear = useCallback(() => {
-    setSelected(new Set());
-  }, []);
-
-  return { selected, toggle, clear, setSelected } as const;
+  return { selected, change } as const;
 }

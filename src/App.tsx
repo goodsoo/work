@@ -473,8 +473,6 @@ function AppContent() {
       <TodosSidePanel
         statusFilter={todoStatus}
         onStatusChange={setTodoStatus}
-        categoryFilter={todoCategory}
-        onCategoryChange={setTodoCategory}
         sortKey={todoSortKey}
         onSortKeyChange={setTodoSortKey}
         selectedRoutineName={selectedRoutineName}
@@ -486,9 +484,6 @@ function AppContent() {
         onFilterChange={setPortfolioFilter}
         sortKey={portfolioSortKey}
         onSortKeyChange={setPortfolioSortKey}
-        selectedCategories={portfolioCategoryFilter.selected}
-        onCategoryToggle={portfolioCategoryFilter.toggle}
-        onCategoryClear={portfolioCategoryFilter.clear}
         syncState={portfolioSync.state}
         onSyncRun={portfolioRunIncrementalSync}
         onSyncCancel={portfolioSync.cancel}
@@ -532,9 +527,8 @@ function AppContent() {
         <PortfolioPage
           activeFilter={portfolioFilter}
           sortKey={portfolioSortKey}
-          selectedCategories={portfolioCategoryFilter.selected}
-          onCategoryToggle={portfolioCategoryFilter.toggle}
-          onCategoryClear={portfolioCategoryFilter.clear}
+          selectedCategory={portfolioCategoryFilter.selected}
+          onCategoryChange={portfolioCategoryFilter.change}
           onSync={portfolioRunFullSync}
           syncRunning={portfolioSync.state.running}
         />
@@ -547,6 +541,7 @@ function AppContent() {
         <TodosPage
           statusFilter={todoStatus}
           categoryFilter={todoCategory}
+          onCategoryChange={setTodoCategory}
           sortKey={todoSortKey}
           scrollToTodoId={scrollToTodoId}
           onScrollHandled={() => setScrollToTodoId(null)}

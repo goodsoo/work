@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Briefcase, X } from "lucide-react";
+import { Briefcase } from "lucide-react";
 import {
   usePortfolioProjects,
   usePortfolioWorks,
@@ -13,10 +13,11 @@ import {
   type PortfolioWorkMeta,
 } from "../api/portfolio";
 import type { PortfolioSortKey } from "../hooks/usePortfolioSort";
+import type { PortfolioCategoryFilter } from "../hooks/usePortfolioCategoryFilter";
 import { PageHeaderBar } from "../components/common/PageHeaderBar";
 import { Text } from "../components/common/Text";
 import { Button } from "../components/common/Button";
-import { Chip } from "../components/common/Chip";
+import { SelectableChip } from "../components/common/SelectableChip";
 import { EmptyState } from "../components/common/EmptyState";
 
 const CATEGORY_LABEL: Record<PortfolioCategory, string> = {
@@ -38,9 +39,8 @@ const CATEGORY_COLOR: Record<PortfolioCategory, string> = {
 type Props = {
   activeFilter: ProjectFilter;
   sortKey: PortfolioSortKey;
-  selectedCategories: Set<PortfolioCategory>;
-  onCategoryToggle: (cat: PortfolioCategory) => void;
-  onCategoryClear: () => void;
+  selectedCategory: PortfolioCategoryFilter;
+  onCategoryChange: (next: PortfolioCategoryFilter) => void;
   onSync: () => void;
   syncRunning: boolean;
 };
@@ -67,10 +67,10 @@ function applyProjectFilter(
 
 function applyCategoryFilter(
   works: PortfolioWorkMeta[],
-  selected: Set<PortfolioCategory>,
+  selected: PortfolioCategoryFilter,
 ): PortfolioWorkMeta[] {
-  if (selected.size === 0) return works;
-  return works.filter((w) => selected.has(w.frontmatter.category));
+  if (selected === "all") return works;
+  return works.filter((w) => w.frontmatter.category === selected);
 }
 
 // 정렬 — sort 옵션에 따라 비교. 안정 정렬 보장 위해 동률은 mtime desc tiebreaker.
@@ -149,9 +149,8 @@ function applySort(
 export function PortfolioPage({
   activeFilter,
   sortKey,
-  selectedCategories,
-  onCategoryToggle,
-  onCategoryClear,
+  selectedCategory,
+  onCategoryChange,
   onSync,
   syncRunning,
 }: Props) {
@@ -162,46 +161,50 @@ export function PortfolioPage({
     const projects = projectsQuery.data ?? [];
     const all = worksQuery.data ?? [];
     const afterProject = applyProjectFilter(all, activeFilter);
-    const afterCategory = applyCategoryFilter(afterProject, selectedCategories);
+    const afterCategory = applyCategoryFilter(afterProject, selectedCategory);
     return applySort(afterCategory, sortKey, projects);
   }, [
     worksQuery.data,
     projectsQuery.data,
     activeFilter,
-    selectedCategories,
+    selectedCategory,
     sortKey,
   ]);
 
+  // 카테고리별 카운트 — included 만 (chip 의 dim 처리에 사용).
+  const categoryCounts = useMemo(() => {
+    const map = new Map<PortfolioCategory, number>();
+    for (const w of worksQuery.data ?? []) {
+      if (!w.frontmatter.included) continue;
+      const c = w.frontmatter.category;
+      map.set(c, (map.get(c) ?? 0) + 1);
+    }
+    return map;
+  }, [worksQuery.data]);
+
   const allWorks = worksQuery.data ?? [];
-  const hasCategoryFilter = selectedCategories.size > 0;
 
   return (
     <>
       <PortfolioHeader />
+      {allWorks.length > 0 ? (
+        <CategoryChipRow
+          selected={selectedCategory}
+          counts={categoryCounts}
+          onChange={onCategoryChange}
+        />
+      ) : null}
       {worksQuery.isLoading ? (
         <SkeletonGrid count={6} />
       ) : allWorks.length === 0 ? (
         <EmptyVault onSync={onSync} running={syncRunning} />
       ) : filtered.length === 0 ? (
-        <>
-          {hasCategoryFilter ? (
-            <ActiveFilterBanner
-              selected={selectedCategories}
-              onToggle={onCategoryToggle}
-              onClear={onCategoryClear}
-            />
-          ) : null}
-          <EmptyFilter filter={activeFilter} hasCategoryFilter={hasCategoryFilter} />
-        </>
+        <EmptyFilter
+          filter={activeFilter}
+          hasCategoryFilter={selectedCategory !== "all"}
+        />
       ) : (
         <div className="px-6 pt-6">
-          {hasCategoryFilter ? (
-            <ActiveFilterBanner
-              selected={selectedCategories}
-              onToggle={onCategoryToggle}
-              onClear={onCategoryClear}
-            />
-          ) : null}
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
             {filtered.map((w) => (
               <PortfolioWorkCard
@@ -217,71 +220,49 @@ export function PortfolioPage({
   );
 }
 
-// 카드 그리드 위 active filter 배너. 사용자가 카테고리 필터 켜둔 걸 까먹고
-// "왜 카드가 이거밖에 안 보이지" 당황하는 걸 막음. 각 chip 클릭 = 단독 해제,
-// 우측 "전체 해제" 한 번에 끔.
-function ActiveFilterBanner({
+// 페이지 헤더 아래 sub-header — 카테고리 chip group (single radio). 옛 사이드바
+// CategoryChipRow 를 본문 헤더로 옮긴 자리. 할일 페이지의 같은 자리와 통일.
+// "전체" chip 1개 + 카테고리 5개 = 6개 chip 가로 wrap.
+function CategoryChipRow({
   selected,
-  onToggle,
-  onClear,
+  counts,
+  onChange,
 }: {
-  selected: Set<PortfolioCategory>;
-  onToggle: (cat: PortfolioCategory) => void;
-  onClear: () => void;
+  selected: PortfolioCategoryFilter;
+  counts: Map<PortfolioCategory, number>;
+  onChange: (next: PortfolioCategoryFilter) => void;
 }) {
-  // PORTFOLIO_CATEGORIES 순서로 표시 — 사이드바 chip 순서와 통일.
-  const ordered = PORTFOLIO_CATEGORIES.filter((c) => selected.has(c));
   return (
-    <div className="mb-4 flex flex-wrap items-center gap-2">
-      <Text
-        variant="caption"
-        color="muted"
-        as="span"
-        className="text-[11px]"
-      >
-        필터:
-      </Text>
-      {ordered.map((cat) => {
-        const color = CATEGORY_COLOR[cat];
-        return (
-          <Chip
-            key={cat}
-            size="md"
-            dot={color}
-            role="button"
-            tabIndex={0}
-            onClick={() => onToggle(cat)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                onToggle(cat);
-              }
-            }}
-            title={`${CATEGORY_LABEL[cat]} 필터 해제`}
-            className="cursor-pointer select-none gap-1.5"
-            style={{
-              backgroundColor: `color-mix(in srgb, ${color} 14%, var(--bg-surface))`,
-              color: "var(--text-primary)",
-              boxShadow: `inset 0 0 0 1px ${color}`,
-            }}
-          >
-            <span>{CATEGORY_LABEL[cat]}</span>
-            <X
-              className="h-3 w-3"
-              style={{ color: "var(--text-muted)" }}
-              aria-hidden
-            />
-          </Chip>
-        );
-      })}
-      <button
-        type="button"
-        onClick={onClear}
-        className="ml-1 text-[11px] transition hover:underline"
-        style={{ color: "var(--text-muted)", minHeight: 0 }}
-      >
-        전체 해제
-      </button>
+    <div
+      className="shrink-0 px-6 py-3"
+      style={{ borderBottom: "1px solid var(--border-default)" }}
+    >
+      <div className="flex flex-wrap gap-1">
+        <SelectableChip
+          active={selected === "all"}
+          onToggle={() => onChange("all")}
+          title="전체 카테고리"
+        >
+          전체
+        </SelectableChip>
+        {PORTFOLIO_CATEGORIES.map((cat) => {
+          const active = selected === cat;
+          const count = counts.get(cat) ?? 0;
+          const color = CATEGORY_COLOR[cat];
+          return (
+            <SelectableChip
+              key={cat}
+              active={active}
+              count={count}
+              color={color}
+              onToggle={() => onChange(cat)}
+              title={`${CATEGORY_LABEL[cat]} ${count > 0 ? `(${count})` : ""}`.trim()}
+            >
+              {CATEGORY_LABEL[cat]}
+            </SelectableChip>
+          );
+        })}
+      </div>
     </div>
   );
 }

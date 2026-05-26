@@ -3,7 +3,7 @@ import type {
   PortfolioProject,
   PortfolioWorkMeta,
 } from "../../api/portfolio";
-import { Button } from "../common/Button";
+import { FilterItem } from "../common/FilterItem";
 import { Text } from "../common/Text";
 
 export type ProjectFilter =
@@ -97,21 +97,31 @@ export function PortfolioProjectList({
             className="my-2"
             style={{ borderTop: "1px solid var(--border-subtle)" }}
           />
-          {visibleProjects.map((p) => (
-            <FilterItem
-              key={p.slug}
-              label={renderProjectName(p.name)}
-              count={counts.byProject.get(p.slug) ?? 0}
-              active={
-                activeFilter.kind === "project" &&
-                activeFilter.slug === p.slug
-              }
-              colorDot={p.color ? COLOR_DOT[p.color] ?? p.color : undefined}
-              onClick={() =>
-                onFilterChange({ kind: "project", slug: p.slug })
-              }
-            />
-          ))}
+          {visibleProjects.map((p) => {
+            const dot = p.color ? COLOR_DOT[p.color] ?? p.color : undefined;
+            return (
+              <FilterItem
+                key={p.slug}
+                label={renderProjectName(p.name)}
+                count={counts.byProject.get(p.slug) ?? 0}
+                leading={
+                  dot ? (
+                    <span
+                      className="inline-block h-2 w-2 rounded-full"
+                      style={{ backgroundColor: dot }}
+                    />
+                  ) : null
+                }
+                active={
+                  activeFilter.kind === "project" &&
+                  activeFilter.slug === p.slug
+                }
+                onClick={() =>
+                  onFilterChange({ kind: "project", slug: p.slug })
+                }
+              />
+            );
+          })}
         </>
       ) : null}
 
@@ -131,59 +141,3 @@ export function PortfolioProjectList({
   );
 }
 
-function FilterItem({
-  label,
-  count,
-  active,
-  muted,
-  colorDot,
-  onClick,
-}: {
-  label: ReactNode;
-  count: number;
-  active: boolean;
-  muted?: boolean;
-  colorDot?: string;
-  onClick: () => void;
-}) {
-  return (
-    <Button
-      variant="ghost"
-      onClick={onClick}
-      className={`w-full justify-between gap-2 px-2 py-1 text-[13px] ${active ? "font-medium" : ""}`}
-      style={{
-        backgroundColor: active ? "var(--bg-surface-active)" : undefined,
-        color: muted
-          ? "var(--text-muted)"
-          : active
-          ? "var(--text-primary)"
-          : "var(--text-secondary)",
-      }}
-    >
-      <span className="inline-flex min-w-0 items-center gap-2">
-        <span
-          aria-hidden
-          className="inline-flex h-2.5 w-2.5 shrink-0 items-center justify-center"
-        >
-          {colorDot ? (
-            <span
-              className="inline-block h-2 w-2 rounded-full"
-              style={{ backgroundColor: colorDot }}
-            />
-          ) : null}
-        </span>
-        <span className="truncate">{label}</span>
-      </span>
-      <Text
-        variant="caption"
-        as="span"
-        className="font-mono"
-        style={{
-          color: active ? "var(--text-secondary)" : "var(--text-muted)",
-        }}
-      >
-        {count}
-      </Text>
-    </Button>
-  );
-}
