@@ -10,18 +10,21 @@ export interface BackupEntry {
   size: number;
 }
 
-// 보관 개수는 고정 (사용자 설정 X).
-export const BACKUP_KEEP_COUNT = 10;
+// 보관 개수 default. 사용자가 설정 모달에서 조정 가능.
+export const DEFAULT_KEEP_COUNT = 10;
+export const KEEP_COUNT_OPTIONS = [5, 10, 20, 30, 50] as const;
 
 export interface AutoBackupConfig {
   enabled: boolean;
   intervalDays: number;
+  keepCount: number;
 }
 
 const AUTO_BACKUP_KEY = "autoBackupConfig";
 const DEFAULT_CONFIG: AutoBackupConfig = {
   enabled: true,
   intervalDays: 1,
+  keepCount: DEFAULT_KEEP_COUNT,
 };
 
 export function readAutoBackupConfig(): AutoBackupConfig {
@@ -29,9 +32,11 @@ export function readAutoBackupConfig(): AutoBackupConfig {
     const raw = localStorage.getItem(AUTO_BACKUP_KEY);
     if (!raw) return DEFAULT_CONFIG;
     const parsed = JSON.parse(raw);
+    const keepCount = Number(parsed.keepCount);
     return {
       enabled: typeof parsed.enabled === "boolean" ? parsed.enabled : DEFAULT_CONFIG.enabled,
       intervalDays: Number(parsed.intervalDays) || DEFAULT_CONFIG.intervalDays,
+      keepCount: Number.isFinite(keepCount) && keepCount > 0 ? keepCount : DEFAULT_KEEP_COUNT,
     };
   } catch {
     return DEFAULT_CONFIG;
@@ -154,10 +159,15 @@ export async function maybeAutoBackup(
   if (entries.length > 0 && Date.now() - entries[0].mtime < intervalMs) {
     return { kind: "skipped", reason: "not-due" };
   }
-  const toDelete = deletionsRequiredForNewBackup(entries, BACKUP_KEEP_COUNT);
+  const toDelete = deletionsRequiredForNewBackup(entries, cfg.keepCount);
   for (const c of toDelete) {
     await deleteBackup(adapter, c.path);
   }
   const entry = await runBackup(adapter);
   return { kind: "created", entry };
+}
+
+// macOS Finder 로 path 열기. portfolio capability 의 `sh -lc` 권한 재사용.
+export async function openInFinder(absPath: string): Promise<void> {
+  await Command.create("sh", ["-lc", `open ${shellQuote(absPath)}`]).execute();
 }

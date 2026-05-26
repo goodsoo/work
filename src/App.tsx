@@ -181,14 +181,24 @@ function AppContent() {
   }, [isReady]);
 
   // 자동 백업 — vault ready 후 10초 뒤 1회. interval/keepCount 설정에 따라 실행.
+  // 1초+ 걸리면 progress toast 로 freeze 같은 체감 차단.
   useEffect(() => {
     if (!isTauri || !isReady || autoBackupDone.current) return;
     autoBackupDone.current = true;
     const t = setTimeout(async () => {
+      let progressId: number | null = null;
+      const progressTimer = setTimeout(() => {
+        progressId = toast.show("vault 자동 백업 중… (크기에 따라 1-10초)", {
+          kind: "progress",
+        });
+      }, 1000);
       try {
         await maybeAutoBackup(adapter);
       } catch (err) {
         console.error("auto backup failed", err);
+      } finally {
+        clearTimeout(progressTimer);
+        if (progressId !== null) toast.dismiss(progressId);
       }
     }, 10000);
     return () => clearTimeout(t);
