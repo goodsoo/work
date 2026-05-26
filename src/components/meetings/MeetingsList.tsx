@@ -176,7 +176,7 @@ function EmptyState({ onCreate }: { onCreate: () => void }) {
         아직 메모장이 없어요
       </Text>
       <Text variant="body" color="secondary" as="p">
-        첫 회의를 기록해볼까요?
+        첫 메모를 작성해볼까요?
       </Text>
       <Button
         variant="primary"
