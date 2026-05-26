@@ -105,9 +105,16 @@ describe("parsePRResponse (V0.7 step 8)", () => {
     expect(r?.category).toBe("backend");
   });
 
-  it("카테고리 이상하면 other fallback", () => {
+  it("자유 슬러그 — 한글 + 공백은 공백만 제거해 받음 (vault union 모델)", () => {
     const r = parsePRResponse(
       `### 한 줄 임팩트\nx\n\n### 카테고리\n뭐 모름\n`,
+    );
+    expect(r?.category).toBe("뭐모름");
+  });
+
+  it("카테고리 라인이 빈 응답 → other fallback", () => {
+    const r = parsePRResponse(
+      `### 한 줄 임팩트\nx\n\n### 카테고리\n\n`,
     );
     expect(r?.category).toBe("other");
   });
@@ -150,13 +157,13 @@ ui_ux
     });
   });
 
-  it("H2 PR body — 카테고리 enum 외 값은 other fallback", () => {
+  it("H2 PR body — 자유 슬러그 그대로 통과 (vault union 모델)", () => {
     const body = `## 한 줄 임팩트
 뭔가 좋아짐
 
 ## 카테고리
 무분류
 `;
-    expect(parsePRResponse(body)?.category).toBe("other");
+    expect(parsePRResponse(body)?.category).toBe("무분류");
   });
 });

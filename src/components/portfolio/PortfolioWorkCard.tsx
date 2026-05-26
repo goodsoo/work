@@ -14,7 +14,6 @@ import { useVault } from "../../lib/vault/useVault";
 import { vaultAssetSrc } from "../../lib/portfolio/assetUrl";
 import {
   useDeletePortfolioWork,
-  usePortfolioCategories,
   useUpdatePortfolioFrontmatter,
 } from "../../hooks/usePortfolio";
 import {
@@ -41,10 +40,8 @@ export function PortfolioWorkCard({ work }: Props) {
   const dateLabel = fm.github_merged_at
     ? formatDateShort(fm.github_merged_at.slice(0, 10))
     : "";
-  const categoriesQuery = usePortfolioCategories();
-  const categoryDefs = categoriesQuery.data ?? [];
-  const categoryLabel = lookupCategoryLabel(fm.category, categoryDefs);
-  const categoryColor = lookupCategoryColor(fm.category, categoryDefs);
+  const categoryLabel = lookupCategoryLabel(fm.category);
+  const categoryColor = lookupCategoryColor(fm.category);
   const isGithub = isGithubCard(fm);
   // source chip: github 카드 = repo 이름 (owner/repo 의 repo 부분), 수동 카드 = 폴더 path.
   // 수동 카드 root 면 chip 안 표시.

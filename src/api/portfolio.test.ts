@@ -3,10 +3,10 @@ import { createMemoryAdapter } from "../lib/vault/adapter";
 import type { GhPRDetail, GhSearchResult } from "../lib/portfolio/gh";
 import {
   ATTACHMENTS_DIR,
-  PORTFOLIO_CATEGORIES,
   PORTFOLIO_DIR,
   attachmentsDirFor,
   defaultUserFields,
+  deriveCategoryUnion,
   fileToPortfolioWork,
   parsePortfolioFrontmatter,
   portfolioWorkPath,
@@ -47,14 +47,19 @@ describe("portfolio schema (step 1 lock-in)", () => {
     expect(fields.screenshots).toEqual([]);
   });
 
-  it("PORTFOLIO_CATEGORIES 는 5종 (builtin default)", () => {
-    expect(PORTFOLIO_CATEGORIES).toEqual([
-      "ui_ux",
-      "backend",
-      "infra",
-      "fix",
-      "other",
-    ]);
+  it("deriveCategoryUnion — 카드 frontmatter.category 의 union (사용 수 desc, slug asc tiebreaker)", () => {
+    const works = [
+      { frontmatter: { category: "ui_ux" } },
+      { frontmatter: { category: "backend" } },
+      { frontmatter: { category: "ui_ux" } },
+      { frontmatter: { category: "design" } },
+      { frontmatter: { category: "" } }, // 빈 = 제외
+    ];
+    expect(deriveCategoryUnion(works)).toEqual(["ui_ux", "backend", "design"]);
+  });
+
+  it("deriveCategoryUnion — 빈 카드 → 빈 배열", () => {
+    expect(deriveCategoryUnion([])).toEqual([]);
   });
 });
 

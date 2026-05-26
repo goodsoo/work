@@ -3,10 +3,10 @@ import { Modal } from "../common/Modal";
 import { Button } from "../common/Button";
 import { Text } from "../common/Text";
 import { LooseDateInput } from "../common/LooseDateInput";
+import { CategoryCombobox } from "./CategoryCombobox";
 import {
   useCreateManualPortfolioWork,
   useManualFolders,
-  usePortfolioCategories,
 } from "../../hooks/usePortfolio";
 
 type Props = {
@@ -19,9 +19,7 @@ type Props = {
 // 고르기만. TaskAddModal 패턴 통일.
 export function PortfolioCreateModal({ open, onClose }: Props) {
   const create = useCreateManualPortfolioWork();
-  const categoriesQuery = usePortfolioCategories();
   const foldersQuery = useManualFolders();
-  const categoryDefs = categoriesQuery.data ?? [];
   const folders = foldersQuery.data ?? [];
 
   const [title, setTitle] = useState("");
@@ -81,8 +79,8 @@ export function PortfolioCreateModal({ open, onClose }: Props) {
           as="p"
           className="mt-1 text-[11px] leading-relaxed"
         >
-          PR 없이 카드를 추가합니다. 새 카테고리는 상단 카테고리 줄,
-          새 프로젝트는 사이드바에서 만듭니다.
+          PR 없이 카드를 추가합니다. 새 카테고리는 카테고리 입력란에서 바로
+          만들고, 새 폴더는 사이드바에서 만듭니다.
         </Text>
 
         <label className="mt-4 block">
@@ -143,27 +141,14 @@ export function PortfolioCreateModal({ open, onClose }: Props) {
               <LooseDateInput value={date} onCommit={setDate} fullWidth />
             </div>
           </label>
-          <label className="block">
+          <div className="block">
             <Text variant="caption" color="secondary" as="span" weight="medium">
               카테고리
             </Text>
-            <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              className="mt-1 w-full rounded-md px-2 py-1.5 text-sm"
-              style={{
-                backgroundColor: "var(--bg-surface)",
-                border: "1px solid var(--border-default)",
-                color: "var(--text-primary)",
-              }}
-            >
-              {categoryDefs.map((c) => (
-                <option key={c.slug} value={c.slug}>
-                  {c.label}
-                </option>
-              ))}
-            </select>
-          </label>
+            <div className="mt-1">
+              <CategoryCombobox value={category} onChange={setCategory} />
+            </div>
+          </div>
         </div>
 
         <label className="mt-3 block">

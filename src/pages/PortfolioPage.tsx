@@ -1,17 +1,15 @@
-import { useMemo, useState } from "react";
-import { LayoutGrid, Settings2 } from "lucide-react";
+import { useMemo } from "react";
+import { LayoutGrid } from "lucide-react";
 import {
   usePortfolioCategories,
   usePortfolioWorks,
 } from "../hooks/usePortfolio";
 import { PortfolioWorkCard } from "../components/portfolio/PortfolioWorkCard";
-import { PortfolioCategoryManageModal } from "../components/portfolio/PortfolioCategoryManageModal";
 import { PortfolioSortMenu } from "../components/portfolio/PortfolioSortMenu";
 import type { SourceFilter } from "../components/portfolio/PortfolioSourceTree";
 import {
   folderPathOfCard,
   isGithubCard,
-  type PortfolioCategoryDef,
   type PortfolioWorkMeta,
 } from "../api/portfolio";
 import type { PortfolioSortKey } from "../hooks/usePortfolioSort";
@@ -21,6 +19,7 @@ import { Text } from "../components/common/Text";
 import { Button } from "../components/common/Button";
 import { SelectableChip } from "../components/common/SelectableChip";
 import { EmptyState } from "../components/common/EmptyState";
+import { CATEGORY_CHIP_COLOR } from "../lib/portfolio/categoryLookup";
 
 type Props = {
   activeFilter: SourceFilter;
@@ -68,16 +67,16 @@ function applyCategoryFilter(
 }
 
 // 정렬 — sort 옵션에 따라 비교. 안정 정렬 보장 위해 동률은 mtime desc tiebreaker.
-// categories merged list 의 순서를 따라 카테고리 정렬 (builtin 5 → 사용자 추가).
+// 카테고리 정렬은 vault union 의 순서 (사용 카드 수 desc → slug asc) 를 그대로 사용.
 // "project" 정렬은 github 카드 = repo nameWithOwner, 수동 카드 = vault folder path
 // (root = 빈) 기준 — 즉 사이드바 트리 분류 자리와 1:1.
 function applySort(
   works: PortfolioWorkMeta[],
   sortKey: PortfolioSortKey,
-  categories: PortfolioCategoryDef[],
+  categories: string[],
 ): PortfolioWorkMeta[] {
   const categoryOrder = new Map<string, number>();
-  categories.forEach((c, i) => categoryOrder.set(c.slug, i));
+  categories.forEach((slug, i) => categoryOrder.set(slug, i));
   const sourceKey = (w: PortfolioWorkMeta): string => {
     if (isGithubCard(w.frontmatter)) {
       return `g:${w.frontmatter.github_owner}/${w.frontmatter.github_repo}`;
@@ -149,17 +148,16 @@ export function PortfolioPage({
   syncRunning,
 }: Props) {
   const worksQuery = usePortfolioWorks();
-  const categoriesQuery = usePortfolioCategories();
+  const categories = usePortfolioCategories();
 
   const filtered = useMemo(() => {
-    const categories = categoriesQuery.data ?? [];
     const all = worksQuery.data ?? [];
     const afterSource = applySourceFilter(all, activeFilter);
     const afterCategory = applyCategoryFilter(afterSource, selectedCategory);
     return applySort(afterCategory, sortKey, categories);
   }, [
     worksQuery.data,
-    categoriesQuery.data,
+    categories,
     activeFilter,
     selectedCategory,
     sortKey,
@@ -185,7 +183,7 @@ export function PortfolioPage({
         <CategoryChipRow
           selected={selectedCategory}
           counts={categoryCounts}
-          categories={categoriesQuery.data ?? []}
+          categories={categories}
           onChange={onCategoryChange}
           sortKey={sortKey}
           onSortKeyChange={onSortKeyChange}
@@ -215,7 +213,7 @@ export function PortfolioPage({
 
 // 페이지 헤더 아래 sub-header — 카테고리 chip group (single radio). 옛 사이드바
 // CategoryChipRow 를 본문 헤더로 옮긴 자리. 할 일 페이지의 같은 자리와 통일.
-// "전체" chip 1개 + 카테고리 5개 = 6개 chip 가로 wrap.
+// 카테고리는 vault union (V0.7.3) — 카드가 박은 slug 만 등장. 색은 모두 단일 회색.
 function CategoryChipRow({
   selected,
   counts,
@@ -226,12 +224,11 @@ function CategoryChipRow({
 }: {
   selected: PortfolioCategoryFilter;
   counts: Map<string, number>;
-  categories: PortfolioCategoryDef[];
+  categories: string[];
   onChange: (next: PortfolioCategoryFilter) => void;
   sortKey: PortfolioSortKey;
   onSortKeyChange: (next: PortfolioSortKey) => void;
 }) {
-  const [manageOpen, setManageOpen] = useState(false);
   return (
     <div
       className="shrink-0 px-6 py-3"
@@ -245,41 +242,26 @@ function CategoryChipRow({
         >
           전체
         </SelectableChip>
-        {categories.map((cat) => {
-          const active = selected === cat.slug;
-          const count = counts.get(cat.slug) ?? 0;
-          const color = cat.color ?? "var(--cat-other)";
+        {categories.map((slug) => {
+          const active = selected === slug;
+          const count = counts.get(slug) ?? 0;
           return (
             <SelectableChip
-              key={cat.slug}
+              key={slug}
               active={active}
               count={count}
-              color={color}
-              onToggle={() => onChange(cat.slug)}
-              title={`${cat.label} ${count > 0 ? `(${count})` : ""}`.trim()}
+              color={CATEGORY_CHIP_COLOR}
+              onToggle={() => onChange(slug)}
+              title={`${slug} ${count > 0 ? `(${count})` : ""}`.trim()}
             >
-              {cat.label}
+              {slug}
             </SelectableChip>
           );
         })}
-        <Button
-          variant="icon"
-          onClick={() => setManageOpen(true)}
-          title="카테고리 관리"
-          aria-label="카테고리 관리"
-          className="ml-1"
-          style={{ color: "var(--text-muted)" }}
-        >
-          <Settings2 className="h-3.5 w-3.5" />
-        </Button>
         <div className="ml-auto">
           <PortfolioSortMenu value={sortKey} onChange={onSortKeyChange} />
         </div>
       </div>
-      <PortfolioCategoryManageModal
-        open={manageOpen}
-        onClose={() => setManageOpen(false)}
-      />
     </div>
   );
 }

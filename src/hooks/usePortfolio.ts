@@ -5,30 +5,26 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useMemo, useRef, useState } from "react";
 import {
   ATTACHMENTS_DIR,
-  BUILTIN_CATEGORIES,
-  CATEGORIES_FILE,
   PORTFOLIO_DIR,
   PORTFOLIO_TRASH_DIR,
   createManualPortfolioWork,
   createPortfolioFolder,
   deletePortfolioFolder,
+  deriveCategoryUnion,
   emptyPortfolioTrash,
+  fileToPortfolioWork,
   listManualFolders,
   listTrashedPortfolioWorks,
-  mergeCategoryDefs,
   moveManualCard,
   portfolioWorkPath,
   purgePortfolioWork,
-  readPortfolioCategories,
   readSyncState,
   readPortfolioWork,
   renamePortfolioFolder,
   restorePortfolioWork,
   scanPortfolio,
   syncPortfolio,
-  writePortfolioCategories,
   type CreateManualPortfolioInput,
-  type PortfolioCategoryDef,
   type PortfolioWork,
   type PortfolioWorkFrontmatter,
   type PortfolioWorkMeta,
@@ -42,7 +38,6 @@ import { patchFrontmatter } from "../lib/vault/parser";
 const worksKey = ["portfolio"] as const;
 const workKey = (slug: string) => ["portfolio", "work", slug] as const;
 const foldersKey = ["portfolio-folders"] as const;
-const categoriesKey = ["portfolio-categories"] as const;
 const trashKey = ["portfolio", "trash"] as const;
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -80,14 +75,19 @@ export function useUpdatePortfolioFrontmatter(slug: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (patch: PortfolioFrontmatterPatch) => {
-      const path = portfolioWorkPath(slug);
+      // cache 의 list 에서 slug 매칭되는 work 의 실제 filePath 사용.
+      // portfolioWorkPath(slug) 만 가정하면 폴더 안 수동 카드 / NFC·NFD 정규화 차이 카드
+      // 에서 read throw → optimistic rollback 으로 옛 값 복귀하던 race 차단.
+      const list = qc.getQueryData<PortfolioWorkMeta[]>(worksKey);
+      const found = list?.find((w) => w.prSlug === slug);
+      const path = found?.filePath ?? portfolioWorkPath(slug);
       const raw = await adapter.read(path);
       const newRaw = patchFrontmatter(raw, patch as Record<string, unknown>);
       const meta = await adapter.write(path, newRaw);
       watcher.markSelfWrite(path);
-      return readPortfolioWork(adapter, slug).then((w) =>
-        w ? { ...w, mtime: meta.mtime } : null,
-      );
+      // readPortfolioWork 도 같은 path 로 직접 — slug→path 추정 회피.
+      const updatedRaw = await adapter.read(path);
+      return fileToPortfolioWork(path, updatedRaw, meta.mtime);
     },
     onMutate: async (patch) => {
       await qc.cancelQueries({ queryKey: workKey(slug) });
@@ -327,103 +327,15 @@ export function useDeletePortfolioFolder() {
   });
 }
 
-// 카테고리 정의 — builtin 5 + categories.md user-defined + 카드 frontmatter 의 unique
-// slug 들 union. 옵시디안에서 카드 frontmatter 만 임의 slug 박아도 사이드바 chip row 에
-// 자동 등장 (orphan 개념 없음). categories.md 는 색·label override + 빈 카테고리 즐겨찾기.
-//
-// 구현: raw user 정의를 query 로 캐싱 + worksQuery 의 data 와 useMemo 로 union 계산.
-// works 는 같은 queryKey(`portfolio`) 라 다른 hook 호출과 자동 캐시 공유.
-export function usePortfolioCategories() {
-  const { adapter, isReady } = useVault();
-  const worksQuery = useQuery({
-    queryKey: worksKey,
-    queryFn: () => scanPortfolio(adapter),
-    enabled: isReady,
-  });
-  const raw = useQuery({
-    queryKey: categoriesKey,
-    queryFn: () => readPortfolioCategories(adapter),
-    enabled: isReady,
-  });
-  const data = useMemo(
-    () => mergeCategoryDefs(raw.data ?? [], worksQuery.data ?? []),
-    [raw.data, worksQuery.data],
+// 카테고리는 vault 카드의 frontmatter union 으로 자연 발생 (V0.7.3 — design-derived).
+// master list 파일·코드 상수 없음. 호출처는 string[] 받아서 자동완성·필터·정렬에 사용.
+// 빈 카드 (sync default) 가 만든 "other" 도 vault union 에 자연 포함됨.
+export function usePortfolioCategories(): string[] {
+  const worksQuery = usePortfolioWorks();
+  return useMemo(
+    () => deriveCategoryUnion(worksQuery.data ?? []),
+    [worksQuery.data],
   );
-  return { ...raw, data };
-}
-
-// 사용자 카테고리 추가 / 수정 — categories.md 의 user-defined 배열만 갱신 (builtin 5 는
-// 코드 const). builtin slug 와 같으면 label/color override 로 동작. 호출처에서 신규/수정
-// 모두 이걸로 처리.
-export function useAddPortfolioCategory() {
-  const { adapter, watcher } = useVault();
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (def: PortfolioCategoryDef) => {
-      const existing = await readPortfolioCategories(adapter);
-      // 같은 slug 있으면 새 def 로 덮기, 아니면 append.
-      const idx = existing.findIndex((c) => c.slug === def.slug);
-      const next =
-        idx >= 0
-          ? existing.map((c, i) => (i === idx ? def : c))
-          : [...existing, def];
-      await writePortfolioCategories(adapter, next);
-      watcher.markSelfWrite(CATEGORIES_FILE);
-      return next;
-    },
-    onSuccess: (next) => {
-      // raw user-defined 만 categoriesKey 에 보관 — usePortfolioCategories 의
-      // useMemo 가 builtin + 카드 frontmatter 와 union 계산.
-      qc.setQueryData(categoriesKey, next);
-    },
-  });
-}
-
-// 카테고리 삭제 — categories.md user-defined 에서 entry 제거.
-// 사용 중인 카드 (frontmatter.category === slug) 는 "other" 로 일괄 patch.
-// builtin slug (ui_ux 등) 삭제 = categories.md 의 override 제거 = label/color default 복귀
-// (코드 const 5는 항상 존재). 카드 마이그레이션도 builtin 의 경우 적용 안 함 (slug 그대로 유효).
-export function useDeletePortfolioCategory() {
-  const { adapter, watcher } = useVault();
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (slug: string) => {
-      // 1) categories.md 에서 entry 제거 (없으면 변동 없음 — builtin 만 있던 경우)
-      const existing = await readPortfolioCategories(adapter);
-      const next = existing.filter((c) => c.slug !== slug);
-      if (next.length !== existing.length) {
-        await writePortfolioCategories(adapter, next);
-        watcher.markSelfWrite(CATEGORIES_FILE);
-      }
-      // 2) custom slug (builtin 외) 인 경우만 카드 마이그레이션 — 빌트인 slug 는 코드 const
-      //    상수라 항상 유효, override 만 제거됨.
-      const isBuiltin = (BUILTIN_CATEGORIES as readonly string[]).includes(slug);
-      let migrated = 0;
-      if (!isBuiltin) {
-        const works = await scanPortfolio(adapter);
-        for (const w of works) {
-          if (w.frontmatter.category !== slug) continue;
-          try {
-            const path = w.filePath;
-            const raw = await adapter.read(path);
-            const patched = patchFrontmatter(raw, { category: "other" });
-            if (patched !== raw) {
-              await adapter.write(path, patched);
-              watcher.markSelfWrite(path);
-              migrated++;
-            }
-          } catch {
-            // 한 카드 실패해도 다음 진행
-          }
-        }
-      }
-      return { next, migrated };
-    },
-    onSuccess: ({ next }) => {
-      qc.setQueryData(categoriesKey, next);
-      qc.invalidateQueries({ queryKey: worksKey });
-    },
-  });
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
