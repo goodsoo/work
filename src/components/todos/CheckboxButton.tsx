@@ -4,6 +4,9 @@ import { categoryColor } from "../../lib/todoCategory";
 // 체크박스 button — pending / done / cancelled 3 state. pending 일 때 카테고리 색을
 // border 로, 미분류는 회색 (--text-muted). done/cancelled 는 카테고리 무관 (완료/취소가
 // 의미 우선). e.stopPropagation 내장 — 부모 행의 click navigate 와 충돌 없음.
+// hit zone: 시각은 18x18 이지만 button 자체는 p-1.5 + -m-1.5 로 30x30 클릭 영역.
+// negative margin 으로 layout footprint 는 18x18 유지 → 행 높이/간격 변동 0,
+// 부모 click (행 edit/navigate) 보다 먼저 catch 되어 오작동 차단.
 export function CheckboxButton({
   status,
   category,
@@ -39,29 +42,33 @@ export function CheckboxButton({
         e.stopPropagation();
         onClick();
       }}
-      className={`group/check flex h-[18px] w-[18px] shrink-0 items-center justify-center border transition ${
-        shape === "circle" ? "rounded-full" : "rounded-md"
-      } ${
-        status === "done"
-          ? "bg-[var(--text-secondary)]"
-          : status === "cancelled"
-            ? "border-[var(--border-default)] bg-[var(--bg-surface)]"
-            : "hover:brightness-95"
-      }`}
-      style={{
-        minHeight: 18,
-        minWidth: 18,
-        borderColor:
-          status === "pending"
-            ? pendingBorder
-            : status === "done"
-              ? "var(--text-secondary)"
-              : undefined,
-        borderWidth: status === "pending" ? 1.5 : undefined,
-        backgroundColor: status === "pending" ? pendingFill : undefined,
-      }}
+      className="group/check -m-1.5 flex shrink-0 items-center justify-center p-1.5"
     >
-      {status === "done" ? (
+      <span
+        aria-hidden
+        className={`flex h-[18px] w-[18px] items-center justify-center border transition ${
+          shape === "circle" ? "rounded-full" : "rounded-md"
+        } ${
+          status === "done"
+            ? "bg-[var(--text-secondary)]"
+            : status === "cancelled"
+              ? "border-[var(--border-default)] bg-[var(--bg-surface)]"
+              : "group-hover/check:brightness-95"
+        }`}
+        style={{
+          minHeight: 18,
+          minWidth: 18,
+          borderColor:
+            status === "pending"
+              ? pendingBorder
+              : status === "done"
+                ? "var(--text-secondary)"
+                : undefined,
+          borderWidth: status === "pending" ? 1.5 : undefined,
+          backgroundColor: status === "pending" ? pendingFill : undefined,
+        }}
+      >
+        {status === "done" ? (
         <svg
           viewBox="0 0 16 16"
           fill="none"
@@ -109,6 +116,7 @@ export function CheckboxButton({
           />
         </svg>
       )}
+      </span>
     </button>
   );
 }

@@ -885,6 +885,7 @@ type CalendarDayPanelProps = {
   selectedDate: string;
   onOpenMeeting: (id: string) => void;
   onOpenTodo: (id: string) => void;
+  onOpenRoutine: (name: string) => void;
 };
 
 function timestampToLocalIso(ts: string): string {
@@ -895,6 +896,7 @@ export function CalendarDayPanel({
   selectedDate,
   onOpenMeeting,
   onOpenTodo,
+  onOpenRoutine,
 }: CalendarDayPanelProps) {
   const meetingsQ = useMeetings();
   const journalsQ = useJournals();
@@ -1072,7 +1074,16 @@ export function CalendarDayPanel({
                   return (
                     <div
                       key={`routine:${r.name}`}
-                      className="flex items-center gap-2 rounded-md px-2 py-1 text-[13px]"
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => onOpenRoutine(r.name)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          onOpenRoutine(r.name);
+                        }
+                      }}
+                      className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-[13px] transition hover:bg-[var(--bg-surface-hover)]"
                     >
                       <CheckboxButton
                         status={done ? "done" : "pending"}

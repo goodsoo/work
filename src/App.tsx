@@ -507,6 +507,15 @@ function AppContent() {
     }
   }
 
+  function openRoutine(name: string) {
+    drawer.close();
+    setTab("todos");
+    setSelectedRoutineName(name);
+    if (window.location.hash !== "#todos") {
+      window.history.pushState({ tab: "todos" }, "", "#todos");
+    }
+  }
+
   function closeMeeting() {
     if (window.history.state?.meetingId) {
       window.history.back();
@@ -585,6 +594,7 @@ function AppContent() {
         selectedDate={calendarDate}
         onOpenMeeting={openMeeting}
         onOpenTodo={openTodo}
+        onOpenRoutine={openRoutine}
       />
     ) : tab === "todos" ? (
       <TodosSidePanel
