@@ -72,6 +72,20 @@ export default function App() {
     return () => window.removeEventListener("hashchange", onChange);
   }, []);
 
+  // Tauri webview default drop = 떨어진 이미지 파일을 새 page 로 열어버림 — 뒤로가기도
+  // 못 함 (history 0). textarea 밖에 잘못 drop 한 사용자가 앱을 닫을 수밖에 없는 함정.
+  // window 레벨에서 dragover/drop default 항상 차단 — textarea 의 onDrop 은 핸들러
+  // 단계에서 e.preventDefault 한 뒤 stopPropagation 없이 그대로 bubble (이중 차단).
+  useEffect(() => {
+    const block = (e: DragEvent) => e.preventDefault();
+    window.addEventListener("dragover", block);
+    window.addEventListener("drop", block);
+    return () => {
+      window.removeEventListener("dragover", block);
+      window.removeEventListener("drop", block);
+    };
+  }, []);
+
   if (hash === "#styleguide") return <StyleguidePage />;
 
   return (

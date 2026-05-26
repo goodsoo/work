@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   Trash2,
   Ban,
@@ -39,6 +39,8 @@ import { CopyButton } from "./CopyButton";
 import { EditableList } from "./EditableList";
 import { AttendeeTagInput } from "./AttendeeTagInput";
 import { SourceBodyEditor } from "./SourceBodyEditor";
+import { useVault } from "../../lib/vault/useVault";
+import { saveAttachment } from "../../lib/attachments";
 import { MarkdownView } from "./MarkdownView";
 import { TaskAddModal } from "../tasks/TaskAddModal";
 import type { TodoCategory, TodoInsert, TodoPriority } from "../../api/todos";
@@ -157,6 +159,7 @@ export function MeetingForm({ meetingId, onBack }: Props) {
   const deleteMutation = useDeleteMeeting();
   const createTodoMutation = useCreateTodo();
   const [viewMode, setViewMode] = useViewMode();
+  const { adapter } = useVault();
 
   const attendeeSuggestions = useMemo(() => {
     const set = new Set<string>();
@@ -177,6 +180,27 @@ export function MeetingForm({ meetingId, onBack }: Props) {
   const uid = data?.uid;
   const initialBody = data?.content ?? "";
   const initialTranscript = data?.transcript ?? "";
+
+  // 본문 textarea 안 이미지 paste/drop → vault `meetings/_attachments/{uid}/{N}.{ext}`
+  // 저장 후 `![](path)` insert. slug 는 영구 식별자 uid — 메모 title 은 자주 바뀌니
+  // title 기반 폴더는 흩어짐/orphan 비용. V0.7.1 의 "모든 client cache key 는 uid 기반"
+  // 정책과 정합. Finder 가독성은 떨어지지만 본인 빌더 모드 + grep 으로 역추적 가능.
+  const onImageAttach = useCallback(
+    async (file: File): Promise<string | null> => {
+      if (!uid) return null;
+      try {
+        return await saveAttachment(adapter, {
+          baseDir: "meetings",
+          slug: uid,
+          file,
+        });
+      } catch (err) {
+        console.error("image attach failed", err);
+        return null;
+      }
+    },
+    [adapter, uid],
+  );
   const initialSummary = useMemo<SummaryDoc>(
     () => ({
       discussion_items: data?.discussion_items ?? [],
@@ -960,6 +984,7 @@ export function MeetingForm({ meetingId, onBack }: Props) {
                   setTaskModalPrefill(lineToTaskPrefill(lineText, meetingId));
                   setTaskModalOpen(true);
                 }}
+                onImageAttach={onImageAttach}
               />
             ) : body.trim() === "" ? (
               <EmptyBodyCTA onStartEdit={startEditing} />
