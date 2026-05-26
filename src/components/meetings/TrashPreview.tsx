@@ -86,7 +86,7 @@ export function TrashPreview({ selectedId }: { selectedId: string | null }) {
               weight="medium"
               className="mb-2"
             >
-              회의 내용
+              음성 기록
             </Text>
             <pre
               className="whitespace-pre-wrap rounded-lg px-4 py-3 text-sm"
