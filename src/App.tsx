@@ -210,6 +210,17 @@ function AppContent() {
   const sidebar = useSidebarCollapsed();
   const createMeetingMutation = useCreateMeeting();
   const deleteMeetingMutation = useDeleteMeeting();
+  // 폴더 자동 펼침 신호 — App 이 단일 소유. nonce 증가 → MeetingsSidePanel →
+  // MeetingsTreeView 가 그 폴더(+조상)를 collapsed 에서 제거. Cmd+N(아래)·사이드바
+  // "+"·폴더 생성 모두 requestMeetingReveal 로 모여 트리거.
+  const [meetingReveal, setMeetingReveal] = useState<{
+    path: string;
+    nonce: number;
+  }>({ path: "", nonce: 0 });
+  const requestMeetingReveal = useCallback((path: string) => {
+    if (!path) return; // root 는 항상 보여 펼칠 게 없음
+    setMeetingReveal((r) => ({ path, nonce: r.nonce + 1 }));
+  }, []);
   const autoSyncDone = useRef(false);
   const autoBackupDone = useRef(false);
   const autoSelectedRef = useRef(didAutoSelectThisSession);
@@ -376,6 +387,11 @@ function AppContent() {
 
     async function handleCreate() {
       if (createMeetingMutation.isPending) return;
+      // 현재 선택된 메모가 있으면 그 메모의 폴더에 생성 (없으면 root).
+      const current = (meetings.data ?? []).find(
+        (m) => m.uid === selectedMeetingId,
+      );
+      const folder = current ? meetingFolder(current.id) : "";
       try {
         const created = await createMeetingMutation.mutateAsync({
           title: null,
@@ -384,7 +400,9 @@ function AppContent() {
           attendees: null,
           content: "",
           summary: null,
+          folder,
         });
+        requestMeetingReveal(folder);
         openMeeting(created.uid);
       } catch {
         // 사이드 패널의 createError 와 별도 — 단축키 실패는 silent (drawer 안에서도 동작)
@@ -592,6 +610,9 @@ function AppContent() {
       <MeetingsSidePanel
         selectedId={selectedMeetingId}
         onSelect={openMeeting}
+        revealPath={meetingReveal.path}
+        revealNonce={meetingReveal.nonce}
+        onRevealFolder={requestMeetingReveal}
       />
     ) : tab === "calendar" ? (
       <CalendarDayPanel

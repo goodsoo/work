@@ -59,11 +59,19 @@ import { useToast } from "../Toast";
 type MeetingsPanelProps = {
   selectedId: string | null;
   onSelect: (id: string) => void;
+  // 폴더 자동 펼침 — App 이 단일 소유. nonce 바뀌면 트리가 revealPath(+조상) 펼침.
+  // 메모/폴더 생성 시 onRevealFolder 로 App 에 요청 (Cmd+N 도 App 이 직접 호출).
+  revealPath?: string;
+  revealNonce?: number;
+  onRevealFolder: (path: string) => void;
 };
 
 export function MeetingsSidePanel({
   selectedId,
   onSelect,
+  revealPath,
+  revealNonce,
+  onRevealFolder,
 }: MeetingsPanelProps) {
   const { data, isLoading } = useMeetings();
   const { data: folders } = useMeetingFolders();
@@ -132,6 +140,9 @@ export function MeetingsSidePanel({
       const y = now.getFullYear();
       const m = String(now.getMonth() + 1).padStart(2, "0");
       const d = String(now.getDate()).padStart(2, "0");
+      // 현재 선택된 메모가 있으면 그 메모의 폴더에 생성 (없으면 root).
+      const current = (data ?? []).find((mt) => mt.uid === selectedId);
+      const folder = current ? meetingFolder(current.id) : "";
       const created = await createMutation.mutateAsync({
         title: null,
         date: `${y}-${m}-${d}`,
@@ -139,7 +150,9 @@ export function MeetingsSidePanel({
         attendees: null,
         content: "",
         summary: null,
+        folder,
       });
+      onRevealFolder(folder); // 그 폴더가 접혀 있었으면 펼쳐서 새 메모 노출
       onSelect(created.uid);
     } catch (e) {
       toast.show(formatError(e));
@@ -150,21 +163,34 @@ export function MeetingsSidePanel({
   // 행에 인라인 rename 자동 진입. 이미 "새 폴더" 가 있으면 "새 폴더 2" 식으로 N
   // 증가. 빠른 생성 + 즉시 이름 입력 = 한 단계 흐름.
   async function handleCreateFolder() {
+    // 현재 선택된 메모가 있으면 그 폴더 안에 생성 (없으면 root).
+    const current = (data ?? []).find((mt) => mt.uid === selectedId);
+    const parent = current ? meetingFolder(current.id) : "";
     const base = "새 폴더";
-    const existing = new Set(
-      (folders ?? []).map((f) => f.replace(/^meetings\//, "")),
+    // 같은 부모 안 직속 자식 폴더 이름만 모아 충돌 회피 (notes/ prefix 제거).
+    const prefix = parent ? `${parent}/` : "";
+    const siblings = new Set(
+      (folders ?? [])
+        .map((f) => f.replace(/^notes\//, ""))
+        .filter((rel) => rel.startsWith(prefix))
+        .map((rel) => rel.slice(prefix.length))
+        .filter((rest) => rest !== "" && !rest.includes("/")),
     );
-    let candidate = base;
+    let name = base;
     let n = 2;
-    while (existing.has(candidate)) {
-      candidate = `${base} ${n}`;
+    while (siblings.has(name)) {
+      name = `${base} ${n}`;
       n++;
     }
+    const relPath = parent ? `${parent}/${name}` : name;
     try {
-      const full = await createFolderMutation.mutateAsync(candidate);
-      const folderRel = full.replace(/^meetings\//, "");
+      const full = await createFolderMutation.mutateAsync(relPath);
+      const createdRel = full.replace(/^notes\//, "");
+      const createdName = createdRel.slice(createdRel.lastIndexOf("/") + 1);
+      onRevealFolder(parent); // 부모 폴더 펼쳐서 새 폴더 행 노출
       // 즉시 rename mode 로. 입력은 폴더 행 안 input (MeetingsTreeView 가 렌더).
-      setEditingFolder({ folder: folderRel, value: folderRel });
+      // value 는 마지막 segment 만 (편집할 이름), folder 는 full rel path.
+      setEditingFolder({ folder: createdRel, value: createdName });
     } catch (e) {
       toast.show(formatError(e));
     }
@@ -373,6 +399,8 @@ export function MeetingsSidePanel({
               onContextMenu={handleContextMenu}
               onFolderContextMenu={handleFolderContextMenu}
               onMoveDrop={(uid, folder) => void handleMoveDrop(uid, folder)}
+              revealPath={revealPath}
+              revealNonce={revealNonce}
             />
           </>
         )}

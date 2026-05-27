@@ -41,6 +41,48 @@ describe("createMeetingFolder", () => {
   });
 });
 
+describe("createMeeting — folder", () => {
+  it("folder 미지정 → root (notes/{slug}.md)", async () => {
+    const adapter = createMemoryAdapter();
+    adapter.setRoot("/vault");
+    const m = await createMeeting(adapter, { title: "회의" });
+    expect(m.id).toBe("notes/회의.md");
+  });
+
+  it("folder 지정 → 그 폴더 안에 생성", async () => {
+    const adapter = createMemoryAdapter();
+    adapter.setRoot("/vault");
+    const m = await createMeeting(adapter, { title: "주간", folder: "work" });
+    expect(m.id).toBe("notes/work/주간.md");
+  });
+
+  it("중첩 폴더 그대로 이어받음", async () => {
+    const adapter = createMemoryAdapter();
+    adapter.setRoot("/vault");
+    const m = await createMeeting(adapter, {
+      title: "메모",
+      folder: "work/2026",
+    });
+    expect(m.id).toBe("notes/work/2026/메모.md");
+  });
+
+  it("같은 폴더 안 같은 title → -2 suffix (충돌 회피)", async () => {
+    const adapter = createMemoryAdapter();
+    adapter.setRoot("/vault");
+    await createMeeting(adapter, { title: "a", folder: "work" });
+    const dup = await createMeeting(adapter, { title: "a", folder: "work" });
+    expect(dup.id).toBe("notes/work/a-2.md");
+  });
+
+  it("folder 는 frontmatter 오염 X (파일 본문에 folder 키 없음)", async () => {
+    const adapter = createMemoryAdapter();
+    adapter.setRoot("/vault");
+    const m = await createMeeting(adapter, { title: "x", folder: "work" });
+    const raw = await adapter.read(m.id);
+    expect(raw).not.toMatch(/folder:/);
+  });
+});
+
 describe("countMeetingsInFolder", () => {
   it("폴더 안 + sub-folder 메모 카운트, sidecar 제외", async () => {
     const adapter = createMemoryAdapter();

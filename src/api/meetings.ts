@@ -46,6 +46,10 @@ export interface MeetingInsert {
 
 export type MeetingUpdate = MeetingInsert;
 
+// createMeeting 전용 입력 — frontmatter/content(MeetingInsert) + 생성 폴더.
+// folder 는 update 와 무관 (폴더 이동은 moveMeeting). 빈 문자열/미지정 = root.
+export type MeetingCreateInput = MeetingInsert & { folder?: string | null };
+
 function normalizeAttendees(v: MeetingInsert["attendees"]): string[] {
   if (Array.isArray(v)) return v;
   if (typeof v === "string" && v.trim() !== "") {
@@ -162,10 +166,11 @@ export async function getMeeting(
 
 export async function createMeeting(
   adapter: VaultAdapter,
-  input: MeetingInsert,
+  input: MeetingCreateInput,
 ): Promise<Meeting> {
   const title = input.title ?? "";
-  const path = await generateMeetingPath(adapter, title);
+  // folder 지정 시 그 폴더 안에 생성 (현재 선택된 메모 폴더 이어받기). 미지정 = root.
+  const path = await generateMeetingPath(adapter, title, input.folder ?? "");
   const uid = crypto.randomUUID();
   const meeting = buildMeeting({ ...input, title }, path, uid);
 

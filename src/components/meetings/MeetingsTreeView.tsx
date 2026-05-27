@@ -67,6 +67,11 @@ type Props = {
   onFolderContextMenu: (folder: string, x: number, y: number) => void;
   // DnD 폴더 이동 — drop 발생 시 호출. folder 빈 문자열 = root.
   onMoveDrop: (uid: string, folder: string) => void;
+  // 새 메모/폴더 생성 직후 그 폴더 자동 펼침 트리거. revealNonce 가 바뀔 때
+  // revealPath(+모든 조상)를 collapsed set 에서 제거. 생성 외 일반 선택엔 안 씀
+  // (사용자가 명시적으로 접은 폴더는 그대로 둔다 — collapse 가 안 되살아남).
+  revealPath?: string;
+  revealNonce?: number;
 };
 
 export function MeetingsTreeView({
@@ -83,6 +88,8 @@ export function MeetingsTreeView({
   onContextMenu,
   onFolderContextMenu,
   onMoveDrop,
+  revealPath,
+  revealNonce,
 }: Props) {
   const folderExpandKey = useScopedKey(FOLDER_EXPAND_BASE_KEY);
   const [collapsed, setCollapsed] = useState<Set<string>>(() => loadCollapsed(folderExpandKey));
@@ -97,6 +104,26 @@ export function MeetingsTreeView({
   useEffect(() => {
     saveCollapsed(folderExpandKey, collapsed);
   }, [folderExpandKey, collapsed]);
+
+  // 새 메모/폴더 생성 시 그 폴더(+조상)를 collapsed 에서 제거 → 자동 펼침.
+  // revealNonce 변화에만 반응 (사용자가 직접 접은 폴더는 안 되살림). React 공식
+  // "prop 변화 시 state 조정" 패턴 — 렌더 중 setState (effect 아님 → cascade 없음).
+  const [seenRevealNonce, setSeenRevealNonce] = useState(revealNonce);
+  if (revealNonce !== seenRevealNonce) {
+    setSeenRevealNonce(revealNonce);
+    if (revealPath) {
+      setCollapsed((prev) => {
+        if (prev.size === 0) return prev;
+        const next = new Set(prev);
+        let acc = "";
+        for (const seg of revealPath.split("/")) {
+          acc = acc ? `${acc}/${seg}` : seg;
+          next.delete(acc);
+        }
+        return next.size === prev.size ? prev : next;
+      });
+    }
+  }
 
   const tree = useMemo(
     () => buildMeetingsTree(meetings, sortMeetings, extraFolders ?? []),

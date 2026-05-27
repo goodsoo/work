@@ -15,7 +15,7 @@ import {
   restoreMeeting,
   updateMeeting,
   type Meeting,
-  type MeetingInsert,
+  type MeetingCreateInput,
   type MeetingUpdate,
 } from "../api/meetings";
 import { summaryPath, transcriptPath } from "../lib/vault/scan";
@@ -178,7 +178,7 @@ export function useCreateMeeting() {
   const { adapter, watcher } = useVault();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (input: MeetingInsert) => {
+    mutationFn: async (input: MeetingCreateInput) => {
       const created = await createMeeting(adapter, input);
       markMeetingSelfWrite(watcher, created.id);
       _justCreatedMeetingUid = created.uid;
