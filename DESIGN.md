@@ -78,7 +78,26 @@
 
 미분류 (`category: null`) 인 todo 는 색 미적용 — 체크박스 border 가 `--text-muted` 기본 회색 유지, 캘린더 셀 chip 에 dot 안 그림. legacy 카드 보호.
 
-### 1.7 Interactive
+### 1.7 Speaker chips (음성 기록 화자색)
+
+음성 기록 보기 모드 (`MeetingForm` 의 `TranscriptView`) 의 참석자별 하이라이트. 카테고리형(positional) 팔레트 — 참석자가 적힌 순서대로 `i % 10` 배정해서 한 회의 안 10명까지 색이 안 겹침. **순서는 hue 휠 순이 아니라 연속 색이 최대한 멀어지게 정렬**: 대부분 2-4명이라 앞 색이 제일 많이 쓰이므로 앞 4개를 파랑·주황·초록·분홍 보색 쌍으로 (d3/Tableau10 방식). 라이트 = 연한 tint bg + 진한 글자, 다크 = 해당 색 `-400` 의 rgba 0.15 bg + `-300` 밝은 글자 (accent 레시피 동일). 토큰 쌍은 `--speaker-{N}-bg` / `--speaker-{N}-text` (N=0..9), 정확한 값은 `index.css`.
+
+| # | hue | 라이트 bg / text | 다크 text |
+|---|-----|------------------|-----------|
+| 0 | sky | `#e0f2fe` / `#0369a1` | `#7dd3fc` |
+| 1 | orange | `#ffedd5` / `#c2410c` | `#fdba74` |
+| 2 | emerald | `#d1fae5` / `#047857` | `#6ee7b7` |
+| 3 | rose | `#ffe4e6` / `#be123c` | `#fda4af` |
+| 4 | violet | `#ede9fe` / `#6d28d9` | `#c4b5fd` |
+| 5 | amber | `#fef3c7` / `#b45309` | `#fcd34d` |
+| 6 | teal | `#ccfbf1` / `#0f766e` | `#5eead4` |
+| 7 | fuchsia | `#fae8ff` / `#a21caf` | `#f0abfc` |
+| 8 | lime | `#ecfccb` / `#4d7c0f` | `#bef264` |
+| 9 | indigo | `#e0e7ff` / `#4338ca` | `#a5b4fc` |
+
+같은 보기 모드의 mm:ss 타임스탬프 칩은 인라인 코드 칩과 동일 (`--bg-surface-hover` / `--text-primary`) — 별도 팔레트 아님.
+
+### 1.8 Interactive
 
 | 토큰 | 라이트 | 다크 | 사용처 |
 |------|--------|------|--------|
@@ -86,7 +105,7 @@
 | `--btn-primary-text` | `#ffffff` | `#18181b` | primary 버튼 텍스트 |
 | `--focus-ring` | `#3b82f6` | `#60a5fa` | focus 표시 (현재 사용 없음 — outline 자체 토큰화는 보류) |
 
-### 1.8 대비 기준 (WCAG 2.2 AA)
+### 1.9 대비 기준 (WCAG 2.2 AA)
 
 | 조합 | 라이트 | 다크 | 기준 |
 |------|--------|------|------|
