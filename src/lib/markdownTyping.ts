@@ -426,6 +426,45 @@ export function applyLineKindTransform(
   return { value: newValue, start: newCaret, end: newCaret };
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// 화살표 자동 치환 — `->` → `→`, `=>` → `⇒`. 입력으로 pair 완성 시 onChange 에서 호출.
+// 코드(펜스/인라인) 안에서는 변환 안 함 (`=>` 화살표 함수, `->` 코드 보존). 되돌리기는
+// 호출부가 "방금 변환 직후 Backspace" 로 original 복원 (macOS/Notion 스마트 치환 패턴).
+
+const ARROW_MAP: Record<string, string> = { "->": "→", "=>": "⇒" };
+
+export type ArrowSubResult = EditResult & { original: string };
+
+// value 의 pos 가 fenced 코드블록(``` / ~~~) 또는 현재 줄 inline code(백틱 홀수) 안인지.
+function isInsideCode(value: string, pos: number): boolean {
+  const before = value.slice(0, pos);
+  const lines = before.split("\n");
+  let fence = 0;
+  for (let i = 0; i < lines.length - 1; i++) {
+    if (/^(```|~~~)/.test(lines[i])) fence += 1;
+  }
+  if (fence % 2 === 1) return true; // 펜스 안
+  const lineStart = before.lastIndexOf("\n") + 1;
+  const backticks = (before.slice(lineStart).match(/`/g) ?? []).length;
+  return backticks % 2 === 1; // 현재 줄 inline code 안
+}
+
+// caret 바로 앞 2글자가 `->`/`=>` 면 화살표로 치환한 EditResult. 코드 안이거나
+// 매칭 안 되면 null. (arrow 는 1글자라 caret 은 -1.)
+export function applyArrowSubstitution(
+  value: string,
+  caret: number,
+): ArrowSubResult | null {
+  if (caret < 2) return null;
+  const pair = value.slice(caret - 2, caret);
+  const arrow = ARROW_MAP[pair];
+  if (!arrow) return null;
+  if (isInsideCode(value, caret)) return null;
+  const newValue = value.slice(0, caret - 2) + arrow + value.slice(caret);
+  const newCaret = caret - 2 + arrow.length;
+  return { value: newValue, start: newCaret, end: newCaret, original: pair };
+}
+
 // `/{filter}` 슬래시 커맨드 trigger 가 살아있는지 판정.
 // 현재 줄에서 caret 위치까지의 text 가 `^{indent or marker}\/{filter}$` 패턴이면 true.
 // filter 는 한 단어 (공백/줄바꿈 없음). marker 뒤에 친 `/` 도 허용 — 그 줄을 다른

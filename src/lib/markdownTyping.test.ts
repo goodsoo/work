@@ -7,6 +7,7 @@ import {
   applyLineMove,
   applyLineDuplicate,
   applyLineKindTransform,
+  applyArrowSubstitution,
   detectSlashTrigger,
   parseLineMarker,
 } from "./markdownTyping";
@@ -260,6 +261,38 @@ describe("applyLineKindTransform", () => {
   it("code-fence → fence pair (multi-line)", () => {
     const r = applyLineKindTransform("", 0, { type: "code-fence" });
     expect(r.value).toBe("```\n\n```");
+  });
+});
+
+describe("applyArrowSubstitution", () => {
+  it("`->` → `→`", () => {
+    const r = applyArrowSubstitution("a->", 3);
+    expect(r?.value).toBe("a→");
+    expect(r?.original).toBe("->");
+    expect(r?.start).toBe(2);
+  });
+  it("`=>` → `⇒`", () => {
+    const r = applyArrowSubstitution("a=>", 3);
+    expect(r?.value).toBe("a⇒");
+    expect(r?.original).toBe("=>");
+  });
+  it("매칭 안 되면 null", () => {
+    expect(applyArrowSubstitution("ab", 2)).toBeNull();
+    expect(applyArrowSubstitution("-", 1)).toBeNull();
+  });
+  it("fenced 코드블록 안에서는 변환 X (=> 화살표 함수 보존)", () => {
+    // ```\n() =>  ← caret 이 펜스 안
+    const src = "```\n() =>";
+    expect(applyArrowSubstitution(src, src.length)).toBeNull();
+  });
+  it("inline code(백틱 홀수) 안에서는 변환 X", () => {
+    const src = "`a->";
+    expect(applyArrowSubstitution(src, src.length)).toBeNull();
+  });
+  it("inline code 닫힌 뒤(백틱 짝수)면 변환 O", () => {
+    const src = "`code` x->";
+    const r = applyArrowSubstitution(src, src.length);
+    expect(r?.value).toBe("`code` x→");
   });
 });
 

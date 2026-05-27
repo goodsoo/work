@@ -23,6 +23,7 @@ import {
   applyLineMove,
   applyLineDuplicate,
   applyLineKindTransform,
+  applyArrowSubstitution,
   detectSlashTrigger,
   type EditResult,
 } from "../../lib/markdownTyping";
@@ -92,6 +93,9 @@ export function SourceBodyEditor({
   // 다음 render 직후 textarea selection 을 강제로 set 할 위치. Tab/Enter/Paste 같은
   // 프로그램 edit 에서 caret 을 정확히 이동시키기 위함.
   const pendingSelectionRef = useRef<{ start: number; end: number } | null>(null);
+  // 방금 자동 변환된 화살표(`->`→`→`, `=>`→`⇒`)의 caret 위치 + 원본 — 바로 다음
+  // 입력이 Backspace 면 원복 (스마트 치환). 다른 입력이 오면 기회 소멸.
+  const lastArrowSubRef = useRef<{ pos: number; original: string } | null>(null);
 
   function updateCaretLine() {
     const el = textareaRef.current;
@@ -367,6 +371,25 @@ export function SourceBodyEditor({
     // IME composition (한글 등) 중에는 절대 가로채지 않음.
     if (e.nativeEvent.isComposing || e.keyCode === 229) return;
     const ta = e.currentTarget;
+    // 방금 자동 변환된 화살표 → 바로 Backspace 면 원본(`->`/`=>`)으로 원복. 그 외
+    // 키는 기회 소멸 (ref 는 매 keydown 에서 소비). caret 이 화살표 직후일 때만.
+    const arrowSub = lastArrowSubRef.current;
+    lastArrowSubRef.current = null;
+    if (
+      arrowSub &&
+      e.key === "Backspace" &&
+      !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey &&
+      ta.selectionStart === ta.selectionEnd &&
+      ta.selectionStart === arrowSub.pos
+    ) {
+      e.preventDefault();
+      const v = ta.value;
+      const newValue =
+        v.slice(0, arrowSub.pos - 1) + arrowSub.original + v.slice(arrowSub.pos);
+      const newCaret = arrowSub.pos - 1 + arrowSub.original.length;
+      commitEdit({ value: newValue, start: newCaret, end: newCaret });
+      return;
+    }
     // 슬래시 커맨드 popover 열려있을 때 — 위/아래/Enter/Tab/Esc 가로채기.
     if (slashState) {
       const opts = getSlashOptionsForFilter(slashState.filter);
@@ -615,11 +638,23 @@ export function SourceBodyEditor({
           }}
           value={draft}
           onChange={(e) => {
+            const v = e.target.value;
+            const caret = e.target.selectionStart ?? v.length;
+            // 단일 글자 입력으로 `->`/`=>` 완성 시 화살표 자동 치환 (코드 밖에서만).
+            // paste·IME 오발화 방지로 "직전보다 1글자 늘었을 때"만.
+            if (v.length === draft.length + 1) {
+              const sub = applyArrowSubstitution(v, caret);
+              if (sub) {
+                lastArrowSubRef.current = { pos: sub.start, original: sub.original };
+                commitEdit(sub); // draft/onChange/caret 일괄 처리 (useLayoutEffect)
+                return;
+              }
+            }
             skipNextValueSyncRef.current = true;
-            setDraft(e.target.value);
-            onChange(e.target.value);
+            setDraft(v);
+            onChange(v);
             updateCaretLine();
-            updateSlashTrigger(e.target.value, e.target.selectionStart ?? 0);
+            updateSlashTrigger(v, caret);
           }}
           onKeyDown={onKeyDown}
           onPaste={onPaste}
