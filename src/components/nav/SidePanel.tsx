@@ -59,6 +59,8 @@ import { useToast } from "../Toast";
 type MeetingsPanelProps = {
   selectedId: string | null;
   onSelect: (id: string) => void;
+  // 사이드바 빈 공간 클릭 = 선택 해제. 트리 아래 빈 영역만 (행 클릭은 onSelect).
+  onDeselect?: () => void;
   // 폴더 자동 펼침 — App 이 단일 소유. nonce 바뀌면 트리가 revealPath(+조상) 펼침.
   // 메모/폴더 생성 시 onRevealFolder 로 App 에 요청 (Cmd+N 도 App 이 직접 호출).
   revealPath?: string;
@@ -72,6 +74,7 @@ type MeetingsPanelProps = {
 export function MeetingsSidePanel({
   selectedId,
   onSelect,
+  onDeselect,
   revealPath,
   revealNonce,
   onRevealFolder,
@@ -357,7 +360,14 @@ export function MeetingsSidePanel({
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      <div
+        className="min-h-0 flex-1 overflow-y-auto"
+        onClick={(e) => {
+          // 트리 아래 빈 영역(컨테이너 자기 자신)을 직접 클릭했을 때만 선택 해제.
+          // 행/폴더 클릭은 자식에서 발생 → currentTarget 과 달라 무시.
+          if (e.target === e.currentTarget && selectedId) onDeselect?.();
+        }}
+      >
         {isLoading ? (
           <div className="space-y-2 p-3">
             {[0, 1, 2].map((i) => (

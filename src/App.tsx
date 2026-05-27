@@ -425,7 +425,7 @@ function AppContent() {
         if (nextUid) {
           openMeeting(nextUid);
         } else {
-          closeMeeting();
+          deselectMeeting();
         }
       } catch {
         // ignore — TanStack Query mutation state 에 반영됨
@@ -549,6 +549,16 @@ function AppContent() {
     }
   }
 
+  // 메모 선택만 해제 — 메모장 탭에 머무름. history.back() (직전 페이지로 튀는 경로)
+  // 을 안 타고 hash 만 #meetings 로 pushState. 폴더의 유일한 메모를 지워 다음
+  // 메모가 없을 때(삭제 경로), 사이드바 빈 공간 클릭(deselect) 둘 다 이걸 호출.
+  function deselectMeeting() {
+    setSelectedMeetingId(null);
+    if (window.location.hash !== "#meetings") {
+      window.history.pushState({ tab: "meetings", meetingId: null }, "", "#meetings");
+    }
+  }
+
   // 폴더 경로의 부모. "work/2026" → "work", "work" → "", "" → null (root 의 부모 없음).
   function parentFolderPath(folder: string): string | null {
     if (folder === "") return null;
@@ -613,6 +623,7 @@ function AppContent() {
       <MeetingsSidePanel
         selectedId={selectedMeetingId}
         onSelect={openMeeting}
+        onDeselect={deselectMeeting}
         revealPath={meetingReveal.path}
         revealNonce={meetingReveal.nonce}
         onRevealFolder={requestMeetingReveal}
@@ -687,7 +698,7 @@ function AppContent() {
             onBack={closeMeeting}
             onAfterDelete={(nextUid) => {
               if (nextUid) openMeeting(nextUid);
-              else closeMeeting();
+              else deselectMeeting();
             }}
             computeNextAfterDelete={findDeleteNeighbor}
           />
