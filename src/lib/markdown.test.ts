@@ -61,6 +61,55 @@ describe("meetingToMarkdown", () => {
     expect(md).not.toContain("###");
   });
 
+  it("section=body 면 헤더 + 본문만 (요약/음성기록 무시)", () => {
+    const md = meetingToMarkdown(
+      {
+        title: "1on1",
+        date: "2026-05-06",
+        time: null,
+        attendees: "찬스",
+        body: "## 본문 메모\n- 첫 줄",
+        transcript: "찬스: 안녕하세요",
+        summary: "### 결정 사항\n- 결정 1",
+      },
+      "body",
+    );
+
+    expect(md).toBe(
+      [
+        "## 1on1",
+        "",
+        "일시: 2026.05.06 (수)",
+        "참석: 찬스",
+        "",
+        "## 본문 메모\n- 첫 줄",
+        "",
+      ].join("\n"),
+    );
+    expect(md).not.toContain("결정 사항");
+    expect(md).not.toContain("안녕하세요");
+  });
+
+  it("section=transcript 면 헤더 + 음성기록만", () => {
+    const md = meetingToMarkdown(
+      {
+        title: null,
+        date: null,
+        time: "14:00",
+        attendees: null,
+        body: "본문",
+        transcript: "00:03 찬스: 시작합니다",
+        summary: "### 액션 아이템\n- [찬스] 할 일",
+      },
+      "transcript",
+    );
+
+    expect(md).toContain("일시: 14:00");
+    expect(md).toContain("00:03 찬스: 시작합니다");
+    expect(md).not.toContain("본문");
+    expect(md).not.toContain("액션 아이템");
+  });
+
   it("summary trim 공백 정리 후 그대로 박음", () => {
     const md = meetingToMarkdown({
       title: "1on1",

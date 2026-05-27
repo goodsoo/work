@@ -540,6 +540,8 @@ export function MeetingForm({
     date: meta.date || null,
     time: meta.time || null,
     attendees: meta.attendees || null,
+    body,
+    transcript,
     summary,
   };
 
@@ -652,7 +654,12 @@ export function MeetingForm({
         }
         right={
           <>
-            <CopyButton meeting={meetingForCopy} onError={setActionError} compact />
+            <CopyButton
+              meeting={meetingForCopy}
+              section={activeTab}
+              onError={setActionError}
+              compact
+            />
             <Button
               variant="ghost"
               onClick={handleDelete}

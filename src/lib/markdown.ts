@@ -1,11 +1,16 @@
 import type { Meeting } from "../api/meetings";
 
+// 복사 버튼이 붙이는 본문 — 현재 탭 기준. 제목/일시/참석 헤더는 모든 탭 공통.
+export type MeetingMarkdownSection = "body" | "transcript" | "summary";
+
 export interface MeetingMarkdownInput {
   title: Meeting["title"] | null;
   date: Meeting["date"];
   time: Meeting["time"];
   attendees: Meeting["attendees"] | string | null;
-  summary: Meeting["summary"] | null;
+  body?: string | null;
+  transcript?: string | null;
+  summary?: Meeting["summary"] | null;
 }
 
 const isNonEmpty = (s: string | null | undefined): s is string =>
@@ -23,7 +28,10 @@ export function formatMeetingDate(date: string | null | undefined): string | nul
   return `${y}.${mo}.${d} (${WEEKDAYS[parsed.getDay()]})`;
 }
 
-export function meetingToMarkdown(meeting: MeetingMarkdownInput): string {
+export function meetingToMarkdown(
+  meeting: MeetingMarkdownInput,
+  section: MeetingMarkdownSection = "summary",
+): string {
   const parts: string[] = [];
 
   const title = isNonEmpty(meeting.title) ? meeting.title.trim() : "메모";
@@ -43,10 +51,16 @@ export function meetingToMarkdown(meeting: MeetingMarkdownInput): string {
   if (isNonEmpty(attendeesStr)) meta.push(`참석: ${attendeesStr.trim()}`);
   if (meta.length > 0) parts.push(meta.join("\n"));
 
-  // V0.7.3 — summary 가 마크다운 텍스트 통째. 외부 출력 시 그대로 박음 (이미
-  // `### 논의 사항 / 결정 사항 / 액션 아이템` 같은 헤더 구조를 가짐).
-  const summary = isNonEmpty(meeting.summary) ? meeting.summary.trim() : null;
-  if (summary) parts.push(summary);
+  // 현재 탭 내용을 헤더 뒤에 그대로 박음. 본문/음성기록은 raw 텍스트, 요약은 이미
+  // `### 논의 사항 / 결정 사항 / 액션 아이템` 마크다운 구조 (V0.7.3 부터 텍스트 통째).
+  const content =
+    section === "body"
+      ? meeting.body
+      : section === "transcript"
+        ? meeting.transcript
+        : meeting.summary;
+  const trimmed = isNonEmpty(content) ? content.trim() : null;
+  if (trimmed) parts.push(trimmed);
 
   return parts.join("\n\n") + "\n";
 }

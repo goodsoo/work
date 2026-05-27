@@ -1,10 +1,16 @@
 import { useState } from "react";
 import { Check, ClipboardCopy } from "lucide-react";
-import { meetingToMarkdown, type MeetingMarkdownInput } from "../../lib/markdown";
+import {
+  meetingToMarkdown,
+  type MeetingMarkdownInput,
+  type MeetingMarkdownSection,
+} from "../../lib/markdown";
 import { Button } from "../common/Button";
 
 type Props = {
   meeting: MeetingMarkdownInput;
+  // 현재 탭 — 헤더(제목/일시/참석) 뒤에 이 탭 내용을 붙임.
+  section?: MeetingMarkdownSection;
   onError?: (message: string) => void;
   compact?: boolean;
 };
@@ -34,11 +40,11 @@ async function copyText(text: string): Promise<boolean> {
   }
 }
 
-export function CopyButton({ meeting, onError, compact }: Props) {
+export function CopyButton({ meeting, section, onError, compact }: Props) {
   const [copied, setCopied] = useState(false);
 
   async function handleClick() {
-    const md = meetingToMarkdown(meeting);
+    const md = meetingToMarkdown(meeting, section);
     const ok = await copyText(md);
     if (ok) {
       setCopied(true);
