@@ -28,12 +28,14 @@ import type {
   TaskStatusFilter,
 } from "../components/nav/SidePanel";
 import { type TaskSortKey } from "../hooks/useTaskSort";
+import { TaskSortMenu } from "../components/tasks/TaskSortMenu";
 
 type Props = {
   statusFilter?: TaskStatusFilter;
   categoryFilter?: TaskCategoryFilter;
   onCategoryChange?: (next: TaskCategoryFilter) => void;
   sortKey?: TaskSortKey;
+  onSortKeyChange?: (next: TaskSortKey) => void;
   // 캘린더 사이드바 task 클릭으로 진입 시 해당 row 로 scroll. 한 번 처리 후 clear.
   scrollToTaskId?: string | null;
   onScrollHandled?: () => void;
@@ -44,6 +46,7 @@ export function TasksPage({
   categoryFilter = "all",
   onCategoryChange,
   sortKey = "date_asc",
+  onSortKeyChange,
   scrollToTaskId = null,
   onScrollHandled,
 }: Props) {
@@ -220,6 +223,8 @@ export function TasksPage({
           selected={categoryFilter}
           counts={categoryCounts}
           onChange={onCategoryChange}
+          sortKey={sortKey}
+          onSortKeyChange={onSortKeyChange}
         />
       ) : null}
       <div className="mx-auto w-full max-w-2xl px-5 pb-16 pt-5 lg:max-w-4xl">
@@ -280,17 +285,25 @@ function CategoryChipRow({
   selected,
   counts,
   onChange,
+  sortKey,
+  onSortKeyChange,
 }: {
   selected: TaskCategoryFilter;
   counts: Map<TaskCategory | "uncategorized", number>;
   onChange: (next: TaskCategoryFilter) => void;
+  sortKey: TaskSortKey;
+  onSortKeyChange?: (next: TaskSortKey) => void;
 }) {
   return (
     <div
-      className="shrink-0 px-6 py-3"
-      style={{ borderBottom: "1px solid var(--border-default)" }}
+      className="sticky z-10 shrink-0 px-6 py-2 backdrop-blur"
+      style={{
+        top: "var(--page-header-h)",
+        borderBottom: "1px solid var(--border-subtle)",
+        backgroundColor: "var(--bg-overlay)",
+      }}
     >
-      <div className="flex flex-wrap gap-1">
+      <div className="flex flex-wrap items-center gap-1">
         <SelectableChip
           active={selected === "all"}
           onToggle={() => onChange("all")}
@@ -324,6 +337,11 @@ function CategoryChipRow({
             </SelectableChip>
           );
         })}
+        {onSortKeyChange ? (
+          <div className="ml-auto">
+            <TaskSortMenu value={sortKey} onChange={onSortKeyChange} />
+          </div>
+        ) : null}
       </div>
     </div>
   );

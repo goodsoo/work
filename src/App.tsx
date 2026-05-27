@@ -27,6 +27,7 @@ import type { TaskCategory, TaskInsert } from "./api/tasks";
 import { TodosTrashModal } from "./components/tasks/TodosTrashModal";
 import { Text } from "./components/common/Text";
 import { EmptyState } from "./components/common/EmptyState";
+import { PageHeaderBar } from "./components/common/PageHeaderBar";
 import { CalendarPage } from "./pages/CalendarPage";
 import { TasksPage } from "./pages/TasksPage";
 import { PortfolioPage } from "./pages/PortfolioPage";
@@ -641,8 +642,6 @@ function AppContent() {
       <TodosSidePanel
         statusFilter={taskStatus}
         onStatusChange={setTaskStatus}
-        sortKey={taskSortKey}
-        onSortKeyChange={setTaskSortKey}
         selectedRoutineName={selectedRoutineName}
         onSelectRoutine={setSelectedRoutineName}
       />
@@ -683,6 +682,7 @@ function AppContent() {
       sidePanel={sidePanel}
       sidePanelFooter={sidePanelFooter}
       sidebarCollapsed={sidebar.collapsed}
+      onToggleSidebar={sidebar.toggle}
       onOpenSearch={() => setQuickSwitcherOpen(true)}
     >
       <PrefetchWarmup />
@@ -731,6 +731,7 @@ function AppContent() {
           categoryFilter={taskCategory}
           onCategoryChange={setTaskCategory}
           sortKey={taskSortKey}
+          onSortKeyChange={setTaskSortKey}
           scrollToTaskId={scrollToTaskId}
           onScrollHandled={() => setScrollToTaskId(null)}
         />
@@ -829,38 +830,52 @@ function PrefetchWarmup() {
 }
 
 function MeetingsEmpty({ count, loading }: { count: number; loading: boolean }) {
-  // 메모가 있는데 미선택 = 매일 보는 빈 상태. 문구 없이 앱 로고만 크게 + 연하게.
-  // PNG 대신 favicon.svg 를 mask 로 깔고 토큰 색으로 칠함 — 라이트/다크 둘 다 연한 회색으로 적응.
-  if (!loading && count > 0) {
-    return (
-      <div className="flex h-[calc(100svh-3rem)] flex-col items-center justify-center px-6">
-        <div
-          aria-hidden
-          style={{
-            width: "11rem",
-            height: "11rem",
-            backgroundColor: "var(--border-default)",
-            WebkitMaskImage: "url(/favicon.svg)",
-            maskImage: "url(/favicon.svg)",
-            WebkitMaskRepeat: "no-repeat",
-            maskRepeat: "no-repeat",
-            WebkitMaskPosition: "center",
-            maskPosition: "center",
-            WebkitMaskSize: "contain",
-            maskSize: "contain",
-          }}
-        />
-      </div>
-    );
-  }
-  // 첫 진입 (메모 0개) 은 만들기 안내 유지.
+  // 메모 미선택이어도 헤더는 유지 — 좌측 사이드바 토글이 사라지지 않도록
+  // (MeetingForm 과 같은 flex-col 레이아웃 + PageHeaderBar sticky=false).
+  // body: 메모가 있는데 미선택 = 매일 보는 빈 상태라 문구 없이 앱 로고만 크게 + 연하게
+  // (favicon.svg 를 mask 로 깔고 토큰 색으로 칠해 라이트/다크 적응). 메모 0개 = 첫
+  // 진입이라 만들기 안내.
+  const showLogo = !loading && count > 0;
   const message = loading
     ? ""
-    : "아직 메모가 없어요. 메뉴에서 + 를 눌러 새 메모를 만드세요.";
+    : count === 0
+      ? "아직 메모가 없어요. 메뉴에서 + 를 눌러 새 메모를 만드세요."
+      : "메뉴에서 메모를 선택하세요.";
   return (
-    <EmptyState
-      className="flex h-[calc(100svh-3rem)] flex-col items-center justify-center gap-3 px-6 text-center"
-      description={<Text variant="body" color="muted" as="span">{message}</Text>}
-    />
+    <div className="min-h-svh lg:flex lg:h-full lg:min-h-0 lg:flex-col">
+      <PageHeaderBar
+        sticky={false}
+        center={
+          <Text variant="h4" as="h2">
+            메모장
+          </Text>
+        }
+      />
+      {showLogo ? (
+        <div className="flex flex-1 flex-col items-center justify-center px-6">
+          <div
+            aria-hidden
+            style={{
+              width: "11rem",
+              height: "11rem",
+              backgroundColor: "var(--border-default)",
+              WebkitMaskImage: "url(/favicon.svg)",
+              maskImage: "url(/favicon.svg)",
+              WebkitMaskRepeat: "no-repeat",
+              maskRepeat: "no-repeat",
+              WebkitMaskPosition: "center",
+              maskPosition: "center",
+              WebkitMaskSize: "contain",
+              maskSize: "contain",
+            }}
+          />
+        </div>
+      ) : (
+        <EmptyState
+          className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center"
+          description={<Text variant="body" color="muted" as="span">{message}</Text>}
+        />
+      )}
+    </div>
   );
 }

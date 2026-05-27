@@ -18,6 +18,8 @@ import {
 } from "../../hooks/useSidePanelWidth";
 import { useDrawer } from "../../hooks/useDrawer";
 import { isTauri } from "../../lib/isTauri";
+import { SidebarToggleProvider } from "../../hooks/sidebarToggle";
+import { formatClockNow } from "../../lib/dates";
 import { useVault } from "../../lib/vault/useVault";
 import { SettingsModal } from "../settings/SettingsModal";
 import { Button } from "../common/Button";
@@ -38,6 +40,9 @@ type Props = {
   // 데스크탑 SidePanel collapse 상태. true = 사이드바 숨김 + main 이 윈도우 전체.
   // 옵시디안 패턴 — Cmd+\ 단축키로 토글, useSidebarCollapsed 가 관리.
   sidebarCollapsed?: boolean;
+  // 사이드바 collapse 토글 — 사이드바 상단 닫기 버튼 / collapse 시 타이틀바 열기 버튼.
+  // Cmd+\ 단축키와 같은 동작 (App.tsx 의 useSidebarCollapsed.toggle).
+  onToggleSidebar?: () => void;
   // 타이틀바 우측 검색 버튼 클릭 시 호출 — App.tsx 의 QuickSwitcher 를 open.
   // 단축키 Cmd+P 와 같은 동작, 데스크탑/모바일 양쪽 헤더에 노출.
   onOpenSearch?: () => void;
@@ -50,6 +55,7 @@ export function AppShell({
   sidePanel,
   sidePanelFooter,
   sidebarCollapsed = false,
+  onToggleSidebar,
   onOpenSearch,
   children,
 }: Props) {
@@ -148,8 +154,13 @@ export function AppShell({
         <div data-tauri-drag-region className="flex h-full items-stretch">
           <HeaderTabs activeTab={activeTab} onTabChange={onTabChange} />
         </div>
-        {/* 가운데 flex-1 = drag region 빈 공간 */}
-        <div data-tauri-drag-region className="flex-1" />
+        {/* 가운데 flex-1 = drag region — live 시계를 중앙에 둠 */}
+        <div
+          data-tauri-drag-region
+          className="flex flex-1 items-center justify-center"
+        >
+          <TitlebarClock />
+        </div>
         {/* 우측: search + settings + theme. button 자체는 click, 사이 gap 은 drag region. */}
         <div data-tauri-drag-region className="flex items-center gap-0.5 pr-2">
           {onOpenSearch ? (
@@ -318,7 +329,15 @@ export function AppShell({
         }
         className="lg:!pb-0 lg:h-screen lg:overflow-y-auto lg:overscroll-none lg:[padding-left:var(--gs-main-pl)] lg:[padding-top:var(--gs-main-pt)]"
       >
-        {children}
+        <SidebarToggleProvider
+          value={
+            onToggleSidebar
+              ? { collapsed: sidebarCollapsed, toggle: onToggleSidebar }
+              : null
+          }
+        >
+          {children}
+        </SidebarToggleProvider>
       </main>
 
       {/* Mobile bottom tabs */}
@@ -442,6 +461,31 @@ function HeaderTabs({
         );
       })}
     </nav>
+  );
+}
+
+// 타이틀바 중앙 live 시계 — 날짜 + 12시간 시각. 1초 tick 으로 갱신하되 분 단위
+// 라벨이 바뀔 때만 setState → 분이 넘어가는 순간 정확히 flip, 불필요한 re-render 없음.
+function TitlebarClock() {
+  const [label, setLabel] = useState(() => formatClockNow());
+
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      const next = formatClockNow();
+      setLabel((prev) => (prev === next ? prev : next));
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  return (
+    <Text
+      variant="caption"
+      color="secondary"
+      as="span"
+      className="pointer-events-none select-none whitespace-nowrap tabular-nums"
+    >
+      {label}
+    </Text>
   );
 }
 

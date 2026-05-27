@@ -10,6 +10,7 @@ import { addDays, startOfWeek } from "date-fns";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "../components/common/Button";
 import { Text } from "../components/common/Text";
+import { PageHeaderBar } from "../components/common/PageHeaderBar";
 import { useMeetings } from "../hooks/useMeetings";
 import { useJournals } from "../hooks/useJournals";
 import { useTasks } from "../hooks/useTasks";
@@ -381,98 +382,87 @@ export function CalendarPage({ targetDate, onSelectedDateChange }: Props) {
         className="shrink-0"
         style={{ borderBottom: "1px solid var(--border-subtle)" }}
       >
-        {/* 년월 헤더 — 메모장 헤더와 동일 spec (3.5rem, text-base, bg-overlay, backdrop-blur).
-            grid 3-col 로 nav 가 늘어나도 제목은 viewport-center 유지. */}
-        <div
-          className="grid items-center gap-2 px-3 backdrop-blur lg:px-5"
-          style={{
-            height: "var(--page-header-h)",
-            gridTemplateColumns:
-              "minmax(0, 1fr) minmax(0, auto) minmax(0, 1fr)",
-            backgroundColor: "var(--bg-overlay)",
-            borderBottom: "1px solid var(--border-subtle)",
-          }}
-        >
-          {/* 좌측 — 카테고리 색 범례. 셀 chip 의 bg tint 가 어떤 카테고리인지 명시.
-              compact swatch + 한글 라벨 가로 정렬. 미분류는 회색(--text-muted) 으로
-              chip 의 fallback tint 와 동일. */}
-          <div className="justify-self-start flex items-center gap-2.5">
-            {[
-              ...TASK_CATEGORIES.map((c) => ({
-                key: c.id,
-                label: c.label,
-                color: categoryColor(c.id),
-              })),
-              { key: "uncategorized", label: "미분류", color: "var(--text-muted)" },
-            ].map((c) => (
-              <span
-                key={c.key}
-                className="inline-flex items-center gap-1 text-[11px]"
-                style={{ color: "var(--text-secondary)" }}
-              >
+        {/* 년월 헤더 — 공통 PageHeaderBar (legend=left, 년월=center, nav=right).
+            좌측 끝에 사이드바 토글 자동 포함. sticky=false (바깥 shrink-0 블록이 고정). */}
+        <PageHeaderBar
+          sticky={false}
+          left={
+            <div className="flex items-center gap-2.5">
+              {[
+                ...TASK_CATEGORIES.map((c) => ({
+                  key: c.id,
+                  label: c.label,
+                  color: categoryColor(c.id),
+                })),
+                { key: "uncategorized", label: "미분류", color: "var(--text-muted)" },
+              ].map((c) => (
                 <span
-                  aria-hidden
-                  className="inline-block h-2.5 w-2.5 rounded-sm"
-                  style={{
-                    backgroundColor: `color-mix(in srgb, ${c.color} 18%, transparent)`,
-                    border: `1px solid color-mix(in srgb, ${c.color} 40%, transparent)`,
-                  }}
-                />
-                {c.label}
-              </span>
-            ))}
-          </div>
-          <Text
-            variant="h4"
-            as="h3"
-            className="justify-self-center"
-          >
-            {currentMonthYM.year}년 {currentMonthYM.month}월
-          </Text>
-          <div className="justify-self-end flex items-center gap-2">
+                  key={c.key}
+                  className="inline-flex items-center gap-1 text-[11px]"
+                  style={{ color: "var(--text-secondary)" }}
+                >
+                  <span
+                    aria-hidden
+                    className="inline-block h-2.5 w-2.5 rounded-sm"
+                    style={{
+                      backgroundColor: `color-mix(in srgb, ${c.color} 18%, transparent)`,
+                      border: `1px solid color-mix(in srgb, ${c.color} 40%, transparent)`,
+                    }}
+                  />
+                  {c.label}
+                </span>
+              ))}
+            </div>
+          }
+          center={
+            <Text variant="h4" as="h3">
+              {currentMonthYM.year}년 {currentMonthYM.month}월
+            </Text>
+          }
+          right={
             <div
               className="inline-flex overflow-hidden rounded-md"
               style={{ border: "1px solid var(--border-subtle)" }}
             >
-            <Button
-              variant="ghost"
-              onClick={() => jumpToMonth(-1)}
-              title="이전 달"
-              aria-label="이전 달"
-              className="rounded-none px-1.5 py-1"
-              style={{ color: "var(--text-secondary)" }}
-            >
-              <ChevronLeft className="h-3.5 w-3.5" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={jumpToToday}
-              title="오늘"
-              className="rounded-none px-2 py-1"
-              style={{
-                color: "var(--text-secondary)",
-                borderLeft: "1px solid var(--border-subtle)",
-              }}
-            >
-              오늘
-            </Button>
-            <Button
-              variant="ghost"
-              onClick={() => jumpToMonth(1)}
-              title="다음 달"
-              aria-label="다음 달"
-              className="rounded-none px-1.5 py-1"
-              style={{
-                color: "var(--text-secondary)",
-                borderLeft: "1px solid var(--border-subtle)",
-              }}
-            >
-              <ChevronRight className="h-3.5 w-3.5" />
-            </Button>
+              <Button
+                variant="ghost"
+                onClick={() => jumpToMonth(-1)}
+                title="이전 달"
+                aria-label="이전 달"
+                className="rounded-none px-1.5 py-1"
+                style={{ color: "var(--text-secondary)" }}
+              >
+                <ChevronLeft className="h-3.5 w-3.5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={jumpToToday}
+                title="오늘"
+                className="rounded-none px-2 py-1"
+                style={{
+                  color: "var(--text-secondary)",
+                  borderLeft: "1px solid var(--border-subtle)",
+                }}
+              >
+                오늘
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => jumpToMonth(1)}
+                title="다음 달"
+                aria-label="다음 달"
+                className="rounded-none px-1.5 py-1"
+                style={{
+                  color: "var(--text-secondary)",
+                  borderLeft: "1px solid var(--border-subtle)",
+                }}
+              >
+                <ChevronRight className="h-3.5 w-3.5" />
+              </Button>
             </div>
-          </div>
-        </div>
+          }
+        />
         <div className="grid grid-cols-7">
           {WEEKDAYS.map((w, i) => (
             <div

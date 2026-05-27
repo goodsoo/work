@@ -29,7 +29,6 @@ import {
 import { meetingFolder } from "../../api/meetings";
 import { useMeetingSort, type MeetingSortKey } from "../../hooks/useMeetingSort";
 import { buildMeetingSortComparator } from "../../lib/meetingSort";
-import { type TaskSortKey } from "../../hooks/useTaskSort";
 import { useJournals } from "../../hooks/useJournals";
 import { useTasks, useUpdateTask } from "../../hooks/useTasks";
 import {
@@ -1362,8 +1361,6 @@ export type TaskCategoryFilter =
 type TodosPanelProps = {
   statusFilter: TaskStatusFilter;
   onStatusChange: (next: TaskStatusFilter) => void;
-  sortKey: TaskSortKey;
-  onSortKeyChange: (next: TaskSortKey) => void;
   // 사이드바 루틴 폴더의 selected entry 와 onSelect.
   // null = 루틴 미선택 (= 태스크 필터 활성). routine 선택 시 본문이 RoutineDetail 로
   // 전환되고 태스크 필터는 시각 비활성 (회색).
@@ -1374,8 +1371,6 @@ type TodosPanelProps = {
 export function TodosSidePanel({
   statusFilter,
   onStatusChange,
-  sortKey,
-  onSortKeyChange,
   selectedRoutineName,
   onSelectRoutine,
 }: TodosPanelProps) {
@@ -1454,7 +1449,6 @@ export function TodosSidePanel({
           할 일
         </h2>
         <div className="flex items-center gap-0.5">
-          <SortMenu value={sortKey} onChange={onSortKeyChange} />
           <Button
             variant="icon"
             onClick={() =>

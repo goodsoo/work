@@ -1,12 +1,10 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
-  Trash2,
   Ban,
   Copy,
   Check,
   Undo2,
   Redo2,
-  Eye,
   Pencil,
   X,
   Calendar as CalendarIcon,
@@ -16,7 +14,6 @@ import {
   Circle,
   AlertCircle,
   Sparkles,
-  Clipboard,
   Upload,
 } from "lucide-react";
 
@@ -34,9 +31,10 @@ import { Text } from "../common/Text";
 import { PageHeaderBar } from "../common/PageHeaderBar";
 import { Kbd } from "../common/Kbd";
 import { EmptyState } from "../common/EmptyState";
-import { ClaudeAutoSummaryModal } from "./ClaudeAutoSummaryModal";
-import { PasteSummaryModal } from "./PasteSummaryModal";
-import { CopyButton } from "./CopyButton";
+import { SummaryModal } from "./SummaryModal";
+import { MeetingActionMenu } from "./MeetingActionMenu";
+import { ModeChip } from "../common/ModeChip";
+import { useToast } from "../Toast";
 import { AttendeeTagInput } from "./AttendeeTagInput";
 import { SourceBodyEditor } from "./SourceBodyEditor";
 import { useVault } from "../../lib/vault/useVault";
@@ -142,6 +140,7 @@ export function MeetingForm({
   const deleteMutation = useDeleteMeeting();
   const [viewMode, setViewMode] = useViewMode();
   const { adapter } = useVault();
+  const toast = useToast();
 
   const attendeeSuggestions = useMemo(() => {
     const set = new Set<string>();
@@ -240,8 +239,7 @@ export function MeetingForm({
   const [actionError, setActionError] = useState<string | null>(null);
   const [copiedToast, setCopiedToast] = useState<string | null>(null);
   // 요약 흐름 — 두 진입점 모두 모달로 분리 (자동 호출 / 외부 paste).
-  const [autoSummaryOpen, setAutoSummaryOpen] = useState(false);
-  const [pasteSummaryOpen, setPasteSummaryOpen] = useState(false);
+  const [summaryModalOpen, setSummaryModalOpen] = useState(false);
   async function copyToastMessage(text: string, id: string) {
     try {
       await navigator.clipboard.writeText(text);
@@ -557,6 +555,19 @@ export function MeetingForm({
   const summaryDisabled =
     (body ?? "").trim().length === 0 && (transcript ?? "").trim().length === 0;
 
+  // "요약하기" 클릭 — 메모·음성 기록 둘 다 비면 모달 대신 하단 안내 토스트.
+  // 버튼을 비활성(disabled)으로 두면 클릭 자체가 안 먹어 이유를 모르므로, 클릭은
+  // 받되 시각만 흐리게 (aria-disabled) 하고 안내를 띄움.
+  function handleSummaryClick() {
+    if (summaryDisabled) {
+      toast.show("메모나 음성 기록을 먼저 작성하면 요약할 수 있습니다.", {
+        kind: "info",
+      });
+      return;
+    }
+    setSummaryModalOpen(true);
+  }
+
   const summaryPromptInput = {
     title: titleDraft.trim() || initialTitle || null,
     date: meta.date || null,
@@ -565,6 +576,24 @@ export function MeetingForm({
     content: body,
     transcript: transcript || null,
   };
+
+  // 탭별 액션 — 헤더 우측 편집 토글 왼쪽에 모음 (sticky 라 스크롤해도 닿음).
+  // 음성 기록 업로드는 편집 모드만, 요약 자동요약·붙여넣기는 항상.
+  const showUploadAction = activeTab === "transcript" && viewMode === "edit";
+  const showSummaryActions = activeTab === "summary";
+  const hasTabActions = showUploadAction || showSummaryActions;
+
+  // 활성 탭 밑줄 색 — 편집 모드면 파랑(ModeChip 과 통일), 보기 모드면 모노톤.
+  const tabAccentColor =
+    viewMode === "edit" ? "var(--accent-blue-text)" : "var(--text-primary)";
+
+  // 활성 탭 글자수 — 에디터 하단 우측 sticky chip 으로 표시 (헤더 컨트롤 클러스터에서 분리).
+  const activeCount =
+    activeTab === "body"
+      ? body.length
+      : activeTab === "transcript"
+        ? transcript.length
+        : summary.length;
 
   // 빈 메모 CTA 클릭 — 편집 모드 전환 + 다음 frame 에 본문 textarea focus.
   // 본문 탭 active 일 때 transcript textarea 는 unmount → 활성 textarea 는 SourceBodyEditor 의 것 1개.
@@ -656,28 +685,13 @@ export function MeetingForm({
           />
         }
         right={
-          <>
-            <CopyButton
-              meeting={meetingForCopy}
-              section={activeTab}
-              onError={setActionError}
-              compact
-            />
-            <Button
-              variant="ghost"
-              onClick={handleDelete}
-              disabled={deleteMutation.isPending}
-              title="메모 삭제"
-              aria-label="메모 삭제"
-              className="px-1.5 py-1 disabled:opacity-40"
-              style={{
-                border: "1px solid var(--border-subtle)",
-                color: "var(--text-muted)",
-              }}
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </Button>
-          </>
+          <MeetingActionMenu
+            meeting={meetingForCopy}
+            section={activeTab}
+            onError={setActionError}
+            onDelete={handleDelete}
+            deleteDisabled={deleteMutation.isPending}
+          />
         }
       />
 
@@ -867,29 +881,55 @@ export function MeetingForm({
             <TabBtn
               label="메모"
               active={activeTab === "body"}
+              accentColor={tabAccentColor}
               onClick={() => setActiveTab("body")}
             />
             <TabBtn
               label="음성 기록"
               active={activeTab === "transcript"}
+              accentColor={tabAccentColor}
               onClick={() => setActiveTab("transcript")}
             />
             <TabBtn
               label="요약"
               active={activeTab === "summary"}
+              accentColor={tabAccentColor}
               onClick={() => setActiveTab("summary")}
             />
           </div>
           <div className="flex items-center gap-1.5 pb-1">
-            <CharCountBadge
-              count={
-                activeTab === "body"
-                  ? body.length
-                  : activeTab === "transcript"
-                    ? transcript.length
-                    : summary.length
-              }
-            />
+            {/* 탭별 액션 — 편집 토글 왼쪽. 음성 기록 업로드(편집 모드만) /
+                요약 자동요약·붙여넣기(항상). */}
+            {showUploadAction ? (
+              <TranscriptUploadButton
+                transcript={transcript}
+                onChange={(v) => {
+                  const prevLines = doc.transcript.match(/\n/g)?.length ?? 0;
+                  const newLines = v.match(/\n/g)?.length ?? 0;
+                  if (newLines > prevLines) docHistory.flush();
+                  setDoc("transcript", { ...doc, transcript: v });
+                }}
+                onError={setActionError}
+              />
+            ) : null}
+            {showSummaryActions ? (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleSummaryClick}
+                aria-disabled={summaryDisabled}
+                aria-label="요약하기"
+                title="요약하기 (자동 요약 / 직접 붙여넣기)"
+                leftIcon={<Sparkles className="h-4 w-4" />}
+                className={`px-2 py-1 ${summaryDisabled ? "opacity-40" : ""}`}
+              />
+            ) : null}
+            {hasTabActions ? (
+              <div
+                className="mx-0.5 h-4 w-px"
+                style={{ backgroundColor: "var(--border-default)" }}
+              />
+            ) : null}
             {/* 세 탭 모두 편집/보기 토글 (음성 기록 보기 = 읽기 전용 + 참석자 하이라이트). */}
             <ModeChip
               viewMode={viewMode}
@@ -986,21 +1026,11 @@ export function MeetingForm({
             파일 업로드는 메타 칩 trailing 으로 (요약 탭 아이콘 버튼 패턴과 통일). */}
         {activeTab === "transcript" ? (
           <div>
-            <MetaInlineChip
-              meta={meta}
-              trailing={
-                <TranscriptUploadButton
-                  transcript={transcript}
-                  onChange={(v) => {
-                    const prevLines = (doc.transcript.match(/\n/g)?.length ?? 0);
-                    const newLines = (v.match(/\n/g)?.length ?? 0);
-                    if (newLines > prevLines) docHistory.flush();
-                    setDoc("transcript", { ...doc, transcript: v });
-                  }}
-                  onError={setActionError}
-                />
-              }
-            />
+            {viewMode === "edit" ? (
+              <MetaReadOnly meta={meta} boxed />
+            ) : (
+              <MetaReadOnly meta={meta} />
+            )}
             <div
               key={`transcript:${viewMode}`}
               style={{ animation: "meetingViewFade 140ms ease" }}
@@ -1027,60 +1057,15 @@ export function MeetingForm({
         ) : null}
 
         {/* Summary tab — 메타는 본문 탭에서만 편집 가능. 여기선 readOnly 만.
-            요약 있음 = 메타 행 우측에 아이콘 버튼 (compact, 재실행/덮어쓰기 의도).
-            요약 없음 = 큰 primary 버튼 (onboarding CTA). */}
+            액션(자동요약·붙여넣기)은 헤더 우측 아이콘으로 이동. 요약 없을 땐
+            본문 중앙 EmptyState 로 두 CTA 유도 (헤더 아이콘과 별개, 첫 진입 안내). */}
         {activeTab === "summary" ? (
           <div className="space-y-4">
-            <MetaInlineChip
-              meta={meta}
-              trailing={
-                hasAnySummary ? (
-                  <>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => setAutoSummaryOpen(true)}
-                      disabled={summaryDisabled}
-                      title="Claude 한테 자동 요약"
-                      leftIcon={<Sparkles className="h-4 w-4" />}
-                      className="px-2 py-1 disabled:opacity-40"
-                    />
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => setPasteSummaryOpen(true)}
-                      disabled={summaryDisabled}
-                      title="직접 붙여넣기"
-                      leftIcon={<Clipboard className="h-4 w-4" />}
-                      className="px-2 py-1 disabled:opacity-40"
-                    />
-                  </>
-                ) : null
-              }
-            />
-            {!hasAnySummary ? (
-              <div className="flex flex-wrap items-center gap-2">
-                <Button
-                  variant="primary"
-                  onClick={() => setAutoSummaryOpen(true)}
-                  disabled={summaryDisabled}
-                  leftIcon={<Sparkles className="h-4 w-4" />}
-                  className="px-3 py-2 disabled:opacity-60"
-                >
-                  Claude 한테 자동 요약
-                </Button>
-                <Button
-                  variant="secondary"
-                  onClick={() => setPasteSummaryOpen(true)}
-                  disabled={summaryDisabled}
-                  leftIcon={<Clipboard className="h-4 w-4" />}
-                  className="px-3 py-2 disabled:opacity-60"
-                >
-                  직접 붙여넣기
-                </Button>
-              </div>
-            ) : null}
-
+            {viewMode === "edit" ? (
+              <MetaReadOnly meta={meta} boxed />
+            ) : (
+              <MetaReadOnly meta={meta} />
+            )}
             {hasAnySummary ? (
               <div
                 key={`summary:${viewMode}`}
@@ -1117,14 +1102,56 @@ export function MeetingForm({
                 )}
               </div>
             ) : (
-              <Text variant="body" color="muted" as="p">
-                위 버튼을 눌러 메모와 음성 기록을 정리해보세요.
-              </Text>
+              <EmptyState
+                icon={
+                  <Sparkles
+                    className="h-12 w-12"
+                    style={{ color: "var(--text-muted)" }}
+                    strokeWidth={1.25}
+                  />
+                }
+                title="요약이 아직 없습니다"
+                description={
+                  summaryDisabled
+                    ? "메모나 음성 기록을 먼저 작성하면 요약할 수 있습니다."
+                    : "Claude 로 자동 요약하거나 직접 붙여넣어 시작하세요."
+                }
+                action={
+                  <Button
+                    variant="primary"
+                    onClick={handleSummaryClick}
+                    aria-disabled={summaryDisabled}
+                    leftIcon={<Sparkles className="h-4 w-4" />}
+                    className={`px-3 py-2 ${summaryDisabled ? "opacity-60" : ""}`}
+                  >
+                    요약하기
+                  </Button>
+                }
+              />
             )}
           </div>
         ) : null}
         </div>
 
+        {/* 글자수 — 뷰포트 우측하단 고정 (fixed). 스크롤·드래그 선택과 무관하게 위치
+            불변. 흐린 frost chip. 에러 토스트(z-50)보다 아래(z-40) 라 겹치면 토스트 우선.
+            count 0 이면 숨김. */}
+        {activeCount > 0 ? (
+          <div
+            className="pointer-events-none fixed z-40"
+            style={{ bottom: "calc(var(--safe-bottom) + 0.75rem)", right: "1rem" }}
+          >
+            <span
+              className="rounded-md px-2 py-0.5 text-xs backdrop-blur"
+              style={{
+                backgroundColor: "var(--bg-overlay)",
+                color: "var(--text-muted)",
+              }}
+            >
+              {activeCount.toLocaleString("ko-KR")}자
+            </span>
+          </div>
+        ) : null}
         </div>
       </div>
       <TaskAddModal
@@ -1132,15 +1159,9 @@ export function MeetingForm({
         onClose={() => setTaskModalOpen(false)}
         prefill={taskModalPrefill}
       />
-      <ClaudeAutoSummaryModal
-        open={autoSummaryOpen}
-        onClose={() => setAutoSummaryOpen(false)}
-        promptInput={summaryPromptInput}
-        onApply={applySummaryFromModal}
-      />
-      <PasteSummaryModal
-        open={pasteSummaryOpen}
-        onClose={() => setPasteSummaryOpen(false)}
+      <SummaryModal
+        open={summaryModalOpen}
+        onClose={() => setSummaryModalOpen(false)}
         promptInput={summaryPromptInput}
         onApply={applySummaryFromModal}
       />
@@ -1180,46 +1201,6 @@ function lineToTaskPrefill(
 }
 
 // 본문 탭 활성 시 글자수 옆 chip — 현재 viewMode 표시 + 클릭 토글.
-// 헤더 우측 Eye/Pencil 토글 버튼을 대체.
-function ModeChip({
-  viewMode,
-  onToggle,
-}: {
-  viewMode: "edit" | "view";
-  onToggle: () => void;
-}) {
-  const isEdit = viewMode === "edit";
-  const title = `${isEdit ? "보기" : "편집"} 모드로  ⌘⇧E`;
-  return (
-    <Button
-      variant="ghost"
-      size="sm"
-      onClick={onToggle}
-      title={title}
-      leftIcon={
-        isEdit ? <Pencil className="h-3 w-3" /> : <Eye className="h-3 w-3" />
-      }
-      className="px-1.5 py-0.5"
-      style={{
-        border: "1px solid var(--border-subtle)",
-        color: isEdit ? "var(--accent-blue-text)" : "var(--text-secondary)",
-        backgroundColor: isEdit ? "var(--accent-blue-bg)" : "var(--bg-surface)",
-      }}
-    >
-      {isEdit ? "편집" : "보기"}
-    </Button>
-  );
-}
-
-function CharCountBadge({ count }: { count: number }) {
-  if (count <= 0) return null;
-  return (
-    <Text variant="caption" color="muted" as="span">
-      {count}자
-    </Text>
-  );
-}
-
 // 본문 textarea 의 line gutter 패턴과 동일: icon col (1.75rem) + 우측 divider + 라벨 + 값.
 function MetaRow({
   icon,
@@ -1258,74 +1239,62 @@ function MetaRow({
   );
 }
 
-// 음성기록 / 요약 탭용 — 한 줄 칩 형태로 메타 노출 (참고용). 편집은 본문 탭에서만.
-// 마크다운 inline code 와 같은 시각 어휘 (monospace + bg-surface-hover + rounded) →
-// "메모 텍스트가 아니라 메타데이터 값" 이라는 의미를 시선 부담 없이 전달.
-// trailing — 같은 행 우측 끝에 보조 액션 (예: 요약 탭의 아이콘 버튼 모음).
-function MetaInlineChip({
-  meta,
-  trailing,
-}: {
-  meta: MetaDoc;
-  trailing?: React.ReactNode;
-}) {
-  const wd = weekdayShort(meta.date);
-  const parts: string[] = [];
-  if (meta.date) parts.push(wd ? `${meta.date} (${wd})` : meta.date);
-  if (meta.time) parts.push(meta.time);
-  if (meta.attendees) parts.push(meta.attendees);
-  if (parts.length === 0 && !trailing) return null;
-  return (
-    <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-      {parts.length > 0 ? (
-        <code
-          className="inline-block rounded px-2 py-1 font-mono text-xs"
-          style={{
-            backgroundColor: "var(--bg-surface-hover)",
-            color: "var(--text-secondary)",
-          }}
-        >
-          {parts.join(" · ")}
-        </code>
-      ) : (
-        <span />
-      )}
-      {trailing ? <div className="flex items-center gap-1">{trailing}</div> : null}
-    </div>
-  );
-}
-
-// 보기 모드용 meta — icon/divider 없는 plain text. 빈 field 안 보임.
-// 편집 모드 MetaRow 와 같은 line height (1.625rem) + 라벨 위치 (gutter 1.75rem + paddingLeft 0.5rem).
-function MetaReadOnly({ meta }: { meta: MetaDoc }) {
+// 읽기 전용 meta — icon/divider 없는 plain text. 빈 field 안 보임.
+// 편집 모드 MetaRow 와 같은 line height (1.625rem) + 라벨 위치.
+//  - 기본 (보기 모드, 메모·음성기록·요약 공통): 박스 없는 평문.
+//  - boxed (음성기록·요약 편집 모드): 회색 박스 + 전체 muted — 메타 편집은 메모 탭에서만
+//    가능함을 시각적으로 명확히 (입력칸 MetaRow 와 구분).
+function MetaReadOnly({ meta, boxed }: { meta: MetaDoc; boxed?: boolean }) {
   const wd = weekdayShort(meta.date);
   const rows: { label: string; value: string }[] = [];
   if (meta.date) rows.push({ label: "날짜", value: wd ? `${meta.date} (${wd})` : meta.date });
   if (meta.time) rows.push({ label: "시간", value: meta.time });
   if (meta.attendees) rows.push({ label: "참석자", value: meta.attendees });
   if (rows.length === 0) return null;
+  const inner = rows.map((r) => (
+    <div
+      key={r.label}
+      className="flex items-center gap-3"
+      style={{ minHeight: "1.625rem" }}
+    >
+      <Text
+        variant="body"
+        color="muted"
+        as="span"
+        className="shrink-0"
+        style={{ width: "3.5rem" }}
+      >
+        {r.label}
+      </Text>
+      <Text variant="body" color={boxed ? "muted" : undefined} as="span">
+        {r.value}
+      </Text>
+    </div>
+  ));
+  if (boxed) {
+    // 박스의 padding·border 를 동일 크기의 negative margin 으로 상쇄 → 박스는 바깥으로
+    // bleed 하되 안쪽 텍스트는 보기 모드(박스 없음)와 정확히 같은 위치. 모드 토글 시 점프 X.
+    return (
+      <div
+        className="rounded-lg"
+        style={{
+          backgroundColor: "var(--bg-surface)",
+          border: "1px solid var(--border-subtle)",
+          padding: "0.5rem 0.75rem",
+          marginTop: "calc(-0.5rem - 1px)",
+          marginLeft: "calc(-0.75rem - 1px)",
+          marginRight: "calc(-0.75rem - 1px)",
+          // 보기 모드의 mb-4(1rem) 와 같은 하단 간격 유지 (padding 0.5rem + border 1px 보정).
+          marginBottom: "calc(0.5rem - 1px)",
+        }}
+      >
+        {inner}
+      </div>
+    );
+  }
   return (
     <Text variant="body" as="div" className="mb-4">
-      {rows.map((r) => (
-        <div
-          key={r.label}
-          className="flex items-center gap-3"
-          style={{ minHeight: "1.625rem" }}
-        >
-          <Text
-            variant="body"
-            color="muted"
-            as="span"
-            className="shrink-0"
-            style={{ width: "3.5rem" }}
-          >
-            {r.label}
-          </Text>
-          <Text variant="body" as="span">
-            {r.value}
-          </Text>
-        </div>
-      ))}
+      {inner}
     </Text>
   );
 }
@@ -1380,6 +1349,7 @@ function TabBtn({
   onBadgeClick,
   badgeTitle,
   active,
+  accentColor = "var(--text-primary)",
   onClick,
 }: {
   label: string;
@@ -1388,6 +1358,8 @@ function TabBtn({
   onBadgeClick?: () => void;
   badgeTitle?: string;
   active: boolean;
+  // 활성 탭 밑줄 색 (편집 모드 파랑 / 보기 모드 모노톤). 라벨은 항상 검정. 기본 모노톤.
+  accentColor?: string;
   onClick: () => void;
 }) {
   return (
@@ -1400,7 +1372,7 @@ function TabBtn({
       style={{
         color: active ? "var(--text-primary)" : "var(--text-secondary)",
         borderBottom: active
-          ? "2px solid var(--text-primary)"
+          ? `2px solid ${accentColor}`
           : "2px solid transparent",
         marginBottom: "-1px",
         fontWeight: active ? 600 : 400,
@@ -1552,7 +1524,7 @@ function TranscriptArea({
           ref={textareaRef}
           value={transcript}
           onChange={(e) => onChange(e.target.value)}
-          placeholder="음성 녹음의 텍스트 변환 결과를 여기에..."
+          placeholder="회의 또는 관련 대화 내용을 파일로 업로드하거나 직접 적어주세요..."
           className="w-full resize-none bg-transparent text-base leading-relaxed outline-none"
           autoCorrect="off"
           autoCapitalize="off"
