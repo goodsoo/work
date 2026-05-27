@@ -43,7 +43,7 @@ export function TasksPage({
   statusFilter = "all",
   categoryFilter = "all",
   onCategoryChange,
-  sortKey = "date_desc",
+  sortKey = "date_asc",
   scrollToTaskId = null,
   onScrollHandled,
 }: Props) {
