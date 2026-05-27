@@ -108,6 +108,105 @@ function findContinuationKind(full: string, lineStart: number): LineKind {
   return { type: "paragraph" };
 }
 
+// `|` 로 시작하는 줄이 직전 list item 의 lazy continuation 으로 흡수되는지.
+// GFM (실측: remark-gfm 4.0.1 / react-markdown 10): 목록(번호/점/체크박스) 바로
+// 다음에 빈 줄 없이 쓴 표는 표로 렌더 안 되고 목록 항목 텍스트로 흡수된다 — 빈 줄을
+// 끼워야 표가 됨. 단락 다음 표는 단락을 interrupt 해서 정상 렌더되므로 false.
+function tableLineAbsorbedByList(full: string, lineStart: number): boolean {
+  let scanEnd = lineStart - 1;
+  while (scanEnd > 0) {
+    const scanStart = full.lastIndexOf("\n", scanEnd - 1) + 1;
+    const ln = full.slice(scanStart, scanEnd);
+    if (ln.trim() === "") return false; // 빈 줄 다음 → 진짜 표
+    if (/^\|/.test(ln)) {
+      // 같은 표 후보의 윗 줄 — anchor 찾아 계속 위로
+      if (scanStart === 0) return false;
+      scanEnd = scanStart - 1;
+      continue;
+    }
+    // 첫 비-`|`·비-blank anchor 줄
+    const trimmed = ln.replace(/^ +/, "");
+    if (/^[-*+] \[[ xX]\] /.test(trimmed)) return true; // 체크박스
+    if (/^[-*+]\s/.test(trimmed)) return true; // 점 목록
+    if (/^\d+\.\s/.test(trimmed)) return true; // 번호 목록
+    return false; // 단락/제목/인용 등 → 표가 interrupt → 진짜 표
+  }
+  return false; // 문서 시작 → 진짜 표
+}
+
+// pipe row(`|` 포함 줄)의 컬럼 수. 양 끝 파이프 1개씩 제거 후 `|` 로 split.
+// (이스케이프 `\|`·코드스팬 내 파이프는 gutter 휴리스틱상 무시.)
+function pipeRowCols(line: string): number {
+  let t = line.trim();
+  if (t.startsWith("|")) t = t.slice(1);
+  if (t.endsWith("|")) t = t.slice(0, -1);
+  return t.split("|").length;
+}
+
+// 구분행이면 컬럼 수, 아니면 null. 셀이 모두 `:?-+:?` (하이픈 1+ 에 옵션 정렬콜론).
+function delimiterRowCols(line: string): number | null {
+  let t = line.trim();
+  if (t === "") return null;
+  if (t.startsWith("|")) t = t.slice(1);
+  if (t.endsWith("|")) t = t.slice(0, -1);
+  const cells = t.split("|");
+  for (const c of cells) {
+    if (!/^\s*:?-+:?\s*$/.test(c)) return null;
+  }
+  return cells.length;
+}
+
+function getNextLine(full: string, lineStart: number, line: string): string | null {
+  const afterLine = lineStart + line.length; // `\n` 위치 또는 full.length
+  if (afterLine >= full.length) return null;
+  const ns = afterLine + 1;
+  const ne = full.indexOf("\n", ns);
+  return full.slice(ns, ne === -1 ? undefined : ne);
+}
+
+// `|` 로 시작하는 줄이 "유효한 GFM 표"의 일부인지 (헤더 / 구분행 / 데이터행).
+// 핵심은 구분행 — `|` 만으로는 표가 아니고, 헤더행 바로 밑 구분행(+컬럼 수 일치)이
+// 있어야 표가 된다. 실측(remark-gfm 4.0.1): 구분행 없는 `| a | b |` 한 줄은 단락,
+// 헤더2칸 + 구분행1칸 처럼 컬럼 수가 어긋나도 표 아님, 헤더 없는 구분행도 표 아님.
+function isTablePipeRow(full: string, lineStart: number, line: string): boolean {
+  const dc = delimiterRowCols(line);
+  if (dc !== null) {
+    // 현재 줄 = 구분행 → 바로 위가 컬럼 수 맞는 헤더여야 표.
+    const prev = getPrevLine(full, lineStart);
+    return !!(
+      prev &&
+      prev.trim() !== "" &&
+      delimiterRowCols(prev) === null &&
+      pipeRowCols(prev) === dc
+    );
+  }
+  const cols = pipeRowCols(line);
+  // 현재 줄 = 헤더? 바로 아래가 컬럼 수 맞는 구분행.
+  const next = getNextLine(full, lineStart, line);
+  if (next !== null && delimiterRowCols(next) === cols) return true;
+  // 현재 줄 = 데이터행? 위로 contiguous pipe row 거슬러 구분행(+유효 헤더) 발견.
+  let scanEnd = lineStart - 1;
+  while (scanEnd > 0) {
+    const scanStart = full.lastIndexOf("\n", scanEnd - 1) + 1;
+    const ln = full.slice(scanStart, scanEnd);
+    if (ln.trim() === "") return false; // 빈 줄 → 표 블록 끝
+    const ldc = delimiterRowCols(ln);
+    if (ldc !== null) {
+      const h = getPrevLine(full, scanStart);
+      return !!(
+        h &&
+        h.trim() !== "" &&
+        delimiterRowCols(h) === null &&
+        pipeRowCols(h) === ldc
+      );
+    }
+    if (!/^\|/.test(ln)) return false; // pipe row 도 구분행도 아님 → 표 아님
+    if (scanStart === 0) return false;
+    scanEnd = scanStart - 1;
+  }
+  return false;
+}
+
 export function inferLineKind(full: string, pos: number): LineKind {
   const lineStart = full.lastIndexOf("\n", pos - 1) + 1;
   const nextNewline = full.indexOf("\n", pos);
@@ -171,7 +270,17 @@ export function inferLineKind(full: string, pos: number): LineKind {
 
   if (/^>\s?/.test(line)) return { type: "quote" };
   if (/^---+$|^\*\*\*+$|^___+$/.test(line)) return { type: "hr" };
-  if (/^\|/.test(line)) return { type: "table" };
+  if (/^\|/.test(line)) {
+    // 구분행 없는 `|` 줄은 표가 아니라 단락/목록 텍스트. 유효한 표라도 목록 직후
+    // (빈 줄 없이)면 흡수돼 렌더 안 됨 → 둘 다 단락/목록 이어짐으로 표시.
+    if (
+      !isTablePipeRow(full, lineStart, line) ||
+      tableLineAbsorbedByList(full, lineStart)
+    ) {
+      return findContinuationKind(full, lineStart);
+    }
+    return { type: "table" };
+  }
   if (/^\[[^\]]+\]:\s/.test(line)) return { type: "link-def" };
   if (line.trim() === "") return { type: "empty" };
 
