@@ -4,6 +4,8 @@ import {
   GhAuthError,
   GhNotInstalledError,
   GhSyncError,
+  LOGIN_SHELL_PROGRAM,
+  loginShellArgs,
   shellSingleQuote,
 } from "./gh";
 
@@ -24,6 +26,19 @@ describe("shellSingleQuote (TODO-1 sh -lc 래핑)", () => {
 
   it("빈 문자열", () => {
     expect(shellSingleQuote("")).toBe("''");
+  });
+});
+
+describe("loginShellArgs — release Finder PATH fix", () => {
+  // 회귀: release .app(Finder 실행)은 launchd 최소 PATH 라 gh(~/.local/bin)·claude(nvm)
+  // 가 PATH 밖. `sh -lc` 로 되돌리면 .bash_profile 미로딩 → command not found 로 깨짐.
+  it("bash login 셸로 래핑 (sh 아님)", () => {
+    expect(LOGIN_SHELL_PROGRAM).toBe("bash");
+  });
+
+  it("-lc + 명령 문자열을 그대로 args 로", () => {
+    expect(loginShellArgs("gh --version")).toEqual(["-lc", "gh --version"]);
+    expect(loginShellArgs("command -v gh")).toEqual(["-lc", "command -v gh"]);
   });
 });
 

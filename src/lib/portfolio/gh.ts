@@ -1,9 +1,13 @@
-// V0.7 — gh CLI 위임 (sh -lc 래핑).
+// V0.7 — gh CLI 위임 (bash -lc 래핑).
 //
-// design v2.3, TODO-1: Tauri macOS login shell PATH 상속 X →
-// 모든 gh 호출은 `Command.create("sh", ["-lc", "gh ..."])` 패턴.
-// `sh -lc` 가 사용자 login shell 환경 로딩 → brew (Apple Silicon /opt/homebrew/bin,
-// Intel /usr/local/bin), ~/.local/bin, Windows PATH 모두 호환.
+// design v2.3, TODO-1 + release PATH fix: Tauri macOS PATH 문제.
+// Finder 로 실행한 release .app 은 launchd 최소 PATH(/usr/bin:/bin:/usr/sbin:/sbin)
+// 로 시작 → gh(~/.local/bin), claude(nvm), brew(/opt/homebrew·/usr/local) 가
+// PATH 에 없음. `bash -lc` 가 login 셸로 ~/.bash_profile(+nvm, .local/bin) 을 로딩 →
+// 사용자 터미널과 동일 PATH 확보.
+//   - 옛 `sh -lc` 는 /etc/profile + ~/.profile 만 읽어 .local/bin·nvm 누락.
+//   - dev 가 됐던 건 -l 이 아니라 부모 터미널 PATH 상속 덕분이었고, release 는
+//     상속이 없어 gh: command not found / code 127 로 깨졌다.
 
 import { Command } from "@tauri-apps/plugin-shell";
 
@@ -54,6 +58,14 @@ export function shellSingleQuote(value: string): string {
   return `'${value.replace(/'/g, "'\\''")}'`;
 }
 
+// 모든 portfolio 셸 위임(gh/claude)의 단일 진입점 = release PATH fix 의 single source.
+// 위 헤더 주석 참조 — bash login 셸이라야 ~/.local/bin·nvm 이 PATH 에 들어온다.
+// (curl/zip/open 등 /usr/bin 시스템 binary 는 최소 PATH 로도 잡혀 sh -lc 유지 가능.)
+export const LOGIN_SHELL_PROGRAM = "bash";
+export function loginShellArgs(cmdStr: string): string[] {
+  return ["-lc", cmdStr];
+}
+
 // gh 명령어를 sh -lc 안에서 실행. 인자는 각각 single-quoted.
 export interface ShCommandResult {
   stdout: string;
@@ -90,7 +102,7 @@ export function classifyGhError(
 
 export async function runGh(args: string[]): Promise<ShCommandResult> {
   const cmdStr = `gh ${args.map(shellSingleQuote).join(" ")}`;
-  const cmd = Command.create("sh", ["-lc", cmdStr]);
+  const cmd = Command.create(LOGIN_SHELL_PROGRAM, loginShellArgs(cmdStr));
   const output = await cmd.execute();
   if (output.code !== 0) {
     throw classifyGhError(output.stderr, output.code);
@@ -122,7 +134,7 @@ export async function ghAuthCheck(host: string = "github.com"): Promise<boolean>
 // `command -v gh` 가 exit 0 이면 PATH 에 있음.
 export async function ghIsInstalled(): Promise<boolean> {
   try {
-    const cmd = Command.create("sh", ["-lc", "command -v gh"]);
+    const cmd = Command.create(LOGIN_SHELL_PROGRAM, loginShellArgs("command -v gh"));
     const output = await cmd.execute();
     return output.code === 0 && output.stdout.trim().length > 0;
   } catch {

@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "portfolio",
-  "description": "V0.7 — gh CLI 위임 (sh -lc 래핑) + 스크린샷 binary write + dotfile (.synced.md, .trash/) scope",
+  "description": "V0.7 — gh/claude CLI 위임 (bash -lc login 셸 PATH fix) + curl/zip/open (sh -lc) + 스크린샷 binary write + dotfile (.synced.md, .trash/) scope",
   "windows": ["main"],
   "permissions": [
     "shell:default",
@@ -11,6 +11,12 @@
         {
           "name": "sh",
           "cmd": "sh",
+          "args": true,
+          "sidecar": false
+        },
+        {
+          "name": "bash",
+          "cmd": "bash",
           "args": true,
           "sidecar": false
         }
