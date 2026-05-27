@@ -237,7 +237,9 @@ function TaskForm({
         </div>
       </div>
 
-      <label className="mt-3 flex items-center gap-2 text-xs">
+      {/* w-fit: label 폭을 체크박스+텍스트 만큼으로 한정 — flex 가 full-width 가 되어
+          텍스트 오른쪽 빈 공간 클릭에도 토글되던 것 방지. */}
+      <label className="mt-3 flex w-fit items-center gap-2 text-xs">
         <input
           type="checkbox"
           checked={done}
