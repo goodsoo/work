@@ -40,7 +40,12 @@ import {
 import type { Meeting } from "../../api/meetings";
 import type { Routine } from "../../api/routines";
 import type { Task, TaskCategory } from "../../api/tasks";
-import { formatDateLong, isToday, todayIso } from "../../lib/dates";
+import {
+  formatDateLong,
+  formatMemoDateShort,
+  isToday,
+  todayIso,
+} from "../../lib/dates";
 import { formatError } from "../../lib/errors";
 import { TaskAddModal } from "../tasks/TaskAddModal";
 import { CheckboxButton } from "../tasks/CheckboxButton";
@@ -1248,37 +1253,26 @@ export function CalendarDayPanel({
                   key={m.uid}
                   variant="ghost"
                   onClick={() => onOpenMeeting(m.uid)}
-                  className="w-full justify-start items-start gap-2 px-2 py-1 text-[13px]"
-                  leftIcon={
-                    <FileText className="mt-0.5 h-3 w-3 shrink-0 text-blue-500" />
-                  }
+                  className="w-full justify-start gap-1.5 rounded py-1 px-2 text-[13px] font-normal"
+                  style={{ color: "var(--text-primary)" }}
                 >
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-baseline gap-2">
-                      <span className="min-w-0 flex-1 truncate">
-                        {m.title?.trim() || "(제목 없음)"}
-                      </span>
-                      {m.time ? (
-                        <span
-                          className="shrink-0 text-[11px] tabular-nums"
-                          style={{ color: "var(--text-muted)" }}
-                        >
-                          {m.time}
-                        </span>
-                      ) : null}
-                    </div>
-                    {m.attendees ? (
-                      <Text
-                        variant="caption"
-                        color="secondary"
-                        as="div"
-                        truncate
-                        className="mt-0.5 text-[11px]"
-                      >
-                        {m.attendees}
-                      </Text>
-                    ) : null}
-                  </div>
+                  <FileText
+                    className="h-3 w-3 shrink-0"
+                    style={{ color: "var(--accent-blue)" }}
+                  />
+                  <span className="min-w-0 flex-1 truncate">
+                    {m.title?.trim() || "(제목 없음)"}
+                  </span>
+                  {m.date ? (
+                    <Text
+                      variant="caption"
+                      color="muted"
+                      as="span"
+                      className="shrink-0 pl-2 text-[11px] tabular-nums"
+                    >
+                      {formatMemoDateShort(m.date)}
+                    </Text>
+                  ) : null}
                 </Button>
                 ))}
               </SectionChildren>
