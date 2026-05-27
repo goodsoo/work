@@ -238,7 +238,7 @@ export function AppShell({
               as="h1"
               className="tracking-tight"
             >
-              goodsoob
+              짱수
             </Text>
           </div>
           <div className="flex items-center gap-0.5">

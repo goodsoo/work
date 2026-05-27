@@ -6,6 +6,13 @@
 
 ## 2026-05-27
 
+### PR #56 — 앱 이름·아이콘 짱수 브랜딩
+
+- **한 줄 임팩트**: 앱을 '짱수' 이름·아이콘으로 브랜딩
+- `productName` + window `title` + 인앱 헤더 h1 + `index.html` 타이틀 → "짱수". 번들 `identifier`(`com.goodsoob.work`)는 유지 — vault 경로/데이터 보존.
+- 아이콘 교체 — macOS 표준 그리드(1024 캔버스 + 824 둥근 흰 배경 + 여백)로 직접 합성해 구움. macOS 가 앱 아이콘을 자동으로 둥글게 마스킹하지 않아 직접 처리. 어두운 라인아트라 흰 배경 선택. squircle 소스 `~/Projects/logo-macos.png` 보관.
+- 내부 식별자(`package.json` name, Cargo 바이너리 name, theme 키)는 유지. ui_ux.
+
 ### 🚀 milestone — 데스크탑 앱 첫 배포 (V0.7.x 안정화 단계 진입)
 
 - **한 줄 임팩트**: 본인 매일 실사용 시작 — 이제 vault 안 데이터가 production
