@@ -27,6 +27,7 @@ import type { TaskCategory, TaskInsert } from "./api/tasks";
 import { TodosTrashModal } from "./components/tasks/TodosTrashModal";
 import { Text } from "./components/common/Text";
 import { EmptyState } from "./components/common/EmptyState";
+import { PageHeaderBar } from "./components/common/PageHeaderBar";
 import { CalendarPage } from "./pages/CalendarPage";
 import { TasksPage } from "./pages/TasksPage";
 import { PortfolioPage } from "./pages/PortfolioPage";
@@ -641,8 +642,6 @@ function AppContent() {
       <TodosSidePanel
         statusFilter={taskStatus}
         onStatusChange={setTaskStatus}
-        sortKey={taskSortKey}
-        onSortKeyChange={setTaskSortKey}
         selectedRoutineName={selectedRoutineName}
         onSelectRoutine={setSelectedRoutineName}
       />
@@ -683,6 +682,7 @@ function AppContent() {
       sidePanel={sidePanel}
       sidePanelFooter={sidePanelFooter}
       sidebarCollapsed={sidebar.collapsed}
+      onToggleSidebar={sidebar.toggle}
       onOpenSearch={() => setQuickSwitcherOpen(true)}
     >
       <PrefetchWarmup />
@@ -731,6 +731,7 @@ function AppContent() {
           categoryFilter={taskCategory}
           onCategoryChange={setTaskCategory}
           sortKey={taskSortKey}
+          onSortKeyChange={setTaskSortKey}
           scrollToTaskId={scrollToTaskId}
           onScrollHandled={() => setScrollToTaskId(null)}
         />
@@ -834,10 +835,22 @@ function MeetingsEmpty({ count, loading }: { count: number; loading: boolean }) 
     : count === 0
       ? "아직 메모가 없어요. 메뉴에서 + 를 눌러 새 메모를 만드세요."
       : "메뉴에서 메모를 선택하세요.";
+  // 메모 미선택이어도 헤더는 유지 — 좌측 사이드바 토글이 사라지지 않도록
+  // (MeetingForm 과 같은 flex-col 레이아웃 + PageHeaderBar sticky=false).
   return (
-    <EmptyState
-      className="flex h-[calc(100svh-3rem)] flex-col items-center justify-center gap-3 px-6 text-center"
-      description={<Text variant="body" color="muted" as="span">{message}</Text>}
-    />
+    <div className="min-h-svh lg:flex lg:h-full lg:min-h-0 lg:flex-col">
+      <PageHeaderBar
+        sticky={false}
+        center={
+          <Text variant="h4" as="h2">
+            메모장
+          </Text>
+        }
+      />
+      <EmptyState
+        className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center"
+        description={<Text variant="body" color="muted" as="span">{message}</Text>}
+      />
+    </div>
   );
 }

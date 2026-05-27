@@ -1,4 +1,7 @@
 import type { ReactNode } from "react";
+import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { useSidebarToggle } from "../../hooks/sidebarToggle";
+import { Button } from "./Button";
 
 type Props = {
   // 3-col grid 의 좌/가운데/우 slot. 빈 칸은 빈 div 자동 채움 (grid track 유지 → 가운데 viewport-center).
@@ -26,6 +29,7 @@ export function PageHeaderBar({
   sticky = true,
 }: Props) {
   const position = sticky ? "sticky top-0 z-20" : "";
+  const sidebarToggle = useSidebarToggle();
   return (
     <div
       className={`${position} grid items-center gap-2 overflow-hidden px-3 backdrop-blur lg:shrink-0 ${className}`}
@@ -37,6 +41,24 @@ export function PageHeaderBar({
       }}
     >
       <div className="flex shrink-0 items-center gap-2 justify-self-start">
+        {/* 사이드바 열기/닫기 토글 — undo/redo 등 left slot 왼쪽 고정. 데스크탑 전용
+            (모바일은 드로어). 열림=닫기 아이콘, 닫힘=열기 아이콘 — 자리 불변. */}
+        {sidebarToggle ? (
+          <Button
+            variant="icon"
+            onClick={sidebarToggle.toggle}
+            title={sidebarToggle.collapsed ? "사이드바 열기 (⌘\\)" : "사이드바 닫기 (⌘\\)"}
+            aria-label={sidebarToggle.collapsed ? "사이드바 열기" : "사이드바 닫기"}
+            className="hidden lg:inline-flex"
+            style={{ color: "var(--text-secondary)" }}
+          >
+            {sidebarToggle.collapsed ? (
+              <PanelLeftOpen className="h-4 w-4" />
+            ) : (
+              <PanelLeftClose className="h-4 w-4" />
+            )}
+          </Button>
+        ) : null}
         {left}
       </div>
       <div className="justify-self-center">{center}</div>

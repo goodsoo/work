@@ -76,6 +76,11 @@ export function formatDateTimeKo(iso: string): string {
   return format(d, "yyyy.MM.dd(EEE) HH:mm", { locale: ko });
 }
 
+/** 타이틀바 live 시계 — "2026.05.27 (수) · 오후 5:42". 날짜 정밀 + 12시간 시각. */
+export function formatClockNow(now = new Date()): string {
+  return format(now, "yyyy.MM.dd (EEE) · a h:mm", { locale: ko });
+}
+
 /** Relative human label: 오늘 / 어제 / 내일 / N일 후 / N일 전 / "5/6" */
 export function relativeDateLabel(
   iso: string,
