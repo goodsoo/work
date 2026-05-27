@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
-import { Ban, X } from "lucide-react";
+import { Ban, Info, X } from "lucide-react";
 import { Button } from "./common/Button";
 import { Text } from "./common/Text";
 import { Spinner } from "./common/Spinner";
@@ -8,7 +8,7 @@ import { Spinner } from "./common/Spinner";
 // 카드 띄움. MeetingForm 의 자체 actionError toast 와 같은 디자인 (var(--surface-frost)).
 // 다른 토스트 라이브러리 의존성 없이 가볍게.
 
-export type ToastKind = "error" | "progress";
+export type ToastKind = "error" | "progress" | "info";
 
 type Toast = {
   id: number;
@@ -91,11 +91,16 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                     className="h-4 w-4 shrink-0"
                     style={{ color: "var(--accent-red)" }}
                   />
+                ) : t.kind === "info" ? (
+                  <Info
+                    className="h-4 w-4 shrink-0"
+                    style={{ color: "var(--accent-primary)" }}
+                  />
                 ) : (
                   <Spinner size="sm" />
                 )}
                 <span className="min-w-0 flex-1 truncate font-semibold">
-                  {t.kind === "error" ? "ERROR" : "진행 중"}
+                  {t.kind === "error" ? "ERROR" : t.kind === "info" ? "안내" : "진행 중"}
                 </span>
                 <Button
                   variant="icon"

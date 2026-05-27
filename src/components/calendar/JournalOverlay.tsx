@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { X, Eye, Pencil } from "lucide-react";
+import { X } from "lucide-react";
 import { useUpsertJournal, useDeleteJournal, useJournals } from "../../hooks/useJournals";
 import { useDebouncedSave, type SaveStatus } from "../../hooks/useDebouncedSave";
 import { formatDateLong } from "../../lib/dates";
@@ -7,6 +7,7 @@ import { MarkdownView } from "../meetings/MarkdownView";
 import { SourceBodyEditor } from "../meetings/SourceBodyEditor";
 import { Modal } from "../common/Modal";
 import { Button } from "../common/Button";
+import { ModeChip } from "../common/ModeChip";
 import { Text } from "../common/Text";
 
 type Props = {
@@ -178,39 +179,6 @@ export function JournalOverlay({ open, date, onClose }: Props) {
           </div>
         )}
     </Modal>
-  );
-}
-
-// 메모장 ModeChip 과 동일 spec (MeetingForm.tsx 의 ModeChip 참고): chip 스타일,
-// 아이콘 의미 = 다음 액션 (편집 모드면 Pencil + "편집" 라벨, 클릭하면 보기로).
-function ModeChip({
-  viewMode,
-  onToggle,
-}: {
-  viewMode: "edit" | "view";
-  onToggle: () => void;
-}) {
-  const isEdit = viewMode === "edit";
-  const title = `${isEdit ? "보기" : "편집"} 모드로  ⌘⇧E`;
-  return (
-    <Button
-      variant="ghost"
-      size="sm"
-      onClick={onToggle}
-      title={title}
-      aria-label={title}
-      leftIcon={
-        isEdit ? <Pencil className="h-3 w-3" /> : <Eye className="h-3 w-3" />
-      }
-      className="px-1.5 py-0.5"
-      style={{
-        border: "1px solid var(--border-subtle)",
-        color: isEdit ? "var(--accent-blue-text)" : "var(--text-secondary)",
-        backgroundColor: isEdit ? "var(--accent-blue-bg)" : "var(--bg-surface)",
-      }}
-    >
-      {isEdit ? "편집" : "보기"}
-    </Button>
   );
 }
 
