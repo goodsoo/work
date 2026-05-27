@@ -26,6 +26,11 @@ const TASK_EXAMPLES: Example[] = [
   { inputs: ["#high", "#medium", "#low"], output: "우선순위" },
 ];
 
+const LINEBREAK_EXAMPLES: Example[] = [
+  { inputs: ["Enter"], output: "한 번이면 다음 줄로 줄바꿈" },
+  { inputs: ["Enter 2번 (빈 줄)"], output: "문단 띄우기 (간격 넓게)" },
+];
+
 export function HelpSection() {
   return (
     <div className="space-y-5">
@@ -35,6 +40,7 @@ export function HelpSection() {
         title="메모 → 할 일 (cursor 줄 위 ⌘⏎)"
         examples={TASK_EXAMPLES}
       />
+      <Block title="메모 본문 줄바꿈" examples={LINEBREAK_EXAMPLES} />
     </div>
   );
 }
