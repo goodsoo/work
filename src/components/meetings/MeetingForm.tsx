@@ -122,9 +122,10 @@ function docToPatch(d: DocSnapshot): MeetingUpdate {
 
 type ActiveTab = "body" | "transcript" | "summary";
 
-// 메모별 마지막 활성 탭 기억. 페이지 전환으로 컴포넌트가 unmount/mount 되어도
-// 살아남도록 모듈 레벨에. 새로고침 시 초기화.
-const ACTIVE_TAB_CACHE = new Map<string, ActiveTab>();
+// 마지막 활성 탭 — 메모 전체 공통 (메모별 분리 X). 메모 A 의 음성 기록 탭에서
+// 메모 B 로 전환하면 B 도 음성 기록 탭으로 열림 (옵시디안의 "탭은 뷰 상태" 모델).
+// 페이지 전환으로 unmount/mount 돼도 살아남도록 모듈 레벨. 새로고침 시 초기화.
+let activeTabGlobal: ActiveTab = "body";
 // 메모 + 탭 별 scroll 위치 기억 (`${meetingId}:${tab}` → scrollTop). 탭 전환/페이지
 // 전환 시 outgoing 탭의 위치 저장 + incoming 탭의 위치 복원. 새로고침 시 초기화.
 const SCROLL_CACHE = new Map<string, number>();
@@ -317,11 +318,11 @@ export function MeetingForm({
     setDoc("meta:attendees", { ...doc, meta: { ...meta, attendees: next } }, true);
   }
   const [activeTab, setActiveTabState] = useState<ActiveTab>(
-    () => ACTIVE_TAB_CACHE.get(meetingId) ?? "body",
+    () => activeTabGlobal,
   );
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   function setActiveTab(t: ActiveTab) {
-    ACTIVE_TAB_CACHE.set(meetingId, t);
+    activeTabGlobal = t;
     setActiveTabState(t);
   }
   const [taskModalOpen, setTaskModalOpen] = useState(false);
@@ -338,12 +339,6 @@ export function MeetingForm({
     window.addEventListener("beforeunload", onBeforeUnload);
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
   }, [docHistory]);
-
-  // 메모 전환 시 그 메모의 마지막 탭으로 (cache miss 면 본문).
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setActiveTabState(ACTIVE_TAB_CACHE.get(meetingId) ?? "body");
-  }, [meetingId]);
 
   // 탭/메모 전환 후 layout 직후 — incoming 탭의 scroll 위치 복원 (없으면 0).
   // content mount 직후엔 textarea auto-resize 등으로 height 가 정해지지 않아
