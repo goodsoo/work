@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useScopedKey } from "../lib/vault/scopedStorage";
+import { scopedKey, useScopedKey } from "../lib/vault/scopedStorage";
 
 export type BodyViewMode = "edit" | "view";
 
@@ -9,6 +9,19 @@ function readKey(key: string): BodyViewMode {
   if (typeof localStorage === "undefined") return "edit";
   const v = localStorage.getItem(key);
   return v === "view" ? "view" : "edit";
+}
+
+/**
+ * vault 전역 viewMode 를 localStorage 에 직접 기록. 새 메모 생성처럼 MeetingForm
+ * mount "전에" 초기값을 정해야 하는 경우용 — mount 후 setState 는 useViewMode 의
+ * key 초기화 effect 와 race 라 안 먹는다. 다음 mount 의 useState 초기값으로 반영됨.
+ */
+export function setStoredViewMode(
+  vaultId: string | null,
+  mode: BodyViewMode,
+): void {
+  if (typeof localStorage === "undefined") return;
+  localStorage.setItem(scopedKey(BASE_KEY, vaultId), mode);
 }
 
 export function useViewMode() {
