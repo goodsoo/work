@@ -1645,6 +1645,10 @@ function TranscriptView({
         color: "var(--text-primary)",
         whiteSpace: "pre-wrap",
         overflowWrap: "anywhere",
+        // 보기 모드 음성 기록도 외부 복사 주 경로 — body { user-select: none } 를
+        // override 해 드래그 선택 허용 (.markdown-view 와 동일 정책).
+        userSelect: "text",
+        WebkitUserSelect: "text",
       }}
     >
       {segments.map((seg, i) => {
