@@ -829,11 +829,34 @@ function PrefetchWarmup() {
 }
 
 function MeetingsEmpty({ count, loading }: { count: number; loading: boolean }) {
+  // 메모가 있는데 미선택 = 매일 보는 빈 상태. 문구 없이 앱 로고만 크게 + 연하게.
+  // PNG 대신 favicon.svg 를 mask 로 깔고 토큰 색으로 칠함 — 라이트/다크 둘 다 연한 회색으로 적응.
+  if (!loading && count > 0) {
+    return (
+      <div className="flex h-[calc(100svh-3rem)] flex-col items-center justify-center px-6">
+        <div
+          aria-hidden
+          style={{
+            width: "11rem",
+            height: "11rem",
+            backgroundColor: "var(--border-default)",
+            WebkitMaskImage: "url(/favicon.svg)",
+            maskImage: "url(/favicon.svg)",
+            WebkitMaskRepeat: "no-repeat",
+            maskRepeat: "no-repeat",
+            WebkitMaskPosition: "center",
+            maskPosition: "center",
+            WebkitMaskSize: "contain",
+            maskSize: "contain",
+          }}
+        />
+      </div>
+    );
+  }
+  // 첫 진입 (메모 0개) 은 만들기 안내 유지.
   const message = loading
     ? ""
-    : count === 0
-      ? "아직 메모가 없어요. 메뉴에서 + 를 눌러 새 메모를 만드세요."
-      : "메뉴에서 메모를 선택하세요.";
+    : "아직 메모가 없어요. 메뉴에서 + 를 눌러 새 메모를 만드세요.";
   return (
     <EmptyState
       className="flex h-[calc(100svh-3rem)] flex-col items-center justify-center gap-3 px-6 text-center"
