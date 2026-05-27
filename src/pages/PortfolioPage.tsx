@@ -231,8 +231,12 @@ function CategoryChipRow({
 }) {
   return (
     <div
-      className="shrink-0 px-6 py-3"
-      style={{ borderBottom: "1px solid var(--border-default)" }}
+      className="sticky z-10 shrink-0 px-6 py-2 backdrop-blur"
+      style={{
+        top: "var(--page-header-h)",
+        borderBottom: "1px solid var(--border-subtle)",
+        backgroundColor: "var(--bg-overlay)",
+      }}
     >
       <div className="flex flex-wrap items-center gap-1">
         <SelectableChip
