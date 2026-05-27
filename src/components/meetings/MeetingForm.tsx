@@ -403,7 +403,7 @@ export function MeetingForm({
   //   Cmd/Ctrl+Z/Y/Shift+Z = docHistory undo/redo (전체 도큐먼트 timeline. 제목 제외).
   //     focus 가 제목 input 이면 native input undo 사용 (preventDefault X).
   //   Opt+Tab / Opt+Shift+Tab = sub-tab cycle 본문→음성기록→요약 (textarea/input 무관).
-  //   Cmd+Shift+E = 본문 탭일 때 편집/보기 토글 (Cmd+E inline-code wrap 충돌 회피).
+  //   Cmd+Shift+E = 모든 탭 편집/보기 토글 (Cmd+E inline-code wrap 충돌 회피).
   useEffect(() => {
     function isInTitleInput(): boolean {
       return document.activeElement === titleInputRef.current;
@@ -440,10 +440,10 @@ export function MeetingForm({
         setActiveTab(order[(idx + dir + order.length) % order.length]);
         return;
       }
-      // Cmd+Shift+E — 본문 탭일 때 편집/보기 토글.
+      // Cmd+Shift+E — 모든 탭에서 편집/보기 토글 (ModeChip 과 동일, viewMode 공유).
       // SourceBodyEditor 의 Cmd+E (inline-code wrap) 충돌 회피로 Shift 동반.
+      // 음성 기록 보기 모드 = 읽기 전용 + 참석자 하이라이트 (마크다운 렌더 X).
       if (cmd && e.shiftKey && !e.altKey && e.code === "KeyE") {
-        if (activeTab !== "body") return;
         e.preventDefault();
         setViewMode(viewMode === "edit" ? "view" : "edit");
         return;
@@ -885,14 +885,13 @@ export function MeetingForm({
                     : summary.length
               }
             />
-            {activeTab === "body" || activeTab === "summary" ? (
-              <ModeChip
-                viewMode={viewMode}
-                onToggle={() =>
-                  setViewMode(viewMode === "edit" ? "view" : "edit")
-                }
-              />
-            ) : null}
+            {/* 세 탭 모두 편집/보기 토글 (음성 기록 보기 = 읽기 전용 + 참석자 하이라이트). */}
+            <ModeChip
+              viewMode={viewMode}
+              onToggle={() =>
+                setViewMode(viewMode === "edit" ? "view" : "edit")
+              }
+            />
           </div>
         </div>
 
@@ -997,16 +996,28 @@ export function MeetingForm({
                 />
               }
             />
-            <TranscriptArea
-              key={`${meetingId}:transcript`}
-              transcript={transcript}
-              onChange={(v) => {
-                const prevLines = (doc.transcript.match(/\n/g)?.length ?? 0);
-                const newLines = (v.match(/\n/g)?.length ?? 0);
-                if (newLines > prevLines) docHistory.flush();
-                setDoc("transcript", { ...doc, transcript: v });
-              }}
-            />
+            <div
+              key={`transcript:${viewMode}`}
+              style={{ animation: "meetingViewFade 140ms ease" }}
+            >
+              {viewMode === "edit" ? (
+                <TranscriptArea
+                  key={`${meetingId}:transcript`}
+                  transcript={transcript}
+                  onChange={(v) => {
+                    const prevLines = (doc.transcript.match(/\n/g)?.length ?? 0);
+                    const newLines = (v.match(/\n/g)?.length ?? 0);
+                    if (newLines > prevLines) docHistory.flush();
+                    setDoc("transcript", { ...doc, transcript: v });
+                  }}
+                />
+              ) : (
+                <TranscriptView
+                  transcript={transcript}
+                  attendees={meta.attendees}
+                />
+              )}
+            </div>
           </div>
         ) : null}
 
@@ -1547,6 +1558,129 @@ function TranscriptArea({
           }}
         />
       </div>
+    </div>
+  );
+}
+
+// 음성 기록 보기 모드 — 읽기 전용 평문(pre-wrap, 마크다운 렌더 X) + 참석자별 색상 칩
+// + mm:ss 타임스탬프(회색 박스) 하이라이트. textarea 안에선 inline 색을 못 넣어 div 로
+// 렌더 → 자연히 편집 불가. STT 줄바꿈/들여쓰기 보존.
+const SPEAKER_COLOR_COUNT = 10; // index.css 의 --speaker-0..9 와 일치.
+
+function TranscriptView({
+  transcript,
+  attendees,
+}: {
+  transcript: string;
+  attendees: string;
+}) {
+  // 참석자 문자열(", " join) → 적힌 순서 유지 unique 이름 배열. 1글자 이름은 오버매치
+  // (전부 하이라이트) 회피로 제외. 색은 이 순서대로 i%N 배정 → 한 회의 안 색 안 겹침.
+  const orderedNames = useMemo(() => {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const raw of attendees.split(",")) {
+      const n = raw.trim();
+      if (n.length >= 2 && !seen.has(n)) {
+        seen.add(n);
+        out.push(n);
+      }
+    }
+    return out;
+  }, [attendees]);
+
+  // 이름 → speaker 색 인덱스 (적힌 순서 기준, 매칭 정렬과 무관).
+  const colorOf = useMemo(() => {
+    const m = new Map<string, number>();
+    orderedNames.forEach((n, i) => m.set(n, i % SPEAKER_COLOR_COUNT));
+    return m;
+  }, [orderedNames]);
+
+  // 참석자 이름 + mm:ss / h:mm:ss 타임스탬프를 한 토크나이저로 분리. named group 으로
+  // 어느 종류가 매칭됐는지 판별. 둘 다 없으면 통짜 plain.
+  const segments = useMemo<
+    { text: string; kind: "plain" | "name" | "time" }[]
+  >(() => {
+    if (transcript.length === 0) return [];
+    const patterns: string[] = [];
+    if (orderedNames.length > 0) {
+      // 매칭은 긴 이름 우선(부분 매칭 방지) — 색 배정 순서와 무관하므로 정렬 복사본.
+      const escaped = [...orderedNames]
+        .sort((a, b) => b.length - a.length)
+        .map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+      patterns.push(`(?<name>${escaped.join("|")})`);
+    }
+    // STT 시간 마커 — 1:23 / 01:23 / 1:23:45. 단어 경계로 12.3 같은 숫자 오매칭 회피.
+    patterns.push(`(?<time>\\b\\d{1,2}:\\d{2}(?::\\d{2})?\\b)`);
+    const re = new RegExp(patterns.join("|"), "g");
+    const out: { text: string; kind: "plain" | "name" | "time" }[] = [];
+    let last = 0;
+    for (const m of transcript.matchAll(re)) {
+      const idx = m.index ?? 0;
+      if (idx > last) out.push({ text: transcript.slice(last, idx), kind: "plain" });
+      out.push({ text: m[0], kind: m.groups?.name ? "name" : "time" });
+      last = idx + m[0].length;
+    }
+    if (last < transcript.length) {
+      out.push({ text: transcript.slice(last), kind: "plain" });
+    }
+    return out;
+  }, [transcript, orderedNames]);
+
+  if (transcript.trim() === "") {
+    return (
+      <div style={{ minHeight: "60vh" }}>
+        <Text variant="body" color="muted" as="p">
+          음성 기록이 없습니다. 편집 모드에서 입력하거나 파일을 업로드하세요.
+        </Text>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="text-base leading-relaxed"
+      style={{
+        minHeight: "60vh",
+        color: "var(--text-primary)",
+        whiteSpace: "pre-wrap",
+        overflowWrap: "anywhere",
+      }}
+    >
+      {segments.map((seg, i) => {
+        if (seg.kind === "name") {
+          const ci = colorOf.get(seg.text) ?? 0;
+          return (
+            <span
+              key={i}
+              className="rounded px-1"
+              style={{
+                backgroundColor: `var(--speaker-${ci}-bg)`,
+                color: `var(--speaker-${ci}-text)`,
+              }}
+            >
+              {seg.text}
+            </span>
+          );
+        }
+        if (seg.kind === "time") {
+          // 인라인 코드 칩과 동일 레시피 (MarkdownView) — surface-hover + primary.
+          // surface-active 는 한 단계 진한 active/선택 상태색이라 정적 칩엔 무거움.
+          return (
+            <span
+              key={i}
+              className="rounded px-1 py-0.5 font-mono"
+              style={{
+                backgroundColor: "var(--bg-surface-hover)",
+                color: "var(--text-primary)",
+              }}
+            >
+              {seg.text}
+            </span>
+          );
+        }
+        return <span key={i}>{seg.text}</span>;
+      })}
     </div>
   );
 }

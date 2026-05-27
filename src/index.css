@@ -70,6 +70,22 @@
     --cat-work: #ea580c;
     --cat-schedule: #0d9488;
 
+    /* Speaker chips — 음성 기록 보기의 참석자 하이라이트. 카테고리형(positional)
+       팔레트: 적힌 순서대로 i%10 배정 → 한 회의 안 10명까지 색 안 겹침. accent 레시피
+       동일 (라이트=연한 tint bg + 진한 글자). 순서는 hue 휠 순이 아니라 연속 색이
+       최대한 멀어지게 점프 (대부분 2-4명 → 앞 색이 제일 많이 쓰임. 앞 4개=파랑·주황·
+       초록·분홍 보색 쌍, d3/Tableau10 방식). 색 자체 바꾸면 .dark 블록도 같이 수정. */
+    --speaker-0-bg: #e0f2fe; --speaker-0-text: #0369a1; /* sky */
+    --speaker-1-bg: #ffedd5; --speaker-1-text: #c2410c; /* orange */
+    --speaker-2-bg: #d1fae5; --speaker-2-text: #047857; /* emerald */
+    --speaker-3-bg: #ffe4e6; --speaker-3-text: #be123c; /* rose */
+    --speaker-4-bg: #ede9fe; --speaker-4-text: #6d28d9; /* violet */
+    --speaker-5-bg: #fef3c7; --speaker-5-text: #b45309; /* amber */
+    --speaker-6-bg: #ccfbf1; --speaker-6-text: #0f766e; /* teal */
+    --speaker-7-bg: #fae8ff; --speaker-7-text: #a21caf; /* fuchsia */
+    --speaker-8-bg: #ecfccb; --speaker-8-text: #4d7c0f; /* lime */
+    --speaker-9-bg: #e0e7ff; --speaker-9-text: #4338ca; /* indigo */
+
     /* Interactive */
     --btn-primary: #18181b;
     --btn-primary-text: #ffffff;
@@ -167,6 +183,18 @@
     /* Task category dots */
     --cat-work: #fb923c;
     --cat-schedule: #2dd4bf;
+
+    /* Speaker chips (dark) — 저알파 tint bg + 밝은 글자. 순서는 라이트와 동일. */
+    --speaker-0-bg: rgba(56, 189, 248, 0.15);  --speaker-0-text: #7dd3fc; /* sky */
+    --speaker-1-bg: rgba(251, 146, 60, 0.15);  --speaker-1-text: #fdba74; /* orange */
+    --speaker-2-bg: rgba(52, 211, 153, 0.15);  --speaker-2-text: #6ee7b7; /* emerald */
+    --speaker-3-bg: rgba(251, 113, 133, 0.15); --speaker-3-text: #fda4af; /* rose */
+    --speaker-4-bg: rgba(167, 139, 250, 0.15); --speaker-4-text: #c4b5fd; /* violet */
+    --speaker-5-bg: rgba(251, 191, 36, 0.15);  --speaker-5-text: #fcd34d; /* amber */
+    --speaker-6-bg: rgba(45, 212, 191, 0.15);  --speaker-6-text: #5eead4; /* teal */
+    --speaker-7-bg: rgba(232, 121, 249, 0.15); --speaker-7-text: #f0abfc; /* fuchsia */
+    --speaker-8-bg: rgba(163, 230, 53, 0.15);  --speaker-8-text: #bef264; /* lime */
+    --speaker-9-bg: rgba(129, 140, 248, 0.15); --speaker-9-text: #a5b4fc; /* indigo */
 
     /* Interactive */
     --btn-primary: #e4e4e7;
