@@ -221,6 +221,9 @@ function AppContent() {
     if (!path) return; // root 는 항상 보여 펼칠 게 없음
     setMeetingReveal((r) => ({ path, nonce: r.nonce + 1 }));
   }, []);
+  // 마크다운 도움말 패널 open — footer 버튼(좌측하단)이 토글, 패널은 콘텐츠 영역만
+  // 덮어 하단바 유지. 상태를 App 이 소유해 footer 슬롯·sidePanel 슬롯이 공유.
+  const [markdownHelpOpen, setMarkdownHelpOpen] = useState(false);
   const autoSyncDone = useRef(false);
   const autoBackupDone = useRef(false);
   const autoSelectedRef = useRef(didAutoSelectThisSession);
@@ -613,6 +616,8 @@ function AppContent() {
         revealPath={meetingReveal.path}
         revealNonce={meetingReveal.nonce}
         onRevealFolder={requestMeetingReveal}
+        markdownHelpOpen={markdownHelpOpen}
+        onMarkdownHelpClose={() => setMarkdownHelpOpen(false)}
       />
     ) : tab === "calendar" ? (
       <CalendarDayPanel
@@ -646,7 +651,11 @@ function AppContent() {
   // 탭별 footer slot. 휴지통은 overlay 모달, 도메인별 분리.
   const sidePanelFooter =
     tab === "meetings" ? (
-      <MeetingsSidePanelFooter onTrashOpen={() => setTrashOpen(true)} />
+      <MeetingsSidePanelFooter
+        onTrashOpen={() => setTrashOpen(true)}
+        markdownHelpOpen={markdownHelpOpen}
+        onMarkdownHelpToggle={() => setMarkdownHelpOpen((v) => !v)}
+      />
     ) : tab === "todos" ? (
       <TodosSidePanelFooter onTrashOpen={() => setTodosTrashOpen(true)} />
     ) : tab === "portfolio" ? (

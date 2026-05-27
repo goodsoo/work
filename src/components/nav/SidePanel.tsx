@@ -15,7 +15,7 @@ import {
   ChevronRight,
   Star,
 } from "lucide-react";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   useMeetings,
   useMeetingFolders,
@@ -64,6 +64,9 @@ type MeetingsPanelProps = {
   revealPath?: string;
   revealNonce?: number;
   onRevealFolder: (path: string) => void;
+  // 마크다운 도움말 패널 — open 상태는 App 소유, footer 토글 버튼이 제어.
+  markdownHelpOpen?: boolean;
+  onMarkdownHelpClose?: () => void;
 };
 
 export function MeetingsSidePanel({
@@ -72,6 +75,8 @@ export function MeetingsSidePanel({
   revealPath,
   revealNonce,
   onRevealFolder,
+  markdownHelpOpen,
+  onMarkdownHelpClose,
 }: MeetingsPanelProps) {
   const { data, isLoading } = useMeetings();
   const { data: folders } = useMeetingFolders();
@@ -406,6 +411,10 @@ export function MeetingsSidePanel({
         )}
       </div>
 
+      {markdownHelpOpen ? (
+        <MarkdownHelpPanel onClose={onMarkdownHelpClose ?? (() => {})} />
+      ) : null}
+
       {contextMenu ? (
         <MeetingContextMenu
           x={contextMenu.x}
@@ -696,12 +705,31 @@ function MeetingContextMenu({
 // AppShell.sidePanelFooter slot 으로 주입. 메모장 탭의 list 모드일 때만 보임.
 export function MeetingsSidePanelFooter({
   onTrashOpen,
+  markdownHelpOpen,
+  onMarkdownHelpToggle,
 }: {
   onTrashOpen: () => void;
+  markdownHelpOpen?: boolean;
+  onMarkdownHelpToggle?: () => void;
 }) {
   return (
     <div className="flex items-center gap-1">
-      <MarkdownHelp />
+      <Button
+        variant="icon"
+        onClick={onMarkdownHelpToggle}
+        title={markdownHelpOpen ? "도움말 닫기" : "마크다운 도움말"}
+        aria-label={markdownHelpOpen ? "도움말 닫기" : "마크다운 도움말"}
+        style={{
+          color: markdownHelpOpen ? "var(--text-primary)" : "var(--text-muted)",
+          backgroundColor: markdownHelpOpen ? "var(--bg-surface-active)" : undefined,
+        }}
+      >
+        {markdownHelpOpen ? (
+          <X className="h-3.5 w-3.5" />
+        ) : (
+          <HelpCircle className="h-3.5 w-3.5" />
+        )}
+      </Button>
       <Button
         variant="icon"
         onClick={onTrashOpen}
@@ -748,62 +776,56 @@ export function PortfolioSidePanelFooter({
   );
 }
 
-function MarkdownHelp() {
-  const [open, setOpen] = useState(false);
+// 마크다운 문법 패널 — open 상태는 App 이 소유 (footer 버튼이 토글). 콘텐츠 영역
+// (MeetingsSidePanel root, relative) 안에서 absolute inset-0 으로 렌더 → 하단
+// footer 는 안 덮음. 닫기는 footer 의 토글 버튼 (좌측하단) + ESC.
+function MarkdownHelpPanel({ onClose }: { onClose: () => void }) {
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
   return (
-    <>
-      <Button
-        variant="icon"
-        onClick={() => setOpen(true)}
-        title="마크다운 도움말"
-        aria-label="마크다운 도움말"
-        style={{ color: "var(--text-muted)" }}
+    <div
+      className="absolute inset-0 z-30 flex flex-col overflow-y-auto"
+      style={{ backgroundColor: "var(--bg-surface)" }}
+    >
+      <div
+        className="flex shrink-0 items-center px-4"
+        style={{ height: "var(--page-header-h)", borderBottom: "1px solid var(--border-default)" }}
       >
-        <HelpCircle className="h-3.5 w-3.5" />
-      </Button>
-      {open ? (
-        <div
-          className="absolute inset-0 z-30 flex flex-col overflow-y-auto"
-          style={{ backgroundColor: "var(--bg-surface)" }}
-        >
-          <div className="flex items-center justify-between px-4" style={{ height: "var(--page-header-h)", borderBottom: "1px solid var(--border-default)" }}>
-            <Text variant="body" weight="semibold" as="span">
-              마크다운 문법
-            </Text>
-            <Button
-              variant="icon"
-              onClick={() => setOpen(false)}
-              style={{ color: "var(--text-muted)" }}
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-          <div className="space-y-1.5 px-4 py-4 text-sm" style={{ color: "var(--text-primary)" }}>
-            {MARKDOWN_HINTS.map((h, i) => (
-              <div key={i}>
-                {h.section ? (
-                  <div
-                    className="mb-1 mt-3 text-[10px] font-semibold uppercase tracking-wider first:mt-0"
-                    style={{ color: "var(--text-muted)" }}
-                  >
-                    {h.section}
-                  </div>
-                ) : null}
-                <div className="flex items-baseline gap-2">
-                  <code
-                    className="shrink-0 rounded px-1.5 py-0.5 font-mono text-[11px]"
-                    style={{ backgroundColor: "var(--bg-surface-active)", color: "var(--text-secondary)" }}
-                  >
-                    {h.syntax}
-                  </code>
-                  <Text variant="caption" color="muted" as="span">{h.desc}</Text>
-                </div>
+        <Text variant="body" weight="semibold" as="span">
+          마크다운 문법
+        </Text>
+      </div>
+      {/* 정렬 2열 grid: 칩(auto)·설명(1fr) 한 column 으로 가지런히. 섹션 라벨은 full-span row. */}
+      <div
+        className="grid grid-cols-[auto_1fr] items-baseline gap-x-3 gap-y-1.5 px-4 py-4 text-sm"
+        style={{ color: "var(--text-primary)" }}
+      >
+        {MARKDOWN_HINTS.map((h, i) => (
+          <Fragment key={i}>
+            {h.section ? (
+              <div
+                className="col-span-2 mb-0.5 mt-3 text-[10px] font-semibold uppercase tracking-wider first:mt-0"
+                style={{ color: "var(--text-muted)" }}
+              >
+                {h.section}
               </div>
-            ))}
-          </div>
-        </div>
-      ) : null}
-    </>
+            ) : null}
+            <code
+              className="whitespace-nowrap rounded px-1.5 py-0.5 text-left font-mono text-[11px]"
+              style={{ backgroundColor: "var(--bg-surface-active)", color: "var(--text-secondary)" }}
+            >
+              {h.syntax}
+            </code>
+            <Text variant="caption" color="muted" as="span">{h.desc}</Text>
+          </Fragment>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -881,15 +903,11 @@ function SortMenu({
   );
 }
 
+// 좁은 사이드바(288px)용으로 압축 — 비슷한 건 한 줄로 묶되, 칩은 항목당 하나(2개씩
+// 묶지 않음). 자주 쓰는 문법 위주, 드문 reference 문법(참조 링크·4칸 코드블록 등)은 생략.
 const MARKDOWN_HINTS: Array<{ syntax: string; desc: string; section?: string }> = [
-  { section: "제목", syntax: "# 제목", desc: "H1 (대제목)" },
-  { syntax: "## 소제목", desc: "H2" },
-  { syntax: "### 소소제목", desc: "H3" },
-  { syntax: "#### 제목 4", desc: "H4" },
-  { syntax: "##### 제목 5", desc: "H5" },
-  { syntax: "###### 제목 6", desc: "H6" },
-  { syntax: "===", desc: "윗줄을 H1으로 (밑줄식)" },
-  { syntax: "---", desc: "윗줄을 H2로 (밑줄식, 윗줄에 텍스트 있을 때)" },
+  { section: "제목", syntax: "# ~ ######", desc: "제목 H1 ~ H6" },
+  { syntax: "=== / ---", desc: "윗줄을 H1 / H2 로" },
 
   { section: "서식 (인라인)", syntax: "**굵게**", desc: "굵은 글씨" },
   { syntax: "*기울임*", desc: "기울인 글씨" },
@@ -899,26 +917,19 @@ const MARKDOWN_HINTS: Array<{ syntax: string; desc: string; section?: string }> 
   { section: "목록", syntax: "- 항목", desc: "글머리 목록" },
   { syntax: "1. 항목", desc: "번호 목록" },
   { syntax: "- [ ] 할 일", desc: "체크박스" },
-  { syntax: "- [x] 완료", desc: "완료 체크박스" },
-  { syntax: "␣␣- 항목", desc: "중첩 목록 (2칸 들여쓰기 = 1단계)" },
-  { syntax: "␣␣␣␣- 항목", desc: "중첩 목록 (4칸 = 2단계)" },
+  { syntax: "␣␣- 항목", desc: "중첩 목록" },
 
-  { section: "블록", syntax: "> 인용문", desc: "인용 블록 (여러 줄은 줄마다 >)" },
-  { syntax: "```\n코드\n```", desc: "코드 블록 (펜스)" },
-  { syntax: "␣␣␣␣코드", desc: "코드 블록 (4칸 들여쓰기, list 밖에서)" },
-  { syntax: "---", desc: "구분선 (앞뒤로 빈 줄, 단독)" },
+  { section: "블록", syntax: "> 인용문", desc: "인용 블록" },
+  { syntax: "```코드```", desc: "코드 블록 (펜스)" },
+  { syntax: "---", desc: "구분선 (앞뒤 빈 줄)" },
 
-  { section: "줄바꿈", syntax: "줄 끝␣␣", desc: "강제 줄바꿈 (줄 끝 공백 2개)" },
+  { section: "줄바꿈", syntax: "Enter", desc: "줄바꿈 (2번=문단)" },
 
-  { section: "링크/이미지", syntax: "[텍스트](URL)", desc: "링크" },
+  { section: "링크 / 이미지", syntax: "[텍스트](URL)", desc: "링크" },
   { syntax: "![설명](URL)", desc: "이미지" },
-  { syntax: "<URL>", desc: "자동 링크" },
-  { syntax: "[label]: URL", desc: "참조 링크 정의 (별도 줄)" },
-  { syntax: "[텍스트][label]", desc: "참조 링크 사용" },
 
   { section: "표", syntax: "| A | B |", desc: "표 (GFM)" },
-  { syntax: "|---|---|", desc: "표 헤더 구분선" },
-  { syntax: "|:---|---:|", desc: "정렬 (왼쪽/오른쪽)" },
+  { syntax: "|---|---|", desc: "헤더 구분선" },
 ];
 
 /* ── Calendar Day Detail Panel ── */

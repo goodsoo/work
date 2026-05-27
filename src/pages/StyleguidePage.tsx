@@ -175,7 +175,7 @@ const MOTION = [
 const Z_LAYERS = [
   { name: "--z-dropdown", value: 10, usage: "메모장 컨텍스트 메뉴" },
   { name: "--z-sticky", value: 20, usage: "사이드 패널 헤더 sticky" },
-  { name: "--z-overlay", value: 30, usage: "popover / MarkdownHelp" },
+  { name: "--z-overlay", value: 30, usage: "popover / MarkdownHelpPanel" },
   { name: "--z-modal", value: 50, usage: "모든 <Modal>" },
   { name: "--z-popover", value: 55, usage: "모달 안 popover" },
   { name: "--z-tooltip", value: 60, usage: "<GlobalTooltip />" },
