@@ -363,10 +363,13 @@ export function MeetingForm({
     else setActiveTab("body"); // "body" 또는 "meta:*"
   }
 
-  // 방금 만든 메모면 title input 자동 focus + select all — 사용자가 default
-  // 'memo' 위에 바로 타이핑하면 새 제목으로 교체.
+  // 방금 만든 메모면 본문 탭으로 전환 + title input 자동 focus + select all —
+  // 새 메모는 바로 제목 타이핑 → 본문 작성으로 이어지도록.
+  // 편집 모드 강제는 useCreateMeeting 가 생성 시점에 viewMode 를 edit 로 써둠 →
+  // 이 remount 의 useViewMode 초기값이 edit (mount 후 setViewMode 는 race 라 안 씀).
   useEffect(() => {
     if (consumeJustCreatedMeetingUid(meetingId)) {
+      setActiveTab("body");
       // mount 직후 ref attach 되도록 microtask 한 tick 미룸
       requestAnimationFrame(() => {
         titleInputRef.current?.focus();

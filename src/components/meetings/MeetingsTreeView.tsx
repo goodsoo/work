@@ -7,6 +7,7 @@ import {
   type MeetingsFolderNode,
 } from "../../lib/meetingsTree";
 import { useScopedKey } from "../../lib/vault/scopedStorage";
+import { formatMemoDateShort } from "../../lib/dates";
 import { Button } from "../common/Button";
 import { Text } from "../common/Text";
 
@@ -542,23 +543,10 @@ function FolderRowEditing({
   );
 }
 
-// 짧은 inline 메타 포맷: 올해면 "MM/DD", 작년 이전이면 "YY/MM/DD".
-function formatShortDate(d: string | null): string {
-  if (!d) return "";
-  const parsed = new Date(d + "T00:00:00");
-  if (Number.isNaN(parsed.getTime())) return d;
-  const mm = String(parsed.getMonth() + 1).padStart(2, "0");
-  const dd = String(parsed.getDate()).padStart(2, "0");
-  const yr = parsed.getFullYear();
-  const thisYear = new Date().getFullYear();
-  if (yr === thisYear) return `${mm}/${dd}`;
-  const yy = String(yr % 100).padStart(2, "0");
-  return `${yy}/${mm}/${dd}`;
-}
-
 // inline meta — 날짜만. 시간/인원수는 카드에서 제외 (정보 밀도 trade-off).
+// 날짜 포맷은 dates.ts 의 formatMemoDateShort 공유 (캘린더 사이드바 메모 아이템과 통일).
 function formatMeetingMeta(meeting: Meeting): string {
-  return formatShortDate(meeting.date);
+  return formatMemoDateShort(meeting.date);
 }
 
 function MeetingRow({

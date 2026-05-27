@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "portfolio",
-  "description": "V0.7 — gh/claude CLI 위임 (bash -lc login 셸 PATH fix) + curl/zip/open (sh -lc) + 스크린샷 binary write + dotfile (.synced.md, .trash/) scope",
+  "description": "V0.7 — gh/claude CLI 위임 (bash -lc login 셸 PATH fix) + curl/zip/open (sh -lc) + 스크린샷 binary write + dotfile (.synced.md, .trash/) scope. claude 자동 요약 스트리밍용 spawn/kill 추가.",
   "windows": ["main"],
   "permissions": [
     "shell:default",
@@ -22,6 +22,18 @@
         }
       ]
     },
+    {
+      "identifier": "shell:allow-spawn",
+      "allow": [
+        {
+          "name": "bash",
+          "cmd": "bash",
+          "args": true,
+          "sidecar": false
+        }
+      ]
+    },
+    "shell:allow-kill",
     "fs:allow-write-file",
     {
       "identifier": "fs:scope",

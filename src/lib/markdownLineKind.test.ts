@@ -138,4 +138,125 @@ describe("inferLineKind — depth 계산", () => {
     const k = kindOfLastLine("1. a\n   1. b");
     expect(k.type === "ordered" && k.depth).toBe(1);
   });
+
+  // depth 는 나눗셈이 아니라 containment 기반 — 아래는 모두 remark-gfm 실측과 대조.
+  it("점목록 부모 밑 번호 자식 (2칸) = 1단계 (floor(2/3)=0 아님)", () => {
+    const k = kindOfLastLine("- 부모\n  1. 자식");
+    expect(k.type).toBe("ordered");
+    expect(k.type === "ordered" && k.depth).toBe(1);
+  });
+
+  it("과들여쓰기 번호 자식 (6칸) = 1단계 (floor(6/3)=2 아님)", () => {
+    const k = kindOfLastLine("1. 부모\n      1. 자식");
+    expect(k.type === "ordered" && k.depth).toBe(1);
+  });
+
+  it("두 자리 부모(10.) 밑 점 자식 (4칸) = 1단계 (floor(4/2)=2 아님)", () => {
+    const k = kindOfLastLine("10. 부모\n    - 자식");
+    expect(k.type === "bullet" && k.depth).toBe(1);
+  });
+
+  it("점>번호>점 3단 혼합 = 2단계", () => {
+    const k = kindOfLastLine("- a\n  1. b\n     - c");
+    expect(k.type === "bullet" && k.depth).toBe(2);
+  });
+
+  it("같은 단계 형제는 같은 depth (점부모 밑 번호 형제)", () => {
+    const k = kindOfLastLine("- 부모\n  1. 자식\n  2. 형제");
+    expect(k.type === "ordered" && k.depth).toBe(1);
+  });
+
+  // 부모로 인정하려면 자식이 부모 content offset(마커 폭)까지 들여써야 함 — remark 실측.
+  it("점부모 + 1칸 자식 = 형제 (depth 0, content offset 2 못 미침)", () => {
+    const k = kindOfLastLine("- A\n - B");
+    expect(k.type === "bullet" && k.depth).toBe(0);
+  });
+
+  it("점부모 + 2칸 자식 = 중첩 (depth 1)", () => {
+    const k = kindOfLastLine("- A\n  - B");
+    expect(k.type === "bullet" && k.depth).toBe(1);
+  });
+
+  it("번호부모(offset 3) + 2칸 자식 = 형제 (depth 0)", () => {
+    const k = kindOfLastLine("1. A\n  - B");
+    expect(k.type === "bullet" && k.depth).toBe(0);
+  });
+
+  it("번호부모(offset 3) + 3칸 자식 = 중첩 (depth 1)", () => {
+    const k = kindOfLastLine("1. A\n   - B");
+    expect(k.type === "bullet" && k.depth).toBe(1);
+  });
+
+  it("체크박스부모(nesting 마커 `- `=2) + 2칸 자식 = 중첩", () => {
+    const k = kindOfLastLine("- [ ] A\n  - B");
+    expect(k.type === "bullet" && k.depth).toBe(1);
+  });
+});
+
+describe("inferLineKind — 부모 없는 4칸 마커는 list 아니라 코드", () => {
+  // remark-gfm 실측: 최상위(부모 list 없음)에서 4칸 들여쓴 list 마커는 코드 블록.
+  // list 안에서의 4칸은 정상 중첩이므로 코드 아님.
+  it("부모 없이 4칸 번호 마커 (doc 시작) → code-indent", () => {
+    expect(kindOfLastLine("    1. foo").type).toBe("code-indent");
+  });
+
+  it("부모 없이 4칸 점 마커 (doc 시작) → code-indent", () => {
+    expect(kindOfLastLine("    - foo").type).toBe("code-indent");
+  });
+
+  it("빈 줄 뒤 4칸 번호 마커 → code-indent", () => {
+    expect(kindOfLastLine("글.\n\n    1. foo").type).toBe("code-indent");
+  });
+
+  it("3칸 번호 마커는 여전히 list (코드 아님)", () => {
+    expect(kindOfLastLine("   1. foo").type).toBe("ordered");
+  });
+
+  it("부모 list 안의 4칸 자식은 코드 아니라 중첩 list", () => {
+    const k = kindOfLastLine("1. 부모\n    - 자식");
+    expect(k.type).toBe("bullet");
+    expect(k.type === "bullet" && k.depth).toBe(1);
+  });
+
+  it("3단 중첩의 4칸(점 c)도 코드 아니라 list", () => {
+    expect(kindOfLastLine("- a\n  - b\n    - c").type).toBe("bullet");
+  });
+});
+
+describe("inferLineKind — 들여쓰기 코드는 열린 단락/리스트/인용을 interrupt 못 함", () => {
+  // remark-gfm 실측: 4칸 들여써도 바로 윗 줄이 단락/항목/인용 본문이면 그 lazy
+  // continuation (코드 아님). 빈 줄·제목·구분선 뒤라야 코드 블록.
+  it("단락 직후 4칸 평문 → 단락 이어짐 (코드 아님)", () => {
+    expect(kindOfLastLine("글\n    텍스트").type).toBe("paragraph");
+  });
+
+  it("단락 직후 4칸 번호 마커 → 단락 이어짐 (코드도 list 도 아님)", () => {
+    expect(kindOfLastLine("글\n    1. foo").type).toBe("paragraph");
+  });
+
+  it("4칸 줄 체인 — 둘째 줄도 단락 이어짐", () => {
+    expect(kindOfLastLine("글\n    줄1\n    줄2").type).toBe("paragraph");
+  });
+
+  it("제목 직후 4칸 → 코드 (제목은 닫힌 블록)", () => {
+    expect(kindOfLastLine("# 제목\n    텍스트").type).toBe("code-indent");
+  });
+
+  it("구분선 직후 4칸 → 코드", () => {
+    expect(kindOfLastLine("***\n    텍스트").type).toBe("code-indent");
+  });
+
+  it("인용 직후 4칸 → 인용 이어짐", () => {
+    const k = kindOfLastLine("> 인용\n    텍스트");
+    expect(k.type).toBe("quote");
+  });
+
+  it("점항목 직후 4칸 평문 → 점목록 이어짐", () => {
+    const k = kindOfLastLine("- 항목\n    텍스트");
+    expect(k.type).toBe("bullet");
+  });
+
+  it("빈 줄 뒤 4칸 2줄 → 둘 다 코드", () => {
+    expect(kindOfLastLine("글\n\n    줄1\n    줄2").type).toBe("code-indent");
+  });
 });

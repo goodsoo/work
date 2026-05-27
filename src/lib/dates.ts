@@ -69,6 +69,23 @@ export function formatDateShortWithDay(iso: string): string {
   return format(parseIsoDate(iso), "M/d EEE", { locale: ko });
 }
 
+/**
+ * 메모 inline 메타용: 올해면 "MM/DD", 작년 이전이면 "YY/MM/DD". 빈 값은 "".
+ * 메모장 사이드바와 캘린더 사이드바 메모 아이템이 공유하는 단일 포맷.
+ */
+export function formatMemoDateShort(d: string | null): string {
+  if (!d) return "";
+  const parsed = new Date(d + "T00:00:00");
+  if (Number.isNaN(parsed.getTime())) return d;
+  const mm = String(parsed.getMonth() + 1).padStart(2, "0");
+  const dd = String(parsed.getDate()).padStart(2, "0");
+  const yr = parsed.getFullYear();
+  const thisYear = new Date().getFullYear();
+  if (yr === thisYear) return `${mm}/${dd}`;
+  const yy = String(yr % 100).padStart(2, "0");
+  return `${yy}/${mm}/${dd}`;
+}
+
 /** "2026.05.17(일) 14:09" — 휴지통 삭제 시각 표시용. ISO datetime 입력. */
 export function formatDateTimeKo(iso: string): string {
   const d = new Date(iso);

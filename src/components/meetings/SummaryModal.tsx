@@ -1,10 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Sparkles, Clipboard, Check, RotateCw, X } from "lucide-react";
 import {
   buildClaudePrompt,
   type PromptInput,
 } from "../../lib/clipboardPrompt";
-import { runClaude } from "../../lib/portfolio/claude";
+import {
+  runClaudeStream,
+  type ClaudeStreamController,
+} from "../../lib/portfolio/claude";
 import { ClipPromptButton } from "../common/ClipPromptButton";
 import { Modal } from "../common/Modal";
 import { Button } from "../common/Button";
@@ -13,8 +16,11 @@ import { Spinner } from "../common/Spinner";
 import { MarkdownView } from "./MarkdownView";
 
 // 요약하기 모달 — 한 오버레이 안에 [자동 요약] / [직접 붙여넣기] 두 탭.
-// 자동: claude CLI 1회 호출 → 응답 미리보기 → [적용]. 붙여넣기: 프롬프트 복사 →
-// 외부 Claude → 응답 paste → [적용]. 둘 다 응답 텍스트를 통째 summary 에 박음 (파싱 X).
+// 자동: "요약 생성" 클릭 시 claude CLI 스트리밍 호출(진행률 표시) → 응답 → [적용].
+//   모달 열림 ≠ 호출 (붙여넣기를 원할 때 헛호출 방지). stream-json 으로 경과시간 +
+//   도착 글자/토큰 라이브 표시 (PR #57 의 runClaudeStream 통합).
+// 붙여넣기: 프롬프트 복사 → 외부 Claude → 응답 paste → [적용].
+// 둘 다 응답 텍스트를 통째 summary 에 박음 (파싱 X).
 
 type Tab = "auto" | "paste";
 
@@ -25,55 +31,130 @@ type Props = {
   onApply: (summary: string) => void;
 };
 
+type Stats = {
+  durationMs?: number;
+  inputTokens?: number;
+  outputTokens?: number;
+  model?: string;
+};
+
+// "claude-sonnet-4-6" → "sonnet-4-6" (claude- 접두사만 떼서 간결하게).
+function shortModel(model?: string): string | null {
+  if (!model) return null;
+  return model.replace(/^claude-/, "");
+}
+
+// 40초 넘게 걸리면 "느린 게 정상일 수 있다"는 안내를 띄울 임계.
+const SLOW_HINT_MS = 40_000;
+
+function formatElapsed(ms: number): string {
+  const total = Math.floor(ms / 1000);
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
 export function SummaryModal({ open, onClose, promptInput, onApply }: Props) {
   const [tab, setTab] = useState<Tab>("auto");
 
-  // 자동 요약 탭 상태. 호출은 자동이 아니라 "요약 생성" 버튼 클릭으로만 — 직접
-  // 붙여넣기를 원하는 경우 헛호출 방지 (모달 열림 ≠ Claude 호출).
+  // 자동 요약 탭 상태. 호출은 "요약 생성" 버튼 클릭으로만.
   const [requesting, setRequesting] = useState(false);
   const [autoError, setAutoError] = useState<string | null>(null);
   const [suggestion, setSuggestion] = useState<string | null>(null);
+  const [chars, setChars] = useState(0);
+  const [liveTokens, setLiveTokens] = useState<number | undefined>(undefined);
+  const [liveModel, setLiveModel] = useState<string | undefined>(undefined);
+  const [elapsedMs, setElapsedMs] = useState(0);
+  const [stats, setStats] = useState<Stats | null>(null);
+  const controllerRef = useRef<ClaudeStreamController | null>(null);
+  const startRef = useRef(0);
 
   // 직접 붙여넣기 탭 상태
   const [raw, setRaw] = useState("");
   const [pasteError, setPasteError] = useState<string | null>(null);
 
-  // 닫힐 때 전체 reset.
+  // 닫힐 때 진행 중 프로세스 kill + 전체 reset.
   useEffect(() => {
     if (open) return;
+    void controllerRef.current?.cancel();
+    controllerRef.current = null;
     setTab("auto");
     setRequesting(false);
     setAutoError(null);
     setSuggestion(null);
+    setChars(0);
+    setLiveTokens(undefined);
+    setLiveModel(undefined);
+    setElapsedMs(0);
+    setStats(null);
     setRaw("");
     setPasteError(null);
   }, [open]);
+
+  // 경과시간 tick — 요청 중일 때만 200ms 마다 갱신.
+  useEffect(() => {
+    if (!requesting) return;
+    const id = setInterval(() => setElapsedMs(Date.now() - startRef.current), 200);
+    return () => clearInterval(id);
+  }, [requesting]);
 
   async function runAuto() {
     setRequesting(true);
     setAutoError(null);
     setSuggestion(null);
+    setChars(0);
+    setLiveTokens(undefined);
+    setLiveModel(undefined);
+    setStats(null);
+    startRef.current = Date.now();
+    setElapsedMs(0);
+
+    const ctrl = runClaudeStream(buildClaudePrompt(promptInput), (p) => {
+      setChars(p.chars);
+      if (p.outputTokens != null) setLiveTokens(p.outputTokens);
+      if (p.model) setLiveModel(p.model);
+    });
+    controllerRef.current = ctrl;
+
     try {
-      const prompt = buildClaudePrompt(promptInput);
-      const result = await runClaude(prompt);
-      if (result.code !== 0) {
-        const msg = result.stderr.trim();
+      const res = await ctrl.done;
+      if (controllerRef.current !== ctrl) return; // 닫혔거나 재요청으로 교체됨
+      const msg = res.stderr || (res.errored ? res.text : "");
+      if (res.code !== 0 || res.errored || !res.text) {
         if (/not found|command not found/i.test(msg)) {
           throw new Error("claude CLI 가 안 보입니다. 설치 후 `claude` 로그인을 먼저 하세요.");
         }
         if (/auth|login|unauthor/i.test(msg)) {
           throw new Error("claude 로그인이 필요합니다. 터미널에서 `claude` 실행 후 인증하세요.");
         }
-        throw new Error(msg || "claude CLI 실행 실패");
+        if (!res.text) {
+          throw new Error(msg.trim() || "응답이 비어있습니다.");
+        }
+        throw new Error(msg.trim() || "claude CLI 실행 실패");
       }
-      const text = result.stdout.trim();
-      if (!text) throw new Error("응답이 비어있습니다.");
-      setSuggestion(text);
+      setSuggestion(res.text);
+      setStats({
+        durationMs: res.durationMs,
+        inputTokens: res.inputTokens,
+        outputTokens: res.outputTokens,
+        model: res.model,
+      });
     } catch (err) {
+      if (controllerRef.current !== ctrl) return;
       setAutoError(err instanceof Error ? err.message : String(err));
     } finally {
-      setRequesting(false);
+      if (controllerRef.current === ctrl) {
+        controllerRef.current = null;
+        setRequesting(false);
+      }
     }
+  }
+
+  async function cancelAuto() {
+    const ctrl = controllerRef.current;
+    controllerRef.current = null;
+    setRequesting(false);
+    await ctrl?.cancel();
   }
 
   function applyAuto() {
@@ -91,6 +172,10 @@ export function SummaryModal({ open, onClose, promptInput, onApply }: Props) {
     onApply(trimmed);
     onClose();
   }
+
+  const tokenLabel = liveTokens != null ? `${liveTokens.toLocaleString()}토큰` : null;
+  const liveModelLabel = shortModel(liveModel);
+  const statsModelLabel = shortModel(stats?.model);
 
   return (
     <Modal
@@ -152,13 +237,33 @@ export function SummaryModal({ open, onClose, promptInput, onApply }: Props) {
 
               {requesting ? (
                 <div
-                  className="flex items-center gap-2 rounded-md p-3"
+                  className="flex flex-col gap-1.5 rounded-md p-3"
                   style={{ backgroundColor: "var(--bg-surface)" }}
                 >
-                  <Spinner size="md" />
-                  <Text variant="body" color="secondary">
-                    Claude 에게 묻는 중…
+                  <div className="flex items-center gap-2">
+                    <Spinner size="md" />
+                    <Text variant="body" color="secondary">
+                      Claude 가 작성 중…
+                    </Text>
+                    <Text
+                      variant="body"
+                      color="secondary"
+                      className="ml-auto tabular-nums"
+                      style={{ fontVariantNumeric: "tabular-nums" }}
+                    >
+                      {formatElapsed(elapsedMs)}
+                    </Text>
+                  </div>
+                  <Text variant="caption" color="muted" as="div">
+                    {liveModelLabel ? `${liveModelLabel} · ` : ""}
+                    출력 {chars.toLocaleString()}자
+                    {tokenLabel ? ` · ${tokenLabel}` : ""}
                   </Text>
+                  {elapsedMs > SLOW_HINT_MS ? (
+                    <Text variant="caption" color="muted" as="div">
+                      예상보다 오래 걸리고 있습니다. 입력이 길면 더 걸릴 수 있습니다.
+                    </Text>
+                  ) : null}
                 </div>
               ) : null}
 
@@ -177,14 +282,31 @@ export function SummaryModal({ open, onClose, promptInput, onApply }: Props) {
               ) : null}
 
               {suggestion ? (
-                <div
-                  className="rounded-md p-3"
-                  style={{
-                    backgroundColor: "var(--bg-surface-hover)",
-                    border: "1px solid var(--border-default)",
-                  }}
-                >
-                  <MarkdownView content={suggestion} />
+                <div className="flex flex-col gap-2">
+                  {stats ? (
+                    <Text variant="caption" color="muted" as="div">
+                      완료
+                      {statsModelLabel ? ` · ${statsModelLabel}` : ""}
+                      {stats.durationMs != null
+                        ? ` · ${Math.round(stats.durationMs / 1000)}초`
+                        : ""}
+                      {stats.inputTokens != null
+                        ? ` · 입력 ${stats.inputTokens.toLocaleString()}토큰`
+                        : ""}
+                      {stats.outputTokens != null
+                        ? ` · 출력 ${stats.outputTokens.toLocaleString()}토큰`
+                        : ""}
+                    </Text>
+                  ) : null}
+                  <div
+                    className="rounded-md p-3"
+                    style={{
+                      backgroundColor: "var(--bg-surface-hover)",
+                      border: "1px solid var(--border-default)",
+                    }}
+                  >
+                    <MarkdownView content={suggestion} />
+                  </div>
                 </div>
               ) : null}
             </div>
@@ -201,15 +323,24 @@ export function SummaryModal({ open, onClose, promptInput, onApply }: Props) {
               >
                 닫기
               </Button>
-              {suggestion ? (
+              {requesting ? (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={cancelAuto}
+                  leftIcon={<X className="h-3.5 w-3.5" />}
+                  className="px-2.5 py-1"
+                >
+                  중지
+                </Button>
+              ) : suggestion ? (
                 <>
                   <Button
                     variant="secondary"
                     size="sm"
                     onClick={runAuto}
-                    disabled={requesting}
                     leftIcon={<RotateCw className="h-3.5 w-3.5" />}
-                    className="px-2.5 py-1 disabled:opacity-50"
+                    className="px-2.5 py-1"
                   >
                     다시 요청
                   </Button>
@@ -228,11 +359,10 @@ export function SummaryModal({ open, onClose, promptInput, onApply }: Props) {
                   variant="primary"
                   size="sm"
                   onClick={runAuto}
-                  disabled={requesting}
                   leftIcon={<Sparkles className="h-3.5 w-3.5" />}
-                  className="px-3 py-1 disabled:opacity-50"
+                  className="px-3 py-1"
                 >
-                  {requesting ? "생성 중…" : autoError ? "다시 요청" : "요약 생성"}
+                  {autoError ? "다시 요청" : "요약 생성"}
                 </Button>
               )}
             </div>

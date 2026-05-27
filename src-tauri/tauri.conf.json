@@ -1,6 +1,6 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "goodsoob-work",
+  "productName": "짱수",
   "version": "0.1.0",
   "identifier": "com.goodsoob.work",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "goodsoob-work",
+        "title": "짱수",
         "width": 1024,
         "height": 768,
         "minWidth": 480,

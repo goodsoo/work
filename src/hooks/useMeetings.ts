@@ -21,6 +21,7 @@ import {
 import { summaryPath, transcriptPath } from "../lib/vault/scan";
 import { useVault } from "../lib/vault/useVault";
 import type { VaultWatcher } from "../lib/vault/watcher";
+import { setStoredViewMode } from "./useViewMode";
 
 // 한 회의는 메인 + 2 sidecar 파일이라 자기 write 마크도 셋 다. path 기반.
 function markMeetingSelfWrite(watcher: VaultWatcher, path: string): void {
@@ -175,13 +176,16 @@ export function useMeeting(uid: string | undefined) {
 }
 
 export function useCreateMeeting() {
-  const { adapter, watcher } = useVault();
+  const { adapter, watcher, activeVaultId } = useVault();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: MeetingCreateInput) => {
       const created = await createMeeting(adapter, input);
       markMeetingSelfWrite(watcher, created.id);
       _justCreatedMeetingUid = created.uid;
+      // 새 메모는 본문 편집 모드로 열리도록 — MeetingForm mount 전에 vault 전역
+      // viewMode 를 edit 로 써둔다 (mount 후 setState 는 useViewMode 초기화와 race).
+      setStoredViewMode(activeVaultId, "edit");
       return created;
     },
     onSuccess: (created) => {

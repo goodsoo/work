@@ -14,6 +14,14 @@
 - 요약 버튼 1개 + SummaryModal(자동 요약 / 붙여넣기 탭, 자동 호출 제거 → 명시 트리거), 비활성 시 안내 토스트(info kind).
 - 편집/보기 세그먼트 토글(편집 파랑 / 보기 모노톤), 글자수 우측하단 fixed, 메타 read-only 박스 통일.
 - 타이틀바 live 시계, 사이드바 열기/닫기 토글을 본문 PageHeaderBar 좌측으로 통일, 캘린더 PageHeaderBar 전환.
+- 자동 요약은 #57 의 runClaudeStream(진행률·sonnet·중립 cwd)을 SummaryModal 자동 탭에 통합.
+
+### PR #56 — 앱 이름·아이콘 짱수 브랜딩
+
+- **한 줄 임팩트**: 앱을 '짱수' 이름·아이콘으로 브랜딩
+- `productName` + window `title` + 인앱 헤더 h1 + `index.html` 타이틀 → "짱수". 번들 `identifier`(`com.goodsoob.work`)는 유지 — vault 경로/데이터 보존.
+- 아이콘 교체 — macOS 표준 그리드(1024 캔버스 + 824 둥근 흰 배경 + 여백)로 직접 합성해 구움. macOS 가 앱 아이콘을 자동으로 둥글게 마스킹하지 않아 직접 처리. 어두운 라인아트라 흰 배경 선택. squircle 소스 `~/Projects/logo-macos.png` 보관.
+- 내부 식별자(`package.json` name, Cargo 바이너리 name, theme 키)는 유지. ui_ux.
 
 ### 🚀 milestone — 데스크탑 앱 첫 배포 (V0.7.x 안정화 단계 진입)
 
