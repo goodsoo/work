@@ -1,0 +1,105 @@
+// Google Calendar 양방향 연동 — 도메인 타입.
+//
+// reconcile 엔진은 이 정규화된 타입들 위에서만 동작한다 (Google API 원형·vault
+// task 원형과 분리). 변환은 mapping.ts 가 담당. 이렇게 분리해야 reconcile 결정
+// 로직을 OAuth·네트워크 없이 순수 함수로 단위 테스트할 수 있다.
+
+// 일정의 동기화 대상 필드. 로컬 task 와 원격 event 를 같은 모양으로 정규화한다.
+export interface ScheduleFields {
+  title: string;
+  date: string | null; // YYYY-MM-DD
+  time: string | null; // HH:MM. null = 종일(all-day) 이벤트.
+}
+
+// Google events.list 가 돌려준 이벤트 (정규화 후).
+export interface RemoteEvent {
+  eventId: string;
+  // status === "cancelled" — Google 에서 삭제됨 (showDeleted=true 로 받음).
+  cancelled: boolean;
+  // cancelled 면 의미 없음 (Google 이 cancelled 이벤트엔 summary 등을 안 줄 수 있음).
+  fields: ScheduleFields;
+  updated: string; // RFC3339 updated 타임스탬프
+}
+
+// #gcal-<id> 앵커를 이미 가진, 휴지통行 아닌 로컬 일정 task.
+// (태그 없는 신규 #schedule 는 reconcile 대상 아님 — 명시적 push 경로로만 올라감.)
+export interface LocalSchedule {
+  taskId: string; // file#Lline — mutation 용 (불안정 — 쓰기 직전 재해석 필요)
+  eventId: string; // = gcal_event_id 앵커
+  fields: ScheduleFields;
+  updatedAt: string; // 로컬 변경 시각 (파일 mtime ISO). 양쪽 변경 시 LWW 타이브레이크.
+}
+
+// 마지막-sync 스냅샷 (변경 감지 baseline). eventId 기준.
+export interface SyncSnapshot {
+  hash: string; // 마지막 sync 시점 scheduleHash(fields)
+  updated: string; // 마지막 sync 시점 remote.updated
+}
+
+// 로컬 삭제 묘비. 좀비 부활 차단의 권위.
+export interface Tombstone {
+  eventId: string;
+  deletedAt: string;
+  // Google events.delete 가 확정됐는지. false = 아직 push 안 됨 (가드 + push 예정).
+  pushConfirmed: boolean;
+}
+
+// 기기 로컬 sync 상태 (appDataDir, vault 아님 — 다중 기기 커서 무효화 차단).
+export interface SyncState {
+  // Google events.list 증분 토큰. null = 다음 sync 가 full resync.
+  syncToken: string | null;
+  // 사용자가 고른 전용 캘린더.
+  calendarId: string | null;
+  lastSyncAt: string | null;
+  authState: "linked" | "disconnected";
+  // eventId → 스냅샷
+  snapshots: Record<string, SyncSnapshot>;
+  tombstones: Tombstone[];
+}
+
+export function emptySyncState(): SyncState {
+  return {
+    syncToken: null,
+    calendarId: null,
+    lastSyncAt: null,
+    authState: "disconnected",
+    snapshots: {},
+    tombstones: [],
+  };
+}
+
+// ─── reconcile 결과 — 실행기(executor)가 수행할 액션 목록 ────────────────────
+//
+// reconcile 은 순수 함수 → 액션 목록만 만든다. 실제 gcal_request / updateTask 호출과
+// push 결과 기반 snapshot 갱신은 executor 의 몫. push 계열은 응답을 받아야 새
+// snapshot.updated 를 알 수 있어 여기선 미리 안 박는다 (executor 가 post-hoc).
+export type ReconcileAction =
+  // 로컬이 바뀜 → events.update. reason=conflict-lww 면 양쪽 변경에서 로컬 승.
+  | { kind: "push-update"; eventId: string; local: LocalSchedule; reason: "local-only" | "conflict-lww" }
+  // 묘비(미확정) → events.delete. 원격이 살아있어도 발사 (좀비 가드).
+  | { kind: "push-delete"; eventId: string }
+  // 원격에만 있는 신규 이벤트 (폰에서 직접 추가) → 로컬 일정 task 생성 + 태그.
+  | { kind: "local-create"; eventId: string; fields: ScheduleFields; updated: string }
+  // 원격이 바뀜 → 로컬 task 필드 반영. reason=conflict-lww 면 양쪽 변경에서 원격 승.
+  | { kind: "local-upsert"; eventId: string; taskId: string; fields: ScheduleFields; updated: string; reason: "remote-only" | "conflict-lww" }
+  // 원격 cancelled → 로컬 휴지통行 (hard-delete 아님).
+  | { kind: "local-trash"; eventId: string; taskId: string }
+  // 스냅샷 기록/갱신 (pull 측은 지금 값 확정, push 측은 executor 가 post-hoc).
+  | { kind: "snapshot-put"; eventId: string; hash: string; updated: string }
+  | { kind: "snapshot-delete"; eventId: string }
+  // 묘비 push 확정 (executor 가 push-delete 성공 후 set).
+  | { kind: "tombstone-confirm"; eventId: string }
+  // 묘비 GC (확정 + 원격 cancelled 확인됨).
+  | { kind: "tombstone-gc"; eventId: string }
+  // 고아 — 로컬에 짝 없고 묘비도 없음 (수동 태그 제거 등). 원격 그대로 둠, 로깅만.
+  | { kind: "orphan"; eventId: string };
+
+export interface ReconcileInput {
+  // 현재 vault 의 #gcal 태그 보유 + 휴지통行 아닌 일정 전부.
+  locals: LocalSchedule[];
+  // events.list 증분(또는 첫 sync/410 시 full). cancelled 포함 (showDeleted=true).
+  remoteDelta: RemoteEvent[];
+  // 마지막-sync 스냅샷.
+  snapshots: Record<string, SyncSnapshot>;
+  tombstones: Tombstone[];
+}
