@@ -20,7 +20,8 @@
 
 - **한 줄 임팩트**: 앱을 '짱수' 이름·아이콘으로 브랜딩
 - `productName` + window `title` + 인앱 헤더 h1 + `index.html` 타이틀 → "짱수". 번들 `identifier`(`com.goodsoob.work`)는 유지 — vault 경로/데이터 보존.
-- 아이콘 교체 — macOS 표준 그리드(1024 캔버스 + 824 둥근 흰 배경 + 여백)로 직접 합성해 구움. macOS 가 앱 아이콘을 자동으로 둥글게 마스킹하지 않아 직접 처리. 어두운 라인아트라 흰 배경 선택. squircle 소스 `~/Projects/logo-macos.png` 보관.
+- 아이콘 교체 — macOS 표준 그리드(1024 캔버스 + 824 둥근 흰 배경 + 여백)로 직접 합성해 구움. macOS 가 앱 아이콘을 자동으로 둥글게 마스킹하지 않아 직접 처리. 어두운 라인아트라 흰 배경 선택. squircle 소스 + 벡터 마스터는 `src-tauri/icons/source/` 에 보관(`logo-macos.png` + `goodsoob_logo.svg`) — 재생성은 `bun run tauri icon src-tauri/icons/source/logo-macos.png`.
+  - ⚠️ 2026-05-28 fix: 위 그리드를 의도했으나 실제 번들은 여백 0 인 full-bleed `logo.png` 로 구워져 Dock 에서 아이콘이 크게 보이던 버그. 올바른 여백 소스(`logo-macos.png`, 아트워크 80.6%)로 재생성해 4면 투명 여백 확보. 데스크탑 전용이라 `tauri icon` 이 딸려 만든 android/ios/64x64 는 제거.
 - 내부 식별자(`package.json` name, Cargo 바이너리 name, theme 키)는 유지. ui_ux.
 
 ### 🚀 milestone — 데스크탑 앱 첫 배포 (V0.7.x 안정화 단계 진입)
