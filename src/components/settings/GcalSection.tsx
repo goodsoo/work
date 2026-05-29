@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { CalendarDays, Link2, Link2Off } from "lucide-react";
+import { CalendarDays, CalendarPlus, Link2, Link2Off } from "lucide-react";
 import { Button } from "../common/Button";
 import { Text } from "../common/Text";
 import { Spinner } from "../common/Spinner";
@@ -11,19 +11,27 @@ import {
   GcalError,
   type AuthStatus,
 } from "../../lib/gcal/transport";
+import { loadSyncState, updateSyncState } from "../../lib/gcal/stateStore";
+import { createCalendar } from "../../lib/gcal/api";
 
-// Google Calendar 연동 설정. 현재는 OAuth 핸드셰이크 검증용 최소 UI
-// (연동/해제/상태) — 전용 캘린더 선택·동기화 상태·재인증 CTA 는 T6/T7 에서 확장.
+const DEDICATED_CALENDAR_NAME = "goodsoob";
+
+// Google Calendar 연동 설정. 연동/해제 + 전용 캘린더 부트스트랩.
+// (일정 push·폴링 동기화·재인증 CTA 는 T6/T7 에서 확장.)
 export function GcalSection() {
   const toast = useToast();
   const [status, setStatus] = useState<AuthStatus | null>(null);
+  const [calendarId, setCalendarId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function refresh() {
     try {
-      setStatus(await gcalAuthStatus());
+      const [s, state] = await Promise.all([gcalAuthStatus(), loadSyncState()]);
+      setStatus(s);
+      setCalendarId(state.calendarId);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -42,6 +50,7 @@ export function GcalSection() {
     setBusy(true);
     try {
       await gcalAuthStart();
+      await updateSyncState((s) => ({ ...s, authState: "linked" }));
       await refresh();
       toast.show("Google 캘린더를 연동했습니다.", { kind: "info" });
     } catch (err) {
@@ -62,12 +71,38 @@ export function GcalSection() {
     setBusy(true);
     try {
       await gcalDisconnect();
+      await updateSyncState((s) => ({ ...s, authState: "disconnected" }));
       await refresh();
       toast.show("Google 캘린더 연동을 해제했습니다.", { kind: "info" });
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function handleCreateCalendar() {
+    setError(null);
+    setCreating(true);
+    try {
+      const cal = await createCalendar(DEDICATED_CALENDAR_NAME);
+      const next = await updateSyncState((s) => ({
+        ...s,
+        calendarId: cal.id,
+        authState: "linked",
+      }));
+      setCalendarId(next.calendarId);
+      toast.show(`전용 "${DEDICATED_CALENDAR_NAME}" 캘린더를 만들었습니다.`, { kind: "info" });
+    } catch (err) {
+      const msg =
+        err instanceof GcalError && err.needsReauth
+          ? "인증이 만료됐습니다. 연동을 다시 하세요."
+          : err instanceof Error
+            ? err.message
+            : String(err);
+      setError(msg);
+    } finally {
+      setCreating(false);
     }
   }
 
@@ -90,7 +125,7 @@ export function GcalSection() {
               {loading
                 ? "상태 확인 중…"
                 : linked
-                  ? "연동됨. 일정이 지정한 Google 캘린더와 동기화됩니다."
+                  ? "연동됨. 개인 캘린더는 건드리지 않고 전용 캘린더만 동기화합니다."
                   : "연동하면 goodsoob 일정을 Google 캘린더에서 함께 봅니다."}
             </Text>
           </div>
@@ -135,6 +170,50 @@ export function GcalSection() {
           </Text>
         )}
       </section>
+
+      {/* 전용 캘린더 부트스트랩 — 연동됐을 때만 노출. */}
+      {!loading && linked && (
+        <section className="space-y-2">
+          <Text
+            variant="caption"
+            color="muted"
+            as="h3"
+            weight="semibold"
+            className="uppercase tracking-wide"
+          >
+            전용 캘린더
+          </Text>
+          {calendarId ? (
+            <div
+              className="rounded-lg px-3 py-2"
+              style={{ background: "var(--bg-base)", border: "1px solid var(--border-subtle)" }}
+            >
+              <Text variant="body" as="div">
+                "{DEDICATED_CALENDAR_NAME}" 캘린더 연결됨
+              </Text>
+              <Text variant="caption" color="muted" as="div" className="mt-0.5 break-all" style={{ fontFamily: "var(--font-mono, monospace)" }}>
+                {calendarId}
+              </Text>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <Text variant="caption" color="secondary" as="p">
+                goodsoob 일정을 올릴 전용 캘린더를 새로 만듭니다. 개인 일정이 든 캘린더는
+                건드리지 않습니다.
+              </Text>
+              <Button
+                variant="primary"
+                onClick={handleCreateCalendar}
+                disabled={creating}
+                leftIcon={creating ? <Spinner size="md" /> : <CalendarPlus className="h-4 w-4" />}
+                className="rounded-lg px-3 py-2 disabled:opacity-50"
+              >
+                {creating ? "만드는 중…" : `"${DEDICATED_CALENDAR_NAME}" 캘린더 만들기`}
+              </Button>
+            </div>
+          )}
+        </section>
+      )}
 
       {error && (
         <Text
