@@ -27,6 +27,10 @@ export interface Task {
   // 메모 → 태스크 ⌘⏎ 로 만든 태스크면 원본 메모 uid. vault 라인엔
   // `#from-<uid>` tag 로 직렬화. uid 영구라 메모 rename 후에도 안 깨짐.
   source_meeting_uid: string | null;
+  // Google Calendar 동기화된 일정이면 그 이벤트 ID. vault 라인엔 `#gcal-<id>`
+  // tag 로 직렬화 — 줄이 이동해도 따라다니는 영구 매핑 앵커 (별도 uid 없음).
+  // null = 아직 push 안 됨(로컬 전용) 또는 동기화 대상 아님.
+  gcal_event_id: string | null;
   // V0.5.3 호환 — UI 가 의존. vault 에선 파일 mtime / "now" 로 대체.
   created_at: string;
   updated_at: string;
@@ -44,10 +48,14 @@ export interface TaskInsert {
   due_time?: string | null;
   priority?: TaskPriority;
   source_meeting_uid?: string | null;
+  gcal_event_id?: string | null;
 }
 
 // vault 라인의 `#from-<uid>` tag prefix. uid = uuid (`-` 포함) 도 tag 정규식 매칭.
 const FROM_TAG_PREFIX = "from-";
+// vault 라인의 `#gcal-<eventId>` tag prefix. Google event ID 는 base32hex
+// (a-v, 0-9, `_`) 라 tag 정규식 `[\p{L}\p{N}_-]+` 에 전부 매칭 → round-trip 안전.
+export const GCAL_TAG_PREFIX = "gcal-";
 
 export interface TodoUpdate {
   title?: string;
@@ -60,6 +68,7 @@ export interface TodoUpdate {
   due_time?: string | null;
   priority?: TaskPriority;
   source_meeting_uid?: string | null;
+  gcal_event_id?: string | null;
 }
 
 // ─── id ↔ source ───────────────────────────────────────────────────────────
@@ -88,6 +97,7 @@ function todoFromItem(item: TaskItem, mtimeIso?: string): Task {
   const categoryTag = item.tags.find(isCategory);
   const priorityTag = item.tags.find(isPriority);
   const fromTag = item.tags.find((t) => t.startsWith(FROM_TAG_PREFIX));
+  const gcalTag = item.tags.find((t) => t.startsWith(GCAL_TAG_PREFIX));
   const iso = mtimeIso ?? new Date().toISOString();
   return {
     id: makeTodoId(item.source.file, item.source.line),
@@ -101,6 +111,7 @@ function todoFromItem(item: TaskItem, mtimeIso?: string): Task {
     due_date: item.due ?? null,
     due_time: item.time ?? null,
     source_meeting_uid: fromTag ? fromTag.slice(FROM_TAG_PREFIX.length) : null,
+    gcal_event_id: gcalTag ? gcalTag.slice(GCAL_TAG_PREFIX.length) : null,
     created_at: iso,
     updated_at: iso,
     _source: item.source,
@@ -125,6 +136,7 @@ export function buildTodoLine(input: {
   due_time?: string | null;
   priority?: TaskPriority;
   source_meeting_uid?: string | null;
+  gcal_event_id?: string | null;
   extra_tags?: string[];
 }): string {
   // 우선: deleted > cancelled > done > pending. 3 final state 중 하나만 true.
@@ -151,9 +163,13 @@ export function buildTodoLine(input: {
   if (input.source_meeting_uid) {
     line += ` #${FROM_TAG_PREFIX}${input.source_meeting_uid}`;
   }
-  // extra_tags 에 from- prefix 가 있으면 중복 박지 않음 (위에서 처리됨).
+  if (input.gcal_event_id) {
+    line += ` #${GCAL_TAG_PREFIX}${input.gcal_event_id}`;
+  }
+  // extra_tags 에 from-/gcal- prefix 가 있으면 중복 박지 않음 (위에서 처리됨).
   for (const tag of input.extra_tags ?? []) {
     if (tag.startsWith(FROM_TAG_PREFIX)) continue;
+    if (tag.startsWith(GCAL_TAG_PREFIX)) continue;
     line += ` #${tag}`;
   }
   return line;
@@ -205,6 +221,7 @@ export async function createTodo(
     due_date: input.due_date ?? null,
     due_time: input.due_time ?? null,
     source_meeting_uid: input.source_meeting_uid ?? null,
+    gcal_event_id: input.gcal_event_id ?? null,
     created_at: iso,
     updated_at: iso,
     _source: { file: INBOX_PATH, line: lineNum },
@@ -236,6 +253,9 @@ export async function updateTask(
     const existingFromTag = existing.tags.find((t) =>
       t.startsWith(FROM_TAG_PREFIX),
     );
+    const existingGcalTag = existing.tags.find((t) =>
+      t.startsWith(GCAL_TAG_PREFIX),
+    );
     const merged = {
       title: patch.title ?? existing.text,
       done: patch.done ?? existing.done,
@@ -256,9 +276,18 @@ export async function updateTask(
           : existingFromTag
             ? existingFromTag.slice(FROM_TAG_PREFIX.length)
             : null,
+      gcal_event_id:
+        patch.gcal_event_id !== undefined
+          ? patch.gcal_event_id
+          : existingGcalTag
+            ? existingGcalTag.slice(GCAL_TAG_PREFIX.length)
+            : null,
       extra_tags: existing.tags.filter(
         (t) =>
-          !isCategory(t) && !isPriority(t) && !t.startsWith(FROM_TAG_PREFIX),
+          !isCategory(t) &&
+          !isPriority(t) &&
+          !t.startsWith(FROM_TAG_PREFIX) &&
+          !t.startsWith(GCAL_TAG_PREFIX),
       ),
     };
     const lines = raw.split("\n");
