@@ -6,6 +6,14 @@
 
 ## 2026-06-01
 
+### 직커밋 — CLAUDE.md vault schema 변경 룰 명시 (docs, `other`)
+
+- **한 줄 임팩트**: 옛 "실데이터 0" 가정 정리 — 향후 schema 변경 migration 룰 확정
+- 첫 배포(2026-05-27) 전 "실데이터 가능성 0" 전제로 migration 코드를 생략하던 가정이 매일 실데이터 누적으로 폐기됨을 명시.
+- CLAUDE.md 마이그레이션 섹션에 **vault schema 변경 룰** 추가 — 단순 신규 필드는 default fallback 으로 흡수, 의미 변경·rename·structural 변경은 lazy migration 필수(첫 read 시 변환+rewrite, V0.7.1 date-prefix→uid 선례), 다단계면 versioned tag(`frontmatter.schema: N`) 검토.
+- V0.6 design doc 의 "마이그레이션 없음, 새로 시작" 결정에 범위 단서 추가 — Supabase→vault 일회성 컷오버 한정, 첫 배포 이후 schema 변경은 lazy migration 필수로 superseded.
+- PR 아닌 main 직커밋 (포트폴리오 가치 없는 문서 정리).
+
 ### PR #65 — 메모장 탭 내 찾기에 바꾸기 추가
 
 - **한 줄 임팩트**: 메모 안에서 찾고 바꾸기까지 한 번에

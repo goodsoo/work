@@ -38,13 +38,6 @@ PR 단위로 묶음. 각 PR 의 **한 줄 임팩트** 는 카드 frontmatter `im
 
 > 실사용 데이터 누적 시작. 지금까지의 "본인 미사용 → legacy 데이터 가능성 0" 전제 폐기.
 
-### CLAUDE.md 문구 정리 `other`
-한 줄 임팩트: 옛 "미사용" 가정 문구 정리 — 향후 schema 변경 시 마이그레이션 default 룰 명시
-
-- [ ] V0.6/V0.7 섹션 안 "본인 미사용 전" / "마이그레이션 0" / "정교한 migration 코드 생략" 표현 일괄 정정
-- [ ] 새 룰 명시: vault schema 변경 시 lazy migration 코드 박기 (frontmatter 필드 추가/이름 변경/structural 변경 모두). 단순 신규 필드는 default 값 fallback 으로 흡수, 의미 변경은 versioned tag (`frontmatter.schema: N` 등) 검토.
-- [ ] V0.6 design doc 안 마이그레이션 노트도 함께 정리
-
 ### PR — 마이그레이션 헬퍼 추상화 `backend` 🟡
 한 줄 임팩트: schema 변경 시 versioned migration 한 곳에서 — 호출처 산재 X
 
