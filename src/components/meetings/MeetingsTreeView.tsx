@@ -7,7 +7,7 @@ import {
   type MeetingsFolderNode,
 } from "../../lib/meetingsTree";
 import { useScopedKey } from "../../lib/vault/scopedStorage";
-import { formatMemoDateShort } from "../../lib/dates";
+import { formatDisplayDate } from "../../lib/dates";
 import { Button } from "../common/Button";
 import { Text } from "../common/Text";
 
@@ -588,9 +588,9 @@ function FolderRowEditing({
 }
 
 // inline meta — 날짜만. 시간/인원수는 카드에서 제외 (정보 밀도 trade-off).
-// 날짜 포맷은 dates.ts 의 formatMemoDateShort 공유 (캘린더 사이드바 메모 아이템과 통일).
+// 날짜 포맷은 dates.ts 의 formatDisplayDate 공유 (앱 전체 날짜 표시 단일 포맷).
 function formatMeetingMeta(meeting: Meeting): string {
-  return formatMemoDateShort(meeting.date);
+  return formatDisplayDate(meeting.date);
 }
 
 function MeetingRow({

@@ -9,7 +9,7 @@ import {
   isGithubCard,
   type PortfolioWorkMeta,
 } from "../../api/portfolio";
-import { formatDateShort } from "../../lib/dates";
+import { formatDisplayDate } from "../../lib/dates";
 import { useVault } from "../../lib/vault/useVault";
 import { vaultAssetSrc } from "../../lib/portfolio/assetUrl";
 import {
@@ -38,7 +38,7 @@ export function PortfolioWorkCard({ work }: Props) {
   const fm = work.frontmatter;
   const firstScreenshot = fm.screenshots[0];
   const dateLabel = fm.github_merged_at
-    ? formatDateShort(fm.github_merged_at.slice(0, 10))
+    ? formatDisplayDate(fm.github_merged_at.slice(0, 10))
     : "";
   const categoryLabel = lookupCategoryLabel(fm.category);
   const categoryColor = lookupCategoryColor(fm.category);

@@ -15,10 +15,8 @@ import { useGcalSync } from "../../hooks/useGcalSync";
 import { useTaskFlash } from "../../hooks/useTaskHistory";
 import {
   daysFromToday,
-  formatDateShort,
   formatDateShortWithDay,
-  parseIsoDate,
-  weekdayShort,
+  formatDisplayDate,
 } from "../../lib/dates";
 import { LooseDateInput } from "../common/LooseDateInput";
 import { LooseTimeInput } from "../common/LooseTimeInput";
@@ -457,25 +455,12 @@ function ReadOnlyMeta({ task }: { task: Task }) {
   const categoryLabel = TASK_CATEGORIES.find((c) => c.id === task.category)?.label;
   const hasSource = !!task.source_meeting_uid;
   if (!hasDate && !hasTime && !categoryLabel && !hasSource) return null;
-  const wd = task.due_date ? weekdayShort(task.due_date) : null;
   return (
     <div
       className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs"
       style={{ color: "var(--text-secondary)" }}
     >
-      {hasDate ? (
-        <span>
-          {(() => {
-            const sameYear =
-              parseIsoDate(task.due_date!).getFullYear() ===
-              new Date().getFullYear();
-            const dateLabel = sameYear
-              ? formatDateShort(task.due_date!)
-              : task.due_date;
-            return `${dateLabel}${wd ? ` (${wd})` : ""}`;
-          })()}
-        </span>
-      ) : null}
+      {hasDate ? <span>{formatDisplayDate(task.due_date)}</span> : null}
       {hasTime ? <span>{task.due_time}</span> : null}
       {categoryLabel ? (
         <span className="inline-flex items-center gap-0.5">

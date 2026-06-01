@@ -54,7 +54,7 @@ import { useViewMode } from "../../hooks/useViewMode";
 import { isTauri } from "../../lib/isTauri";
 import { formatError } from "../../lib/errors";
 import { TitleConflictError } from "../../lib/vault/scan";
-import { weekdayShort } from "../../lib/dates";
+import { formatDisplayDate } from "../../lib/dates";
 import { LooseDateInput } from "../common/LooseDateInput";
 import { LooseTimeInput } from "../common/LooseTimeInput";
 
@@ -1530,9 +1530,8 @@ function MetaRow({
 //  - boxed (음성기록·요약 편집 모드): 회색 박스 + 전체 muted — 메타 편집은 메모 탭에서만
 //    가능함을 시각적으로 명확히 (입력칸 MetaRow 와 구분).
 function MetaReadOnly({ meta, boxed }: { meta: MetaDoc; boxed?: boolean }) {
-  const wd = weekdayShort(meta.date);
   const rows: { label: string; value: string }[] = [];
-  if (meta.date) rows.push({ label: "날짜", value: wd ? `${meta.date} (${wd})` : meta.date });
+  if (meta.date) rows.push({ label: "날짜", value: formatDisplayDate(meta.date) });
   if (meta.time) rows.push({ label: "시간", value: meta.time });
   if (meta.attendees) rows.push({ label: "참석자", value: meta.attendees });
   if (rows.length === 0) return null;

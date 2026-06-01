@@ -47,12 +47,7 @@ import {
 import type { Meeting } from "../../api/meetings";
 import type { Routine } from "../../api/routines";
 import type { Task, TaskCategory } from "../../api/tasks";
-import {
-  formatDateLong,
-  formatMemoDateShort,
-  isToday,
-  todayIso,
-} from "../../lib/dates";
+import { formatDisplayDate, isToday, todayIso } from "../../lib/dates";
 import { formatError } from "../../lib/errors";
 import { TaskAddModal } from "../tasks/TaskAddModal";
 import { CheckboxButton } from "../tasks/CheckboxButton";
@@ -1146,7 +1141,7 @@ export function CalendarDayPanel({
             className="font-serif text-sm font-medium"
             style={{ color: "var(--text-primary)" }}
           >
-            {formatDateLong(selectedDate)}
+            {formatDisplayDate(selectedDate)}
           </h2>
         </div>
         <Button
@@ -1354,7 +1349,7 @@ export function CalendarDayPanel({
                       as="span"
                       className="shrink-0 pl-2 text-[11px] tabular-nums"
                     >
-                      {formatMemoDateShort(m.date)}
+                      {formatDisplayDate(m.date)}
                     </Text>
                   ) : null}
                 </Button>
