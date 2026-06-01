@@ -52,11 +52,12 @@ PR 단위로 묶음. 각 PR 의 **한 줄 임팩트** 는 카드 frontmatter `im
 - [ ] 첫 진입점 = `scanMeetings` / `readFullMeeting` (옛 lazy migration 자리). f601cec 로 지운 패턴을 versioned 형태로 부활 — 이번엔 실데이터 있으니 필요.
 - [ ] 첫 실제 schema 변경 PR 박을 때 같이 도입 (지금 빈 runner 만 박으면 over-engineering). 트리거 = 다음 frontmatter 필드 추가/이름 변경.
 
-### PR — Conflict resolution 모달 `backend` 🔥
+### PR — Conflict resolution 모달 `backend` 🟡
 한 줄 임팩트: 옵시디안 모바일과 동시 편집 충돌 시 보존/덮어쓰기 선택
 
 - [ ] ConflictError throw → UI 모달 (내 변경 보존 / 외부 변경 가져오기 / `.conflict-*.md` 파일 생성)
 - [ ] 모바일 viewer (read-only) 진입 전 우선 처리 — 동시 편집 발생 빈도 ↑
+- 우선순위 낮춤 (2026-06-01): 현재 옵시디안 모바일 미사용 → 동시 편집 통증 없음. 모바일 viewer 진입 시 재격상.
 
 ### PR — vault 무결성 검사 + 백업 복원 `backend` 🟡
 한 줄 임팩트: 정기 자가 검사 + 백업 zip 한 클릭 복원
