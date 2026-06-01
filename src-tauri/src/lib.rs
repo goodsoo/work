@@ -1,9 +1,18 @@
+mod gcal;
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   tauri::Builder::default()
     .plugin(tauri_plugin_fs::init())
     .plugin(tauri_plugin_dialog::init())
     .plugin(tauri_plugin_shell::init())
+    .manage(gcal::GcalState::new())
+    .invoke_handler(tauri::generate_handler![
+      gcal::gcal_auth_start,
+      gcal::gcal_auth_status,
+      gcal::gcal_disconnect,
+      gcal::gcal_request,
+    ])
     .setup(|app| {
       // dev 모드 전용 메뉴 + 로깅. release 에선 devtools API 가 없어 컴파일 자체에서 제거 필요
       // (런타임 if cfg!(debug_assertions) 로는 코드가 compile path 에 남아 release build 실패).

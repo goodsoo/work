@@ -18,6 +18,7 @@ import {
 } from "../api/tasks";
 import { categoryColor } from "../lib/taskCategory";
 import { TaskRow } from "../components/tasks/TaskRow";
+import { SyncStatusChip } from "../components/tasks/SyncStatusChip";
 import { PageHeaderBar } from "../components/common/PageHeaderBar";
 import { Button } from "../components/common/Button";
 import { Text } from "../components/common/Text";
@@ -110,6 +111,12 @@ export function TasksPage({
       copy.sort((a, b) => a.title.localeCompare(b.title, "ko"));
     } else if (sortKey === "date_asc") {
       copy.sort((a, b) => cmpDate(a, b, true));
+    } else if (sortKey === "date_asc_undone") {
+      // 미완료 먼저 → 그 안에서 오래된순. 끝낸 일은 아래로 내려보냄.
+      copy.sort((a, b) => {
+        if (a.done !== b.done) return a.done ? 1 : -1;
+        return cmpDate(a, b, true);
+      });
     } else {
       copy.sort((a, b) => cmpDate(a, b, false));
     }
@@ -217,6 +224,7 @@ export function TasksPage({
             할 일
           </Text>
         }
+        right={<SyncStatusChip />}
       />
       {onCategoryChange ? (
         <CategoryChipRow
@@ -313,7 +321,6 @@ function CategoryChipRow({
         </SelectableChip>
         <SelectableChip
           active={selected === "uncategorized"}
-          count={counts.get("uncategorized") ?? 0}
           color="var(--text-muted)"
           onToggle={() => onChange("uncategorized")}
           title="미분류"
@@ -328,7 +335,6 @@ function CategoryChipRow({
             <SelectableChip
               key={c.id}
               active={active}
-              count={count}
               color={color}
               onToggle={() => onChange(c.id)}
               title={`${c.label} ${count > 0 ? `(${count})` : ""}`.trim()}
