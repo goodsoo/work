@@ -62,8 +62,11 @@ export function parseSyncState(raw: string): SyncState {
   return {
     syncToken: typeof o.syncToken === "string" ? o.syncToken : null,
     calendarId: typeof o.calendarId === "string" ? o.calendarId : null,
+    calendarName: typeof o.calendarName === "string" ? o.calendarName : null,
     lastSyncAt: typeof o.lastSyncAt === "string" ? o.lastSyncAt : null,
     authState,
+    // 누락(구버전 상태 파일) 시 default true — 연동돼 있으면 자동 동기화가 기본.
+    autoSyncEnabled: o.autoSyncEnabled === false ? false : true,
     snapshots,
     tombstones,
   };
@@ -82,6 +85,20 @@ export function addTombstone(state: SyncState, eventId: string, deletedAt: strin
 
 export function isGuarded(state: SyncState, eventId: string): boolean {
   return state.tombstones.some((t) => t.eventId === eventId);
+}
+
+// 캘린더에서 제거(날짜 삭제)된 일정. executor 가 이미 events.delete 를 마쳤으므로
+// pushConfirmed:true 묘비 + 스냅샷 청소. 다음 delta 에서 cancelled 에코가 오면
+// reconcile 의 tombstone-gc 가 정리한다. addTombstone(pushConfirmed:false)과 달리
+// "다시 push-delete" 를 유발하지 않는다 (이미 삭제 완료).
+export function unlinkEvent(state: SyncState, eventId: string, deletedAt: string): SyncState {
+  const exists = state.tombstones.some((t) => t.eventId === eventId);
+  const tombstones = exists
+    ? state.tombstones.map((t) => (t.eventId === eventId ? { ...t, pushConfirmed: true } : t))
+    : [...state.tombstones, { eventId, deletedAt, pushConfirmed: true }];
+  const snapshots = { ...state.snapshots };
+  delete snapshots[eventId];
+  return { ...state, tombstones, snapshots };
 }
 
 // ─── 액션 → 상태 reduce (순수) ───────────────────────────────────────────────

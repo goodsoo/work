@@ -50,8 +50,13 @@ export interface SyncState {
   syncToken: string | null;
   // 사용자가 고른 전용 캘린더.
   calendarId: string | null;
+  // 전용 캘린더 표시 이름 (rename 시 갱신). UI 표시용 — 권위는 Google.
+  calendarName: string | null;
   lastSyncAt: string | null;
   authState: "linked" | "disconnected";
+  // 전역 자동 동기화(포커스 트리거) on/off. 수동 "지금 동기화" 는 이 값과 무관하게 동작.
+  // 회사 outbound 차단 등에서 끌 수 있게. default true.
+  autoSyncEnabled: boolean;
   // eventId → 스냅샷
   snapshots: Record<string, SyncSnapshot>;
   tombstones: Tombstone[];
@@ -61,8 +66,10 @@ export function emptySyncState(): SyncState {
   return {
     syncToken: null,
     calendarId: null,
+    calendarName: null,
     lastSyncAt: null,
     authState: "disconnected",
+    autoSyncEnabled: true,
     snapshots: {},
     tombstones: [],
   };
@@ -84,6 +91,10 @@ export type ReconcileAction =
   | { kind: "local-upsert"; eventId: string; taskId: string; fields: ScheduleFields; updated: string; reason: "remote-only" | "conflict-lww" }
   // 원격 cancelled → 로컬 휴지통行 (hard-delete 아님).
   | { kind: "local-trash"; eventId: string; taskId: string }
+  // 앵커 있던 일정의 날짜가 제거됨 → 캘린더에서만 제거 (task 는 보존).
+  // Google 이벤트는 start(날짜) 필수라 날짜 없는 일정을 표현 못 한다 → 이벤트 삭제 +
+  // #gcal 앵커 해제 + 삭제 echo 좀비 가드용 묘비. 휴지통行(local-trash)과 다르다.
+  | { kind: "calendar-unlink"; eventId: string; taskId: string }
   // 스냅샷 기록/갱신 (pull 측은 지금 값 확정, push 측은 executor 가 post-hoc).
   | { kind: "snapshot-put"; eventId: string; hash: string; updated: string }
   | { kind: "snapshot-delete"; eventId: string }

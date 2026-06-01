@@ -8,6 +8,18 @@ export interface GcalApiEvent {
   start?: { date?: string; dateTime?: string; timeZone?: string };
   end?: { date?: string; dateTime?: string; timeZone?: string };
   updated?: string;
+  // 반복 일정 마스터의 RRULE 등. 존재하면 반복 일정.
+  recurrence?: string[];
+  // 반복 일정의 개별 인스턴스/예외가 가리키는 마스터 eventId.
+  recurringEventId?: string;
+}
+
+// 반복 일정(마스터 또는 인스턴스/예외)인지. Phase 1 은 반복 미지원 — 동기화에서
+// 제외한다 (import X, 수정·삭제도 안 건드림). 단일 이벤트로 PUT 하면 Google 의 반복
+// 규칙이 통째로 깨지는 footgun 을 구조적으로 차단.
+export function isRecurringEvent(ev: GcalApiEvent): boolean {
+  return (Array.isArray(ev.recurrence) && ev.recurrence.length > 0) ||
+    typeof ev.recurringEventId === "string";
 }
 
 // events.insert / events.update 요청 바디.

@@ -225,3 +225,35 @@ describe("reconcile — 고아 / 엣지", () => {
     expect(actions.find((a) => a.kind === "local-upsert")).toBeUndefined();
   });
 });
+
+describe("reconcile — calendar-unlink (날짜 제거 = 캘린더에서 제거)", () => {
+  it("앵커 있는 로컬에서 날짜 제거 (원격 delta 없음) → calendar-unlink (push-update 아님)", () => {
+    const actions = run({
+      locals: [local("ev1", fields("회의", null, null))],
+      snapshots: { ev1: snap(fields("회의", "2026-05-29", "14:00")) },
+    });
+    expect(actions).toContainEqual({ kind: "calendar-unlink", eventId: "ev1", taskId: "inbox.md#L1" });
+    // 날짜 없는 일정을 push-update 하면 mapping 이 throw → 절대 emit 되면 안 됨.
+    expect(actions.find((a) => a.kind === "push-update")).toBeUndefined();
+  });
+
+  it("날짜 제거 + 원격은 아직 살아있음 → calendar-unlink (원격 변경 무시하고 제거 우선)", () => {
+    const actions = run({
+      locals: [local("ev1", fields("회의", null, null))],
+      remoteDelta: [remote("ev1", fields("회의", "2026-05-29", "14:00"), "2026-05-29T12:00:00Z")],
+      snapshots: { ev1: snap(fields("회의", "2026-05-29", "14:00")) },
+    });
+    expect(actions).toContainEqual({ kind: "calendar-unlink", eventId: "ev1", taskId: "inbox.md#L1" });
+    expect(actions.find((a) => a.kind === "local-upsert")).toBeUndefined();
+    expect(actions.find((a) => a.kind === "push-update")).toBeUndefined();
+  });
+
+  it("묘비가 있으면 날짜 제거보다 묘비 분기 우선 (calendar-unlink 안 함)", () => {
+    const actions = run({
+      locals: [local("ev1", fields("회의", null, null))],
+      tombstones: [{ eventId: "ev1", deletedAt: "2026-05-29T09:00:00Z", pushConfirmed: false }],
+    });
+    expect(actions.find((a) => a.kind === "calendar-unlink")).toBeUndefined();
+    expect(actions).toContainEqual({ kind: "push-delete", eventId: "ev1" });
+  });
+});

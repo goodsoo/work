@@ -3,8 +3,27 @@ import {
   DEFAULT_DURATION_MIN,
   fieldsToGcalEvent,
   gcalEventToRemote,
+  isRecurringEvent,
   type GcalApiEvent,
 } from "./mapping";
+
+describe("isRecurringEvent", () => {
+  it("recurrence(RRULE) 있으면 반복", () => {
+    const ev: GcalApiEvent = { id: "e1", recurrence: ["RRULE:FREQ=WEEKLY"] };
+    expect(isRecurringEvent(ev)).toBe(true);
+  });
+  it("recurringEventId(인스턴스/예외) 있으면 반복", () => {
+    const ev: GcalApiEvent = { id: "e1_20260601", recurringEventId: "e1" };
+    expect(isRecurringEvent(ev)).toBe(true);
+  });
+  it("단일 이벤트는 반복 아님", () => {
+    const ev: GcalApiEvent = { id: "e1", summary: "회의", start: { dateTime: "2026-06-01T09:00:00+09:00" } };
+    expect(isRecurringEvent(ev)).toBe(false);
+  });
+  it("빈 recurrence 배열은 반복 아님", () => {
+    expect(isRecurringEvent({ id: "e1", recurrence: [] })).toBe(false);
+  });
+});
 
 describe("gcalEventToRemote", () => {
   it("시점 이벤트 (dateTime) → date + time (wall-clock 그대로)", () => {
