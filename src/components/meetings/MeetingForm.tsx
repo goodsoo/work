@@ -39,6 +39,9 @@ import { ModeChip } from "../common/ModeChip";
 import { useToast } from "../Toast";
 import { AttendeeTagInput } from "./AttendeeTagInput";
 import { SourceBodyEditor } from "./SourceBodyEditor";
+import { FindBar } from "./FindBar";
+import { findAllMatches } from "../../lib/findMatches";
+import { measureCaretTop } from "../../lib/textareaMeasure";
 import { useVault } from "../../lib/vault/useVault";
 import { saveAttachment } from "../../lib/attachments";
 import { MarkdownView } from "./MarkdownView";
@@ -331,6 +334,222 @@ export function MeetingForm({
     activeTabGlobal = t;
     setActiveTabState(t);
   }
+
+  // ── 탭 내 찾기 (Cmd+F) ──────────────────────────────────────────────
+  // 현재 탭(본문/음성기록/요약)에서 검색. 편집 모드는 textarea 선택(inactive 하이라이트),
+  // 보기 모드는 렌더 DOM Range 의 client rect 를 떠 오버레이 박스로 강조 + 컨테이너 스크롤.
+  // (보기 모드에서 문서 selection 은 focus 가 입력창이면 페인트 안 되고 user-select:none
+  // 영역도 있어 못 씀.) 두 모드 모두 focus 는 find 입력창에 유지 → Enter 연타 순회, 입력
+  // 오염 X. Enter/↓=다음, Shift+Enter/↑=이전, Cmd+G/Cmd+Shift+G 동일. window keydown + ref API.
+  //
+  // 보기 모드는 raw 마크다운이 아니라 "화면에 보이는 텍스트"(textContent)를 검색해야
+  // 사용자 기대와 맞음 (`**굵게**` → "굵게"). 그래서 매치 계산을 mode 별로 분기.
+  const [findOpen, setFindOpen] = useState(false);
+  const [findQuery, setFindQuery] = useState("");
+  const [findCase, setFindCase] = useState(false);
+  const [findActive, setFindActive] = useState(-1); // 0-based, -1 = 아직 미점프
+  const [findMatches, setFindMatches] = useState<number[]>([]);
+  // 보기 모드 현재 매치 하이라이트 박스 (contentWrapper 기준 좌표, 줄당 1개).
+  // 문서 selection 은 focus 가 find 입력창에 있으면 페인트가 안 돼(+ user-select:none
+  // 영역도 있음) 오버레이 박스로 그린다.
+  const [findHitRects, setFindHitRects] = useState<
+    { top: number; left: number; width: number; height: number }[]
+  >([]);
+  const findInputRef = useRef<HTMLInputElement>(null);
+  const contentWrapperRef = useRef<HTMLDivElement>(null);
+
+  const findText =
+    activeTab === "body"
+      ? body
+      : activeTab === "transcript"
+        ? transcript
+        : summary;
+
+  // 보기 모드 검색 대상 = data-find-content 안 렌더 텍스트. 활성 탭의 것 1개만 mount.
+  function findContentEl(): HTMLElement | null {
+    return (
+      scrollContainerRef.current?.querySelector<HTMLElement>(
+        "[data-find-content]",
+      ) ?? null
+    );
+  }
+  function findSearchText(): string {
+    if (viewMode === "edit") return findText;
+    return findContentEl()?.textContent ?? "";
+  }
+
+  // 매치는 DOM(보기 모드 textContent)에 의존하므로 layout effect 에서 계산해 state 보관.
+  // findText 를 dep 에 둬 편집 중 본문 변경 시에도 재계산. 닫혀있거나 빈 query 면 비움.
+  useLayoutEffect(() => {
+    // DOM(보기 모드 textContent)을 읽어 state 로 동기화 — 정당한 effect→state 케이스.
+    // query/탭/모드/본문 변경 시 이전 하이라이트 박스도 비움 (다음 점프에서 재계산).
+    /* eslint-disable react-hooks/set-state-in-effect */
+    setFindHitRects([]);
+    if (!findOpen || !findQuery) {
+      setFindMatches([]);
+      return;
+    }
+    setFindMatches(findAllMatches(findSearchText(), findQuery, findCase));
+    /* eslint-enable react-hooks/set-state-in-effect */
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [findOpen, findQuery, findCase, activeTab, viewMode, findText]);
+
+  function setFindQueryAndReset(v: string) {
+    setFindQuery(v);
+    setFindActive(-1);
+  }
+  function toggleFindCase() {
+    setFindCase((c) => !c);
+    setFindActive(-1);
+  }
+
+  // 컨테이너 기준 매치 top px 로 스크롤 (화면 40% 지점).
+  function scrollContainerTo(topInContainer: number) {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    container.scrollTo({
+      top: Math.max(0, topInContainer - container.clientHeight * 0.4),
+      behavior: "smooth",
+    });
+  }
+
+  // 편집 모드: textarea 선택 (focus 안 옮김 → inactive selection 회색 하이라이트).
+  function selectMatchInTextarea(start: number) {
+    const container = scrollContainerRef.current;
+    const ta = container?.querySelector("textarea");
+    if (!(ta instanceof HTMLTextAreaElement) || !container) return;
+    ta.setSelectionRange(start, start + findQuery.length);
+    const caretTop = measureCaretTop(ta, start);
+    const taTop =
+      ta.getBoundingClientRect().top -
+      container.getBoundingClientRect().top +
+      container.scrollTop;
+    scrollContainerTo(taTop + caretTop);
+  }
+
+  // 보기 모드: 렌더 텍스트의 char offset → text node Range 로 매핑 → client rect 들을
+  // contentWrapper 기준 좌표로 변환해 오버레이 박스로 그린다 (selection 페인트 불안정 회피).
+  function selectMatchInView(start: number) {
+    const root = findContentEl();
+    const wrapper = contentWrapperRef.current;
+    const container = scrollContainerRef.current;
+    if (!root || !wrapper || !container) return;
+    const end = start + findQuery.length;
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    let acc = 0;
+    let startNode: Text | null = null;
+    let startOff = 0;
+    let endNode: Text | null = null;
+    let endOff = 0;
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+      const t = n as Text;
+      const len = t.data.length;
+      if (!startNode && start < acc + len) {
+        startNode = t;
+        startOff = start - acc;
+      }
+      if (startNode && end <= acc + len) {
+        endNode = t;
+        endOff = end - acc;
+        break;
+      }
+      acc += len;
+    }
+    if (!startNode || !endNode) return;
+    const range = document.createRange();
+    range.setStart(startNode, startOff);
+    range.setEnd(endNode, endOff);
+    const rects = Array.from(range.getClientRects());
+    if (rects.length === 0) return;
+    const wrapRect = wrapper.getBoundingClientRect();
+    setFindHitRects(
+      rects.map((r) => ({
+        top: r.top - wrapRect.top,
+        left: r.left - wrapRect.left,
+        width: r.width,
+        height: r.height,
+      })),
+    );
+    const cRect = container.getBoundingClientRect();
+    scrollContainerTo(container.scrollTop + (rects[0].top - cRect.top));
+  }
+
+  function scrollToMatch(i: number) {
+    const start = findMatches[i];
+    if (start == null) return;
+    if (viewMode === "edit") selectMatchInTextarea(start);
+    else selectMatchInView(start);
+  }
+
+  function gotoMatch(nextIdx: number) {
+    const n = findMatches.length;
+    if (n === 0) return;
+    const i = ((nextIdx % n) + n) % n;
+    setFindActive(i);
+    scrollToMatch(i);
+  }
+  // 미점프(-1) 상태에선 다음=첫 매치, 이전=마지막 매치.
+  function findNext() {
+    gotoMatch(findActive < 0 ? 0 : findActive + 1);
+  }
+  function findPrev() {
+    gotoMatch(findActive < 0 ? findMatches.length - 1 : findActive - 1);
+  }
+
+  function openFind() {
+    setFindOpen(true);
+    requestAnimationFrame(() => {
+      findInputRef.current?.focus();
+      findInputRef.current?.select();
+    });
+  }
+
+  function closeFind() {
+    setFindOpen(false);
+    setFindHitRects([]);
+  }
+
+  // window keydown 핸들러가 매 렌더 closure 를 안 잡도록 ref 로 최신 API 전달
+  // (listener 는 빈 deps 로 한 번만 등록 — 본문 typing 마다 재등록 폭주 회피).
+  // ref 갱신은 deps 없는 effect 에서 (렌더 중 ref 변경 회피). keydown 은 항상
+  // paint 후라 최신값을 본다.
+  const findApiRef = useRef<{
+    open: () => void;
+    advance: (d: number) => void;
+    close: () => void;
+    isOpen: boolean;
+  }>({ open: () => {}, advance: () => {}, close: () => {}, isOpen: false });
+  useEffect(() => {
+    findApiRef.current = {
+      open: openFind,
+      advance: (d: number) => (d > 0 ? findNext() : findPrev()),
+      close: closeFind,
+      isOpen: findOpen,
+    };
+  });
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      const cmd = e.metaKey || e.ctrlKey;
+      const api = findApiRef.current;
+      if (cmd && !e.altKey && !e.shiftKey && e.code === "KeyF") {
+        e.preventDefault();
+        api.open();
+        return;
+      }
+      if (api.isOpen && cmd && e.code === "KeyG") {
+        e.preventDefault();
+        api.advance(e.shiftKey ? -1 : 1);
+        return;
+      }
+      // textarea 등 find 입력창 밖에서 Esc — 찾기 닫기 (입력창 안 Esc 는 FindBar 처리).
+      if (api.isOpen && e.key === "Escape" && document.activeElement !== findInputRef.current) {
+        api.close();
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
   const [taskModalOpen, setTaskModalOpen] = useState(false);
   const [taskModalPrefill, setTaskModalPrefill] = useState<
     Partial<TaskInsert>
@@ -616,7 +835,21 @@ export function MeetingForm({
   }
 
   return (
-    <div className="min-h-svh lg:flex lg:h-full lg:min-h-0 lg:flex-col">
+    <div className="relative min-h-svh lg:flex lg:h-full lg:min-h-0 lg:flex-col">
+      {findOpen ? (
+        <FindBar
+          query={findQuery}
+          onQueryChange={setFindQueryAndReset}
+          caseSensitive={findCase}
+          onToggleCase={toggleFindCase}
+          active={findActive < 0 ? 0 : Math.min(findActive, findMatches.length - 1) + 1}
+          total={findMatches.length}
+          onNext={findNext}
+          onPrev={findPrev}
+          onClose={closeFind}
+          inputRef={findInputRef}
+        />
+      ) : null}
       <PageHeaderBar
         sticky={false}
         left={
@@ -863,7 +1096,8 @@ export function MeetingForm({
         }}
       >
         <div
-          className="mx-auto w-full max-w-3xl px-6 pb-24 lg:flex lg:flex-1 lg:flex-col"
+          ref={contentWrapperRef}
+          className="relative mx-auto w-full max-w-3xl px-6 pb-24 lg:flex lg:flex-1 lg:flex-col"
           onMouseDown={(e) => {
             // wrapper 의 padding 영역 (특히 pb-24 하단) 클릭 → 활성 textarea 끝으로 focus.
             // 좌우 px-6 (24px) 영역은 제외 — 사용자가 좌우 padding 은 클릭으로 잡지 말라고 했음.
@@ -879,6 +1113,24 @@ export function MeetingForm({
             ta.setSelectionRange(end, end);
           }}
         >
+        {/* 보기 모드 찾기 현재 매치 하이라이트 — 줄당 박스 1개, 텍스트 위 반투명 오버레이. */}
+        {findOpen && viewMode === "view"
+          ? findHitRects.map((r, i) => (
+              <div
+                key={i}
+                aria-hidden
+                className="pointer-events-none absolute rounded-[2px]"
+                style={{
+                  top: r.top,
+                  left: r.left,
+                  width: r.width,
+                  height: r.height,
+                  backgroundColor: "var(--find-highlight)",
+                  zIndex: 5,
+                }}
+              />
+            ))
+          : null}
         {/* Tab nav — 헤더 바로 아래에 sticky. 헤더 (3.5rem) 와 시각적으로 연결.
             position: sticky 인라인 — Tailwind v4 의 utility 충돌 또는 hot reload
             누락 회피 (시맨틱 토큰 작업 중 발견된 회기 케이스). */}
@@ -1019,19 +1271,21 @@ export function MeetingForm({
             ) : body.trim() === "" ? (
               <EmptyBodyCTA onStartEdit={startEditing} />
             ) : (
-              <MarkdownView
-                content={body}
-                onChange={(v) => {
-                  // 체크박스 토글은 단일 캐릭터 변경 — 별 history entry 로 두는 게
-                  // 옵시디안 동작에 맞음 (입력처럼 coalesce 하면 직전 textarea 변경에
-                  // 합쳐져 undo 가 어색해짐).
-                  setDoc("body", { ...doc, body: v }, true);
-                }}
-                onAddTaskFromLine={(lineText) => {
-                  setTaskModalPrefill(lineToTaskPrefill(lineText, meetingId));
-                  setTaskModalOpen(true);
-                }}
-              />
+              <div data-find-content>
+                <MarkdownView
+                  content={body}
+                  onChange={(v) => {
+                    // 체크박스 토글은 단일 캐릭터 변경 — 별 history entry 로 두는 게
+                    // 옵시디안 동작에 맞음 (입력처럼 coalesce 하면 직전 textarea 변경에
+                    // 합쳐져 undo 가 어색해짐).
+                    setDoc("body", { ...doc, body: v }, true);
+                  }}
+                  onAddTaskFromLine={(lineText) => {
+                    setTaskModalPrefill(lineToTaskPrefill(lineText, meetingId));
+                    setTaskModalOpen(true);
+                  }}
+                />
+              </div>
             )}
           </div>
         ) : null}
@@ -1061,10 +1315,12 @@ export function MeetingForm({
                   }}
                 />
               ) : (
-                <TranscriptView
-                  transcript={transcript}
-                  attendees={meta.attendees}
-                />
+                <div data-find-content>
+                  <TranscriptView
+                    transcript={transcript}
+                    attendees={meta.attendees}
+                  />
+                </div>
               )}
             </div>
           </div>
@@ -1103,16 +1359,18 @@ export function MeetingForm({
                     onImageAttach={onImageAttach}
                   />
                 ) : (
-                  <MarkdownView
-                    content={summary}
-                    onChange={(v) => {
-                      setDoc("summary", { ...doc, summary: v }, true);
-                    }}
-                    onAddTaskFromLine={(lineText: string) => {
-                      setTaskModalPrefill(lineToTaskPrefill(lineText, meetingId));
-                      setTaskModalOpen(true);
-                    }}
-                  />
+                  <div data-find-content>
+                    <MarkdownView
+                      content={summary}
+                      onChange={(v) => {
+                        setDoc("summary", { ...doc, summary: v }, true);
+                      }}
+                      onAddTaskFromLine={(lineText: string) => {
+                        setTaskModalPrefill(lineToTaskPrefill(lineText, meetingId));
+                        setTaskModalOpen(true);
+                      }}
+                    />
+                  </div>
                 )}
               </div>
             ) : (
