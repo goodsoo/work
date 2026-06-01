@@ -1342,15 +1342,13 @@ export function CalendarDayPanel({
                   <span className="min-w-0 flex-1 truncate">
                     {m.title?.trim() || "(제목 없음)"}
                   </span>
-                  {m.date ? (
-                    <Text
-                      variant="caption"
-                      color="muted"
-                      as="span"
-                      className="shrink-0 pl-2 text-[11px] tabular-nums"
+                  {m.time ? (
+                    <span
+                      className="shrink-0 text-[11px] tabular-nums"
+                      style={{ color: "var(--text-muted)" }}
                     >
-                      {formatDisplayDate(m.date)}
-                    </Text>
+                      {m.time}
+                    </span>
                   ) : null}
                 </Button>
                 ))}
