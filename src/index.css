@@ -57,6 +57,7 @@
     --accent-blue-text: #1d4ed8;
     --accent-green: #16a34a;
     --accent-yellow: #eab308; /* 즐겨찾기/별 — 사이드바 pinned 메모 아이콘 */
+    --find-highlight: rgba(250, 204, 21, 0.45); /* 탭 내 찾기 현재 매치 오버레이 */
 
     /* Portfolio category dots */
     --cat-uiux: #2563eb;
@@ -172,6 +173,7 @@
     --accent-blue-text: #93c5fd;
     --accent-green: #4ade80;
     --accent-yellow: #fbbf24; /* 즐겨찾기/별 — 사이드바 pinned 메모 아이콘 (dark) */
+    --find-highlight: rgba(250, 204, 21, 0.38); /* 탭 내 찾기 현재 매치 오버레이 (dark) */
 
     /* Portfolio category dots */
     --cat-uiux: #60a5fa;
