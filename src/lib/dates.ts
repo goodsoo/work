@@ -303,3 +303,61 @@ export function parseLooseTime(raw: string): string | null {
   if (minute < 0 || minute > 59) return null;
   return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
 }
+
+/** 해당 연·월의 일수 (1-31). */
+function daysInMonth(year: number, month: number): number {
+  return new Date(year, month, 0).getDate();
+}
+
+export type DateSegment = "year" | "month" | "day";
+
+/**
+ * ISO(yyyy-mm-dd) 의 한 구간을 delta(±1) 만큼 증감 → 새 ISO.
+ * native date input 처럼 구간별로 독립 wrap (carry 없음): 월 1↔12, 일 1↔말일.
+ * 월 변경으로 일이 말일을 넘으면 말일로 clamp. 결과가 MIN_DATE 미만이면 MIN_DATE.
+ */
+export function stepDateSegment(
+  iso: string,
+  segment: DateSegment,
+  delta: number,
+): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  if (!m) return iso;
+  let year = parseInt(m[1], 10);
+  let month = parseInt(m[2], 10);
+  let day = parseInt(m[3], 10);
+
+  if (segment === "year") {
+    year += delta;
+  } else if (segment === "month") {
+    month = ((month - 1 + delta) % 12 + 12) % 12 + 1;
+  } else {
+    const max = daysInMonth(year, month);
+    day = ((day - 1 + delta) % max + max) % max + 1;
+  }
+  // 월 변경 후 일 clamp.
+  day = Math.min(day, daysInMonth(year, month));
+
+  const next = `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  return next < MIN_DATE_ISO ? MIN_DATE_ISO : next;
+}
+
+export type TimeSegment = "hour" | "minute";
+
+/**
+ * HH:mm 의 한 구간을 delta(±1) 만큼 증감 → 새 HH:mm.
+ * native time input 처럼 구간별 독립 wrap (carry 없음): 시 0↔23, 분 0↔59.
+ */
+export function stepTimeSegment(
+  hhmm: string,
+  segment: TimeSegment,
+  delta: number,
+): string {
+  const m = /^(\d{2}):(\d{2})$/.exec(hhmm);
+  if (!m) return hhmm;
+  let hour = parseInt(m[1], 10);
+  let minute = parseInt(m[2], 10);
+  if (segment === "hour") hour = (hour + delta + 24) % 24;
+  else minute = (minute + delta + 60) % 60;
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+}

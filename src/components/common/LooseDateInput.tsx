@@ -1,5 +1,18 @@
 import { useEffect, useRef, useState } from "react";
-import { parseLooseDate, weekdayShort } from "../../lib/dates";
+import {
+  parseLooseDate,
+  stepDateSegment,
+  todayIso,
+  weekdayShort,
+  type DateSegment,
+} from "../../lib/dates";
+
+// 캐럿 위치 → yyyy-mm-dd 의 어느 구간인가. 0-4 년, 5-7 월, 그 외 일.
+function dateSegmentAt(caret: number): DateSegment {
+  if (caret <= 4) return "year";
+  if (caret <= 7) return "month";
+  return "day";
+}
 
 type Props = {
   value: string;
@@ -73,6 +86,26 @@ export function LooseDateInput({
           skipCommitRef.current = true;
           setDraft(value);
           e.currentTarget.blur();
+        } else if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+          // 캐럿이 놓인 구간(년/월/일)만 ±1. native date input 과 동일.
+          e.preventDefault();
+          const input = e.currentTarget;
+          const caret = input.selectionStart ?? draft.length;
+          const seed = parseLooseDate(draft.trim()) || parseLooseDate(value);
+          // 값이 비어 파싱 불가면 첫 ↑↓ 는 오늘로 seed (증감 없이).
+          if (!seed) {
+            const today = todayIso();
+            setDraft(today);
+            if (today !== value) onCommit(today);
+            return;
+          }
+          const segment = dateSegmentAt(caret);
+          const next = stepDateSegment(seed, segment, e.key === "ArrowUp" ? 1 : -1);
+          setDraft(next);
+          if (next !== value) onCommit(next);
+          // 같은 구간 끝으로 캐럿 복원 (re-render 후).
+          const pos = segment === "year" ? 4 : segment === "month" ? 7 : 10;
+          requestAnimationFrame(() => input.setSelectionRange(pos, pos));
         }
       }}
       placeholder="yyyy-mm-dd"
