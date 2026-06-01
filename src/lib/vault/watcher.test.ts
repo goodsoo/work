@@ -78,4 +78,28 @@ describe("VaultWatcher", () => {
 
     watcher.stop();
   });
+
+  it("한 write 의 여러 echo 이벤트를 window 내내 모두 무시 (create+modify 연속)", async () => {
+    const adapter = createMemoryAdapter();
+    adapter.setRoot("/vault");
+
+    const qc = new QueryClient();
+    const invalidateSpy = vi.spyOn(qc, "invalidateQueries");
+
+    const watcher = createVaultWatcher(adapter, qc, { selfWriteWindowMs: 500 });
+    await watcher.start();
+
+    // notify-rs 는 한 번의 write 에 created + modified 를 잇따라 쏠 수 있다.
+    // 첫 매칭에서 self-write 표시를 지워버리면 두 번째 echo 가 invalidate 로 샌다.
+    const path = "notes/2026-05-16-test.md";
+    watcher.markSelfWrite(path);
+    adapter.__trigger({ type: "created", path });
+    adapter.__trigger({ type: "modified", path });
+
+    await new Promise((r) => setTimeout(r, 150));
+
+    expect(invalidateSpy).not.toHaveBeenCalled();
+
+    watcher.stop();
+  });
 });

@@ -36,6 +36,15 @@ const deletedMeetingsKey = ["meetings", "deleted"] as const;
 // detail cache key 는 uid (frontmatter 의 영구 id) 기반. path rename 에 영향 받지 않음.
 const meetingKey = (uid: string) => ["meetings", "detail", uid] as const;
 
+// 모든 메모 쓰기 mutation 의 공유 scope. 같은 scope.id 끼리 TanStack 이 순차 실행 →
+// 생성·제목 rename·이동·삭제·폴더 op 가 서로(그리고 본문 편집과) 직렬화된다.
+// 디렉토리 listing 을 건드리는 op 들은 "exists 검사 → write" 사이 TOCTOU 가 있어
+// 빠른 연속 작업 시 거짓 TitleConflictError / 파일 엇갈림이 났는데, 직렬화로 차단.
+// 본문 편집(useUpdateMeeting)도 제목 변경 시 rename 을 유발하므로 같은 scope 에 둔다.
+// 단일 사용자라 cross-memo 병렬 손실은 무의미하고, 에디터는 로컬 state 로 렌더돼
+// 직렬화가 타이핑 체감에 영향 없음 (mutation 은 백그라운드 persist).
+const VAULT_WRITE_SCOPE = { id: "vault:structural" } as const;
+
 // uid → file path lookup. list query cache 에 의존. list 가 active 면 항상 valid.
 function uidToPath(qc: QueryClient, uid: string): string | undefined {
   const list = qc.getQueryData<Meeting[]>(meetingsKey);
@@ -108,6 +117,7 @@ export function useCreateMeetingFolder() {
   const { adapter } = useVault();
   const qc = useQueryClient();
   return useMutation({
+    scope: VAULT_WRITE_SCOPE,
     mutationFn: (folderPath: string) => createMeetingFolder(adapter, folderPath),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: meetingFoldersKey });
@@ -122,6 +132,7 @@ export function useRenameMeetingFolder() {
   const { adapter } = useVault();
   const qc = useQueryClient();
   return useMutation({
+    scope: VAULT_WRITE_SCOPE,
     mutationFn: ({ folder, newName }: { folder: string; newName: string }) =>
       renameMeetingFolder(adapter, folder, newName),
     onSuccess: () => {
@@ -136,6 +147,7 @@ export function useDeleteMeetingFolder() {
   const { adapter } = useVault();
   const qc = useQueryClient();
   return useMutation({
+    scope: VAULT_WRITE_SCOPE,
     mutationFn: (folderPath: string) => deleteMeetingFolder(adapter, folderPath),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: meetingsKey });
@@ -196,6 +208,7 @@ export function useCreateMeeting() {
   const { adapter, watcher, activeVaultId } = useVault();
   const qc = useQueryClient();
   return useMutation({
+    scope: VAULT_WRITE_SCOPE,
     mutationFn: async (input: MeetingCreateInput) => {
       const created = await createMeeting(adapter, input);
       markMeetingSelfWrite(watcher, created.id);
@@ -219,8 +232,9 @@ export function useUpdateMeeting(uid: string) {
   const { adapter, watcher } = useVault();
   const qc = useQueryClient();
   return useMutation({
-    // 같은 메모에 대한 mutation 직렬화 (uid 기반 scope — path rename 무관).
-    scope: { id: `meeting:${uid}` },
+    // 모든 메모 쓰기와 공유하는 scope 로 직렬화 — 제목 변경 시 disk rename 을 유발하므로
+    // 생성·이동 등 다른 namespace op 와도 순서가 보장돼야 한다 (uid 단위로는 부족).
+    scope: VAULT_WRITE_SCOPE,
     mutationFn: async (patch: MeetingUpdate) => {
       // uid 는 영구 — list cache 에서 현재 path 조회.
       const path = uidToPath(qc, uid);
@@ -261,11 +275,12 @@ export function useUpdateMeeting(uid: string) {
 }
 
 // 사이드바 즐겨찾기 토글 — uid 를 mutate 시점에 받음 (메모마다 hook instance 안 만들고
-// 컨텍스트 메뉴에서 직접 호출). 같은 메모 동시 토글 방지를 위해 scope 사용.
+// 컨텍스트 메뉴에서 직접 호출). 공유 scope 로 다른 메모 쓰기와 직렬화.
 export function useTogglePinMeeting() {
   const { adapter, watcher } = useVault();
   const qc = useQueryClient();
   return useMutation({
+    scope: VAULT_WRITE_SCOPE,
     mutationFn: async ({ uid, pinned }: { uid: string; pinned: boolean }) => {
       const path = uidToPath(qc, uid);
       if (!path) throw new Error(`meeting not found: uid=${uid}`);
@@ -302,6 +317,7 @@ export function useMoveMeeting() {
   const { adapter, watcher } = useVault();
   const qc = useQueryClient();
   return useMutation({
+    scope: VAULT_WRITE_SCOPE,
     mutationFn: async ({ uid, folder }: { uid: string; folder: string }) => {
       const path = uidToPath(qc, uid);
       if (!path) throw new Error(`meeting not found: uid=${uid}`);
@@ -325,6 +341,7 @@ export function useDeleteMeeting() {
   const { adapter, watcher } = useVault();
   const qc = useQueryClient();
   return useMutation({
+    scope: VAULT_WRITE_SCOPE,
     mutationFn: async (uid: string) => {
       const path = uidToPath(qc, uid);
       if (!path) throw new Error(`meeting not found: uid=${uid}`);
@@ -347,6 +364,7 @@ export function useRestoreMeeting() {
   const { adapter } = useVault();
   const qc = useQueryClient();
   return useMutation({
+    scope: VAULT_WRITE_SCOPE,
     mutationFn: (trashId: string) => restoreMeeting(adapter, trashId),
     onSuccess: (restored, trashId) => {
       qc.setQueryData<Meeting[]>(deletedMeetingsKey, (prev) =>
@@ -365,6 +383,7 @@ export function usePurgeMeeting() {
   const { adapter } = useVault();
   const qc = useQueryClient();
   return useMutation({
+    scope: VAULT_WRITE_SCOPE,
     mutationFn: (trashId: string) => purgeMeeting(adapter, trashId),
     onSuccess: (_void, trashId) => {
       qc.setQueryData<Meeting[]>(deletedMeetingsKey, (prev) =>
@@ -378,6 +397,7 @@ export function useEmptyTrash() {
   const { adapter } = useVault();
   const qc = useQueryClient();
   return useMutation({
+    scope: VAULT_WRITE_SCOPE,
     mutationFn: () => emptyTrash(adapter),
     onSuccess: () => {
       qc.setQueryData<Meeting[]>(deletedMeetingsKey, []);
