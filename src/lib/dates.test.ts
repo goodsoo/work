@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   MIN_DATE_ISO,
   addDaysIso,
+  formatDisplayDate,
+  formatDisplayDateTime,
   isBeforeMinDate,
   isPast,
   isToday,
@@ -43,6 +45,23 @@ describe("dates", () => {
     expect(relativeDateLabel("2026-05-09", ref)).toBe("3일 후");
     expect(relativeDateLabel("2026-05-03", ref)).toBe("3일 전");
     expect(relativeDateLabel("2026-06-01", ref)).toBe("6/1");
+  });
+
+  it("formatDisplayDate omits year for this year, keeps it otherwise", () => {
+    expect(formatDisplayDate("2026-05-06", ref)).toBe("05.06(수)");
+    expect(formatDisplayDate("2026-01-09", ref)).toBe("01.09(금)");
+    expect(formatDisplayDate("2027-03-04", ref)).toBe("2027.03.04(목)");
+    expect(formatDisplayDate("", ref)).toBe("");
+    expect(formatDisplayDate(null, ref)).toBe("");
+  });
+
+  it("formatDisplayDateTime appends HH:mm with same year rule", () => {
+    expect(formatDisplayDateTime("2026-05-17T14:09:00", ref)).toBe(
+      "05.17(일) 14:09",
+    );
+    expect(formatDisplayDateTime("2027-01-02T08:05:00", ref)).toBe(
+      "2027.01.02(토) 08:05",
+    );
   });
 
   it("isPast / isToday compare against reference", () => {
