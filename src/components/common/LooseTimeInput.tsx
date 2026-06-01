@@ -1,5 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { parseLooseTime } from "../../lib/dates";
+import { parseLooseTime, stepTimeSegment } from "../../lib/dates";
+
+// 캐럿 위치 → HH:mm 의 어느 구간인가. 0-2 시, 그 외 분.
+function timeSegmentAt(caret: number): "hour" | "minute" {
+  return caret <= 2 ? "hour" : "minute";
+}
 
 type Props = {
   value: string;
@@ -58,6 +63,25 @@ export function LooseTimeInput({
           skipCommitRef.current = true;
           setDraft(value);
           e.currentTarget.blur();
+        } else if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+          // 캐럿이 놓인 구간(시/분)만 ±1. native time input 과 동일.
+          e.preventDefault();
+          const input = e.currentTarget;
+          const caret = input.selectionStart ?? draft.length;
+          // 값이 비어 파싱 불가면 첫 ↑↓ 는 00:00 으로 seed (증감 없이).
+          const seed = parseLooseTime(draft.trim()) || parseLooseTime(value);
+          if (!seed) {
+            setDraft("00:00");
+            if (value !== "00:00") onCommit("00:00");
+            return;
+          }
+          const segment = timeSegmentAt(caret);
+          const next = stepTimeSegment(seed, segment, e.key === "ArrowUp" ? 1 : -1);
+          setDraft(next);
+          if (next !== value) onCommit(next);
+          // 같은 구간 끝으로 캐럿 복원 (re-render 후).
+          const pos = segment === "hour" ? 2 : 5;
+          requestAnimationFrame(() => input.setSelectionRange(pos, pos));
         }
       }}
       placeholder="hh:mm"

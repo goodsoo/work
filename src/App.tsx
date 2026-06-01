@@ -52,6 +52,7 @@ import { useTasks } from "./hooks/useTasks";
 import { useVault } from "./lib/vault/useVault";
 import { maybeAutoBackup } from "./lib/backup";
 import { DrawerProvider, useDrawer } from "./hooks/useDrawer";
+import { GcalSyncProvider } from "./hooks/useGcalSync";
 import { useSidebarCollapsed } from "./hooks/useSidebarCollapsed";
 import { todayIso } from "./lib/dates";
 import { isTauri } from "./lib/isTauri";
@@ -106,9 +107,11 @@ export default function App() {
     <VaultGate>
       <GlobalTooltip />
       <ToastProvider>
-        <DrawerProvider>
-          <AppContent />
-        </DrawerProvider>
+        <GcalSyncProvider>
+          <DrawerProvider>
+            <AppContent />
+          </DrawerProvider>
+        </GcalSyncProvider>
       </ToastProvider>
     </VaultGate>
   );

@@ -26,3 +26,11 @@ tauri-plugin-log = "2"
 tauri-plugin-fs = { version = "2", features = ["watch"] }
 tauri-plugin-dialog = "2"
 tauri-plugin-shell = "2"
+# Google Calendar 연동 (T2). reqwest/sha2/base64/rand/url 은 이미 트리에 있던 걸
+# 직접 dep 으로 승격 (+ reqwest 의 json/TLS 활성). keyring 만 신규 — macOS keychain 직결.
+reqwest = { version = "0.13", features = ["json"] }
+keyring = { version = "3", features = ["apple-native"] }
+sha2 = "0.10"
+base64 = "0.22"
+rand = "0.8"
+url = "2"

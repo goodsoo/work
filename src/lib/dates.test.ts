@@ -9,6 +9,8 @@ import {
   parseLooseDate,
   parseLooseTime,
   relativeDateLabel,
+  stepDateSegment,
+  stepTimeSegment,
   todayIso,
 } from "./dates";
 
@@ -139,5 +141,33 @@ describe("dates", () => {
     expect(parseLooseTime("now")).toMatch(/^\d{2}:\d{2}$/);
     expect(parseLooseTime("현재")).toMatch(/^\d{2}:\d{2}$/);
     expect(parseLooseTime("NOW")).toMatch(/^\d{2}:\d{2}$/);
+  });
+
+  it("stepDateSegment bumps year/month/day independently", () => {
+    expect(stepDateSegment("2026-05-06", "year", 1)).toBe("2027-05-06");
+    expect(stepDateSegment("2026-05-06", "month", 1)).toBe("2026-06-06");
+    expect(stepDateSegment("2026-05-06", "day", 1)).toBe("2026-05-07");
+    expect(stepDateSegment("2026-05-06", "day", -1)).toBe("2026-05-05");
+  });
+
+  it("stepDateSegment wraps within field without carry", () => {
+    expect(stepDateSegment("2026-12-06", "month", 1)).toBe("2026-01-06");
+    expect(stepDateSegment("2026-01-06", "month", -1)).toBe("2026-12-06");
+    expect(stepDateSegment("2026-05-31", "day", 1)).toBe("2026-05-01");
+  });
+
+  it("stepDateSegment clamps day to month end and respects MIN_DATE", () => {
+    // 3월 31일 → 월 -1 = 2월, 일은 28 로 clamp.
+    expect(stepDateSegment("2026-03-31", "month", -1)).toBe("2026-02-28");
+    // MIN_DATE 미만은 클램프.
+    expect(stepDateSegment(MIN_DATE_ISO, "year", -1)).toBe(MIN_DATE_ISO);
+  });
+
+  it("stepTimeSegment wraps hour 0-23 and minute 0-59 without carry", () => {
+    expect(stepTimeSegment("14:30", "hour", 1)).toBe("15:30");
+    expect(stepTimeSegment("14:30", "minute", 1)).toBe("14:31");
+    expect(stepTimeSegment("23:30", "hour", 1)).toBe("00:30");
+    expect(stepTimeSegment("14:59", "minute", 1)).toBe("14:00");
+    expect(stepTimeSegment("00:00", "minute", -1)).toBe("00:59");
   });
 });
