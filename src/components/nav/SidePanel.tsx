@@ -9,7 +9,6 @@ import {
   Check,
   Pencil,
   XCircle,
-  FolderInput,
   FolderPlus,
   ChevronDown,
   ChevronRight,
@@ -21,11 +20,20 @@ import {
   useMeetingFolders,
   useCreateMeeting,
   useCreateMeetingFolder,
+  useDeleteMeeting,
   useDeleteMeetingFolder,
+  useGetFullMeeting,
   useMoveMeeting,
   useRenameMeetingFolder,
   useTogglePinMeeting,
 } from "../../hooks/useMeetings";
+import {
+  copyMeetingMarkdown,
+  meetingToMarkdownInput,
+} from "../../lib/meetingExport";
+import type { MeetingMarkdownInput } from "../../lib/markdown";
+import { MeetingMenuItems } from "../meetings/MeetingMenuItems";
+import { MeetingExportModal } from "../meetings/MeetingExportModal";
 import { meetingFolder } from "../../api/meetings";
 import { useMeetingSort, type MeetingSortKey } from "../../hooks/useMeetingSort";
 import { buildMeetingSortComparator } from "../../lib/meetingSort";
@@ -90,9 +98,11 @@ export function MeetingsSidePanel({
   const createMutation = useCreateMeeting();
   const createFolderMutation = useCreateMeetingFolder();
   const deleteFolderMutation = useDeleteMeetingFolder();
+  const deleteMeetingMutation = useDeleteMeeting();
   const renameFolderMutation = useRenameMeetingFolder();
   const moveMutation = useMoveMeeting();
   const togglePinMutation = useTogglePinMeeting();
+  const getFullMeeting = useGetFullMeeting();
   const toast = useToast();
   const [sortKey, setSortKey] = useMeetingSort();
   const [contextMenu, setContextMenu] = useState<{
@@ -116,6 +126,15 @@ export function MeetingsSidePanel({
   const [deleteFolderTarget, setDeleteFolderTarget] = useState<
     { folder: string; total: number; pinned: number } | null
   >(null);
+  // 메모 삭제 confirm target. window.confirm 은 Tauri WebView 에서 신뢰 못해
+  // ConfirmDialog 모달 경유 (폴더 삭제와 동일 패턴).
+  const [deleteMeetingTarget, setDeleteMeetingTarget] = useState<
+    { uid: string; title: string } | null
+  >(null);
+  // 내보내기 섹션 선택 모달 target — full Meeting fetch 후 set.
+  const [exportTarget, setExportTarget] = useState<MeetingMarkdownInput | null>(
+    null,
+  );
 
   // 메모 정렬 — 폴더 안에서만 적용. 폴더 위계는 alphabetic 고정 (정렬 popover 무관).
   // App.tsx (삭제 후 자동 선택, Cmd+↑/↓) 와 같은 comparator 공유 — buildMeetingSortComparator.
@@ -298,6 +317,45 @@ export function MeetingsSidePanel({
     }
   }
 
+  // 마크다운 복사 / 내보내기 — list 항목은 본문이 빈 string 이라 full Meeting 을
+  // 먼저 fetch (getFullMeeting). 본문(body) 섹션 기준 — 사이드바엔 활성 탭 개념 없음.
+  async function handleCopyMeeting(uid: string) {
+    try {
+      const full = await getFullMeeting(uid);
+      const ok = await copyMeetingMarkdown(meetingToMarkdownInput(full), "body");
+      if (!ok) {
+        toast.show(
+          "복사에 실패했습니다. 권한 또는 환경을 확인하고 다시 시도하세요.",
+        );
+      }
+    } catch (e) {
+      toast.show(formatError(e));
+    }
+  }
+
+  // 내보내기 — full Meeting fetch 후 섹션 선택 모달 오픈 (모달이 폴더 선택 + 파일 쓰기).
+  async function handleExportMeeting(uid: string) {
+    try {
+      const full = await getFullMeeting(uid);
+      setExportTarget(meetingToMarkdownInput(full));
+    } catch (e) {
+      toast.show(formatError(e));
+    }
+  }
+
+  async function performDeleteMeeting() {
+    if (!deleteMeetingTarget) return;
+    const { uid } = deleteMeetingTarget;
+    setDeleteMeetingTarget(null);
+    try {
+      await deleteMeetingMutation.mutateAsync(uid);
+      // 삭제한 게 현재 선택 메모면 선택 해제 (App 의 hash 정리 effect 가 이어받음).
+      if (selectedId === uid) onDeselect?.();
+    } catch (e) {
+      toast.show(formatError(e));
+    }
+  }
+
   // 모달 경유 이동 — modal 안에서 commit 결과 throw 받아서 모달에 toast.
   async function handleMoveFromModal(folder: string) {
     if (!moveModalFor) return;
@@ -397,6 +455,7 @@ export function MeetingsSidePanel({
               <PinnedSection
                 meetings={pinnedMeetings}
                 selectedUid={selectedId}
+                contextMeetingId={contextMenu?.meetingId ?? null}
                 onSelect={onSelect}
                 onContextMenu={handleContextMenu}
                 onUnpin={(uid) => void handleTogglePin(uid, false)}
@@ -406,6 +465,8 @@ export function MeetingsSidePanel({
               meetings={data ?? []}
               extraFolders={folders ?? []}
               selectedUid={selectedId}
+              contextMeetingId={contextMenu?.meetingId ?? null}
+              contextFolder={folderContextMenu?.folder ?? null}
               sortMeetings={sortComparator}
               editingFolder={editingFolder}
               editingFolderPending={renameFolderMutation.isPending}
@@ -434,15 +495,35 @@ export function MeetingsSidePanel({
           x={contextMenu.x}
           y={contextMenu.y}
           pinned={contextMeeting?.pinned ?? false}
-          onMove={() => {
-            setMoveModalFor(contextMenu.meetingId);
-            setContextMenu(null);
-          }}
+          deleteDisabled={deleteMeetingMutation.isPending}
           onTogglePin={() => {
             const m = contextMeeting;
             setContextMenu(null);
             if (!m) return;
             void handleTogglePin(m.uid, !m.pinned);
+          }}
+          onMove={() => {
+            setMoveModalFor(contextMenu.meetingId);
+            setContextMenu(null);
+          }}
+          onCopy={() => {
+            const m = contextMeeting;
+            setContextMenu(null);
+            if (m) void handleCopyMeeting(m.uid);
+          }}
+          onExport={() => {
+            const m = contextMeeting;
+            setContextMenu(null);
+            if (m) void handleExportMeeting(m.uid);
+          }}
+          onDelete={() => {
+            const m = contextMeeting;
+            setContextMenu(null);
+            if (m)
+              setDeleteMeetingTarget({
+                uid: m.uid,
+                title: m.title?.trim() || "(제목 없음)",
+              });
           }}
         />
       ) : null}
@@ -451,7 +532,6 @@ export function MeetingsSidePanel({
         <FolderContextMenu
           x={folderContextMenu.x}
           y={folderContextMenu.y}
-          folder={folderContextMenu.folder}
           onRename={() => {
             const f = folderContextMenu.folder;
             setFolderContextMenu(null);
@@ -471,6 +551,11 @@ export function MeetingsSidePanel({
         meetingTitle={moveModalMeeting?.title ?? ""}
         onClose={() => setMoveModalFor(null)}
         onMove={handleMoveFromModal}
+      />
+
+      <MeetingExportModal
+        meeting={exportTarget}
+        onClose={() => setExportTarget(null)}
       />
 
       <ConfirmDialog
@@ -507,6 +592,21 @@ export function MeetingsSidePanel({
         onConfirm={() => void performDeleteFolder()}
         onCancel={() => setDeleteFolderTarget(null)}
       />
+
+      <ConfirmDialog
+        open={deleteMeetingTarget !== null}
+        title={
+          deleteMeetingTarget
+            ? `'${deleteMeetingTarget.title}' 메모를 휴지통으로 옮길까요?`
+            : ""
+        }
+        message="휴지통에서 다시 복원할 수 있습니다."
+        confirmLabel="삭제"
+        danger
+        busy={deleteMeetingMutation.isPending}
+        onConfirm={() => void performDeleteMeeting()}
+        onCancel={() => setDeleteMeetingTarget(null)}
+      />
     </div>
   );
 }
@@ -517,12 +617,15 @@ export function MeetingsSidePanel({
 function PinnedSection({
   meetings,
   selectedUid,
+  contextMeetingId,
   onSelect,
   onContextMenu,
   onUnpin,
 }: {
   meetings: Meeting[];
   selectedUid: string | null;
+  // 우클릭 대상 메모 id — 컨텍스트 메뉴 열려있는 동안 시각 강조.
+  contextMeetingId: string | null;
   onSelect: (uid: string) => void;
   onContextMenu: (meetingId: string, x: number, y: number) => void;
   onUnpin: (uid: string) => void;
@@ -551,6 +654,10 @@ function PinnedSection({
                 backgroundColor:
                   m.uid === selectedUid ? "var(--bg-surface-active)" : undefined,
                 color: "var(--text-primary)",
+                boxShadow:
+                  m.id === contextMeetingId
+                    ? "inset 0 0 0 1.5px var(--focus-ring)"
+                    : undefined,
               }}
             >
               <Star
@@ -584,23 +691,22 @@ function PinnedSection({
   );
 }
 
-// 폴더 우클릭 컨텍스트 메뉴 — 이름 변경 + 삭제.
+// 폴더 우클릭/… 버튼 컨텍스트 메뉴 — 이름 변경 + 삭제. 상단 폴더명 헤더는 제거
+// (우클릭/… 으로 이미 대상이 강조되어 redundant).
 function FolderContextMenu({
   x,
   y,
-  folder,
   onRename,
   onDelete,
 }: {
   x: number;
   y: number;
-  folder: string;
   onRename: () => void;
   onDelete: () => void;
 }) {
   const MENU_W = 200;
-  const MENU_H = 88;
-  const left = Math.min(x, window.innerWidth - MENU_W - 8);
+  const MENU_H = 76;
+  const left = Math.max(8, Math.min(x, window.innerWidth - MENU_W - 8));
   const top = Math.min(y, window.innerHeight - MENU_H - 8);
   return (
     <div
@@ -614,14 +720,6 @@ function FolderContextMenu({
       }}
       onMouseDown={(e) => e.stopPropagation()}
     >
-      <Text
-        variant="caption"
-        color="muted"
-        as="div"
-        className="truncate px-3 pt-2 pb-1 text-[10px] uppercase tracking-wider"
-      >
-        {folder}
-      </Text>
       <Button
         variant="ghost"
         onClick={onRename}
@@ -649,29 +747,37 @@ function FolderContextMenu({
   );
 }
 
-// 메모 우클릭 컨텍스트 메뉴. '고정/해제' + '폴더로 이동'. 추후 항목 추가 시
-// 같은 패턴으로 button list 만 늘리면 됨.
+// 메모 우클릭 컨텍스트 메뉴 — 타이틀바 … 메뉴와 동일 항목 (MeetingMenuItems 공유).
+// 고정 / 폴더로 이동 / 마크다운 복사 / 내보내기 / 삭제.
 function MeetingContextMenu({
   x,
   y,
   pinned,
-  onMove,
+  deleteDisabled,
   onTogglePin,
+  onMove,
+  onCopy,
+  onExport,
+  onDelete,
 }: {
   x: number;
   y: number;
   pinned: boolean;
-  onMove: () => void;
+  deleteDisabled?: boolean;
   onTogglePin: () => void;
+  onMove: () => void;
+  onCopy: () => void;
+  onExport: () => void;
+  onDelete: () => void;
 }) {
-  // 우측/하단 viewport 초과 방지 — 간단히 좌표만 clamp (메뉴 크기 추정).
-  const MENU_W = 180;
-  const MENU_H = 80;
-  const left = Math.min(x, window.innerWidth - MENU_W - 8);
+  // 우측/하단 viewport 초과 방지 — 좌표 clamp (메뉴 크기 추정). 항목 7개(구분선 2 포함).
+  const MENU_W = 184;
+  const MENU_H = 232;
+  const left = Math.max(8, Math.min(x, window.innerWidth - MENU_W - 8));
   const top = Math.min(y, window.innerHeight - MENU_H - 8);
   return (
     <div
-      className="fixed z-50 overflow-hidden rounded-md shadow-lg"
+      className="fixed z-50 overflow-hidden rounded-md py-1 shadow-lg"
       style={{
         left,
         top,
@@ -682,36 +788,15 @@ function MeetingContextMenu({
       // mousedown 으로 메뉴 자체 클릭이 outside-close trigger 되지 않도록 막음
       onMouseDown={(e) => e.stopPropagation()}
     >
-      <Button
-        variant="ghost"
-        onClick={onTogglePin}
-        className="w-full justify-start gap-2 rounded-none px-3 py-2"
-        leftIcon={
-          <Star
-            className="h-3.5 w-3.5 shrink-0"
-            // 고정 상태면 채워진 별 — 의미 신호. 해제 액션 시각 단서.
-            fill={pinned ? "var(--accent-yellow)" : "none"}
-            style={{ color: pinned ? "var(--accent-yellow)" : "var(--text-muted)" }}
-          />
-        }
-        style={{ color: "var(--text-primary)" }}
-      >
-        {pinned ? "고정 해제" : "고정"}
-      </Button>
-      <Button
-        variant="ghost"
-        onClick={onMove}
-        className="w-full justify-start gap-2 rounded-none px-3 py-2"
-        leftIcon={
-          <FolderInput
-            className="h-3.5 w-3.5 shrink-0"
-            style={{ color: "var(--text-muted)" }}
-          />
-        }
-        style={{ color: "var(--text-primary)" }}
-      >
-        폴더로 이동...
-      </Button>
+      <MeetingMenuItems
+        pinned={pinned}
+        onTogglePin={onTogglePin}
+        onMove={onMove}
+        onCopy={onCopy}
+        onExport={onExport}
+        onDelete={onDelete}
+        deleteDisabled={deleteDisabled}
+      />
     </div>
   );
 }
