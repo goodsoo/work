@@ -86,10 +86,11 @@ export function createVaultWatcher(
 
   const handle = (event: VaultWatchEvent) => {
     const path = "path" in event ? event.path : event.to;
-    // 자기 write 인지 확인
+    // 자기 write 인지 확인. 한 번의 write 가 notify-rs 이벤트를 여러 개 쏠 수 있어
+    // (create + modify 등) 첫 매칭에서 지우지 않고 window 만료(markSelfWrite 의 cleanup
+    // 타이머)까지 유지한다 — 그래야 같은 write 의 후속 echo 가 invalidate 로 새지 않음.
     const recent = selfWrites.get(path);
     if (recent && Date.now() - recent < selfWindow) {
-      selfWrites.delete(path);
       return;
     }
     invalidateForPath(path);
