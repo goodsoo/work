@@ -6,6 +6,14 @@
 
 ## 2026-06-01
 
+### PR #63 — 메모 연속 작업 충돌 차단 (mutation 직렬화)
+
+- **한 줄 임팩트**: 메모 빠른 연속 생성·이름변경·이동 시 충돌 에러 사라짐
+- 생성·제목 rename·이동·삭제·폴더 op 가 직렬화 안 돼, "exists 검사 → write" 사이 TOCTOU race 로 거짓 TitleConflictError / 파일 엇갈림이 발생하던 것을 차단.
+- 모든 메모 쓰기 mutation 에 공유 TanStack scope(`vault:structural`) 부여 → 순차 drain. 제목 변경이 disk rename 을 유발하는 useUpdateMeeting 도 같은 scope 로 통일 (기존 per-uid scope 는 생성/이동과 직렬화 못 함).
+- watcher self-echo 누수 수정 — 한 write 의 여러 notify 이벤트(created+modified) 중 후속 echo 가 invalidate 로 새던 것 차단.
+- UI throttle 없이 손은 안 묶음 (에디터는 로컬 state 렌더 → 직렬화 체감 0). 진짜 이름 충돌은 그대로 노출(자동 재시도 X).
+
 ### PR #62 — 메모장 탭 내 찾기 (Cmd+F)
 
 - **한 줄 임팩트**: 긴 메모도 Cmd+F 로 단어 즉시 찾기
