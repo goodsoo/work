@@ -149,6 +149,8 @@ export function CalendarPage({ targetDate, onSelectedDateChange }: Props) {
       ensure(j.date).journal = j;
     }
     for (const t of todosQ.data ?? []) {
+      // 휴지통(soft-delete)·취소된 태스크는 캘린더에서 제외.
+      if (t.deleted || t.cancelled) continue;
       let d: string | null = null;
       if (t.done) {
         if (t.done_at) d = timestampToLocalIsoDate(t.done_at);
@@ -300,10 +302,12 @@ export function CalendarPage({ targetDate, onSelectedDateChange }: Props) {
     }
   }, [centerWeekOffset, minCenterOffset]);
 
-  // 헤더 라벨용 — 보이는 top row의 토요일(마지막 날) month 기준.
-  // "1일 진입" semantic: 새 달 1일이 행에 들어오면 토요일이 새 달이 되므로 헤더가 즉시 전환.
+  // 헤더 라벨용 — 보이는 둘째 row의 토요일(마지막 날) month 기준.
+  // "1일 진입" semantic: 새 달 1일이 top row 또는 둘째 row 에 들어오면 그 달을 focus.
+  // 둘째 row 토요일을 보는 이유 — 새 달 1일이 둘째 줄에 걸쳐 있을 때도 그 달로 즉시 전환
+  // (top row 토요일만 보면 1일이 top row 에 닿을 때까지 한 행 늦게 전환됨).
   const currentMonthYM = useMemo(() => {
-    const w = addDays(anchorWeekStart, visibleWeekOffset * 7 + 6);
+    const w = addDays(anchorWeekStart, (visibleWeekOffset + 1) * 7 + 6);
     return { year: w.getFullYear(), month: w.getMonth() + 1 };
   }, [anchorWeekStart, visibleWeekOffset]);
 
