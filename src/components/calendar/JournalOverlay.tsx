@@ -164,7 +164,9 @@ export function JournalOverlay({ open, date, onClose }: Props) {
         {/* edit: SourceBodyEditor 가 outer scroll 발생시키므로 wrapper 가 min-h-0 + overflow-y-auto.
             view: 컨테이너 스크롤. 둘 다 px-6 py-5 + font-serif 로 일기 느낌 유지. */}
         {viewMode === "edit" ? (
-          <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5 font-serif text-[15px]">
+          // flex flex-col 로 SourceBodyEditor (flex:1 0 auto) 가 남은 높이까지 grow
+          // → textarea 아래 빈 영역 클릭도 에디터 focus 핸들러에 닿음 (메모장과 동일).
+          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-6 py-5 font-serif text-[15px]">
             <SourceBodyEditor
               content={content}
               onChange={handleChange}

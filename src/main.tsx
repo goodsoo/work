@@ -5,9 +5,10 @@ import "./index.css";
 import App from "./App";
 import { queryClient } from "./lib/queryClient";
 import { VaultProvider } from "./lib/vault/VaultProvider";
-import { applyPlatformClasses } from "./lib/platform";
+import { applyPlatformClasses, applyDevWindowTitle } from "./lib/platform";
 
 applyPlatformClasses();
+applyDevWindowTitle();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
