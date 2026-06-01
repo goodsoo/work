@@ -19,3 +19,30 @@ export function findAllMatches(
   }
   return out;
 }
+
+// 전체 바꾸기 — text 안 query 매치를 모두 replacement 로 치환한 새 문자열을 반환.
+// findAllMatches 와 달리 from = idx + query.length 로 전진해 겹치지 않는 매치만 잡는다
+// (겹침까지 치환하면 데이터 유실: "aaa" 의 "aa" 2개를 둘 다 치환하면 1글자 사라짐).
+// 매치를 뒤에서부터 교체하는 것과 동치인 forward rebuild — offset 안 밀림.
+export function replaceAllInText(
+  text: string,
+  query: string,
+  replacement: string,
+  caseSensitive: boolean,
+): string {
+  if (!query) return text;
+  const hay = caseSensitive ? text : text.toLowerCase();
+  const needle = caseSensitive ? query : query.toLowerCase();
+  let out = "";
+  let from = 0;
+  for (;;) {
+    const idx = hay.indexOf(needle, from);
+    if (idx === -1) {
+      out += text.slice(from);
+      break;
+    }
+    out += text.slice(from, idx) + replacement;
+    from = idx + query.length;
+  }
+  return out;
+}
