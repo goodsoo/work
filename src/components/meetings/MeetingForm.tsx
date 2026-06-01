@@ -40,7 +40,7 @@ import { useToast } from "../Toast";
 import { AttendeeTagInput } from "./AttendeeTagInput";
 import { SourceBodyEditor } from "./SourceBodyEditor";
 import { FindBar } from "./FindBar";
-import { findAllMatches } from "../../lib/findMatches";
+import { findAllMatches, replaceAllInText } from "../../lib/findMatches";
 import { measureCaretTop } from "../../lib/textareaMeasure";
 import { useVault } from "../../lib/vault/useVault";
 import { saveAttachment } from "../../lib/attachments";
@@ -509,6 +509,63 @@ export function MeetingForm({
     setFindHitRects([]);
   }
 
+  // ── 바꾸기 (FindBar ▸ 펼침) ─────────────────────────────────────────
+  // 편집 모드 세 탭(본문/음성기록/요약) textarea 의 raw 텍스트만 치환 대상.
+  // 보기 모드는 바꾸기 줄 비활성 (UI 가 막고, 함수도 viewMode 가드). 치환은 기존
+  // setDoc 경로(immediate flush)로 docHistory 에 단일 entry 로 올려 Cmd+Z 한 번에 undo.
+  const [replaceExpanded, setReplaceExpanded] = useState(false);
+  const [replaceText, setReplaceText] = useState("");
+
+  // 활성 탭의 텍스트를 통째로 교체 — 탭별 source 로 분리해 undo 가 그 탭으로 라우팅.
+  // immediate=true 라 직전 typing pending 을 마감하고 치환을 자기 entry 로 둠.
+  function writeActiveTabText(next: string) {
+    if (activeTab === "transcript")
+      setDoc("transcript:replace", { ...doc, transcript: next }, true);
+    else if (activeTab === "summary")
+      setDoc("summary:replace", { ...doc, summary: next }, true);
+    else setDoc("body:replace", { ...doc, body: next }, true);
+  }
+
+  // 현재 매치 1개 치환 → 같은 자리 이후 다음 매치로 이동.
+  function replaceCurrent() {
+    if (viewMode !== "edit") return;
+    const matches = findMatches;
+    if (matches.length === 0 || !findQuery) return;
+    if (findActive < 0) {
+      // 미점프면 먼저 첫 매치로 — 한 번 더 눌러 치환.
+      gotoMatch(0);
+      return;
+    }
+    const i = ((findActive % matches.length) + matches.length) % matches.length;
+    const start = matches[i];
+    const text = findText;
+    const next =
+      text.slice(0, start) + replaceText + text.slice(start + findQuery.length);
+    writeActiveTabText(next);
+    // 새 텍스트에서 매치 재계산 — 치환 지점 이후 첫 매치로 이동 (없으면 처음으로 wrap).
+    const after = findAllMatches(next, findQuery, findCase);
+    if (after.length === 0) {
+      setFindActive(-1);
+      return;
+    }
+    let nextIdx = after.findIndex((m) => m >= start + replaceText.length);
+    if (nextIdx < 0) nextIdx = 0;
+    setFindActive(nextIdx);
+    // textarea 값이 re-render 된 뒤 선택/스크롤 (findMatches state 갱신 전이라 직접 좌표 사용).
+    requestAnimationFrame(() => selectMatchInTextarea(after[nextIdx]));
+  }
+
+  // 전체 치환 — 겹치지 않는 매치를 모두 교체. 단일 history entry → Cmd+Z 한 번에 undo.
+  function replaceAll() {
+    if (viewMode !== "edit" || !findQuery) return;
+    const text = findText;
+    const next = replaceAllInText(text, findQuery, replaceText, findCase);
+    if (next === text) return;
+    writeActiveTabText(next);
+    setFindActive(-1);
+    setFindHitRects([]);
+  }
+
   // window keydown 핸들러가 매 렌더 closure 를 안 잡도록 ref 로 최신 API 전달
   // (listener 는 빈 deps 로 한 번만 등록 — 본문 typing 마다 재등록 폭주 회피).
   // ref 갱신은 deps 없는 effect 에서 (렌더 중 ref 변경 회피). keydown 은 항상
@@ -585,7 +642,8 @@ export function MeetingForm({
   // 둘 다 "변경이 일어나는" 탭으로 가는 일관 규칙.
   function routeToSource(src: string | undefined) {
     if (!src) return;
-    if (src === "transcript") setActiveTab("transcript");
+    // startsWith 로 "transcript", "transcript:replace" 등 변형까지 같은 탭으로.
+    if (src.startsWith("transcript")) setActiveTab("transcript");
     else if (src.startsWith("summary")) setActiveTab("summary");
     else setActiveTab("body"); // "body" 또는 "meta:*"
   }
@@ -848,6 +906,13 @@ export function MeetingForm({
           onPrev={findPrev}
           onClose={closeFind}
           inputRef={findInputRef}
+          expanded={replaceExpanded}
+          onToggleExpanded={() => setReplaceExpanded((v) => !v)}
+          replaceValue={replaceText}
+          onReplaceChange={setReplaceText}
+          onReplaceOne={replaceCurrent}
+          onReplaceAll={replaceAll}
+          canReplace={viewMode === "edit"}
         />
       ) : null}
       <PageHeaderBar
