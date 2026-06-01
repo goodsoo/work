@@ -1,30 +1,39 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Check, ClipboardCopy, MoreVertical, Trash2 } from "lucide-react";
+import { Check, MoreVertical } from "lucide-react";
 import {
-  meetingToMarkdown,
   type MeetingMarkdownInput,
   type MeetingMarkdownSection,
 } from "../../lib/markdown";
+import { copyMeetingMarkdown } from "../../lib/meetingExport";
 import { Button } from "../common/Button";
-import { copyText } from "../../lib/clipboard";
+import { MeetingMenuItems } from "./MeetingMenuItems";
 
 type Props = {
   meeting: MeetingMarkdownInput;
   // 현재 탭 — 헤더(제목/일시/참석) 뒤에 이 탭 내용을 붙여 복사.
   section?: MeetingMarkdownSection;
+  pinned: boolean;
+  onTogglePin: () => void;
+  onMove: () => void;
+  // 내보내기 — 부모가 섹션 선택 모달을 연다 (섹션별 파일 저장).
+  onExport: () => void;
   onError?: (message: string) => void;
   onDelete: () => void;
   deleteDisabled?: boolean;
 };
 
-const MENU_WIDTH = 176; // w-44
+const MENU_WIDTH = 184;
 
-// 메모 헤더 우측 "..." 메뉴 — 마크다운 복사 + 삭제 통합.
+// 메모 헤더 우측 "..." 메뉴 — 사이드바 우클릭 메뉴와 동일 항목 (MeetingMenuItems 공유).
 // 드롭다운은 body 로 portal — PageHeaderBar 의 overflow-hidden 에 잘리지 않게 fixed 위치.
 export function MeetingActionMenu({
   meeting,
   section,
+  pinned,
+  onTogglePin,
+  onMove,
+  onExport,
   onError,
   onDelete,
   deleteDisabled,
@@ -70,7 +79,7 @@ export function MeetingActionMenu({
   }, [open]);
 
   async function handleCopy() {
-    const ok = await copyText(meetingToMarkdown(meeting, section));
+    const ok = await copyMeetingMarkdown(meeting, section);
     if (ok) {
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1000);
@@ -78,6 +87,11 @@ export function MeetingActionMenu({
     } else {
       onError?.("복사에 실패했습니다. 권한 또는 환경을 확인하고 다시 시도하세요.");
     }
+  }
+
+  function handleExport() {
+    setOpen(false);
+    onExport();
   }
 
   function handleDelete() {
@@ -122,56 +136,25 @@ export function MeetingActionMenu({
                 border: "1px solid var(--border-default)",
               }}
             >
-              <MenuItem
-                label="마크다운 복사"
-                icon={<ClipboardCopy className="h-3.5 w-3.5" />}
-                onClick={() => void handleCopy()}
-              />
-              <div
-                className="my-1 h-px"
-                style={{ backgroundColor: "var(--border-default)" }}
-              />
-              <MenuItem
-                label="삭제"
-                icon={<Trash2 className="h-3.5 w-3.5" />}
-                danger
-                disabled={deleteDisabled}
-                onClick={handleDelete}
+              <MeetingMenuItems
+                pinned={pinned}
+                onTogglePin={() => {
+                  setOpen(false);
+                  onTogglePin();
+                }}
+                onMove={() => {
+                  setOpen(false);
+                  onMove();
+                }}
+                onCopy={() => void handleCopy()}
+                onExport={handleExport}
+                onDelete={handleDelete}
+                deleteDisabled={deleteDisabled}
               />
             </div>,
             document.body,
           )
         : null}
     </div>
-  );
-}
-
-function MenuItem({
-  label,
-  icon,
-  danger,
-  disabled,
-  onClick,
-}: {
-  label: string;
-  icon?: React.ReactNode;
-  danger?: boolean;
-  disabled?: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <Button
-      variant="ghost"
-      role="menuitem"
-      onClick={onClick}
-      disabled={disabled}
-      className="w-full justify-start gap-2 rounded-none px-3 py-1.5 font-normal disabled:opacity-40"
-      style={{
-        color: danger ? "var(--accent-red-text)" : "var(--text-primary)",
-      }}
-    >
-      {icon}
-      <span>{label}</span>
-    </Button>
   );
 }

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight, MoreHorizontal } from "lucide-react";
 import type { Meeting } from "../../api/meetings";
 import {
   buildMeetingsTree,
@@ -53,6 +53,9 @@ type Props = {
   // 메모 0개라도 옵시디안에서 mkdir 한 폴더 + 사이드바 "+폴더" 로 만든 폴더 보여줌.
   extraFolders?: string[];
   selectedUid: string | null;
+  // 우클릭/… 으로 컨텍스트 메뉴가 열린 대상 — 그 동안 시각 강조. null = 없음.
+  contextMeetingId?: string | null;
+  contextFolder?: string | null;
   onSelect: (uid: string) => void;
   // 같은 폴더 안에서만 적용되는 정렬. 폴더 위계는 alphabetic 고정.
   sortMeetings?: MeetingComparator;
@@ -79,6 +82,8 @@ export function MeetingsTreeView({
   meetings,
   extraFolders,
   selectedUid,
+  contextMeetingId,
+  contextFolder,
   onSelect,
   sortMeetings,
   editingFolder,
@@ -192,6 +197,8 @@ export function MeetingsTreeView({
           node={node}
           depth={0}
           selectedUid={selectedUid}
+          contextMeetingId={contextMeetingId ?? null}
+          contextFolder={contextFolder ?? null}
           collapsed={collapsed}
           dropTarget={dropTarget}
           dragUid={dragUid}
@@ -229,6 +236,7 @@ export function MeetingsTreeView({
               meeting={m}
               depth={0}
               selected={m.uid === selectedUid}
+              isContextTarget={m.id === contextMeetingId}
               isDragging={dragUid === m.uid}
               onClick={() => onSelect(m.uid)}
               onContextMenu={onContextMenu}
@@ -244,6 +252,7 @@ export function MeetingsTreeView({
             meeting={m}
             depth={0}
             selected={m.uid === selectedUid}
+            isContextTarget={m.id === contextMeetingId}
             isDragging={dragUid === m.uid}
             onClick={() => onSelect(m.uid)}
             onContextMenu={onContextMenu}
@@ -309,6 +318,8 @@ function FolderItem({
   node,
   depth,
   selectedUid,
+  contextMeetingId,
+  contextFolder,
   collapsed,
   dropTarget,
   dragUid,
@@ -330,6 +341,8 @@ function FolderItem({
   node: MeetingsFolderNode;
   depth: number;
   selectedUid: string | null;
+  contextMeetingId: string | null;
+  contextFolder: string | null;
   collapsed: Set<string>;
   dropTarget: string | null;
   dragUid: string | null;
@@ -351,6 +364,7 @@ function FolderItem({
   const isEditing = editingFolder?.folder === node.path;
   const isCollapsed = collapsed.has(node.path);
   const isDropTarget = dropTarget === node.path;
+  const isContextTarget = contextFolder === node.path;
   // depth 별 indent 는 children wrapper 의 paddingLeft 가 nesting 으로 누적시킴.
   // button 자체는 항상 ROW_BASE_PAD_LEFT — 클릭존이 indent 공간까지 안 먹게.
 
@@ -376,7 +390,7 @@ function FolderItem({
           onDragOver={(e) => onDragOverFolder(e, node.path)}
           onDragLeave={() => onDragLeaveFolder(node.path)}
           onDrop={(e) => onDropFolder(e, node.path)}
-          className="w-full justify-start gap-1.5 rounded py-1 pr-2 text-[13px] font-normal"
+          className="group w-full justify-start gap-1.5 rounded py-1 pr-2 text-[13px] font-normal"
           style={{
             paddingLeft: `${ROW_BASE_PAD_LEFT}px`,
             color: "var(--text-secondary)",
@@ -387,6 +401,9 @@ function FolderItem({
               ? "1px dashed var(--btn-primary)"
               : undefined,
             outlineOffset: "-2px",
+            boxShadow: isContextTarget
+              ? "inset 0 0 0 1.5px var(--focus-ring)"
+              : undefined,
           }}
         >
           {isCollapsed ? (
@@ -401,6 +418,30 @@ function FolderItem({
             />
           )}
           <span className="min-w-0 flex-1 truncate">{node.name}</span>
+          {/* hover (또는 컨텍스트 메뉴 열림) 시 우측 … 버튼 — 우클릭과 동일 메뉴를
+              버튼 아래로 연다. nested button 회피 위해 span + onMouseDown (행 toggle
+              과 분리). */}
+          <span
+            role="button"
+            aria-label="폴더 메뉴"
+            title="폴더 메뉴"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+              onFolderContextMenu(node.path, r.left, r.bottom + 2);
+            }}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+            className={`h-4 w-4 shrink-0 items-center justify-center rounded group-hover:inline-flex ${
+              isContextTarget ? "inline-flex" : "hidden"
+            }`}
+            style={{ color: "var(--text-muted)" }}
+          >
+            <MoreHorizontal className="h-3.5 w-3.5" />
+          </span>
         </Button>
       )}
       {!isCollapsed ? (
@@ -433,6 +474,8 @@ function FolderItem({
                 node={c}
                 depth={depth + 1}
                 selectedUid={selectedUid}
+                contextMeetingId={contextMeetingId}
+                contextFolder={contextFolder}
                 collapsed={collapsed}
                 dropTarget={dropTarget}
                 dragUid={dragUid}
@@ -458,6 +501,7 @@ function FolderItem({
                 meeting={m}
                 depth={depth + 1}
                 selected={m.uid === selectedUid}
+                isContextTarget={m.id === contextMeetingId}
                 isDragging={dragUid === m.uid}
                 onClick={() => onSelect(m.uid)}
                 onContextMenu={onContextMenu}
@@ -552,6 +596,7 @@ function formatMeetingMeta(meeting: Meeting): string {
 function MeetingRow({
   meeting,
   selected,
+  isContextTarget,
   isDragging,
   onClick,
   onContextMenu,
@@ -561,6 +606,7 @@ function MeetingRow({
   meeting: Meeting;
   depth: number; // 호환용 — children wrapper 의 padding 이 indent 처리하므로 사용 X
   selected: boolean;
+  isContextTarget: boolean;
   isDragging: boolean;
   onClick: () => void;
   onContextMenu: (meetingId: string, x: number, y: number) => void;
@@ -589,6 +635,9 @@ function MeetingRow({
             backgroundColor: selected ? "var(--bg-surface-active)" : undefined,
             color: "var(--text-primary)",
             opacity: isDragging ? 0.5 : 1,
+            boxShadow: isContextTarget
+              ? "inset 0 0 0 1.5px var(--focus-ring)"
+              : undefined,
             WebkitUserDrag: "element",
             userSelect: "none",
           } as React.CSSProperties

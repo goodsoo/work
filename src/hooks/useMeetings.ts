@@ -1,3 +1,4 @@
+import { useCallback } from "react";
 import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import {
   createMeeting,
@@ -173,6 +174,22 @@ export function useMeeting(uid: string | undefined) {
     },
     enabled: !!uid && isReady && list.isSuccess,
   });
+}
+
+// uid 로 full Meeting (본문/음성기록/요약 포함) 을 1회성 fetch. 사이드바 컨텍스트
+// 메뉴의 마크다운 복사·내보내기처럼 list 항목(본문 빈 string)만으론 부족한 경우에 사용.
+// detail query cache 를 채우진 않고 disk 에서 바로 읽음 (가볍게 read-and-discard).
+export function useGetFullMeeting() {
+  const { adapter } = useVault();
+  const qc = useQueryClient();
+  return useCallback(
+    async (uid: string): Promise<Meeting> => {
+      const path = uidToPath(qc, uid);
+      if (!path) throw new Error(`meeting not found: uid=${uid}`);
+      return getMeeting(adapter, path);
+    },
+    [adapter, qc],
+  );
 }
 
 export function useCreateMeeting() {

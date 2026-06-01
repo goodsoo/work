@@ -23,6 +23,8 @@ import {
   useMeetings,
   useUpdateMeeting,
   useDeleteMeeting,
+  useMoveMeeting,
+  useTogglePinMeeting,
 } from "../../hooks/useMeetings";
 import { useStateHistory } from "../../hooks/useStateHistory";
 import type { MeetingUpdate } from "../../api/meetings";
@@ -41,6 +43,8 @@ import { useVault } from "../../lib/vault/useVault";
 import { saveAttachment } from "../../lib/attachments";
 import { MarkdownView } from "./MarkdownView";
 import { TaskAddModal } from "../tasks/TaskAddModal";
+import { MoveFolderModal } from "./MoveFolderModal";
+import { MeetingExportModal } from "./MeetingExportModal";
 import type { TaskCategory, TaskInsert, TaskPriority } from "../../api/tasks";
 import { extractTasks } from "../../lib/vault/tasks";
 import { useViewMode } from "../../hooks/useViewMode";
@@ -138,6 +142,10 @@ export function MeetingForm({
   const meetingsQ = useMeetings();
   const updateMutation = useUpdateMeeting(meetingId);
   const deleteMutation = useDeleteMeeting();
+  const togglePinMutation = useTogglePinMeeting();
+  const moveMutation = useMoveMeeting();
+  const [moveOpen, setMoveOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
   const [viewMode, setViewMode] = useViewMode();
   const { adapter } = useVault();
   const toast = useToast();
@@ -688,6 +696,12 @@ export function MeetingForm({
           <MeetingActionMenu
             meeting={meetingForCopy}
             section={activeTab}
+            pinned={data.pinned}
+            onTogglePin={() =>
+              togglePinMutation.mutate({ uid: data.uid, pinned: !data.pinned })
+            }
+            onMove={() => setMoveOpen(true)}
+            onExport={() => setExportOpen(true)}
             onError={setActionError}
             onDelete={handleDelete}
             deleteDisabled={deleteMutation.isPending}
@@ -1164,6 +1178,19 @@ export function MeetingForm({
         onClose={() => setSummaryModalOpen(false)}
         promptInput={summaryPromptInput}
         onApply={applySummaryFromModal}
+      />
+      <MoveFolderModal
+        open={moveOpen}
+        meetingId={data.id}
+        meetingTitle={data.title ?? ""}
+        onClose={() => setMoveOpen(false)}
+        onMove={async (folder) => {
+          await moveMutation.mutateAsync({ uid: data.uid, folder });
+        }}
+      />
+      <MeetingExportModal
+        meeting={exportOpen ? meetingForCopy : null}
+        onClose={() => setExportOpen(false)}
       />
     </div>
   );
