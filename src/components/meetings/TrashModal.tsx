@@ -7,7 +7,7 @@ import {
   usePurgeMeeting,
 } from "../../hooks/useMeetings";
 import type { Meeting } from "../../api/meetings";
-import { formatDateTimeKo } from "../../lib/dates";
+import { formatDisplayDateTime } from "../../lib/dates";
 import { formatError } from "../../lib/errors";
 import { ConfirmDialog } from "../ConfirmDialog";
 import { Modal } from "../common/Modal";
@@ -330,7 +330,7 @@ function DeletedMeetingItem({
           className="mt-0.5 w-full"
         >
           {meeting.deleted_at
-            ? `${formatDateTimeKo(meeting.deleted_at)} 삭제`
+            ? `${formatDisplayDateTime(meeting.deleted_at)} 삭제`
             : ""}
         </Text>
       </Button>

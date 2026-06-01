@@ -32,14 +32,6 @@ PR 단위로 묶음. 각 PR 의 **한 줄 임팩트** 는 카드 frontmatter `im
 - [ ] **`ResponsePasteArea` 발견성** — `PortfolioWorkCard.tsx:147` 의 "Claude 응답 paste" 입력란. impact_summary 비었을 때만 등장 + placeholder 만 있어 사용자가 "무슨 기능인지 모름" 체감. 라벨/도움말 보강 또는 가치 재평가 후 제거 결정. (단일 카드 메뉴의 "Claude 프롬프트 복사" 는 별개 — 그건 명확.)
 - [ ] **이미지 업로드 드래그&드롭** — CLAUDE.md 엔 dropzone 명시지만 사용자 체감 안 됨. 실제 동작 점검 + 카드 그리드 어디서든 드래그 받도록 영역 확장. lightbox 안 dropzone 도 동작 검증.
 
-### PR — 날짜/시간 표시 포맷 통일 `ui_ux`
-한 줄 임팩트: 앱 전체 날짜/시간 표시가 한 컨벤션으로
-
-- [ ] **메모장 사이드바 카드** — `MM.DD(ddd) HH:mm · 참석자 N명`. 올해면 연도 생략, 올해 아니면 `YYYY.MM.DD(ddd) HH:mm`
-- [ ] **휴지통 카드** — 메모장 카드와 동일 포맷 통일. 삭제 시각은 카드 secondary 영역 (하단 또는 작은 글씨로 별도 위치)
-- [ ] **앱 전체 검토 + 통일** — 메모 본문 메타 row / 캘린더 라벨 / todos 마감일 / portfolio 카드 등 표시 위치 찾아 한 컨벤션으로
-- [ ] **`lib/dates.ts` 단일 포맷 함수 도입** — `formatMeetingDate()` / `formatTrashDate()` 등 → 모든 호출처 통일. 새 표시 위치 추가 시 함수만 호출
-
 ---
 
 ## 🚨 V0.7.x — 데스크탑 첫 배포 이후 (2026-05-27 ~)

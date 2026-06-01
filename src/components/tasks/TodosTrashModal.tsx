@@ -11,11 +11,7 @@ import {
   useRestoreRoutine,
   useTrashedRoutines,
 } from "../../hooks/useRoutines";
-import {
-  formatDateShort,
-  parseIsoDate,
-  weekdayShort,
-} from "../../lib/dates";
+import { formatDisplayDate } from "../../lib/dates";
 import { TASK_CATEGORIES, type Task } from "../../api/tasks";
 import type { TrashedRoutine } from "../../api/routines";
 import { formatError } from "../../lib/errors";
@@ -448,22 +444,12 @@ function TaskMeta({
   const hasTime = !!task.due_time;
   const categoryLabel = TASK_CATEGORIES.find((c) => c.id === task.category)?.label;
   if (!hasDate && !hasTime && !categoryLabel) return null;
-  const wd = task.due_date ? weekdayShort(task.due_date) : null;
-  const sameYear =
-    task.due_date &&
-    parseIsoDate(task.due_date).getFullYear() === new Date().getFullYear();
-  const dateLabel = sameYear ? formatDateShort(task.due_date!) : task.due_date;
   return (
     <div
       className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px]"
       style={{ color: "var(--text-muted)" }}
     >
-      {hasDate ? (
-        <span>
-          {dateLabel}
-          {wd ? ` (${wd})` : ""}
-        </span>
-      ) : null}
+      {hasDate ? <span>{formatDisplayDate(task.due_date)}</span> : null}
       {hasTime ? <span>{task.due_time}</span> : null}
       {categoryLabel ? <span>#{categoryLabel}</span> : null}
     </div>

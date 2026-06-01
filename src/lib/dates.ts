@@ -70,27 +70,43 @@ export function formatDateShortWithDay(iso: string): string {
 }
 
 /**
- * 메모 inline 메타용: 올해면 "MM/DD", 작년 이전이면 "YY/MM/DD". 빈 값은 "".
- * 메모장 사이드바와 캘린더 사이드바 메모 아이템이 공유하는 단일 포맷.
+ * 앱 전체 날짜 표시 단일 포맷. 올해면 연도 생략 "MM.DD(ddd)", 아니면 "YYYY.MM.DD(ddd)".
+ * 메모장 사이드바 카드 · 캘린더 메모 아이템 · 메모 메타 row · 캘린더 선택 날짜 헤더 ·
+ * todos 마감일 · portfolio 카드가 공유. 새 날짜 표시 위치는 이 함수만 호출하면 됩니다.
+ * ISO 날짜(yyyy-MM-dd) 입력. 빈 값은 "", 파싱 실패는 입력 그대로 반환.
  */
-export function formatMemoDateShort(d: string | null): string {
-  if (!d) return "";
-  const parsed = new Date(d + "T00:00:00");
-  if (Number.isNaN(parsed.getTime())) return d;
-  const mm = String(parsed.getMonth() + 1).padStart(2, "0");
-  const dd = String(parsed.getDate()).padStart(2, "0");
-  const yr = parsed.getFullYear();
-  const thisYear = new Date().getFullYear();
-  if (yr === thisYear) return `${mm}/${dd}`;
-  const yy = String(yr % 100).padStart(2, "0");
-  return `${yy}/${mm}/${dd}`;
+export function formatDisplayDate(
+  iso: string | null,
+  reference = new Date(),
+): string {
+  if (!iso) return "";
+  const d = parseIsoDate(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  const weekday = format(d, "EEE", { locale: ko });
+  const datePart =
+    d.getFullYear() === reference.getFullYear()
+      ? format(d, "MM.dd")
+      : format(d, "yyyy.MM.dd");
+  return `${datePart}(${weekday})`;
 }
 
-/** "2026.05.17(일) 14:09" — 휴지통 삭제 시각 표시용. ISO datetime 입력. */
-export function formatDateTimeKo(iso: string): string {
+/**
+ * 날짜 + 시각 표시 단일 포맷 (휴지통 삭제 시각 등). 올해면 "MM.DD(ddd) HH:mm",
+ * 아니면 "YYYY.MM.DD(ddd) HH:mm". ISO datetime 입력. 파싱 실패는 입력 그대로 반환.
+ * formatDisplayDate 와 같은 연도 생략 규칙을 공유합니다.
+ */
+export function formatDisplayDateTime(
+  iso: string,
+  reference = new Date(),
+): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
-  return format(d, "yyyy.MM.dd(EEE) HH:mm", { locale: ko });
+  const weekday = format(d, "EEE", { locale: ko });
+  const datePart =
+    d.getFullYear() === reference.getFullYear()
+      ? format(d, "MM.dd")
+      : format(d, "yyyy.MM.dd");
+  return `${datePart}(${weekday}) ${format(d, "HH:mm")}`;
 }
 
 /** 타이틀바 live 시계 — "2026.05.27 (수) · 오후 5:42". 날짜 정밀 + 12시간 시각. */

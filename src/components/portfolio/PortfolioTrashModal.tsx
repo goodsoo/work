@@ -13,7 +13,7 @@ import {
   categoryColor as lookupCategoryColor,
   categoryLabel as lookupCategoryLabel,
 } from "../../lib/portfolio/categoryLookup";
-import { formatDateTimeKo } from "../../lib/dates";
+import { formatDisplayDateTime } from "../../lib/dates";
 import { formatError } from "../../lib/errors";
 import { ConfirmDialog } from "../ConfirmDialog";
 import { Modal } from "../common/Modal";
@@ -316,7 +316,7 @@ function TrashListItem({
             className="text-[11px]"
           >
             {work.deletedAt
-              ? `${formatDateTimeKo(new Date(work.deletedAt).toISOString())} 삭제`
+              ? `${formatDisplayDateTime(new Date(work.deletedAt).toISOString())} 삭제`
               : ""}
           </Text>
         </div>
