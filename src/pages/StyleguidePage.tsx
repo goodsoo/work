@@ -23,6 +23,7 @@ import { Text } from "../components/common/Text";
 import { Chip } from "../components/common/Chip";
 import { Kbd } from "../components/common/Kbd";
 import { Spinner } from "../components/common/Spinner";
+import { Toggle } from "../components/common/Toggle";
 import { Modal } from "../components/common/Modal";
 import { Popover } from "../components/common/Popover";
 import { EmptyState } from "../components/common/EmptyState";
@@ -418,6 +419,7 @@ export function StyleguidePage() {
   const { theme, toggle } = useTheme();
   const [modalOpen, setModalOpen] = useState(false);
   const [popoverOpen, setPopoverOpen] = useState(false);
+  const [toggleOn, setToggleOn] = useState(true);
 
   return (
     <div
@@ -1101,6 +1103,41 @@ export function StyleguidePage() {
               <Text variant="caption" as="p" style={{ color: "var(--accent-red)" }}>
                 연결을 끊으면 다시 폴더를 선택해야 합니다.
               </Text>
+            </div>
+          </Card>
+
+          {/* Toggle */}
+          <SubTitle>10.10 Toggle</SubTitle>
+          <Text variant="body" color="secondary" as="p" className="mb-4">
+            on/off 스위치. `role="switch"` + 키보드(Space/Enter). on=`--btn-primary`
+            트랙, knob 은 `--bg-surface` + 그림자. 설정의 on/off 항목에 사용.
+          </Text>
+          <Card>
+            <div className="flex flex-wrap items-center gap-6">
+              <div className="flex items-center gap-2">
+                <Toggle checked={toggleOn} onChange={setToggleOn} ariaLabel="데모 토글" />
+                <Text variant="caption" color="muted">
+                  {toggleOn ? "켜짐" : "꺼짐"} (클릭)
+                </Text>
+              </div>
+              <div className="flex items-center gap-2">
+                <Toggle checked={false} onChange={() => {}} ariaLabel="꺼짐 예시" />
+                <Text variant="caption" color="muted">
+                  off
+                </Text>
+              </div>
+              <div className="flex items-center gap-2">
+                <Toggle size="sm" checked onChange={() => {}} ariaLabel="작은 토글 예시" />
+                <Text variant="caption" color="muted">
+                  sm
+                </Text>
+              </div>
+              <div className="flex items-center gap-2">
+                <Toggle checked disabled onChange={() => {}} ariaLabel="비활성 예시" />
+                <Text variant="caption" color="muted">
+                  disabled
+                </Text>
+              </div>
             </div>
           </Card>
         </Section>

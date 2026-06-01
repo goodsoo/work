@@ -5,6 +5,7 @@ import { Popover } from "../common/Popover";
 import type { TaskSortKey } from "../../hooks/useTaskSort";
 
 const SORT_OPTIONS: Array<{ id: TaskSortKey; label: string }> = [
+  { id: "date_asc_undone", label: "오래된순 (미완료 먼저)" },
   { id: "date_desc", label: "최신순" },
   { id: "date_asc", label: "오래된순" },
   { id: "name", label: "이름순" },
@@ -66,7 +67,7 @@ export function TaskSortMenu({ value, onChange }: Props) {
                 backgroundColor: active ? "var(--bg-surface-active)" : undefined,
               }}
             >
-              <span>{opt.label}</span>
+              <span className="whitespace-nowrap">{opt.label}</span>
               {active ? (
                 <Check
                   className="h-3 w-3"
