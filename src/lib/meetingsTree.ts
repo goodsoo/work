@@ -83,6 +83,28 @@ export function buildMeetingsTree(
   return { folders: rootNode.children, rootMeetings: rootNode.meetings };
 }
 
+// 폴더 path 의 부모 path. "work/2026" → "work", "work" → "" (root).
+export function folderParent(path: string): string {
+  const i = path.lastIndexOf("/");
+  return i === -1 ? "" : path.slice(0, i);
+}
+
+// 폴더 DnD 이동 가능 여부 — 사이드바 하이라이트(점선 valid/blocked)와 drop 게이트가
+// 공유하는 순수 판정. srcPath: 끌고 있는 폴더 (notes-relative). destParent: drop 하려는
+// 부모 폴더 ("" = root). 백엔드 moveFolder 의 가드와 동일 규칙 (defense-in-depth).
+// 불가 케이스:
+//  - root 자체는 끌 수 없음 (srcPath "")
+//  - 자기 자신 위로 (destParent === srcPath)
+//  - 자기 자손 폴더 안으로 (cycle: destParent 가 srcPath 의 하위)
+//  - 이미 그 부모 안에 있음 (destParent === 현재 부모 → no-op)
+export function canDropFolder(srcPath: string, destParent: string): boolean {
+  if (srcPath === "") return false;
+  if (destParent === srcPath) return false;
+  if (destParent.startsWith(srcPath + "/")) return false;
+  if (destParent === folderParent(srcPath)) return false;
+  return true;
+}
+
 // 트리에서 모든 폴더 path 를 평면 list 로. picker UI 에 쓸 용도.
 // 깊이 우선 (parent 먼저). root ("") 도 첫 entry 로 포함 (= "기타" / 폴더 없음).
 export function flattenFolderPaths(tree: MeetingsTree): string[] {

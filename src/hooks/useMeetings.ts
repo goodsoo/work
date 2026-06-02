@@ -11,6 +11,7 @@ import {
   listMeetingFolders,
   listMeetings,
   moveMeeting,
+  moveMeetingFolder,
   purgeMeeting,
   renameMeetingFolder,
   restoreMeeting,
@@ -135,6 +136,23 @@ export function useRenameMeetingFolder() {
     scope: VAULT_WRITE_SCOPE,
     mutationFn: ({ folder, newName }: { folder: string; newName: string }) =>
       renameMeetingFolder(adapter, folder, newName),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: meetingsKey });
+      qc.invalidateQueries({ queryKey: meetingFoldersKey });
+    },
+  });
+}
+
+// 폴더를 다른 폴더 아래로 이동 (위계 DnD). 안 메모·sub-folder 통째 따라옴.
+// rename 과 동일하게 invalidate 만 — path 가 통째 바뀌어도 detail cache 는 uid 기반이라
+// 유효하고, mutation 들이 mutationFn 시점에 list 에서 현재 path 를 lookup 한다.
+export function useMoveMeetingFolder() {
+  const { adapter } = useVault();
+  const qc = useQueryClient();
+  return useMutation({
+    scope: VAULT_WRITE_SCOPE,
+    mutationFn: ({ folder, destParent }: { folder: string; destParent: string }) =>
+      moveMeetingFolder(adapter, folder, destParent),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: meetingsKey });
       qc.invalidateQueries({ queryKey: meetingFoldersKey });

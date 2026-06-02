@@ -7,6 +7,7 @@ import {
   listMeetingFolders,
   listMeetings,
   moveMeeting,
+  moveMeetingFolder,
   renameMeetingFolder,
 } from "./meetings";
 import { createMemoryAdapter } from "../lib/vault/adapter";
@@ -156,6 +157,72 @@ describe("renameMeetingFolder", () => {
     const folders = await listMeetingFolders(adapter);
     expect(folders).toContain("notes/new");
     expect(folders).not.toContain("notes/old");
+  });
+});
+
+describe("moveMeetingFolder", () => {
+  it("폴더를 다른 폴더 아래로 — 안 메모·sub-folder 통째 따라옴", async () => {
+    const adapter = createMemoryAdapter();
+    adapter.setRoot("/vault");
+    const m = await createMeeting(adapter, { title: "note" });
+    await moveMeeting(adapter, m.id, "work");
+    await createMeetingFolder(adapter, "personal");
+    const newFull = await moveMeetingFolder(adapter, "work", "personal");
+    expect(newFull).toBe("notes/personal/work");
+    const list = await listMeetings(adapter);
+    expect(list[0].id).toBe("notes/personal/work/note.md");
+    expect(await adapter.exists("notes/work/note.md")).toBe(false);
+  });
+
+  it("폴더를 root 로 — destParent 빈 문자열", async () => {
+    const adapter = createMemoryAdapter();
+    adapter.setRoot("/vault");
+    const m = await createMeeting(adapter, { title: "x" });
+    await moveMeeting(adapter, m.id, "work/2026");
+    const newFull = await moveMeetingFolder(adapter, "work/2026", "");
+    expect(newFull).toBe("notes/2026");
+    const list = await listMeetings(adapter);
+    expect(list[0].id).toBe("notes/2026/x.md");
+  });
+
+  it("자기 자신 위로 → throw (cycle)", async () => {
+    const adapter = createMemoryAdapter();
+    adapter.setRoot("/vault");
+    await createMeetingFolder(adapter, "work");
+    await expect(moveMeetingFolder(adapter, "work", "work")).rejects.toThrow();
+  });
+
+  it("자손 폴더 안으로 → throw (cycle)", async () => {
+    const adapter = createMemoryAdapter();
+    adapter.setRoot("/vault");
+    await createMeetingFolder(adapter, "work/2026");
+    await expect(
+      moveMeetingFolder(adapter, "work", "work/2026"),
+    ).rejects.toThrow();
+  });
+
+  it("대상에 동명 폴더 존재 → throw (충돌)", async () => {
+    const adapter = createMemoryAdapter();
+    adapter.setRoot("/vault");
+    await createMeetingFolder(adapter, "work");
+    await createMeetingFolder(adapter, "personal/work");
+    await expect(
+      moveMeetingFolder(adapter, "work", "personal"),
+    ).rejects.toThrow();
+  });
+
+  it("현재 부모로 이동 → no-op (현재 path 반환)", async () => {
+    const adapter = createMemoryAdapter();
+    adapter.setRoot("/vault");
+    await createMeetingFolder(adapter, "work/2026");
+    const same = await moveMeetingFolder(adapter, "work/2026", "work");
+    expect(same).toBe("notes/work/2026");
+  });
+
+  it("root 폴더 이동 시도 → throw", async () => {
+    const adapter = createMemoryAdapter();
+    adapter.setRoot("/vault");
+    await expect(moveMeetingFolder(adapter, "", "work")).rejects.toThrow();
   });
 });
 

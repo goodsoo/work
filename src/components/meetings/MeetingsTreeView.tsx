@@ -3,6 +3,7 @@ import { ChevronDown, ChevronRight, MoreHorizontal } from "lucide-react";
 import type { Meeting } from "../../api/meetings";
 import {
   buildMeetingsTree,
+  canDropFolder,
   type MeetingComparator,
   type MeetingsFolderNode,
 } from "../../lib/meetingsTree";
@@ -40,6 +41,17 @@ export type EditingFolderState = {
   value: string; // 현재 input value
 };
 
+// DnD custom MIME — OS 드래그와 충돌 안 나게 고유 type. 메모는 uid, 폴더는 path.
+const MEETING_UID_MIME = "text/x-goodsoob-meeting-uid";
+const FOLDER_PATH_MIME = "text/x-goodsoob-folder-path";
+
+// 끌고 있는 대상. 메모(uid) 와 폴더(path) 를 한 시스템으로 다룬다. drop 시점의
+// 진짜 payload 는 dataTransfer 에서 읽고, 이 state 는 시각 강조(드래그 dim / drop
+// 가능 여부) 전용 — React 가 reconciliation 으로 갱신해도 native drag 에 영향 X.
+type DragItem =
+  | { kind: "meeting"; uid: string }
+  | { kind: "folder"; path: string };
+
 // 행 시각 단위.
 const INDENT_UNIT = 16;
 const ROW_BASE_PAD_LEFT = 8; // ul 의 좌 패딩과 동일 — chevron 시작 위치
@@ -69,8 +81,10 @@ type Props = {
   onContextMenu: (meetingId: string, x: number, y: number) => void;
   // 폴더 우클릭. folder = meetings-relative path (e.g. "work" or "work/2026").
   onFolderContextMenu: (folder: string, x: number, y: number) => void;
-  // DnD 폴더 이동 — drop 발생 시 호출. folder 빈 문자열 = root.
+  // DnD 메모 이동 — 메모를 폴더에 drop 시 호출. folder 빈 문자열 = root.
   onMoveDrop: (uid: string, folder: string) => void;
+  // DnD 폴더 이동 — 폴더를 다른 폴더(또는 root)에 drop 시 호출. destParent "" = root.
+  onFolderMoveDrop: (srcFolder: string, destParent: string) => void;
   // 새 메모/폴더 생성 직후 그 폴더 자동 펼침 트리거. revealNonce 가 바뀔 때
   // revealPath(+모든 조상)를 collapsed set 에서 제거. 생성 외 일반 선택엔 안 씀
   // (사용자가 명시적으로 접은 폴더는 그대로 둔다 — collapse 가 안 되살아남).
@@ -94,13 +108,14 @@ export function MeetingsTreeView({
   onContextMenu,
   onFolderContextMenu,
   onMoveDrop,
+  onFolderMoveDrop,
   revealPath,
   revealNonce,
 }: Props) {
   const folderExpandKey = useScopedKey(FOLDER_EXPAND_BASE_KEY);
   const [collapsed, setCollapsed] = useState<Set<string>>(() => loadCollapsed(folderExpandKey));
   const [dropTarget, setDropTarget] = useState<string | null>(null); // 강조 중인 폴더 path
-  const [dragUid, setDragUid] = useState<string | null>(null);
+  const [dragItem, setDragItem] = useState<DragItem | null>(null);
 
   // vault 전환 시 새 vault 의 collapsed set 으로 갈아끼움.
   useEffect(() => {
@@ -145,28 +160,40 @@ export function MeetingsTreeView({
     });
   }
 
+  // 메모/폴더 드래그 공통: native drag init 이후 setState (아래 race 주석 참조).
+  // dragstart handler 안에서 동기 setState 호출하면 React reconciliation 이
+  // RootDropZone outline 을 mount → DOM mutation → WKWebView 가 drag source
+  // 변경 감지하고 native drag operation 즉시 cancel (start 직후 9ms 안에 end
+  // 발사되던 패턴). setTimeout(0) 으로 native drag init commit 이후 setState.
   function handleDragStart(e: React.DragEvent, uid: string) {
-    e.dataTransfer.setData("text/x-goodsoob-meeting-uid", uid);
+    e.dataTransfer.setData(MEETING_UID_MIME, uid);
     e.dataTransfer.effectAllowed = "move";
-    // dragstart handler 안에서 동기 setState 호출하면 React reconciliation 이
-    // RootDropZone outline 을 mount → DOM mutation → WKWebView 가 drag source
-    // 변경 감지하고 native drag operation 즉시 cancel (start 직후 9ms 안에 end
-    // 발사되던 패턴). setTimeout(0) 으로 native drag init commit 이후 setState.
-    setTimeout(() => setDragUid(uid), 0);
+    setTimeout(() => setDragItem({ kind: "meeting", uid }), 0);
+  }
+
+  function handleDragStartFolder(e: React.DragEvent, path: string) {
+    e.dataTransfer.setData(FOLDER_PATH_MIME, path);
+    e.dataTransfer.effectAllowed = "move";
+    setTimeout(() => setDragItem({ kind: "folder", path }), 0);
   }
 
   function handleDragEnd() {
-    setDragUid(null);
+    setDragItem(null);
     setDropTarget(null);
   }
 
   // dragOver 단계에서 preventDefault 를 무조건 호출해야 drop 이 fire 됨.
   // dataTransfer.types 검사로 분기하면 Tauri WebView 등에서 dragover 단계에 types
   // 가 비어있어 preventDefault 가 skip → drop 자체가 안 발사되는 버그. drop 단계에서
-  // 실제 uid 가 있는지로 분기.
+  // 실제 payload 로 분기. drop 가능 여부는 React state(dragItem) 로 판정 — Tauri
+  // 에서도 신뢰 가능 (dataTransfer.types 와 달리 항상 채워져 있음).
   function handleDragOverFolder(e: React.DragEvent, folder: string) {
     e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
+    const allowed =
+      dragItem?.kind === "folder"
+        ? canDropFolder(dragItem.path, folder)
+        : true;
+    e.dataTransfer.dropEffect = allowed ? "move" : "none";
     if (dropTarget !== folder) setDropTarget(folder);
   }
 
@@ -176,11 +203,16 @@ export function MeetingsTreeView({
 
   function handleDropFolder(e: React.DragEvent, folder: string) {
     e.preventDefault();
-    const uid = e.dataTransfer.getData("text/x-goodsoob-meeting-uid");
+    const folderPath = e.dataTransfer.getData(FOLDER_PATH_MIME);
+    const uid = e.dataTransfer.getData(MEETING_UID_MIME);
     setDropTarget(null);
-    setDragUid(null);
-    if (!uid) return;
-    onMoveDrop(uid, folder);
+    setDragItem(null);
+    if (folderPath) {
+      // 자기 자신·자손·현재 부모(no-op) drop 은 무시 (가드는 backend 에도 있음).
+      if (canDropFolder(folderPath, folder)) onFolderMoveDrop(folderPath, folder);
+      return;
+    }
+    if (uid) onMoveDrop(uid, folder);
   }
 
   const isEmpty =
@@ -201,7 +233,7 @@ export function MeetingsTreeView({
           contextFolder={contextFolder ?? null}
           collapsed={collapsed}
           dropTarget={dropTarget}
-          dragUid={dragUid}
+          dragItem={dragItem}
           editingFolder={editingFolder ?? null}
           editingFolderPending={editingFolderPending ?? false}
           onEditingFolderChange={onEditingFolderChange}
@@ -212,6 +244,7 @@ export function MeetingsTreeView({
           onContextMenu={onContextMenu}
           onFolderContextMenu={onFolderContextMenu}
           onDragStart={handleDragStart}
+          onDragStartFolder={handleDragStartFolder}
           onDragEnd={handleDragEnd}
           onDragOverFolder={handleDragOverFolder}
           onDragLeaveFolder={handleDragLeaveFolder}
@@ -223,8 +256,15 @@ export function MeetingsTreeView({
           ul 직속 (트리 전체가 root 라 박스가 시각 noise). */}
       {tree.folders.length > 0 ? (
         <RootDropZone
-          isDragging={dragUid !== null}
+          isDragging={dragItem !== null}
           isDropTarget={dropTarget === ""}
+          // 폴더 드래그면 root 로 이동 가능할 때만 valid (이미 root 면 no-op).
+          // 메모 드래그는 root drop 항상 가능.
+          dropAllowed={
+            dragItem?.kind === "folder"
+              ? canDropFolder(dragItem.path, "")
+              : true
+          }
           isEmpty={tree.rootMeetings.length === 0}
           onDragOverFolder={handleDragOverFolder}
           onDragLeaveFolder={handleDragLeaveFolder}
@@ -237,7 +277,7 @@ export function MeetingsTreeView({
               depth={0}
               selected={m.uid === selectedUid}
               isContextTarget={m.id === contextMeetingId}
-              isDragging={dragUid === m.uid}
+              isDragging={dragItem?.kind === "meeting" && dragItem.uid === m.uid}
               onClick={() => onSelect(m.uid)}
               onContextMenu={onContextMenu}
               onDragStart={handleDragStart}
@@ -253,7 +293,7 @@ export function MeetingsTreeView({
             depth={0}
             selected={m.uid === selectedUid}
             isContextTarget={m.id === contextMeetingId}
-            isDragging={dragUid === m.uid}
+            isDragging={dragItem?.kind === "meeting" && dragItem.uid === m.uid}
             onClick={() => onSelect(m.uid)}
             onContextMenu={onContextMenu}
             onDragStart={handleDragStart}
@@ -271,6 +311,7 @@ export function MeetingsTreeView({
 function RootDropZone({
   isDragging,
   isDropTarget,
+  dropAllowed,
   isEmpty,
   onDragOverFolder,
   onDragLeaveFolder,
@@ -279,6 +320,7 @@ function RootDropZone({
 }: {
   isDragging: boolean;
   isDropTarget: boolean;
+  dropAllowed: boolean;
   isEmpty: boolean;
   onDragOverFolder: (e: React.DragEvent, folder: string) => void;
   onDragLeaveFolder: (folder: string) => void;
@@ -289,6 +331,8 @@ function RootDropZone({
   if (isEmpty && !isDragging) return null;
   // layout shift 방지: margin/padding 은 평상시도 drag 중도 동일. outline 만 toggle
   // (outline 은 border 와 달리 layout 영향 0). drop target backgroundColor 도 layout 무관.
+  // drop 불가 폴더를 root 로 끌 때(이미 root 면) hover 해도 강조 X — outline 만 점선 유지.
+  const activeAllowed = isDropTarget && dropAllowed;
   return (
     <li
       className="list-none rounded"
@@ -296,14 +340,14 @@ function RootDropZone({
         margin: "0",
         padding: "0",
         minHeight: isDragging && isEmpty ? "32px" : undefined,
-        backgroundColor:
-          isDragging && isDropTarget ? "var(--bg-surface-active)" : undefined,
+        backgroundColor: activeAllowed ? "var(--bg-surface-active)" : undefined,
         outline: isDragging
-          ? isDropTarget
+          ? activeAllowed
             ? "1px dashed var(--btn-primary)"
             : "1px dashed var(--border-subtle)"
           : undefined,
         outlineOffset: "0px",
+        cursor: isDropTarget && !dropAllowed ? "not-allowed" : undefined,
       }}
       onDragOver={(e) => onDragOverFolder(e, "")}
       onDragLeave={() => onDragLeaveFolder("")}
@@ -322,7 +366,7 @@ function FolderItem({
   contextFolder,
   collapsed,
   dropTarget,
-  dragUid,
+  dragItem,
   editingFolder,
   editingFolderPending,
   onEditingFolderChange,
@@ -333,6 +377,7 @@ function FolderItem({
   onContextMenu,
   onFolderContextMenu,
   onDragStart,
+  onDragStartFolder,
   onDragEnd,
   onDragOverFolder,
   onDragLeaveFolder,
@@ -345,7 +390,7 @@ function FolderItem({
   contextFolder: string | null;
   collapsed: Set<string>;
   dropTarget: string | null;
-  dragUid: string | null;
+  dragItem: DragItem | null;
   editingFolder: EditingFolderState | null;
   editingFolderPending: boolean;
   onEditingFolderChange?: (value: string) => void;
@@ -356,6 +401,7 @@ function FolderItem({
   onContextMenu: (meetingId: string, x: number, y: number) => void;
   onFolderContextMenu: (folder: string, x: number, y: number) => void;
   onDragStart: (e: React.DragEvent, uid: string) => void;
+  onDragStartFolder: (e: React.DragEvent, path: string) => void;
   onDragEnd: () => void;
   onDragOverFolder: (e: React.DragEvent, folder: string) => void;
   onDragLeaveFolder: (folder: string) => void;
@@ -365,6 +411,16 @@ function FolderItem({
   const isCollapsed = collapsed.has(node.path);
   const isDropTarget = dropTarget === node.path;
   const isContextTarget = contextFolder === node.path;
+  // 끌고 있는 게 이 폴더 자신이면 dim. drop 가능 여부 — 폴더 드래그면 cycle/no-op
+  // 가드(canDropFolder), 메모 드래그면 항상 가능.
+  const isBeingDragged =
+    dragItem?.kind === "folder" && dragItem.path === node.path;
+  const dropAllowed =
+    dragItem?.kind === "folder"
+      ? canDropFolder(dragItem.path, node.path)
+      : true;
+  const activeAllowed = isDropTarget && dropAllowed;
+  const activeBlocked = isDropTarget && !dropAllowed;
   // depth 별 indent 는 children wrapper 의 paddingLeft 가 nesting 으로 누적시킴.
   // button 자체는 항상 ROW_BASE_PAD_LEFT — 클릭존이 indent 공간까지 안 먹게.
 
@@ -382,29 +438,41 @@ function FolderItem({
       ) : (
         <Button
           variant="ghost"
+          draggable
           onClick={() => onToggle(node.path)}
           onContextMenu={(e) => {
             e.preventDefault();
             onFolderContextMenu(node.path, e.clientX, e.clientY);
           }}
+          onDragStart={(e) => onDragStartFolder(e, node.path)}
+          onDragEnd={onDragEnd}
           onDragOver={(e) => onDragOverFolder(e, node.path)}
           onDragLeave={() => onDragLeaveFolder(node.path)}
           onDrop={(e) => onDropFolder(e, node.path)}
           className="group w-full justify-start gap-1.5 rounded py-1 pr-2 text-[13px] font-normal"
-          style={{
-            paddingLeft: `${ROW_BASE_PAD_LEFT}px`,
-            color: "var(--text-secondary)",
-            backgroundColor: isDropTarget
-              ? "var(--bg-surface-active)"
-              : undefined,
-            outline: isDropTarget
-              ? "1px dashed var(--btn-primary)"
-              : undefined,
-            outlineOffset: "-2px",
-            boxShadow: isContextTarget
-              ? "inset 0 0 0 1.5px var(--focus-ring)"
-              : undefined,
-          }}
+          style={
+            {
+              paddingLeft: `${ROW_BASE_PAD_LEFT}px`,
+              color: "var(--text-secondary)",
+              opacity: isBeingDragged ? 0.5 : 1,
+              backgroundColor: activeAllowed
+                ? "var(--bg-surface-active)"
+                : undefined,
+              // valid = primary 점선, blocked(자기·자손·현재 부모) = red 점선 + not-allowed.
+              outline: activeAllowed
+                ? "1px dashed var(--btn-primary)"
+                : activeBlocked
+                  ? "1px dashed var(--accent-red-text)"
+                  : undefined,
+              outlineOffset: "-2px",
+              cursor: activeBlocked ? "not-allowed" : undefined,
+              boxShadow: isContextTarget
+                ? "inset 0 0 0 1.5px var(--focus-ring)"
+                : undefined,
+              WebkitUserDrag: "element",
+              userSelect: "none",
+            } as React.CSSProperties
+          }
         >
           {isCollapsed ? (
             <ChevronRight
@@ -478,7 +546,7 @@ function FolderItem({
                 contextFolder={contextFolder}
                 collapsed={collapsed}
                 dropTarget={dropTarget}
-                dragUid={dragUid}
+                dragItem={dragItem}
                 editingFolder={editingFolder}
                 editingFolderPending={editingFolderPending}
                 onEditingFolderChange={onEditingFolderChange}
@@ -489,6 +557,7 @@ function FolderItem({
                 onContextMenu={onContextMenu}
                 onFolderContextMenu={onFolderContextMenu}
                 onDragStart={onDragStart}
+                onDragStartFolder={onDragStartFolder}
                 onDragEnd={onDragEnd}
                 onDragOverFolder={onDragOverFolder}
                 onDragLeaveFolder={onDragLeaveFolder}
@@ -502,7 +571,7 @@ function FolderItem({
                 depth={depth + 1}
                 selected={m.uid === selectedUid}
                 isContextTarget={m.id === contextMeetingId}
-                isDragging={dragUid === m.uid}
+                isDragging={dragItem?.kind === "meeting" && dragItem.uid === m.uid}
                 onClick={() => onSelect(m.uid)}
                 onContextMenu={onContextMenu}
                 onDragStart={onDragStart}

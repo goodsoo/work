@@ -24,6 +24,7 @@ import {
   useDeleteMeetingFolder,
   useGetFullMeeting,
   useMoveMeeting,
+  useMoveMeetingFolder,
   useRenameMeetingFolder,
   useTogglePinMeeting,
 } from "../../hooks/useMeetings";
@@ -96,6 +97,7 @@ export function MeetingsSidePanel({
   const deleteMeetingMutation = useDeleteMeeting();
   const renameFolderMutation = useRenameMeetingFolder();
   const moveMutation = useMoveMeeting();
+  const moveFolderMutation = useMoveMeetingFolder();
   const togglePinMutation = useTogglePinMeeting();
   const getFullMeeting = useGetFullMeeting();
   const toast = useToast();
@@ -303,6 +305,16 @@ export function MeetingsSidePanel({
     }
   }
 
+  // 폴더 DnD 이동 — 폴더를 다른 폴더(destParent "" = root) 아래로. 충돌/cycle 시 toast.
+  // 가드(자기·자손·no-op)는 트리뷰가 drop 전에 거르지만 backend 도 재검증.
+  async function handleFolderMoveDrop(srcFolder: string, destParent: string) {
+    try {
+      await moveFolderMutation.mutateAsync({ folder: srcFolder, destParent });
+    } catch (e) {
+      toast.show(formatError(e));
+    }
+  }
+
   // pinned 토글 — 컨텍스트 메뉴 / 별 아이콘 hover 클릭. uid 기반 (path rename 무관).
   async function handleTogglePin(uid: string, nextPinned: boolean) {
     try {
@@ -474,6 +486,9 @@ export function MeetingsSidePanel({
               onContextMenu={handleContextMenu}
               onFolderContextMenu={handleFolderContextMenu}
               onMoveDrop={(uid, folder) => void handleMoveDrop(uid, folder)}
+              onFolderMoveDrop={(src, dest) =>
+                void handleFolderMoveDrop(src, dest)
+              }
               revealPath={revealPath}
               revealNonce={revealNonce}
             />
