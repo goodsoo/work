@@ -11,7 +11,7 @@ import {
   Plus,
 } from "lucide-react";
 import {
-  inferLineKind,
+  inferLineKinds,
   labelForKind,
   type LineKind,
 } from "../../lib/markdownLineKind";
@@ -290,12 +290,7 @@ export function SourceBodyEditor({
 
   const lineKinds = useMemo(() => {
     const lines = draft.split("\n");
-    const kinds: LineKind[] = [];
-    let pos = 0;
-    for (const line of lines) {
-      kinds.push(inferLineKind(draft, pos));
-      pos += line.length + 1;
-    }
+    const kinds = inferLineKinds(draft);
 
     // Post-pass 1: ordered list 실제 렌더링 번호 계산.
     // depth별 counter. 첫 item은 source 의 literal 숫자(예 "3.") 사용.
