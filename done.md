@@ -4,7 +4,23 @@
 
 ---
 
-## 2026-06-01
+## 2026-06-02
+
+### PR #66 — 포트폴리오 카드 입력: 자동 채움 실패 시 수동 paste 자동 노출 (`fix`)
+
+- **한 줄 임팩트**: 자동 채움 실패해도 수동 입력 길이 바로 보임
+- PR 카드 impact 자동 채움([Claude 한테 요청] = `runClaude` 로컬 CLI)이 미설치·인증·파싱 에러로 실패하면, 접혀 있던 "직접 입력(수동 paste)" details 를 자동으로 펼치고 summary 를 "claude CLI 가 없으면 외부 Claude 응답을 붙여넣으세요" 안내로 전환. 정상 흐름에선 접힌 채 유지(주 경로가 자동 채움이라 평소엔 군더더기).
+- fallback 블록을 `PortfolioDetailModal` 인라인 details 에서 `ManualPasteFallback` presentational 컴포넌트로 추출 — `requestError` 로 open 파생 + 사용자 수동 토글 보존. pure `manualFallbackSummary` + RTL auto-open 테스트.
+- 스크린샷 드롭존(`ScreenshotDropzone`) drop→`saveScreenshot`→`mutate({screenshots})` 경로 회귀 테스트 4케이스(before/after label, append, 비이미지 reject, vault 미설정 가드). 카드 그리드 확장은 보류(모달 내 유지 결정).
+- `/ux-review` FLOW 문서(`.planning/flows/portfolio-input.md`)로 흐름 구조화 → Ralph loop TDD 구동. 전체 33파일/493 테스트 통과.
+
+### 직커밋 — CLAUDE.md vault schema 변경 룰 명시 (docs, `other`)
+
+- **한 줄 임팩트**: 옛 "실데이터 0" 가정 정리 — 향후 schema 변경 migration 룰 확정
+- 첫 배포(2026-05-27) 전 "실데이터 가능성 0" 전제로 migration 코드를 생략하던 가정이 매일 실데이터 누적으로 폐기됨을 명시.
+- CLAUDE.md 마이그레이션 섹션에 **vault schema 변경 룰** 추가 — 단순 신규 필드는 default fallback 으로 흡수, 의미 변경·rename·structural 변경은 lazy migration 필수(첫 read 시 변환+rewrite, V0.7.1 date-prefix→uid 선례), 다단계면 versioned tag(`frontmatter.schema: N`) 검토.
+- V0.6 design doc 의 "마이그레이션 없음, 새로 시작" 결정에 범위 단서 추가 — Supabase→vault 일회성 컷오버 한정, 첫 배포 이후 schema 변경은 lazy migration 필수로 superseded.
+- PR 아닌 main 직커밋 (포트폴리오 가치 없는 문서 정리).
 
 ### PR #65 — 메모장 탭 내 찾기에 바꾸기 추가
 

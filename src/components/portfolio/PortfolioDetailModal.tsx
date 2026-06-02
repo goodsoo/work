@@ -33,7 +33,7 @@ import {
 import { relativeDateLabel } from "../../lib/dates";
 import { buildPRPrompt, parsePRResponse } from "../../lib/clipboardPrompt";
 import { runClaude } from "../../lib/portfolio/claude";
-import { ResponsePasteArea } from "./ResponsePasteArea";
+import { ManualPasteFallback } from "./ManualPasteFallback";
 import { ScreenshotDropzone } from "./ScreenshotDropzone";
 import { CategoryCombobox } from "./CategoryCombobox";
 import { Modal } from "../common/Modal";
@@ -648,44 +648,16 @@ export function PortfolioDetailModal({ work, onClose }: Props) {
                   </div>
                 ) : null}
 
-                <details className="mt-1">
-                  <Text
-                    variant="caption"
-                    color="muted"
-                    as="summary"
-                    className="cursor-pointer text-[11px]"
-                  >
-                    직접 입력 (수동 paste)
-                  </Text>
-                  <div className="mt-2 flex flex-col gap-2">
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={handleCopyPrompt}
-                      disabled={fullWork.isLoading}
-                      leftIcon={
-                        promptCopied ? (
-                          <Check className="h-3.5 w-3.5" />
-                        ) : (
-                          <Sparkles className="h-3.5 w-3.5" />
-                        )
-                      }
-                      className="self-start px-2.5 py-1 disabled:opacity-50"
-                      style={{
-                        backgroundColor: "var(--bg-surface-hover)",
-                        color: "var(--text-primary)",
-                      }}
-                    >
-                      {promptCopied ? "복사됨" : "프롬프트 복사"}
-                    </Button>
-                    <ResponsePasteArea
-                      onParsed={(impact, category) => {
-                        setImpactDraft(impact);
-                        setCategoryDraft(category as PortfolioCategory);
-                      }}
-                    />
-                  </div>
-                </details>
+                <ManualPasteFallback
+                  requestError={requestError}
+                  promptCopied={promptCopied}
+                  copyDisabled={fullWork.isLoading}
+                  onCopyPrompt={handleCopyPrompt}
+                  onParsed={(impact, category) => {
+                    setImpactDraft(impact);
+                    setCategoryDraft(category as PortfolioCategory);
+                  }}
+                />
               </div>
             </Field>
             ) : null}
