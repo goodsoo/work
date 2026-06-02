@@ -8,9 +8,24 @@ type CachedState<T> = { value: T; history: T[]; pointer: number };
 
 // Module-level cache shared across all useStateHistory instances.
 // Persists across component remounts so undo/redo survives navigation.
-// cacheKey 는 영구 uid 기반 (`${uid}:body` 등) — 같은 file path 를 다른 entity 가
-// 차지해도 uid 다름 → cache 침범 없음. cleanup 코드 burden 없음.
+// cacheKey 는 영구 uid 기반 (`${uid}:doc` 등) — 같은 file path 를 다른 entity 가
+// 차지해도 uid 다름 → cache 침범 없음.
 const HISTORY_CACHE = new Map<string, CachedState<unknown>>();
+
+// LRU 상한. 한 entry 는 메모 전체 스냅샷(본문+음성기록+요약) 을 최대 maxDepth 개
+// 들고 있어 무겁다. 옛날엔 무한 증가(open 한 메모 수만큼 영구 잔류) — 큰 STT
+// transcript 메모를 수십 개 돌아다닌 긴 세션에서 수십~수백 MB 까지 자랐다.
+// 최근 사용 N개만 유지 (Map 삽입 순서 = recency, set 시 재삽입으로 갱신).
+const MAX_HISTORY_KEYS = 12;
+function cacheSet(key: string, state: CachedState<unknown>): void {
+  HISTORY_CACHE.delete(key); // 재삽입으로 most-recently-used 위치로 이동
+  HISTORY_CACHE.set(key, state);
+  while (HISTORY_CACHE.size > MAX_HISTORY_KEYS) {
+    const oldest = HISTORY_CACHE.keys().next().value;
+    if (oldest === undefined) break;
+    HISTORY_CACHE.delete(oldest);
+  }
+}
 
 export type UseStateHistoryOptions<T> = {
   /** Initial value. Used on first mount and on cache miss. */
@@ -110,7 +125,7 @@ export function useStateHistory<T>(
   if (trackedKey !== cacheKey) {
     // 1) Save outgoing state.
     if (trackedKey !== undefined) {
-      HISTORY_CACHE.set(trackedKey, { value, history, pointer });
+      cacheSet(trackedKey, { value, history, pointer });
     }
     // 2) Defer pending commit to effect (so outgoing onCommit fires).
     if (commitTimerRef.current != null) {
@@ -154,7 +169,7 @@ export function useStateHistory<T>(
     return () => {
       const ck = cacheKeyRef.current;
       if (ck !== undefined) {
-        HISTORY_CACHE.set(ck, {
+        cacheSet(ck, {
           value: valueRef.current,
           history: historyRef.current,
           pointer: pointerRef.current,
