@@ -1039,6 +1039,11 @@ function timestampToLocalIso(ts: string): string {
   return todayIso(new Date(ts));
 }
 
+// 캘린더 day 패널의 "할 일" 항목 — 루틴/태스크 통합 리스트의 한 행. 시간순 정렬용 공통 형태.
+type DayTodoItem =
+  | { kind: "routine"; time: string | null; routine: Routine }
+  | { kind: "task"; time: string | null; task: Task };
+
 export function CalendarDayPanel({
   selectedDate,
   onOpenMeeting,
@@ -1112,6 +1117,37 @@ export function CalendarDayPanel({
       journal: journals[0] ?? null,
     };
   }, [meetingsQ.data, journalsQ.data, todosQ.data, selectedDate]);
+
+  // 루틴 + 태스크를 한 리스트로 합쳐 시간순 배열. 둘 다 "HH:MM" 시각(루틴=frontmatter.time,
+  // 태스크=due_time)을 가지므로 통합 정렬 가능. 시각 없는 항목 먼저(할 일 탭과 동일 — "정해진
+  // 시각 없는 작업 먼저"), 시각 있는 것은 오름차순. 같은 시각이면 루틴 먼저(안정적 순서).
+  const dayItems = useMemo<DayTodoItem[]>(() => {
+    const items: DayTodoItem[] = [
+      ...dayRoutines.map((r) => ({
+        kind: "routine" as const,
+        time: r.frontmatter.time ?? null,
+        routine: r,
+      })),
+      ...tasks.map((t) => ({
+        kind: "task" as const,
+        time: t.due_time ?? null,
+        task: t,
+      })),
+    ];
+    items.sort((a, b) => {
+      const ta = a.time ?? "";
+      const tb = b.time ?? "";
+      if (ta !== tb) {
+        if (!ta) return -1;
+        if (!tb) return 1;
+        return ta < tb ? -1 : 1;
+      }
+      // 같은 시각(또는 둘 다 시각 없음): 루틴 먼저
+      if (a.kind !== b.kind) return a.kind === "routine" ? -1 : 1;
+      return 0;
+    });
+    return items;
+  }, [dayRoutines, tasks, selectedDate]);
 
   function handleToggle(t: Task) {
     // done 만 patch — vault md 에 done_at 안 저장돼 refetch 후 항상 null 로 돌아옴.
@@ -1216,56 +1252,58 @@ export function CalendarDayPanel({
             />
             {!collapsed.has("tasks") ? (
               <SectionChildren>
-                {dayRoutines.map((r) => {
-                  const done = r.log.has(selectedDate);
-                  return (
-                    <div
-                      key={`routine:${r.name}`}
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => onOpenRoutine(r.name)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault();
-                          onOpenRoutine(r.name);
-                        }
-                      }}
-                      className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-[13px] transition hover:bg-[var(--bg-surface-hover)]"
-                    >
-                      <CheckboxButton
-                        status={done ? "done" : "pending"}
-                        category={null}
-                        shape="circle"
-                        onClick={() =>
-                          toggleRoutineDayMutation.mutate({
-                            name: r.name,
-                            date: selectedDate,
-                            done: !done,
-                          })
-                        }
-                      />
-                      <span
-                        className={`min-w-0 flex-1 truncate ${done ? "line-through" : ""}`}
-                        style={{
-                          color: done
-                            ? "var(--text-muted)"
-                            : "var(--text-primary)",
+                {dayItems.map((item) => {
+                  if (item.kind === "routine") {
+                    const r = item.routine;
+                    const done = r.log.has(selectedDate);
+                    return (
+                      <div
+                        key={`routine:${r.name}`}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => onOpenRoutine(r.name)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            onOpenRoutine(r.name);
+                          }
                         }}
+                        className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-[13px] transition hover:bg-[var(--bg-surface-hover)]"
                       >
-                        {r.name}
-                      </span>
-                      {r.frontmatter.time ? (
+                        <CheckboxButton
+                          status={done ? "done" : "pending"}
+                          category={null}
+                          shape="circle"
+                          onClick={() =>
+                            toggleRoutineDayMutation.mutate({
+                              name: r.name,
+                              date: selectedDate,
+                              done: !done,
+                            })
+                          }
+                        />
                         <span
-                          className="shrink-0 text-[11px] tabular-nums"
-                          style={{ color: "var(--text-muted)" }}
+                          className={`min-w-0 flex-1 truncate ${done ? "line-through" : ""}`}
+                          style={{
+                            color: done
+                              ? "var(--text-muted)"
+                              : "var(--text-primary)",
+                          }}
                         >
-                          {r.frontmatter.time}
+                          {r.name}
                         </span>
-                      ) : null}
-                    </div>
-                  );
-                })}
-                {tasks.map((t) => {
+                        {r.frontmatter.time ? (
+                          <span
+                            className="shrink-0 text-[11px] tabular-nums"
+                            style={{ color: "var(--text-muted)" }}
+                          >
+                            {r.frontmatter.time}
+                          </span>
+                        ) : null}
+                      </div>
+                    );
+                  }
+                  const t = item.task;
                   const status = t.cancelled
                     ? "cancelled"
                     : t.done
