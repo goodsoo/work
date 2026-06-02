@@ -6,6 +6,15 @@
 
 ## 2026-06-02
 
+### PR #67 — 요약 상황별 템플릿 (회의록 / 작업 / 강의)
+
+- **한 줄 임팩트**: 칩 하나로 상황에 맞는 요약 형식 전환
+- 요약이 회의록 단일 출력형식(논의/결정/액션)만 지원하던 것을 상황별 템플릿으로 확장. `clipboardPrompt.ts` 에 `SUMMARY_TEMPLATES` 3개(`meeting`/`work`/`lecture`) + `buildClaudePrompt(input, templateId='meeting')` — default 라 기존 호출/테스트 무손상.
+- 입력 파이프라인(메타/메모/음성 기록 합성)은 공통이라 참석자 없는 강의·음성 기록 없는 작업 로그에도 빈 섹션 없이 적응. 출력 형식(### 섹션)과 규칙만 템플릿별로 교체.
+- 모든 템플릿 마지막에 `### 기타` — 본 흐름과 무관하지만 알아둘 내용 모음(빈 섹션 생략으로 없으면 자동 omit, 공유 시 그 섹션만 제외).
+- `SummaryModal` 탭 nav 아래 칩 row(자동·붙여넣기 두 탭 공통) + 선택 칩 한 줄 소개. 선택은 localStorage 전역 last-used(`goodsoob:summaryTemplate`). 칩 변경 시 자동 요약 결과 reset, 진행 중엔 disable.
+- 카테고리: `ui_ux`
+
 ### PR #66 — 포트폴리오 카드 입력: 자동 채움 실패 시 수동 paste 자동 노출 (`fix`)
 
 - **한 줄 임팩트**: 자동 채움 실패해도 수동 입력 길이 바로 보임

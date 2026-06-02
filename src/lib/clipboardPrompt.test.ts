@@ -41,6 +41,47 @@ describe("buildClaudePrompt", () => {
     expect(out).toContain("다음 메모를 정리해주세요");
     expect(out).toContain("제목: 빈 메모");
   });
+
+  it("default templateId = meeting — 기존 회의록 헤더와 byte 동일", () => {
+    const input = { title: "회의", content: "노트" };
+    expect(buildClaudePrompt(input)).toBe(
+      buildClaudePrompt(input, "meeting"),
+    );
+  });
+
+  it("work 템플릿 — 작업 요약 인트로 + 섹션", () => {
+    const out = buildClaudePrompt({ content: "오늘 작업" }, "work");
+    expect(out).toContain("다음 내용을 정리해주세요");
+    expect(out).toContain("### 한 일");
+    expect(out).toContain("### 다음 할 일");
+    expect(out).not.toContain("### 논의 사항"); // 회의록 섹션 안 섞임
+  });
+
+  it("lecture 템플릿 — 강의 인트로 + 섹션, 입력은 동일 파이프라인", () => {
+    const out = buildClaudePrompt(
+      { content: "강의 노트", transcript: "녹음" },
+      "lecture",
+    );
+    expect(out).toContain("### 핵심 개념");
+    expect(out).toContain("### 적용점");
+    // 빈 섹션 생략은 출력 형식 spec, 입력은 그대로 합성
+    expect(out).toContain("## 메모");
+    expect(out).toContain("## 음성 기록");
+  });
+
+  it("모든 템플릿에 '기타' 섹션 + 규칙 문구 포함", () => {
+    for (const id of ["meeting", "work", "lecture"]) {
+      const out = buildClaudePrompt({ content: "x" }, id);
+      expect(out).toContain("### 기타");
+      expect(out).toContain("'기타' 에 모읍니다");
+    }
+  });
+
+  it("알 수 없는 templateId → meeting fallback", () => {
+    const out = buildClaudePrompt({ content: "x" }, "nope");
+    expect(out).toContain("다음 메모를 정리해주세요");
+    expect(out).toContain("### 액션 아이템");
+  });
 });
 
 describe("buildPRPrompt (V0.7 step 8)", () => {
