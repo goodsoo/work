@@ -6,6 +6,14 @@
 
 ## 2026-06-02
 
+### PR #71 — 사이드바 폴더 DnD (메모+폴더 단일 시스템으로 일반화)
+
+- **한 줄 임팩트**: 폴더도 드래그로 옮깁니다
+- 기존엔 메모(uid)를 폴더에 떨구는 단방향 DnD 만 있고 폴더 자체는 못 옮겼다 (rename 만 가능). 기존 메모 DnD 시스템을 복붙 없이 "메모 + 폴더 양쪽을 다루는 하나의 시스템" 으로 일반화 — drop 경로/드래그 핸들러/Tauri WebView race 우회 로직 공유.
+- 백엔드 `moveFolder`: `adapter.rename` 으로 폴더 트리 통째 mv (안 메모·sub-folder 따라옴). 가드 — root 이동 차단 / 자기·자손 cycle 차단 / 동명 폴더 충돌 `TitleConflictError` / 현재 부모 = no-op.
+- `canDropFolder` 순수 함수로 하이라이트·drop 게이트·backend 가드 공유 (defense-in-depth). 시각: valid=primary 점선, blocked(자기·자손·현재 부모)=red 점선 + not-allowed 커서.
+- `dragUid` → `dragItem`(메모|폴더) 통합, 폴더 행 draggable + 고유 MIME. `useMoveMeetingFolder` 훅.
+
 ### PR #70 — gcal 잘못된 '_'=반복 가드 제거 + 대량 push 일회 허용
 
 - **한 줄 임팩트**: 복사해온 일정도 동기화로 시간이 맞춰집니다
