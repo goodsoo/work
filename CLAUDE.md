@@ -123,6 +123,7 @@ results than an ad-hoc answer.
 - CI: `.github/workflows/ci.yml` — push(main) + PR 마다 `bun install --frozen-lockfile` → typecheck → test:run 자동 실행 (ubuntu, oven-sh/setup-bun@v2). Tauri build 는 OS 종속이라 CI 에서 skip.
 - 배포: 없음 (Tauri 데스크탑 전용). `vercel.json` 으로 main deploy 비활성화. Vercel 대시보드 연동은 남아있지만 deploy 자체는 막혀있음.
 - 마이그레이션 (DB): V0.6 부터 없음. vault = 로컬 md 파일. 스키마 변경 = md 파일 형식 변경 (frontmatter 필드 추가/이름 변경 등).
+- **vault schema 변경 룰** (2026-05-27 첫 배포 이후): 첫 배포 전엔 "실데이터 가능성 0" 전제로 migration 코드를 생략했지만, 첫 배포로 매일 실데이터가 쌓이므로 그 전제는 폐기. 이제 frontmatter 필드 추가·이름 변경·structural 변경 모두 lazy migration 코드를 박는다 (첫 read 시 변환 + rewrite, V0.7.1 의 date-prefix→uid 발급 패턴이 선례). **단순 신규 필드** = default 값 fallback 으로 흡수 (migration 불필요), **의미 변경·필드 rename·structural 변경** = lazy migration 필수, 다단계면 versioned tag (`frontmatter.schema: N`) 검토. 산재 호출 방지용 runner 추상화는 todo.md "마이그레이션 헬퍼 추상화" 참조 — 첫 실제 schema 변경 PR 에 같이 도입.
 - **메모 파일 모델** (V0.7.1): `meetings/{title}.md` (date 없음, title 이 곧 파일명). frontmatter = `id: <uuid>` (영구 식별자) + `date` (optional) + `time` + `attendees` + `tags`. **frontmatter 에 title 없음** — 옵시디안 default 모델 (파일명 = 노트 제목). 옛 V0.6 메모 (date prefix + frontmatter title) 는 lazy migration — 첫 read 시 uid 발급 + frontmatter rewrite. title 변경 = pure disk rename only (inode 유지). 충돌 시 `TitleConflictError` throw (자동 -2 X). sidecar (`.transcript.md` / `.summary.md`) 패턴 그대로.
 
 ## 주의사항 / 알려진 footgun

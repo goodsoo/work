@@ -24,26 +24,9 @@ PR 단위로 묶음. 각 PR 의 **한 줄 임팩트** 는 카드 frontmatter `im
 
 ---
 
-## 🎨 폴리시
-
-### PR — portfolio 입력 흐름 `ui_ux`
-한 줄 임팩트: ResponsePasteArea 발견성 + 드래그&드롭 동작 검증
-
-- [ ] **`ResponsePasteArea` 발견성** — `PortfolioWorkCard.tsx:147` 의 "Claude 응답 paste" 입력란. impact_summary 비었을 때만 등장 + placeholder 만 있어 사용자가 "무슨 기능인지 모름" 체감. 라벨/도움말 보강 또는 가치 재평가 후 제거 결정. (단일 카드 메뉴의 "Claude 프롬프트 복사" 는 별개 — 그건 명확.)
-- [ ] **이미지 업로드 드래그&드롭** — CLAUDE.md 엔 dropzone 명시지만 사용자 체감 안 됨. 실제 동작 점검 + 카드 그리드 어디서든 드래그 받도록 영역 확장. lightbox 안 dropzone 도 동작 검증.
-
----
-
 ## 🚨 V0.7.x — 데스크탑 첫 배포 이후 (2026-05-27 ~)
 
 > 실사용 데이터 누적 시작. 지금까지의 "본인 미사용 → legacy 데이터 가능성 0" 전제 폐기.
-
-### CLAUDE.md 문구 정리 `other`
-한 줄 임팩트: 옛 "미사용" 가정 문구 정리 — 향후 schema 변경 시 마이그레이션 default 룰 명시
-
-- [ ] V0.6/V0.7 섹션 안 "본인 미사용 전" / "마이그레이션 0" / "정교한 migration 코드 생략" 표현 일괄 정정
-- [ ] 새 룰 명시: vault schema 변경 시 lazy migration 코드 박기 (frontmatter 필드 추가/이름 변경/structural 변경 모두). 단순 신규 필드는 default 값 fallback 으로 흡수, 의미 변경은 versioned tag (`frontmatter.schema: N` 등) 검토.
-- [ ] V0.6 design doc 안 마이그레이션 노트도 함께 정리
 
 ### PR — 마이그레이션 헬퍼 추상화 `backend` 🟡
 한 줄 임팩트: schema 변경 시 versioned migration 한 곳에서 — 호출처 산재 X
