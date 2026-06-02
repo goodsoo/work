@@ -7,8 +7,8 @@ import {
   updateEvent,
 } from "./api";
 import type { GcalApiEvent } from "./mapping";
-import { fieldsToGcalEvent, gcalEventToRemote, isRecurringEvent } from "./mapping";
-import { reconcile, scheduleHash } from "./reconcile";
+import { fieldsToGcalEvent, gcalEventToRemote, isRecurringEvent, isRecurringEventId } from "./mapping";
+import { MAX_BULK_PUSH_MUTATIONS, mutatingPushCount, reconcile, scheduleHash } from "./reconcile";
 import { addTombstone, isGuarded, reduceState, unlinkEvent } from "./state";
 import { loadSyncState, updateSyncState } from "./stateStore";
 import { GcalError } from "./transport";
@@ -24,6 +24,20 @@ export class GcalNotReadyError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "GcalNotReadyError";
+  }
+}
+
+// 대량 push 가드 발동 — 기존 Google 일정을 임계치 이상 변경/삭제하려 해서 sync 를
+// 중단했다. 적용 전에 던지므로 Google 엔 아무것도 안 나간다 (token 도 advance 안 함).
+export class GcalBulkChangeError extends Error {
+  count: number;
+  constructor(count: number) {
+    super(
+      `동기화를 중단했습니다. 기존 Google 일정 ${count}개를 한꺼번에 변경/삭제하려 했습니다. ` +
+        `정상은 한 번에 1~2개입니다. 데이터 손상이 의심되니 로컬 일정을 확인한 뒤 다시 시도하세요.`,
+    );
+    this.name = "GcalBulkChangeError";
+    this.count = count;
   }
 }
 
@@ -106,6 +120,20 @@ async function applyAction(ctx: ApplyCtx, action: ReconcileAction): Promise<void
   const { adapter, calendarId, tz, taskByEvent, markSelfWrite } = ctx;
   switch (action.kind) {
     case "push-update": {
+      // 반복 일정 인스턴스엔 단일 PUT 금지 (Google 반복 규칙 파손 footgun). Google 은
+      // 그대로 두고 snapshot 만 로컬에 맞춰 settle → 더 이상 push 시도 안 함.
+      if (isRecurringEventId(action.eventId)) {
+        console.warn(`[gcal] push-update skip (반복 일정): ${action.eventId}`);
+        await updateSyncState((s) =>
+          reduceState(s, {
+            kind: "snapshot-put",
+            eventId: action.eventId,
+            hash: scheduleHash(action.local.fields),
+            updated: "",
+          }),
+        );
+        break;
+      }
       const ev = await updateEvent(
         calendarId,
         action.eventId,
@@ -122,6 +150,12 @@ async function applyAction(ctx: ApplyCtx, action: ReconcileAction): Promise<void
       break;
     }
     case "push-delete": {
+      // 반복 일정엔 단일 DELETE 금지 (전체 시리즈 삭제 위험). 묘비만 확정.
+      if (isRecurringEventId(action.eventId)) {
+        console.warn(`[gcal] push-delete skip (반복 일정): ${action.eventId}`);
+        await updateSyncState((s) => reduceState(s, { kind: "tombstone-confirm", eventId: action.eventId }));
+        break;
+      }
       await safeDeleteEvent(calendarId, action.eventId);
       await updateSyncState((s) => reduceState(s, { kind: "tombstone-confirm", eventId: action.eventId }));
       break;
@@ -269,14 +303,10 @@ export async function runSync(
     });
   }
 
-  // 3.5) tz import fix 일회성 복구. tz pin 이전 syncToken 은 import 시각이 UTC 로
-  // 읽혀(−9h) 손상된 상태로 reconcile 됐다. 플래그가 없으면(구버전 상태 파일) syncToken
-  // 을 1회 버려 full pull 을 강제 → remote 의 올바른 시각이 snapshot(손상 hash)과 달라
-  // local-upsert 로 자동 교정된다. snapshots 는 보존해야 이 비교가 성립 (지우면
-  // both-changed conflict → LWW 로 손상값이 역push 될 위험).
-  if (!state.tzImportFixApplied) {
-    state = await updateSyncState((s) => ({ ...s, syncToken: null, tzImportFixApplied: true }));
-  }
+  // (제거됨) tz import fix 자동 full-pull 복구는 위험해 폐기. snapshot 과 로컬이
+  // 불일치한 상태(복구 시 흔함)에서 full pull 이 "로컬이 바뀜 → push-update" 로 흘러
+  // 손상된 로컬 시각을 Google 에 역push 해 실제 캘린더를 망가뜨렸다. 이미 어긋난
+  // 데이터 복구는 reconcile(양방향)이 아니라 명시적 pull-only 경로로만 해야 한다.
 
   // 4) 원격 delta (410 → full resync). 인증 만료는 상위로 던져 CTA.
   const remote = await fetchRemoteDelta(calendarId, state.syncToken, tz);
@@ -298,6 +328,15 @@ export async function runSync(
     snapshots: state.snapshots,
     tombstones: state.tombstones,
   });
+
+  // 6.5) 대량 push 가드 (#2). 기존 Google 이벤트를 임계치 이상 덮어쓰/삭제하려 하면
+  // 적용 전에 중단 — 데이터 손상·버그(타임존 일괄 시프트 등)가 실 캘린더에 닿는 것을
+  // 막는 최후 방어선. push-create(신규)는 제외. 던지면 token 미advance → 다음 sync 가
+  // 같은 delta 로 다시 와 사용자가 로컬을 고치면 자동 정상화.
+  const bulk = mutatingPushCount(actions);
+  if (bulk > MAX_BULK_PUSH_MUTATIONS) {
+    throw new GcalBulkChangeError(bulk);
+  }
 
   // 7) apply. eventId→task 맵으로 line drift 보호 + 액션별 격리.
   const taskByEvent = new Map<string, Task>();

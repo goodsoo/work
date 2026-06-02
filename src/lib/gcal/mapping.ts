@@ -22,6 +22,15 @@ export function isRecurringEvent(ev: GcalApiEvent): boolean {
     typeof ev.recurringEventId === "string";
 }
 
+// 로컬 task 의 gcal_event_id(문자열)만으로 반복 일정 인스턴스/예외 판별 — API 이벤트
+// 객체(recurrence/recurringEventId)가 없는 push 경로용. Google 반복 인스턴스·예외 id 는
+// `<masterId>_<instance>` 형태로 `_` 를 포함하고, 단일 이벤트 id(base32hex)는 `_` 가
+// 없다. 반복 인스턴스에 단일 PUT/DELETE 를 날리면 Google 반복 규칙이 깨지는 footgun →
+// executor 의 push 가 이 판별로 반복 일정을 건너뛴다 (import 의 isRecurringEvent 와 대칭).
+export function isRecurringEventId(eventId: string): boolean {
+  return eventId.includes("_");
+}
+
 // events.insert / events.update 요청 바디.
 export interface GcalEventBody {
   summary: string;

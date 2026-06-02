@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { compareUpdated, reconcile, scheduleHash } from "./reconcile";
+import {
+  compareUpdated,
+  MAX_BULK_PUSH_MUTATIONS,
+  mutatingPushCount,
+  reconcile,
+  scheduleHash,
+} from "./reconcile";
 import type {
   LocalSchedule,
+  ReconcileAction,
   ReconcileInput,
   RemoteEvent,
   ScheduleFields,
@@ -255,5 +262,29 @@ describe("reconcile — calendar-unlink (날짜 제거 = 캘린더에서 제거)
     });
     expect(actions.find((a) => a.kind === "calendar-unlink")).toBeUndefined();
     expect(actions).toContainEqual({ kind: "push-delete", eventId: "ev1" });
+  });
+});
+
+describe("mutatingPushCount / 대량 push 가드 (#2)", () => {
+  it("push-update·push-delete 만 센다 (push-create 제외)", () => {
+    const actions: ReconcileAction[] = [
+      { kind: "push-update", eventId: "a", local: {} as never, reason: "local-only" },
+      { kind: "push-delete", eventId: "b" },
+      { kind: "local-create", eventId: "c", fields: {} as never, updated: "" },
+      { kind: "snapshot-put", eventId: "d", hash: "h", updated: "" },
+    ];
+    expect(mutatingPushCount(actions)).toBe(2);
+  });
+  it("임계치는 1인 도구 정상 사용(1~2개)보다 충분히 큼", () => {
+    expect(MAX_BULK_PUSH_MUTATIONS).toBeGreaterThanOrEqual(8);
+  });
+  it("이번 사고(19개 일괄 push)는 임계치 초과 → 가드 발동", () => {
+    const actions: ReconcileAction[] = Array.from({ length: 19 }, (_, i) => ({
+      kind: "push-update" as const,
+      eventId: `ev${i}`,
+      local: {} as never,
+      reason: "local-only" as const,
+    }));
+    expect(mutatingPushCount(actions) > MAX_BULK_PUSH_MUTATIONS).toBe(true);
   });
 });
