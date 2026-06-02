@@ -7,7 +7,7 @@ import {
   updateEvent,
 } from "./api";
 import type { GcalApiEvent } from "./mapping";
-import { fieldsToGcalEvent, gcalEventToRemote, isRecurringEvent, isRecurringEventId } from "./mapping";
+import { fieldsToGcalEvent, gcalEventToRemote, isRecurringEvent } from "./mapping";
 import { MAX_BULK_PUSH_MUTATIONS, mutatingPushCount, reconcile, scheduleHash } from "./reconcile";
 import { addTombstone, isGuarded, reduceState, unlinkEvent } from "./state";
 import { loadSyncState, updateSyncState } from "./stateStore";
@@ -120,20 +120,6 @@ async function applyAction(ctx: ApplyCtx, action: ReconcileAction): Promise<void
   const { adapter, calendarId, tz, taskByEvent, markSelfWrite } = ctx;
   switch (action.kind) {
     case "push-update": {
-      // 반복 일정 인스턴스엔 단일 PUT 금지 (Google 반복 규칙 파손 footgun). Google 은
-      // 그대로 두고 snapshot 만 로컬에 맞춰 settle → 더 이상 push 시도 안 함.
-      if (isRecurringEventId(action.eventId)) {
-        console.warn(`[gcal] push-update skip (반복 일정): ${action.eventId}`);
-        await updateSyncState((s) =>
-          reduceState(s, {
-            kind: "snapshot-put",
-            eventId: action.eventId,
-            hash: scheduleHash(action.local.fields),
-            updated: "",
-          }),
-        );
-        break;
-      }
       const ev = await updateEvent(
         calendarId,
         action.eventId,
@@ -150,12 +136,6 @@ async function applyAction(ctx: ApplyCtx, action: ReconcileAction): Promise<void
       break;
     }
     case "push-delete": {
-      // 반복 일정엔 단일 DELETE 금지 (전체 시리즈 삭제 위험). 묘비만 확정.
-      if (isRecurringEventId(action.eventId)) {
-        console.warn(`[gcal] push-delete skip (반복 일정): ${action.eventId}`);
-        await updateSyncState((s) => reduceState(s, { kind: "tombstone-confirm", eventId: action.eventId }));
-        break;
-      }
       await safeDeleteEvent(calendarId, action.eventId);
       await updateSyncState((s) => reduceState(s, { kind: "tombstone-confirm", eventId: action.eventId }));
       break;
@@ -335,7 +315,13 @@ export async function runSync(
   // 같은 delta 로 다시 와 사용자가 로컬을 고치면 자동 정상화.
   const bulk = mutatingPushCount(actions);
   if (bulk > MAX_BULK_PUSH_MUTATIONS) {
-    throw new GcalBulkChangeError(bulk);
+    // allowBulkPushOnce = 사용자가 명시 승인한 일회성 대량 push (대량 복구용). 소비하고
+    // 진행. 없으면 가드 발동 — 적용 전 중단(Google 미변경, token 미advance).
+    if (state.allowBulkPushOnce) {
+      state = await updateSyncState((s) => ({ ...s, allowBulkPushOnce: false }));
+    } else {
+      throw new GcalBulkChangeError(bulk);
+    }
   }
 
   // 7) apply. eventId→task 맵으로 line drift 보호 + 액션별 격리.

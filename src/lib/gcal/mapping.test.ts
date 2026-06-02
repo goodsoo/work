@@ -4,7 +4,6 @@ import {
   fieldsToGcalEvent,
   gcalEventToRemote,
   isRecurringEvent,
-  isRecurringEventId,
   type GcalApiEvent,
 } from "./mapping";
 
@@ -113,15 +112,5 @@ describe("fieldsToGcalEvent", () => {
       updated: "2026-05-29T05:00:00Z",
     });
     expect(r.fields).toEqual(original);
-  });
-});
-
-describe("isRecurringEventId — id 기반 반복 일정 판별 (push 가드)", () => {
-  it("`_` 포함 = 반복 인스턴스 → true", () => {
-    expect(isRecurringEventId("_6opk8d9h691j2b9i651j2b9k64sj2b9o6d246b9m6cqj4hhm8d2j2cq564")).toBe(true);
-  });
-  it("단일 이벤트 id(`_` 없음) → false", () => {
-    expect(isRecurringEventId("qfurs4piv2rmdnl6g652l98rvg")).toBe(false);
-    expect(isRecurringEventId("cli6m2i5a4foe8vfun2lsa28sc")).toBe(false);
   });
 });

@@ -6,6 +6,14 @@
 
 ## 2026-06-02
 
+### PR #70 — gcal 잘못된 '_'=반복 가드 제거 + 대량 push 일회 허용
+
+- **한 줄 임팩트**: 복사해온 일정도 동기화로 시간이 맞춰집니다
+- PR #69 가 넣은 `isRecurringEventId`(id 에 `_` 있으면 반복으로 판정) push 가드가 오판이었다. `_` 는 반복 일정이 아니라 다른 캘린더에서 복사·가져온 단일 이벤트의 Google id 형식(iCalUID 인코딩). 진짜 반복은 import 의 `isRecurringEvent`(API recurrence 필드)가 이미 걸러 vault 에 안 들어오므로 push 측 가드는 불필요했고, 오히려 단발성 일정의 정상 push 를 막아 손상 복구 때 일부 일정이 Google 에 반영 안 되던 버그.
+- `isRecurringEventId` 제거 + executor push-update/push-delete 의 반복 가드 제거.
+- `allowBulkPushOnce`: 대량 push 가드를 사용자 명시 승인 시 1회 우회 (대량 복구용). runSync 가 소비 후 false.
+- dogfood 후속: gcal `calendar.app.created` scope 는 앱이 만든 이벤트만 수정 가능 — 외부 복사 일정(`_` id)은 read-only 라 sync 로 못 고침(권한 한계, 코드 버그 아님).
+
 ### PR #69 — gcal sync 안전장치 3종 (손상값 역push 방지)
 
 - **한 줄 임팩트**: 동기화가 진짜 캘린더를 망가뜨리지 못하게 막음

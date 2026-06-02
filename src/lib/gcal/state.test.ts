@@ -22,6 +22,7 @@ function sample(): SyncState {
     tombstones: [{ eventId: "ev9", deletedAt: "2026-05-29T08:00:00Z", pushConfirmed: false }],
     tzImportFixApplied: true,
     vaultPath: "/Users/me/Vault",
+    allowBulkPushOnce: false,
   };
 }
 
