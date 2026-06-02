@@ -115,33 +115,6 @@ export async function runGh(args: string[]): Promise<ShCommandResult> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Auth check
-//
-// `gh auth token --hostname <host>` 은 로그인 시 토큰 출력 + exit 0,
-// 안 되어 있으면 exit 1. adversarial review #6: `gh auth status` 보다 reliable.
-
-export async function ghAuthCheck(host: string = "github.com"): Promise<boolean> {
-  try {
-    const result = await runGh(["auth", "token", "--hostname", host]);
-    return result.stdout.trim().length > 0;
-  } catch {
-    // runGh 가 throw = code !== 0 (미설치 / 미로그인 / 그 외). 모두 false 로 단일화.
-    return false;
-  }
-}
-
-// gh 자체 존재 여부 (auth 와 무관).
-// `command -v gh` 가 exit 0 이면 PATH 에 있음.
-export async function ghIsInstalled(): Promise<boolean> {
-  try {
-    const cmd = Command.create(LOGIN_SHELL_PROGRAM, loginShellArgs("command -v gh"));
-    const output = await cmd.execute();
-    return output.code === 0 && output.stdout.trim().length > 0;
-  } catch {
-    return false;
-  }
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 // gh search / pr view — design v2.3 Step 1 / Step 2
 

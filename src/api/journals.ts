@@ -24,17 +24,6 @@ export async function listJournals(adapter: VaultAdapter): Promise<Journal[]> {
   return journals;
 }
 
-export async function getJournalByDate(
-  adapter: VaultAdapter,
-  date: string,
-): Promise<Journal | null> {
-  const path = journalPath(date);
-  if (!(await adapter.exists(path))) return null;
-  const raw = await adapter.read(path);
-  const meta = await adapter.readMeta(path);
-  return fileToJournal(path, raw, meta.mtime);
-}
-
 export async function upsertJournal(
   adapter: VaultAdapter,
   date: string,

@@ -19,7 +19,8 @@ import {
 } from "../lib/portfolio/gh";
 import { downloadImageToVault } from "../lib/portfolio/imageDownload";
 import { extractPRBodyImages, planImagePaths } from "../lib/portfolio/imageImport";
-import { patchFrontmatter } from "../lib/vault/parser";
+import { patchFrontmatter, splitFrontmatter } from "../lib/vault/parser";
+import { parseStampToMs } from "../lib/vault/scan";
 
 export const PORTFOLIO_DIR = "portfolio";
 export const SYNCED_FILE = "portfolio/.synced.md";
@@ -163,8 +164,6 @@ export function defaultUserFields(): PortfolioUserFields {
 export const DESCRIPTION_HEADER = "## Description (from GitHub)";
 export const NOTES_HEADER = "## Notes";
 
-const FRONTMATTER_RE = /^---\s*\n([\s\S]*?)\n---\s*(\n|$)/;
-
 // 부분 view — 카드 그리드 / 사이드바 카운트용 (description / notes 본문 제외).
 export interface PortfolioWorkMeta {
   prSlug: string;
@@ -260,23 +259,6 @@ export function parsePortfolioFrontmatter(
 // ─────────────────────────────────────────────────────────────────────────────
 // Body parsing — frontmatter 분리 후 H2 split (Description / Notes)
 
-function stripFrontmatter(
-  raw: string,
-): { fm: Record<string, unknown>; body: string } {
-  const match = raw.match(FRONTMATTER_RE);
-  if (!match) return { fm: {}, body: raw };
-  let fm: Record<string, unknown> = {};
-  try {
-    const parsed = yaml.load(match[1], { schema: yaml.JSON_SCHEMA });
-    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-      fm = parsed as Record<string, unknown>;
-    }
-  } catch {
-    fm = {};
-  }
-  return { fm, body: raw.slice(match[0].length) };
-}
-
 // "## Description (from GitHub)" / "## Notes" 사이로 분할. 헤더 외 H2 는 보존 안 함
 // (PR 카드 외 H2 는 owner-edit 영역인 Notes 안에 들어가야 함).
 export function splitPortfolioBody(
@@ -314,7 +296,7 @@ export function fileToPortfolioWork(
   raw: string,
   mtime: number,
 ): PortfolioWork | null {
-  const { fm, body } = stripFrontmatter(raw);
+  const { frontmatter: fm, body } = splitFrontmatter(raw);
   const frontmatter = parsePortfolioFrontmatter(fm);
   if (!frontmatter) return null;
 
@@ -609,16 +591,6 @@ export async function listTrashedPortfolioWorks(
   return results;
 }
 
-function parseStampToMs(stamp: string): number {
-  // "2026-05-22T11-24-38" → "2026-05-22T11:24:38" → ms
-  const iso = stamp.replace(
-    /^(\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})-(\d{2})$/,
-    "$1T$2:$3:$4",
-  );
-  const t = Date.parse(iso);
-  return Number.isFinite(t) ? t : 0;
-}
-
 // 복원 — trashCardPath: portfolio/.trash/{stamp}-{slug}.md
 // 원래 위치 portfolio/{slug}.md 로 이동 + 같은 stamp 의 attachments 짝 동행.
 // 복원된 카드는 항상 `included: false` (미사용) 상태로 — 휴지통 = 임시 자리, 복원 = 미사용으로.
@@ -831,7 +803,7 @@ export async function readSyncState(
     return { last_sync: null, last_sync_pr_count: 0 };
   }
   const raw = await adapter.read(SYNCED_FILE);
-  const { fm } = stripFrontmatter(raw);
+  const { frontmatter: fm } = splitFrontmatter(raw);
   return {
     last_sync: fmStr(fm.last_sync) || null,
     last_sync_pr_count: fmNum(fm.last_sync_pr_count),

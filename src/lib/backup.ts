@@ -122,15 +122,6 @@ export async function deleteBackup(adapter: VaultAdapter, path: string): Promise
   await adapter.delete(path);
 }
 
-// 보관 한도 초과한 오래된 백업 (자동 삭제 후보).
-export function identifyRotationCandidates(
-  entries: BackupEntry[],
-  keepCount: number,
-): BackupEntry[] {
-  if (entries.length <= keepCount) return [];
-  return entries.slice(keepCount); // 최신순 정렬 전제
-}
-
 // 새 백업 1개 만들기 위해 삭제해야 할 오래된 entries.
 // entries.length + 1 > keepCount 일 때 (length + 1 - keepCount) 개 반환.
 export function deletionsRequiredForNewBackup(

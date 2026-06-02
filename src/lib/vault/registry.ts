@@ -101,9 +101,3 @@ export function renameVault(id: string, name: string): void {
   if (!trimmed) return;
   writeVaults(getVaults().map((v) => (v.id === id ? { ...v, name: trimmed } : v)));
 }
-
-// test 전용 — production code 에선 직접 호출하지 말 것.
-export const __testing = {
-  VAULTS_KEY,
-  ACTIVE_VAULT_KEY,
-};

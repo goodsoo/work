@@ -666,6 +666,17 @@ export function freshStamp(): string {
   return new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
 }
 
+// trash 파일명 prefix stamp(`YYYY-MM-DDTHH-MM-SS`) → epoch ms. 깨진 stamp 는 0
+// (호출자가 mtime 으로 fallback). routines/.trash, portfolio/.trash 공용.
+export function parseStampToMs(stamp: string): number {
+  const iso = stamp.replace(
+    /^(\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})-(\d{2})$/,
+    "$1T$2:$3:$4",
+  );
+  const t = Date.parse(iso);
+  return Number.isFinite(t) ? t : 0;
+}
+
 export async function restoreFromTrash(
   adapter: VaultAdapter,
   trashPath: string,

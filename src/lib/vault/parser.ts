@@ -8,24 +8,30 @@ export interface VaultFile {
 
 const FRONTMATTER_RE = /^---\s*\n([\s\S]*?)\n---\s*(\n|$)/;
 
-export function parseVaultFile(raw: string): VaultFile {
-  const fmMatch = raw.match(FRONTMATTER_RE);
+// frontmatter 블록만 파싱. body 는 raw slice 그대로 (개행 trim 안 함) — 소비자마다
+// body 처리(루틴 로그 / 포트폴리오 H2 split / 메모 본문)가 달라 정리는 각자 한다.
+// parseVaultFile 은 여기에 메모 본문용 앞뒤 개행 trim 을 얹은 것.
+export function splitFrontmatter(raw: string): {
+  frontmatter: Record<string, unknown>;
+  body: string;
+} {
+  const m = raw.match(FRONTMATTER_RE);
+  if (!m) return { frontmatter: {}, body: raw };
   let frontmatter: Record<string, unknown> = {};
-  let body = raw;
-
-  if (fmMatch) {
-    try {
-      const parsed = yaml.load(fmMatch[1], { schema: yaml.JSON_SCHEMA });
-      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-        frontmatter = parsed as Record<string, unknown>;
-      }
-    } catch {
-      // 손상된 frontmatter — empty object 로 fallback. raw 는 그대로 보존.
-      frontmatter = {};
+  try {
+    const parsed = yaml.load(m[1], { schema: yaml.JSON_SCHEMA });
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      frontmatter = parsed as Record<string, unknown>;
     }
-    body = raw.slice(fmMatch[0].length);
+  } catch {
+    // 손상된 frontmatter — empty object 로 fallback. raw 는 그대로 보존.
+    frontmatter = {};
   }
+  return { frontmatter, body: raw.slice(m[0].length) };
+}
 
+export function parseVaultFile(raw: string): VaultFile {
+  const { frontmatter, body } = splitFrontmatter(raw);
   return { raw, frontmatter, body: body.replace(/^\n+/, "").replace(/\n+$/, "") };
 }
 

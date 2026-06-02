@@ -54,12 +54,6 @@ export function recordTaskUpdate(task: Task, patch: TodoUpdate) {
   push({ kind: "update", id: task.id, before, after });
 }
 
-export function clearTodoHistory() {
-  UNDO.length = 0;
-  REDO.length = 0;
-  notify();
-}
-
 // React subscribe — stack 변경 시 component re-render. canUndo/canRedo 등 reactive.
 function useStackVersion() {
   const [, force] = useReducer((x) => x + 1, 0);

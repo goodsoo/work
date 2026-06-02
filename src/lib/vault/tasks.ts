@@ -171,7 +171,7 @@ function stableId(filePath: string, content: string): string {
 
 // 체크박스 status patch: ` ` / `x` / `-` 중 하나로 set. 텍스트 부분은 건드리지 않음.
 // 외부 편집으로 라인 이동했어도 라인 내 패턴만 일치하면 OK.
-export function setTaskCheckChar(
+function setTaskCheckChar(
   raw: string,
   line: number,
   char: " " | "x" | "-" | "D",

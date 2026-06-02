@@ -10,7 +10,8 @@
 
 import yaml from "js-yaml";
 import type { VaultAdapter } from "../lib/vault/adapter";
-import { freshStamp } from "../lib/vault/scan";
+import { splitFrontmatter } from "../lib/vault/parser";
+import { freshStamp, parseStampToMs } from "../lib/vault/scan";
 
 export const ROUTINES_DIR = "routines";
 // 휴지통은 routines 도메인 안 별도 폴더 — 메모 `.trash/` / 포트폴리오 `portfolio/.trash`
@@ -36,8 +37,6 @@ export interface Routine {
   filePath: string;
   mtime: number;
 }
-
-export type RoutineMeta = Routine;
 
 // ─── path / id ─────────────────────────────────────────────────────────────
 
@@ -94,26 +93,6 @@ export function parseRoutineLog(body: string): Set<string> {
 
 // ─── serialize ─────────────────────────────────────────────────────────────
 
-const FRONTMATTER_RE = /^---\s*\n([\s\S]*?)\n---\s*(\n|$)/;
-
-function stripFrontmatter(raw: string): {
-  fm: Record<string, unknown>;
-  body: string;
-} {
-  const m = raw.match(FRONTMATTER_RE);
-  if (!m) return { fm: {}, body: raw };
-  let fm: Record<string, unknown> = {};
-  try {
-    const parsed = yaml.load(m[1], { schema: yaml.JSON_SCHEMA });
-    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-      fm = parsed as Record<string, unknown>;
-    }
-  } catch {
-    fm = {};
-  }
-  return { fm, body: raw.slice(m[0].length) };
-}
-
 function fmStr(v: unknown): string {
   if (typeof v === "string") return v;
   if (typeof v === "number") return String(v);
@@ -145,7 +124,7 @@ export function fileToRoutine(
   raw: string,
   mtime: number,
 ): Routine | null {
-  const { fm, body } = stripFrontmatter(raw);
+  const { frontmatter: fm, body } = splitFrontmatter(raw);
   const id = fmStr(fm.id);
   if (!id) return null;
   const started = fmStr(fm.started);
@@ -371,15 +350,6 @@ export interface TrashedRoutine {
   frontmatter: RoutineFrontmatter;
   log: Set<string>;
   mtime: number;
-}
-
-function parseStampToMs(stamp: string): number {
-  const iso = stamp.replace(
-    /^(\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})-(\d{2})$/,
-    "$1T$2:$3:$4",
-  );
-  const t = Date.parse(iso);
-  return Number.isFinite(t) ? t : 0;
 }
 
 export async function listTrashedRoutines(
