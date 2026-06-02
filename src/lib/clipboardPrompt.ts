@@ -15,11 +15,25 @@ function attendeesToString(v: PromptInput["attendees"]): string {
   return v;
 }
 
-const PROMPT_HEADER = `다음 메모를 정리해주세요.
+// 요약 템플릿 — 출력 형식(### 섹션들) + 규칙만 상황별로 바꾼다. 입력 파이프라인
+// (메타/메모/음성 기록 합성)은 공통이라, 참석자 없는 강의·음성 기록 없는 작업 로그에도
+// 같은 흐름이 빈 섹션 없이 적응한다. 저장은 코드 프리셋 (vault 승격은 보류).
+export interface SummaryTemplate {
+  id: string; // 'meeting' | 'work' | 'lecture'
+  label: string; // 모달 칩 라벨
+  description: string; // 칩 선택 시 보여줄 한 줄 소개
+  intro: string; // 인트로 1줄 (meeting 만 "다음 메모를", 나머지 "다음 내용을")
+  format: string; // 출력 형식 fenced 블록 안의 ### 섹션들
+  rule: string; // 규칙 1줄
+}
 
-## 출력 형식
-\`\`\`
-### 논의 사항
+export const SUMMARY_TEMPLATES: SummaryTemplate[] = [
+  {
+    id: "meeting",
+    label: "회의록",
+    description: "회의 논의·결정·할 일을 정리합니다.",
+    intro: "다음 메모를 정리해주세요.",
+    format: `### 논의 사항
 - 항목1
 - 항목2
 
@@ -28,12 +42,71 @@ const PROMPT_HEADER = `다음 메모를 정리해주세요.
 
 ### 액션 아이템
 - [담당자] 할 일 — 기한
+
+### 기타
+- 본 안건과 무관하지만 알아둘 내용`,
+    rule: "규칙: 메모에 있는 정보를 우선하고, 음성 기록(transcript)은 디테일 보조. 충돌 시 메모 우선. 본 안건과 무관하지만 알아둘 내용은 '기타' 에 모읍니다. 빈 섹션은 생략.",
+  },
+  {
+    id: "work",
+    label: "작업 요약",
+    description: "한 일·결과·다음 할 일로 작업을 회고합니다.",
+    intro: "다음 내용을 정리해주세요.",
+    format: `### 한 일
+- 항목1
+- 항목2
+
+### 결과
+- 배운 점, 막힌 점
+
+### 다음 할 일
+- 항목1
+
+### 기타
+- 본 작업과 무관하지만 알아둘 내용`,
+    rule: "규칙: 주어진 내용과 음성 기록을 종합합니다. 본 작업과 무관하지만 알아둘 내용은 '기타' 에 모읍니다. 빈 섹션은 생략.",
+  },
+  {
+    id: "lecture",
+    label: "세미나·강의",
+    description: "핵심 개념·주요 내용·적용점으로 정리합니다.",
+    intro: "다음 내용을 정리해주세요.",
+    format: `### 핵심 개념
+- 항목1
+- 항목2
+
+### 주요 내용
+- 항목1
+
+### 적용점
+- 내 일에 어떻게 쓸지
+
+### 기타
+- 본 주제와 무관하지만 알아둘 내용`,
+    rule: "규칙: 주어진 내용과 음성 기록을 종합합니다. 본 주제와 무관하지만 알아둘 내용은 '기타' 에 모읍니다. 빈 섹션은 생략.",
+  },
+];
+
+export const DEFAULT_SUMMARY_TEMPLATE_ID = "meeting";
+
+function buildPromptHeader(templateId: string): string {
+  const tpl =
+    SUMMARY_TEMPLATES.find((t) => t.id === templateId) ?? SUMMARY_TEMPLATES[0];
+  return `${tpl.intro}
+
+## 출력 형식
+\`\`\`
+${tpl.format}
 \`\`\`
 
-규칙: 메모에 있는 정보를 우선하고, 음성 기록(transcript)은 디테일 보조. 충돌 시 메모 우선. 빈 섹션은 생략.`;
+${tpl.rule}`;
+}
 
-export function buildClaudePrompt(input: PromptInput): string {
-  const parts: string[] = [PROMPT_HEADER];
+export function buildClaudePrompt(
+  input: PromptInput,
+  templateId: string = DEFAULT_SUMMARY_TEMPLATE_ID,
+): string {
+  const parts: string[] = [buildPromptHeader(templateId)];
 
   const metaLines: string[] = [];
   if (input.title) metaLines.push(`제목: ${input.title}`);
