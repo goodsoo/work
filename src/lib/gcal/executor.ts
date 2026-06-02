@@ -27,7 +27,9 @@ export class GcalNotReadyError extends Error {
   }
 }
 
-function localTimeZone(): string {
+// IANA 로컬 tz (예: "Asia/Seoul"). push(이벤트 생성) 시 dateTime 에 부착하고,
+// fetchRemoteDelta 가 events.list 에 pin 해 import wall-clock 을 로컬과 일치시킨다.
+export function localTimeZone(): string {
   try {
     return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
   } catch {
@@ -64,13 +66,14 @@ interface RemoteFetch {
 async function fetchRemoteDelta(
   calendarId: string,
   syncToken: string | null,
+  timeZone: string,
 ): Promise<RemoteFetch> {
   const items: GcalApiEvent[] = [];
   let nextSyncToken: string | null = null;
   let pageToken: string | undefined;
   try {
     do {
-      const resp = await listEvents(calendarId, { syncToken, pageToken });
+      const resp = await listEvents(calendarId, { syncToken, pageToken, timeZone });
       items.push(...resp.items);
       pageToken = resp.nextPageToken;
       if (resp.nextSyncToken) nextSyncToken = resp.nextSyncToken;
@@ -78,7 +81,7 @@ async function fetchRemoteDelta(
   } catch (e) {
     // syncToken 만료(410) → 토큰 버리고 full resync 1회 재귀.
     if (e instanceof GcalError && e.kind === "Http" && e.httpStatus === 410 && syncToken) {
-      return fetchRemoteDelta(calendarId, null);
+      return fetchRemoteDelta(calendarId, null, timeZone);
     }
     throw e;
   }
@@ -266,8 +269,17 @@ export async function runSync(
     });
   }
 
+  // 3.5) tz import fix 일회성 복구. tz pin 이전 syncToken 은 import 시각이 UTC 로
+  // 읽혀(−9h) 손상된 상태로 reconcile 됐다. 플래그가 없으면(구버전 상태 파일) syncToken
+  // 을 1회 버려 full pull 을 강제 → remote 의 올바른 시각이 snapshot(손상 hash)과 달라
+  // local-upsert 로 자동 교정된다. snapshots 는 보존해야 이 비교가 성립 (지우면
+  // both-changed conflict → LWW 로 손상값이 역push 될 위험).
+  if (!state.tzImportFixApplied) {
+    state = await updateSyncState((s) => ({ ...s, syncToken: null, tzImportFixApplied: true }));
+  }
+
   // 4) 원격 delta (410 → full resync). 인증 만료는 상위로 던져 CTA.
-  const remote = await fetchRemoteDelta(calendarId, state.syncToken);
+  const remote = await fetchRemoteDelta(calendarId, state.syncToken, tz);
 
   // 5) locals: 앵커 + 미삭제 (done/cancelled 포함 → 캘린더에 그대로 유지).
   const locals: LocalSchedule[] = tasks

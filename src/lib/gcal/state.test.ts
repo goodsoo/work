@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   addTombstone,
+  findAdoptableOrphan,
   isGuarded,
   parseSyncState,
   reduceState,
@@ -19,6 +20,8 @@ function sample(): SyncState {
     autoSyncEnabled: true,
     snapshots: { ev1: { hash: "abc", updated: "2026-05-29T09:00:00Z" } },
     tombstones: [{ eventId: "ev9", deletedAt: "2026-05-29T08:00:00Z", pushConfirmed: false }],
+    tzImportFixApplied: true,
+    vaultPath: "/Users/me/Vault",
   };
 }
 
@@ -84,6 +87,21 @@ describe("parseSyncState — 신규 필드", () => {
   it("autoSyncEnabled false 명시 → false", () => {
     expect(parseSyncState(JSON.stringify({ autoSyncEnabled: false })).autoSyncEnabled).toBe(false);
   });
+  it("tzImportFixApplied 누락(구버전 파일) → false (첫 sync 가 1회 복구)", () => {
+    expect(parseSyncState(JSON.stringify({})).tzImportFixApplied).toBe(false);
+  });
+  it("tzImportFixApplied true 명시 → true (재복구 안 함)", () => {
+    expect(parseSyncState(JSON.stringify({ tzImportFixApplied: true })).tzImportFixApplied).toBe(true);
+  });
+  it("emptySyncState(신규 vault) → tzImportFixApplied true (손상 이력 없음)", () => {
+    expect(emptySyncState().tzImportFixApplied).toBe(true);
+  });
+  it("vaultPath 누락 → null", () => {
+    expect(parseSyncState(JSON.stringify({})).vaultPath).toBeNull();
+  });
+  it("vaultPath 보존", () => {
+    expect(parseSyncState(JSON.stringify({ vaultPath: "/a/b" })).vaultPath).toBe("/a/b");
+  });
   it("calendarName round-trip", () => {
     expect(parseSyncState(JSON.stringify({ calendarName: "내 캘린더" })).calendarName).toBe("내 캘린더");
   });
@@ -114,5 +132,32 @@ describe("reduceState", () => {
     const before = sample();
     const after = reduceState(before, { kind: "push-delete", eventId: "ev9" });
     expect(after).toEqual(before);
+  });
+});
+
+describe("findAdoptableOrphan — vault id 변경 시 고아 상태 입양 대상 선택", () => {
+  const target = "gcal-sync-NEWID.json";
+  it("같은 vaultPath 의 고아 파일을 찾는다", () => {
+    const cands = [
+      { name: "gcal-sync-OLDID.json", vaultPath: "/Users/me/AGR" },
+      { name: "gcal-sync-OTHER.json", vaultPath: "/Users/me/Other" },
+    ];
+    expect(findAdoptableOrphan(cands, "/Users/me/AGR", target)).toBe("gcal-sync-OLDID.json");
+  });
+  it("자기 자신(target)은 제외", () => {
+    const cands = [{ name: target, vaultPath: "/Users/me/AGR" }];
+    expect(findAdoptableOrphan(cands, "/Users/me/AGR", target)).toBeNull();
+  });
+  it("vaultPath stamp 없는 옛 파일은 입양 불가 (null)", () => {
+    const cands = [{ name: "gcal-sync-OLDID.json", vaultPath: null }];
+    expect(findAdoptableOrphan(cands, "/Users/me/AGR", target)).toBeNull();
+  });
+  it("path 불일치면 입양 안 함", () => {
+    const cands = [{ name: "gcal-sync-OLDID.json", vaultPath: "/Users/me/Different" }];
+    expect(findAdoptableOrphan(cands, "/Users/me/AGR", target)).toBeNull();
+  });
+  it("gcal-sync- 접두사 아닌 파일은 무시", () => {
+    const cands = [{ name: "vaults.json", vaultPath: "/Users/me/AGR" }];
+    expect(findAdoptableOrphan(cands, "/Users/me/AGR", target)).toBeNull();
   });
 });

@@ -23,6 +23,7 @@ import {
 } from "../../lib/gcal/transport";
 import { loadSyncState, updateSyncState } from "../../lib/gcal/stateStore";
 import { createCalendar, patchCalendar } from "../../lib/gcal/api";
+import { localTimeZone } from "../../lib/gcal/executor";
 
 const DEFAULT_CALENDAR_NAME = "goodsoob";
 
@@ -121,7 +122,7 @@ export function GcalSection() {
     setError(null);
     setCreating(true);
     try {
-      const cal = await createCalendar(name);
+      const cal = await createCalendar(name, localTimeZone());
       await updateSyncState((s) => ({
         ...s,
         calendarId: cal.id,
