@@ -67,9 +67,30 @@ export function parseSyncState(raw: string): SyncState {
     authState,
     // 누락(구버전 상태 파일) 시 default true — 연동돼 있으면 자동 동기화가 기본.
     autoSyncEnabled: o.autoSyncEnabled === false ? false : true,
+    // 기존 상태 파일엔 이 키가 없다(undefined) → false 로 떨어져 tz fix 후 첫 sync 가
+    // 1회 full pull 복구를 돌린다. 이미 복구한 파일만 true 로 저장돼 재실행을 막는다.
+    tzImportFixApplied: o.tzImportFixApplied === true,
+    vaultPath: typeof o.vaultPath === "string" ? o.vaultPath : null,
     snapshots,
     tombstones,
   };
+}
+
+// 고아 상태파일 입양 대상 선택 (순수). vault id 가 remove+재등록으로 바뀌면 옛
+// id-keyed 상태가 고아가 된다. 같은 vaultPath 를 stamp 한 다른 gcal-sync-*.json 을
+// 찾아 현재 id 의 파일명으로 rename 하면 연결·snapshot·tombstone 이 살아난다.
+// targetName(현재 id 파일) 자신과 stamp 없는 옛 파일은 제외. 여러 후보면 첫 매치.
+export function findAdoptableOrphan(
+  candidates: Array<{ name: string; vaultPath: string | null }>,
+  activeVaultPath: string,
+  targetName: string,
+): string | null {
+  for (const c of candidates) {
+    if (c.name === targetName) continue;
+    if (!c.name.startsWith("gcal-sync-") || !c.name.endsWith(".json")) continue;
+    if (c.vaultPath && c.vaultPath === activeVaultPath) return c.name;
+  }
+  return null;
 }
 
 // ─── 묘비 CRUD (순수) ────────────────────────────────────────────────────────

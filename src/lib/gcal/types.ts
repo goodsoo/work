@@ -60,6 +60,14 @@ export interface SyncState {
   // eventId → 스냅샷
   snapshots: Record<string, SyncSnapshot>;
   tombstones: Tombstone[];
+  // tz import fix 일회성 복구 완료 플래그. tz pin 이전엔 import 시각이 UTC 로 읽혀
+  // (−9h) 손상됐다 → fix 적용 후 첫 sync 가 syncToken 을 1회 버려 full pull 을 강제,
+  // remote 의 올바른 시각으로 self-heal 한다. 미설정/false = 아직 복구 안 함.
+  tzImportFixApplied?: boolean;
+  // 이 상태가 속한 vault 의 path (저장 시 stamp). vault id 는 remove+재등록 시
+  // 재발급돼 id-keyed 상태파일이 고아가 되는데, path 는 안정적이라 같은 path 의 고아
+  // 상태를 현재 id 로 자동 입양(rename)하는 앵커로 쓴다. 미설정 = 옛 파일(입양 불가).
+  vaultPath?: string | null;
 }
 
 export function emptySyncState(): SyncState {
@@ -72,6 +80,9 @@ export function emptySyncState(): SyncState {
     autoSyncEnabled: true,
     snapshots: {},
     tombstones: [],
+    // 새 vault 는 손상 이력이 없으니 복구 불필요 → true 로 시작 (full pull 강제 안 함).
+    tzImportFixApplied: true,
+    vaultPath: null,
   };
 }
 

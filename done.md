@@ -6,6 +6,14 @@
 
 ## 2026-06-02
 
+### PR #68 — gcal import 시각 타임존 보정 + vault 재등록 연결 자동 복구
+
+- **한 줄 임팩트**: 구글 캘린더 일정 시간·연결이 안 깨집니다
+- dogfooding 중 발견한 gcal 신뢰성 버그 2건 일괄 수정.
+- **시간 −9h 어긋남**: import 경로가 `events.list` 에 `timeZone` 을 안 줘서 Google 이 캘린더 기본 tz(API 생성 캘린더는 UTC)로 dateTime 을 반환 → `splitDateTime` 이 UTC wall-clock 을 그대로 읽어 가져온 일정 시각이 전부 −9h(KST) 어긋났다. push 는 tz 명시라 정상이라 read 경로만 비대칭. fix: `listEvents` timeZone pin + `createCalendar` 생성 tz + `tzImportFixApplied` 플래그로 첫 sync 1회 full pull self-heal(snapshot 보존).
+- **연결 손실**: gcal 상태파일이 불안정한 vault id 로 키잉돼, vault 제거+재등록(id 재발급) 시 상태가 고아 → "연결 해제 + 새 캘린더만 생성" 증상. fix: `SyncState.vaultPath` stamp + load 시 id-keyed 파일 없으면 같은 path 고아 상태를 현재 id 로 자동 입양(`findAdoptableOrphan`).
+- 테스트 +12 (timeZone pin / tzImportFixApplied / vaultPath / 입양 매칭).
+
 ### PR #67 — 요약 상황별 템플릿 (회의록 / 작업 / 강의)
 
 - **한 줄 임팩트**: 칩 하나로 상황에 맞는 요약 형식 전환

@@ -1,7 +1,7 @@
 import { appDataDir, join } from "@tauri-apps/api/path";
-import { exists, mkdir, readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
-import { getActiveVaultId } from "../vault/registry";
-import { parseSyncState, serializeSyncState } from "./state";
+import { exists, mkdir, readDir, readTextFile, rename, writeTextFile } from "@tauri-apps/plugin-fs";
+import { getActiveVault, getActiveVaultId } from "../vault/registry";
+import { findAdoptableOrphan, parseSyncState, serializeSyncState } from "./state";
 import { emptySyncState, type SyncState } from "./types";
 
 // 기기 로컬 sync 상태 파일 — appDataDir/gcal-sync-<vaultId>.json.
@@ -23,12 +23,67 @@ async function statePath(): Promise<string> {
   return join(await appDataDir(), stateFileName(getActiveVaultId()));
 }
 
+// 현재 vault 의 path 를 state 에 stamp. vault id 가 remove+재등록으로 바뀌면 옛
+// id-keyed 상태가 고아가 되는데, 이 path 앵커가 있어야 adoptOrphan 이 같은 vault 의
+// 고아를 찾아 입양할 수 있다.
+function stampVaultPath(state: SyncState): SyncState {
+  const path = getActiveVault()?.path;
+  return path ? { ...state, vaultPath: path } : state;
+}
+
+// 고아 상태 입양 — vault id 가 바뀌어 현재 id 의 상태파일이 없을 때, 같은 vaultPath 를
+// stamp 한 옛 파일을 현재 id 파일명으로 rename 해 연결·snapshot·tombstone 을 살린다.
+// vault id 당 1회 (deduped). best-effort — 실패해도 sync 흐름은 빈 상태로 진행한다.
+const adoptionByVault = new Map<string, Promise<void>>();
+
+function ensureAdopted(): Promise<void> {
+  const id = getActiveVaultId();
+  if (!id) return Promise.resolve();
+  let p = adoptionByVault.get(id);
+  if (!p) {
+    p = adoptOrphan(id).catch(() => {});
+    adoptionByVault.set(id, p);
+  }
+  return p;
+}
+
+async function adoptOrphan(vaultId: string): Promise<void> {
+  const dir = await appDataDir();
+  const targetName = stateFileName(vaultId);
+  const targetPath = await join(dir, targetName);
+  if (await exists(targetPath)) return; // 현재 id 파일 이미 있음 → 입양 불필요
+  const vault = getActiveVault();
+  if (!vault?.path) return;
+
+  let entries;
+  try {
+    entries = await readDir(dir);
+  } catch {
+    return; // appDataDir 없음 = 첫 실행, 고아도 없음
+  }
+  const candidates: Array<{ name: string; vaultPath: string | null }> = [];
+  for (const e of entries) {
+    if (!e.isFile || !e.name) continue;
+    if (!e.name.startsWith("gcal-sync-") || !e.name.endsWith(".json")) continue;
+    try {
+      const parsed = parseSyncState(await readTextFile(await join(dir, e.name)));
+      candidates.push({ name: e.name, vaultPath: parsed.vaultPath ?? null });
+    } catch {
+      /* 못 읽는 후보는 skip */
+    }
+  }
+  const orphan = findAdoptableOrphan(candidates, vault.path, targetName);
+  if (!orphan) return;
+  await rename(await join(dir, orphan), targetPath);
+}
+
 // 직렬화는 단일 프로세스·단일 기기라 mutex 1개로 write 직렬화 (read-modify-write
 // 사이 race 차단). 같은 turn 에 load→save 가 겹쳐도 안전.
 let writeChain: Promise<unknown> = Promise.resolve();
 
 export async function loadSyncState(): Promise<SyncState> {
   try {
+    await ensureAdopted(); // 옛 vault id 의 고아 상태를 현재 id 로 입양 (1회/vault)
     const path = await statePath();
     if (!(await exists(path))) return emptySyncState();
     return parseSyncState(await readTextFile(path));
@@ -40,11 +95,12 @@ export async function loadSyncState(): Promise<SyncState> {
 
 export async function saveSyncState(state: SyncState): Promise<void> {
   const run = async () => {
+    await ensureAdopted();
     const dir = await appDataDir();
     if (!(await exists(dir))) {
       await mkdir(dir, { recursive: true });
     }
-    await writeTextFile(await statePath(), serializeSyncState(state));
+    await writeTextFile(await statePath(), serializeSyncState(stampVaultPath(state)));
   };
   // 이전 write 가 끝난 뒤 이어서 (순차 보장).
   writeChain = writeChain.then(run, run);
@@ -63,7 +119,7 @@ export async function updateSyncState(
     if (!(await exists(dir))) {
       await mkdir(dir, { recursive: true });
     }
-    await writeTextFile(await statePath(), serializeSyncState(next));
+    await writeTextFile(await statePath(), serializeSyncState(stampVaultPath(next)));
     return next;
   };
   writeChain = writeChain.then(run, run);
