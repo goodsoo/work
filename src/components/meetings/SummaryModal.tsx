@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { Sparkles, Clipboard, Check, RotateCw, X } from "lucide-react";
 import {
   buildClaudePrompt,
+  SUMMARY_TEMPLATES,
+  DEFAULT_SUMMARY_TEMPLATE_ID,
   type PromptInput,
 } from "../../lib/clipboardPrompt";
 import {
@@ -47,6 +49,20 @@ function shortModel(model?: string): string | null {
 // 40초 넘게 걸리면 "느린 게 정상일 수 있다"는 안내를 띄울 임계.
 const SLOW_HINT_MS = 40_000;
 
+// 템플릿 선택은 전역 last-used (메모별 X — v1). 사이드바 정렬(goodsoob:meetingSort)과
+// 동일한 localStorage 캐시 패턴.
+const TEMPLATE_STORAGE_KEY = "goodsoob:summaryTemplate";
+
+function loadTemplateId(): string {
+  try {
+    const v = localStorage.getItem(TEMPLATE_STORAGE_KEY);
+    if (v && SUMMARY_TEMPLATES.some((t) => t.id === v)) return v;
+  } catch {
+    // localStorage 접근 불가 — default 로.
+  }
+  return DEFAULT_SUMMARY_TEMPLATE_ID;
+}
+
 function formatElapsed(ms: number): string {
   const total = Math.floor(ms / 1000);
   const m = Math.floor(total / 60);
@@ -56,6 +72,9 @@ function formatElapsed(ms: number): string {
 
 export function SummaryModal({ open, onClose, promptInput, onApply }: Props) {
   const [tab, setTab] = useState<Tab>("auto");
+
+  // 템플릿 선택 — 자동 요약·붙여넣기 두 탭 공통 (프롬프트 자체를 바꾸므로).
+  const [templateId, setTemplateId] = useState<string>(loadTemplateId);
 
   // 자동 요약 탭 상태. 호출은 "요약 생성" 버튼 클릭으로만.
   const [requesting, setRequesting] = useState(false);
@@ -98,6 +117,25 @@ export function SummaryModal({ open, onClose, promptInput, onApply }: Props) {
     return () => clearInterval(id);
   }, [requesting]);
 
+  // 칩 변경 → localStorage 저장. 자동 요약 결과가 이미 있으면 형식이 달라지므로
+  // suggestion·진행 표시 일체 reset (stale "출력 N자" 잔재 방지). 진행 중엔 disable.
+  function changeTemplate(id: string) {
+    if (requesting || id === templateId) return;
+    setTemplateId(id);
+    try {
+      localStorage.setItem(TEMPLATE_STORAGE_KEY, id);
+    } catch {
+      // 저장 실패해도 세션 내 선택은 유지.
+    }
+    setSuggestion(null);
+    setStats(null);
+    setChars(0);
+    setLiveTokens(undefined);
+    setLiveModel(undefined);
+    setElapsedMs(0);
+    setAutoError(null);
+  }
+
   async function runAuto() {
     setRequesting(true);
     setAutoError(null);
@@ -109,7 +147,7 @@ export function SummaryModal({ open, onClose, promptInput, onApply }: Props) {
     startRef.current = Date.now();
     setElapsedMs(0);
 
-    const ctrl = runClaudeStream(buildClaudePrompt(promptInput), (p) => {
+    const ctrl = runClaudeStream(buildClaudePrompt(promptInput, templateId), (p) => {
       setChars(p.chars);
       if (p.outputTokens != null) setLiveTokens(p.outputTokens);
       if (p.model) setLiveModel(p.model);
@@ -173,6 +211,9 @@ export function SummaryModal({ open, onClose, promptInput, onApply }: Props) {
     onClose();
   }
 
+  const activeTemplate =
+    SUMMARY_TEMPLATES.find((t) => t.id === templateId) ?? SUMMARY_TEMPLATES[0];
+
   const tokenLabel = liveTokens != null ? `${liveTokens.toLocaleString()}토큰` : null;
   const liveModelLabel = shortModel(liveModel);
   const statsModelLabel = shortModel(stats?.model);
@@ -218,6 +259,26 @@ export function SummaryModal({ open, onClose, promptInput, onApply }: Props) {
               onClick={() => setTab("paste")}
             />
           </div>
+          {/* 템플릿 칩 row — 두 탭 공통 (프롬프트 출력 형식 전환) */}
+          <div className="flex flex-wrap items-center gap-1.5 px-5 pt-3">
+            <Text variant="caption" color="muted" as="span" className="mr-0.5">
+              템플릿
+            </Text>
+            {SUMMARY_TEMPLATES.map((t) => (
+              <TemplateChip
+                key={t.id}
+                label={t.label}
+                active={t.id === templateId}
+                disabled={requesting}
+                onClick={() => changeTemplate(t.id)}
+              />
+            ))}
+          </div>
+          {activeTemplate ? (
+            <Text variant="caption" color="muted" as="p" className="px-5 pt-1.5">
+              {activeTemplate.description}
+            </Text>
+          ) : null}
         </div>
 
         {/* 자동 요약 탭 */}
@@ -382,7 +443,7 @@ export function SummaryModal({ open, onClose, promptInput, onApply }: Props) {
                   2) 받은 응답을 다시 아래 영역에 붙여넣고 [적용] 을 누르세요.
                 </Text>
                 <ClipPromptButton
-                  buildPrompt={() => buildClaudePrompt(promptInput)}
+                  buildPrompt={() => buildClaudePrompt(promptInput, templateId)}
                   label="프롬프트 복사"
                 />
               </div>
@@ -442,6 +503,36 @@ export function SummaryModal({ open, onClose, promptInput, onApply }: Props) {
         )}
       </div>
     </Modal>
+  );
+}
+
+function TemplateChip({
+  label,
+  active,
+  disabled,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-pressed={active}
+      className="rounded-full px-2.5 py-1 text-[12px] transition disabled:cursor-not-allowed disabled:opacity-50"
+      style={{
+        backgroundColor: active ? "var(--bg-surface-hover)" : "transparent",
+        border: `1px solid ${active ? "var(--border-default)" : "var(--border-subtle)"}`,
+        color: active ? "var(--text-primary)" : "var(--text-secondary)",
+        fontWeight: active ? 600 : 400,
+      }}
+    >
+      {label}
+    </button>
   );
 }
 
