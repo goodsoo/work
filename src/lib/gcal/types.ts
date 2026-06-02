@@ -68,6 +68,10 @@ export interface SyncState {
   // 재발급돼 id-keyed 상태파일이 고아가 되는데, path 는 안정적이라 같은 path 의 고아
   // 상태를 현재 id 로 자동 입양(rename)하는 앵커로 쓴다. 미설정 = 옛 파일(입양 불가).
   vaultPath?: string | null;
+  // 일회성 대량 push 승인. 대량 push 가드(MAX_BULK_PUSH_MUTATIONS 초과)를 다음 sync
+  // 1회만 우회한다 — 사용자가 명시 승인한 대량 복구(예: tz 손상 일괄 재push)용. runSync
+  // 가 소비 후 false 로 되돌린다. 기본 미설정(=가드 정상 작동).
+  allowBulkPushOnce?: boolean;
 }
 
 export function emptySyncState(): SyncState {
@@ -83,6 +87,7 @@ export function emptySyncState(): SyncState {
     // 새 vault 는 손상 이력이 없으니 복구 불필요 → true 로 시작 (full pull 강제 안 함).
     tzImportFixApplied: true,
     vaultPath: null,
+    allowBulkPushOnce: false,
   };
 }
 

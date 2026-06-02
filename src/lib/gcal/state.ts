@@ -71,6 +71,7 @@ export function parseSyncState(raw: string): SyncState {
     // 1회 full pull 복구를 돌린다. 이미 복구한 파일만 true 로 저장돼 재실행을 막는다.
     tzImportFixApplied: o.tzImportFixApplied === true,
     vaultPath: typeof o.vaultPath === "string" ? o.vaultPath : null,
+    allowBulkPushOnce: o.allowBulkPushOnce === true,
     snapshots,
     tombstones,
   };
