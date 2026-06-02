@@ -75,3 +75,58 @@ describe("useStateHistory cacheKey transition", () => {
     expect(result.current.canUndo).toBe(true);
   });
 });
+
+describe("useStateHistory LRU eviction", () => {
+  // Memory guard: the module cache used to grow unbounded — every opened memo's
+  // full-document undo stack stayed resident forever. With an LRU cap, a memo
+  // not touched for many switches gets evicted and falls back to `initial`.
+  it("evicts the least-recently-used key once many keys are opened", () => {
+    const EDITED: Doc = { title: "오래된 메모", body: "편집됨" };
+    const KEY = (i: number) => `lru-${i}`;
+
+    const { result, rerender } = renderHook(
+      ({ cacheKey, initial }: { cacheKey: string; initial: Doc }) =>
+        useStateHistory<Doc>({ cacheKey, initial }),
+      { initialProps: { cacheKey: KEY(0), initial: REAL } },
+    );
+
+    // Edit the first memo, then open 19 more (each switch saves the outgoing to
+    // cache). 20 distinct keys » the cap → the very first must be evicted.
+    act(() => {
+      result.current.set(EDITED);
+      result.current.flush();
+    });
+    for (let i = 1; i < 20; i++) {
+      rerender({ cacheKey: KEY(i), initial: EMPTY });
+    }
+
+    // Return to the long-untouched first memo: evicted → shows `initial`, no undo.
+    rerender({ cacheKey: KEY(0), initial: REAL });
+    expect(result.current.value).toEqual(REAL);
+    expect(result.current.canUndo).toBe(false);
+  });
+
+  it("keeps recently-used keys restorable", () => {
+    const RECENT: Doc = { title: "최근", body: "방금 편집" };
+    const KEY = (i: number) => `lru-recent-${i}`;
+
+    const { result, rerender } = renderHook(
+      ({ cacheKey, initial }: { cacheKey: string; initial: Doc }) =>
+        useStateHistory<Doc>({ cacheKey, initial }),
+      { initialProps: { cacheKey: KEY(0), initial: EMPTY } },
+    );
+
+    // Open a few, edit the last one, switch away once, then return to it.
+    for (let i = 1; i < 5; i++) {
+      rerender({ cacheKey: KEY(i), initial: EMPTY });
+    }
+    act(() => {
+      result.current.set(RECENT);
+      result.current.flush();
+    });
+    rerender({ cacheKey: KEY(99), initial: EMPTY });
+    rerender({ cacheKey: KEY(4), initial: EMPTY });
+    expect(result.current.value).toEqual(RECENT);
+    expect(result.current.canUndo).toBe(true);
+  });
+});

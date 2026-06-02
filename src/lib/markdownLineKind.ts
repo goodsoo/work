@@ -253,15 +253,43 @@ function isTablePipeRow(full: string, lineStart: number, line: string): boolean 
   return false;
 }
 
+// 단건 줄 분류. fence 내부 여부를 그 자리에서 한 번 계산 (isInsideFencedCode 는
+// O(pos)). 줄마다 호출하면 O(n²) 이므로 문서 전체는 inferLineKinds 를 쓸 것.
 export function inferLineKind(full: string, pos: number): LineKind {
   const lineStart = full.lastIndexOf("\n", pos - 1) + 1;
-  const nextNewline = full.indexOf("\n", pos);
+  return inferLineKindCore(full, lineStart, isInsideFencedCode(full, pos));
+}
+
+// 문서 전체를 한 번의 forward pass 로 분류. fence 상태를 누적해 줄별로 주입 —
+// 줄마다 isInsideFencedCode 로 처음부터 재스캔하던 O(n²) 를 O(n) 으로.
+// (그 외 backward-scan 헬퍼들은 가장 가까운 빈 줄에서 멈춰 단락 길이로 bound 됨.)
+export function inferLineKinds(full: string): LineKind[] {
+  const lines = full.split("\n");
+  const out: LineKind[] = [];
+  let lineStart = 0;
+  let open = false; // 이 줄 시작 시점에 열린 코드펜스 안인지
+  for (const line of lines) {
+    out.push(inferLineKindCore(full, lineStart, open));
+    if (/^(```|~~~)/.test(line)) open = !open;
+    lineStart += line.length + 1;
+  }
+  return out;
+}
+
+// 한 줄 분류 본체. insideFence 는 호출자가 주입 (단건=isInsideFencedCode,
+// 배치=forward-pass 누적값). lineStart = 줄 시작 offset.
+function inferLineKindCore(
+  full: string,
+  lineStart: number,
+  insideFence: boolean,
+): LineKind {
+  const nextNewline = full.indexOf("\n", lineStart);
   const line = full.slice(
     lineStart,
     nextNewline === -1 ? undefined : nextNewline,
   );
 
-  if (isInsideFencedCode(full, pos)) return { type: "code-block" };
+  if (insideFence) return { type: "code-block" };
   if (/^(```|~~~)/.test(line)) return { type: "code-fence" };
 
   // Setext heading
