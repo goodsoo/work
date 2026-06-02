@@ -6,6 +6,15 @@
 
 ## 2026-06-02
 
+### PR #69 — gcal sync 안전장치 3종 (손상값 역push 방지)
+
+- **한 줄 임팩트**: 동기화가 진짜 캘린더를 망가뜨리지 못하게 막음
+- PR #68 의 `tzImportFixApplied` 자동 복구가 snapshot/로컬 불일치 상태에서 양방향 reconcile 을 타, 손상된 로컬 시각(−9h)을 Google 로 역push 해 실제 캘린더 일정을 망가뜨린 사고(dogfood 중 발견)에 대한 hotfix.
+- **#1 자동 복구 제거**: 데이터 복구는 pull-only/순수 로컬로만. 양방향 sync 경로로 복구하면 push 로 새는 구조라 경로 자체 폐기.
+- **#2 대량 push 가드**: 한 sync 가 기존 Google 이벤트를 10개 초과 변경/삭제하려 하면 적용 전 `GcalBulkChangeError` 로 중단 (정상은 1~2개; 타임존 일괄 시프트 등 손상 시그니처를 실데이터 닿기 전 차단). push-create(신규)는 제외.
+- **#3 반복 일정 push 가드**: import 에만 있던 반복 제외를 push 에도 대칭 적용. 반복 인스턴스에 단일 PUT/DELETE 금지 (Google 반복 규칙 파손 방지).
+- 테스트 +5. 손상된 실데이터(로컬 inbox.md +9h, Google 비반복 일정 push 교정)는 백업 기반으로 별도 복구 완료.
+
 ### PR #68 — gcal import 시각 타임존 보정 + vault 재등록 연결 자동 복구
 
 - **한 줄 임팩트**: 구글 캘린더 일정 시간·연결이 안 깨집니다
