@@ -37,8 +37,6 @@ export interface Routine {
   mtime: number;
 }
 
-export type RoutineMeta = Routine;
-
 // ─── path / id ─────────────────────────────────────────────────────────────
 
 export function routinePath(name: string): string {

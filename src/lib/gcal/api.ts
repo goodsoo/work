@@ -24,11 +24,6 @@ export async function createCalendar(
   });
 }
 
-// 캘린더 메타 조회. 전용 캘린더가 Google 에서 삭제됐는지(404) 확인용.
-export async function getCalendar(calendarId: string): Promise<GcalCalendar> {
-  return gcalRequest<GcalCalendar>("GET", `/calendars/${encodeURIComponent(calendarId)}`);
-}
-
 // 전용 캘린더 이름 변경 (summary patch). calendar.app.created scope 로 만든
 // 캘린더만 대상 — 개인 캘린더는 구조적으로 못 건드림.
 export async function patchCalendar(calendarId: string, summary: string): Promise<GcalCalendar> {

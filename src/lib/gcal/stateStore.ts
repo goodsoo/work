@@ -93,20 +93,6 @@ export async function loadSyncState(): Promise<SyncState> {
   }
 }
 
-export async function saveSyncState(state: SyncState): Promise<void> {
-  const run = async () => {
-    await ensureAdopted();
-    const dir = await appDataDir();
-    if (!(await exists(dir))) {
-      await mkdir(dir, { recursive: true });
-    }
-    await writeTextFile(await statePath(), serializeSyncState(stampVaultPath(state)));
-  };
-  // 이전 write 가 끝난 뒤 이어서 (순차 보장).
-  writeChain = writeChain.then(run, run);
-  return writeChain as Promise<void>;
-}
-
 // load → patch → save 헬퍼. 동시 호출 시에도 writeChain 으로 직렬화되지만,
 // read-modify-write 원자성을 위해 최신 state 를 chain 안에서 다시 읽는다.
 export async function updateSyncState(
