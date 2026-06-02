@@ -1344,9 +1344,9 @@ export function CalendarDayPanel({
                         onClick={() => handleToggle(t)}
                       />
                       <span
-                        className={`min-w-0 flex-1 truncate ${t.done ? "line-through" : ""}`}
+                        className={`min-w-0 flex-1 truncate ${t.done || t.cancelled ? "line-through" : ""}`}
                         style={{
-                          color: t.done
+                          color: t.done || t.cancelled
                             ? "var(--text-muted)"
                             : "var(--text-primary)",
                         }}
