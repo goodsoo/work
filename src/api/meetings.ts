@@ -11,6 +11,7 @@ import {
   meetingToMainRaw,
   meetingToSummaryRaw,
   meetingToTranscriptRaw,
+  moveFolder as _moveFolder,
   moveMeetingToFolder,
   normalizeFolderPath,
   patchMeetingFrontmatter,
@@ -460,6 +461,16 @@ export async function renameMeetingFolder(
   newName: string,
 ): Promise<string> {
   return _renameMeetingFolder(adapter, oldFolder, newName);
+}
+
+// 폴더를 다른 폴더 아래로 이동 (위계 이동). 안 메모·sub-folder 통째 따라옴.
+// destParent "" = root. 충돌 시 TitleConflictError, cycle 시 일반 Error throw.
+export async function moveMeetingFolder(
+  adapter: VaultAdapter,
+  srcFolder: string,
+  destParent: string,
+): Promise<string> {
+  return _moveFolder(adapter, srcFolder, destParent);
 }
 
 // re-export — watcher / 외부 호환 + sidebar 트리 빌더

@@ -417,6 +417,46 @@ export async function renameMeetingFolder(
   return newFull;
 }
 
+// 폴더 자체를 다른 폴더 아래로 이동 — 위계 이동. rename(마지막 segment 만 바꿈)과
+// 달리 부모 path 가 바뀐다. 안 메모·sub-folder 는 disk rename (POSIX mv) 으로 통째
+// 따라옴 (adapter.rename 의 디렉토리 케이스). 이름은 유지.
+// srcFolder: 옮길 폴더 (notes-relative, "work" 또는 "work/2026").
+// destParent: 새 부모 폴더 (notes-relative, "" = root).
+// 반환: 새 vault-relative path ("notes/personal/work").
+// 가드: root 이동 X / 자기 자신·자손으로 이동 X (cycle) / 대상에 동명 폴더 있으면 throw.
+export async function moveFolder(
+  adapter: VaultAdapter,
+  srcFolder: string,
+  destParent: string,
+): Promise<string> {
+  const src = normalizeFolderPath(srcFolder);
+  if (src === "") {
+    throw new Error("root 폴더는 이동할 수 없습니다");
+  }
+  const dest = normalizeFolderPath(destParent);
+  // cycle 가드 — 자기 자신 또는 자기 자손 폴더 안으로는 못 옮긴다 (mv 가 부모를
+  // 자식 밑으로 넣는 순환). dest === src 또는 dest 가 src 의 자손.
+  if (dest === src || dest.startsWith(src + "/")) {
+    throw new Error("폴더를 자기 자신이나 하위 폴더로 옮길 수 없습니다");
+  }
+  const name = src.split("/").pop() ?? src;
+  const newRel = dest === "" ? name : `${dest}/${name}`;
+  const oldFull = `notes/${src}`;
+  // 이미 그 부모 안에 있으면 no-op (현재 부모 위로 drop).
+  if (newRel === src) return oldFull;
+  if (!(await adapter.exists(oldFull))) {
+    throw new Error(`folder not found: ${oldFull}`);
+  }
+  const newFull = `notes/${newRel}`;
+  if (await adapter.exists(newFull)) {
+    throw new TitleConflictError(name, newFull);
+  }
+  // 대상 부모 폴더 보장 (Tauri rename 은 부모가 없으면 실패).
+  await adapter.mkdir(dest === "" ? "notes" : `notes/${dest}`);
+  await adapter.rename(oldFull, newFull);
+  return newFull;
+}
+
 // 메인 + 두 sidecar 한 묶음 rename. sidecar 가 없으면 skip.
 export async function renameMeetingFiles(
   adapter: VaultAdapter,

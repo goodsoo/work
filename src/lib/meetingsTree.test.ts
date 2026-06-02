@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { buildMeetingsTree, flattenFolderPaths } from "./meetingsTree";
+import {
+  buildMeetingsTree,
+  canDropFolder,
+  flattenFolderPaths,
+  folderParent,
+} from "./meetingsTree";
 import type { Meeting } from "../api/meetings";
 
 function fakeMeeting(id: string, title: string, mtime = 1000): Meeting {
@@ -120,5 +125,42 @@ describe("flattenFolderPaths", () => {
   it("폴더 0개 → root 만", () => {
     const tree = buildMeetingsTree([fakeMeeting("notes/x.md", "x")]);
     expect(flattenFolderPaths(tree)).toEqual([""]);
+  });
+});
+
+describe("folderParent", () => {
+  it("중첩 → 부모 path", () => {
+    expect(folderParent("work/2026")).toBe("work");
+  });
+  it("최상위 → root('')", () => {
+    expect(folderParent("work")).toBe("");
+  });
+});
+
+describe("canDropFolder", () => {
+  it("다른 폴더 아래로 → 가능", () => {
+    expect(canDropFolder("work", "personal")).toBe(true);
+  });
+  it("root 로 (현재 sub) → 가능", () => {
+    expect(canDropFolder("work/2026", "")).toBe(true);
+  });
+  it("root 폴더 자체는 끌 수 없음", () => {
+    expect(canDropFolder("", "work")).toBe(false);
+  });
+  it("자기 자신 위로 → 불가", () => {
+    expect(canDropFolder("work", "work")).toBe(false);
+  });
+  it("자손 폴더 안으로 → 불가 (cycle)", () => {
+    expect(canDropFolder("work", "work/2026")).toBe(false);
+  });
+  it("현재 부모로 (이미 그 안) → 불가 (no-op)", () => {
+    expect(canDropFolder("work/2026", "work")).toBe(false);
+  });
+  it("최상위 폴더를 root 로 (이미 root) → 불가 (no-op)", () => {
+    expect(canDropFolder("work", "")).toBe(false);
+  });
+  it("이름 prefix 만 겹치는 형제는 자손 아님 → 가능", () => {
+    // "work" 의 자손은 "work/..." 만. "workshop" 은 별개 폴더.
+    expect(canDropFolder("work", "workshop")).toBe(true);
   });
 });
