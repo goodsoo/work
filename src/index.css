@@ -4,6 +4,7 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
+/* DESIGN-SYSTEM:tokens-theme START — managed by goodsoob-design-system, do not edit */
   --font-sans:
     "Pretendard Variable", "Pretendard", -apple-system, BlinkMacSystemFont,
     "Segoe UI", Roboto, sans-serif;
@@ -20,11 +21,13 @@
      등 utility scale 을 사용자 정의로 교체해 raw 자리 utility 가 사라짐. 시맨틱
      명시는 var() 인라인으로 (`style={{ zIndex: "var(--z-modal)" }}`). 본문 자리
      migration 가능. */
+/* DESIGN-SYSTEM:tokens-theme END */
 }
 
 @layer base {
   /* ── Design Tokens ── */
 
+/* DESIGN-SYSTEM:tokens START — managed by goodsoob-design-system, do not edit */
   :root {
     color-scheme: light;
 
@@ -209,6 +212,7 @@
       --app-header-h: 0px;
     }
   }
+/* DESIGN-SYSTEM:tokens END */
 
   /* ── Base styles ── */
 
