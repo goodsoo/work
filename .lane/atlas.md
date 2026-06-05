@@ -4,14 +4,14 @@
 > 범용 규칙(voice/tone·디자인시스템·PR 양식)은 `CLAUDE.md` / `DESIGN.md` 참조 — 여기 중복 금지.
 
 ## Stack
-- router: 없음 — `window.location.hash` 수동 라우팅 (`src/App.tsx:61` `parseTab`)
+- router: 없음 — `window.location.hash` 수동 라우팅 (`src/App.tsx:60` `readTabFromHash`)
 - state: TanStack Query v5 (`src/hooks/use*.ts`) + hash 기반 로컬 React state
 - data/IO: Tauri IPC + 로컬 md 파일 vault (`src/api/*.ts` → `src/lib/vault/adapter.ts`)
 - test: Vitest (`src/**/*.test.ts(x)`, 33개 파일)
 - style: Tailwind v4 + 디자인 토큰 (DS 연결: **yes** — `src/index.css` 의 `goodsoob-design-system` 관리 sentinel 블록)
 
 ## Backbone
-- routes: `src/App.tsx:61` (`parseTab` — `#calendar`(default)/`#meetings`/`#todos`/`#portfolio`/`#styleguide`). meeting 상세는 `selectedMeetingId`(uid) state + `#meeting-{uid}` hash
+- routes: `src/App.tsx:60` (`readTabFromHash` — `#calendar`(default)/`#meetings`/`#todos`/`#portfolio`/`#styleguide`). meeting 상세는 `selectedMeetingId`(uid) state + `#meeting-{uid}` hash
 - state stores: `src/hooks/use*.ts` (query/mutation 훅), 전역 모달/선택 state 는 `src/App.tsx` 가 owner
 - data layer: `src/api/{meetings,journals,tasks,routines,portfolio}.ts` (vault 캡슐화) → `src/lib/vault/adapter.ts` (per-path mutex + atomic write)
 - vault 코어: `src/lib/vault/{adapter,parser,scan,watcher,registry,tasks}.ts`
