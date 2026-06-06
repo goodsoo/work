@@ -1097,6 +1097,8 @@ export function CalendarDayPanel({
       (j) => j.date === selectedDate,
     );
     const tasks = (todosQ.data ?? []).filter((t) => {
+      // 휴지통(soft-delete)行은 캘린더 그리드와 마찬가지로 상세 목록에서도 제외.
+      if (t.deleted) return false;
       if (t.done) {
         const d = t.done_at
           ? timestampToLocalIso(t.done_at)

@@ -4,6 +4,17 @@
 
 ---
 
+## 2026-06-07
+
+### PR #75 — 다일(2일 이상) 일정 — 가로 스팬 바 + gcal 양방향
+
+- **한 줄 임팩트**: 출장·휴가를 캘린더에서 기간 바로 봅니다
+- task 가 `due_date` 단일 날짜만 가져 한 셀에만 찍혔다. 며칠 걸치는 일정(출장·휴가·워크샵)을 기간으로 못 봤다. 시작~종료를 가진 일정을 추가하고, 그 기간을 가로지르는 연속 바로 그린다.
+- 데이터 모델: `Task.end_date` + vault `<start>..<end>` 범위 토큰(Dataview 관례). `..` 없는 기존 단일 라인은 그대로 단일 (마이그레이션 불필요).
+- 캘린더: 순수 함수 `computeWeekSegments`(주별 세그먼트·clip·레인 쌓기) + `MonthGrid` 오버레이 그리드. 주 경계 넘으면 ◀/▶ 이어짐. 단일 일정 chip 경로 회귀 0. 스팬 바 세로 정렬 fix(Button base gap-1.5 누락 보정).
+- 폼: `TaskAddModal` 종료일 필드 + validation, `TaskRow` 보기 모드 범위 표시.
+- gcal: `endDate` 양방향(종일 end exclusive ±1), `scheduleHash` 에 endDate 포함.
+
 ## 2026-06-02
 
 ### PR #71 — 사이드바 폴더 DnD (메모+폴더 단일 시스템으로 일반화)
