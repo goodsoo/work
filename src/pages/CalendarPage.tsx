@@ -37,18 +37,6 @@ const WEEK_CENTER = Math.floor(WEEK_BUFFER / 2); // 10
 const REBALANCE_EDGE = 4;
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
-// 2026년 이전은 표시하지 않음. 버퍼 first week가 startOfWeek(2026-01-01) 보다 앞으로
-// 못 나가도록 centerWeekOffset 의 하한 (minCenterOffset) 을 잡음.
-const MIN_DATE = new Date(2026, 0, 1);
-
-function computeMinCenterOffset(anchor: Date): number {
-  const minWS = startOfWeek(MIN_DATE, { weekStartsOn: 0 });
-  const minWeekOffset = Math.round(
-    (minWS.getTime() - anchor.getTime()) / WEEK_MS,
-  );
-  return minWeekOffset + WEEK_CENTER;
-}
-
 function timestampToLocalIsoDate(ts: string): string {
   return todayIso(new Date(ts));
 }
@@ -85,18 +73,11 @@ export function CalendarPage({ targetDate, onSelectedDateChange }: Props) {
     return calendarStateCache;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  // minCenterOffset: centerWeekOffset 의 하한. 버퍼가 2026년 이전으로 안 빠지게.
-  const minCenterOffset = useMemo(
-    () => computeMinCenterOffset(anchorWeekStart),
-    [anchorWeekStart],
+  // centerWeekOffset: 버퍼 중심이 anchor 로부터 몇 주 떨어져 있는지. cache 있으면 거기서
+  // 복원 (anchor 동일 보장), 없으면 0 (= 오늘 주가 버퍼 중심).
+  const [centerWeekOffset, setCenterWeekOffset] = useState(
+    () => cachedInitial?.centerWeekOffset ?? 0,
   );
-  // centerWeekOffset: 버퍼 중심이 anchor 로부터 몇 주 떨어져 있는지. cache 있으면 거기서 복원
-  // (anchor 동일 보장), 없으면 minCenter 클램프. 자정 넘긴 케이스도 cachedInitial=null 이라 안전.
-  const [centerWeekOffset, setCenterWeekOffset] = useState(() => {
-    const min = computeMinCenterOffset(anchorWeekStart);
-    if (cachedInitial) return Math.max(min, cachedInitial.centerWeekOffset);
-    return Math.max(0, min);
-  });
   // visibleWeekOffset: 현재 viewport 최상단의 주가 anchor 로부터 몇 주.
   const [visibleWeekOffset, setVisibleWeekOffset] = useState(
     () => cachedInitial?.visibleWeekOffset ?? 0,
@@ -218,14 +199,11 @@ export function CalendarPage({ targetDate, onSelectedDateChange }: Props) {
     const diffWeeks = Math.round(
       (targetWeekStart.getTime() - anchorWeekStart.getTime()) / WEEK_MS,
     );
-    const targetCenter = Math.max(minCenterOffset, diffWeeks);
-    if (targetCenter !== centerWeekOffset) {
-      // diffWeeks 가 minCenter 보다 작아 클램프되었으면 idx 도 조정 (그 주가 버퍼의 어느 인덱스에 있는지).
-      const idxTarget = diffWeeks - targetCenter + WEEK_CENTER;
-      // 의도: external target 진입 시 즉시 scroll 위치 기록 후 layout 직후 effect 가 사용.
+    if (diffWeeks !== centerWeekOffset) {
+      // 타깃 주를 버퍼 중심(WEEK_CENTER 행)에 놓고 그 행으로 scroll. layout 직후 effect 사용.
       // eslint-disable-next-line react-hooks/refs
-      rebalanceTargetRef.current = idxTarget * rowHeightRef.current;
-      setCenterWeekOffset(targetCenter);
+      rebalanceTargetRef.current = WEEK_CENTER * rowHeightRef.current;
+      setCenterWeekOffset(diffWeeks);
     }
   }
 
@@ -301,7 +279,6 @@ export function CalendarPage({ targetDate, onSelectedDateChange }: Props) {
 
   // Scroll handler — visible week 갱신 + edge 근접 시 rebalance.
   // round 사용해서 subpixel 으로 인한 off-by-one 방지 (snap 됐는데 헤더가 한 주 이전으로 잡히는 버그).
-  // 클램프: newCenter 가 minCenter 보다 작아질 수 없음 (2026 이전 차단).
   const handleScroll = useCallback(() => {
     const el = containerRef.current;
     const rh = rowHeightRef.current;
@@ -312,16 +289,13 @@ export function CalendarPage({ targetDate, onSelectedDateChange }: Props) {
 
     if (rebalanceTargetRef.current !== null) return;
     if (idx < REBALANCE_EDGE || idx > WEEK_BUFFER - 1 - REBALANCE_EDGE) {
+      // 버퍼를 idx=WEEK_CENTER 가 되도록 평행이동. scroll 위치는 remainder 로 보존.
       const delta = idx - WEEK_CENTER;
-      const newCenter = Math.max(minCenterOffset, centerWeekOffset + delta);
-      if (newCenter === centerWeekOffset) return; // 더 이상 못 미는 경우 (이미 minCenter)
-      const appliedDelta = newCenter - centerWeekOffset;
-      const newIdx = idx - appliedDelta;
       const remainder = el.scrollTop - idx * rh;
-      rebalanceTargetRef.current = newIdx * rh + remainder;
-      setCenterWeekOffset(newCenter);
+      rebalanceTargetRef.current = WEEK_CENTER * rh + remainder;
+      setCenterWeekOffset(centerWeekOffset + delta);
     }
-  }, [centerWeekOffset, minCenterOffset]);
+  }, [centerWeekOffset]);
 
   // 헤더 라벨용 — 보이는 둘째 row의 토요일(마지막 날) month 기준.
   // "1일 진입" semantic: 새 달 1일이 top row 또는 둘째 row 에 들어오면 그 달을 focus.
@@ -354,15 +328,13 @@ export function CalendarPage({ targetDate, onSelectedDateChange }: Props) {
     const el = containerRef.current;
     const rh = rowHeightRef.current;
     if (!el || !rh) return;
-    const targetCenter = Math.max(minCenterOffset, off);
-    const idx = off - targetCenter + WEEK_CENTER;
-    const targetTop = idx * rh;
+    const targetTop = WEEK_CENTER * rh;
     setVisibleWeekOffset(off);
-    if (targetCenter === centerWeekOffset) {
+    if (off === centerWeekOffset) {
       el.scrollTop = targetTop;
     } else {
       rebalanceTargetRef.current = targetTop;
-      setCenterWeekOffset(targetCenter);
+      setCenterWeekOffset(off);
     }
   }
 

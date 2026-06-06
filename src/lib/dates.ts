@@ -1,19 +1,6 @@
 import { addDays, differenceInCalendarDays, format, parseISO } from "date-fns";
 import { ko } from "date-fns/locale";
 
-/**
- * 앱 전체의 최소 허용 날짜. 2026 본인 사용 시작 시점.
- * date input 의 `min` 속성 + parseLooseDate / onChange 에서 silent reject 에 사용.
- * 캘린더 view 의 좌측 클램프도 이 값 기준.
- */
-export const MIN_DATE_ISO = "2026-01-01";
-
-/** ISO 가 MIN_DATE_ISO 미만이면 true. 빈 문자열은 false (지우기는 통과). */
-export function isBeforeMinDate(iso: string): boolean {
-  if (!iso) return false;
-  return iso < MIN_DATE_ISO;
-}
-
 /** "월"/"화"/... or null if iso is invalid */
 export function weekdayShort(iso: string): string | null {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return null;
@@ -249,8 +236,6 @@ function composeIso(year: number, month: number, day: number): string | null {
     return null;
   }
   const iso = `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-  // 2026-01-01 미만은 silent reject (parseLooseDate 의 모든 분기가 이 경로로 흐름).
-  if (iso < MIN_DATE_ISO) return null;
   return iso;
 }
 
@@ -330,7 +315,7 @@ export type DateSegment = "year" | "month" | "day";
 /**
  * ISO(yyyy-mm-dd) 의 한 구간을 delta(±1) 만큼 증감 → 새 ISO.
  * native date input 처럼 구간별로 독립 wrap (carry 없음): 월 1↔12, 일 1↔말일.
- * 월 변경으로 일이 말일을 넘으면 말일로 clamp. 결과가 MIN_DATE 미만이면 MIN_DATE.
+ * 월 변경으로 일이 말일을 넘으면 말일로 clamp.
  */
 export function stepDateSegment(
   iso: string,
@@ -354,8 +339,7 @@ export function stepDateSegment(
   // 월 변경 후 일 clamp.
   day = Math.min(day, daysInMonth(year, month));
 
-  const next = `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-  return next < MIN_DATE_ISO ? MIN_DATE_ISO : next;
+  return `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
 export type TimeSegment = "hour" | "minute";

@@ -1,10 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
-  MIN_DATE_ISO,
   addDaysIso,
   formatDisplayDate,
   formatDisplayDateTime,
-  isBeforeMinDate,
   isPast,
   isToday,
   isoDateRange,
@@ -141,16 +139,10 @@ describe("dates", () => {
     expect(parseLooseTime("아침")).toBe(null);
   });
 
-  it("MIN_DATE_ISO blocks anything before 2026-01-01", () => {
-    expect(MIN_DATE_ISO).toBe("2026-01-01");
-    expect(isBeforeMinDate("2025-12-31")).toBe(true);
-    expect(isBeforeMinDate("2026-01-01")).toBe(false);
-    expect(isBeforeMinDate("2027-05-19")).toBe(false);
-    expect(isBeforeMinDate("")).toBe(false); // 빈 문자열 = 지우기, 통과
-    // parseLooseDate 도 silent reject (composeIso 경로)
-    expect(parseLooseDate("2025-12-31", ref)).toBe(null);
-    expect(parseLooseDate("2025.12.31", ref)).toBe(null);
-    expect(parseLooseDate("251231", ref)).toBe(null);
+  it("parseLooseDate now accepts dates before 2026 (no min-date floor)", () => {
+    expect(parseLooseDate("2025-12-31", ref)).toBe("2025-12-31");
+    expect(parseLooseDate("2025.12.31", ref)).toBe("2025-12-31");
+    expect(parseLooseDate("251231", ref)).toBe("2025-12-31");
     expect(parseLooseDate("2026-01-01", ref)).toBe("2026-01-01");
   });
 
@@ -175,11 +167,11 @@ describe("dates", () => {
     expect(stepDateSegment("2026-05-31", "day", 1)).toBe("2026-05-01");
   });
 
-  it("stepDateSegment clamps day to month end and respects MIN_DATE", () => {
+  it("stepDateSegment clamps day to month end", () => {
     // 3월 31일 → 월 -1 = 2월, 일은 28 로 clamp.
     expect(stepDateSegment("2026-03-31", "month", -1)).toBe("2026-02-28");
-    // MIN_DATE 미만은 클램프.
-    expect(stepDateSegment(MIN_DATE_ISO, "year", -1)).toBe(MIN_DATE_ISO);
+    // 2026 이전으로도 자유롭게 내려감 (min-date floor 제거됨).
+    expect(stepDateSegment("2026-01-01", "year", -1)).toBe("2025-01-01");
   });
 
   it("stepTimeSegment wraps hour 0-23 and minute 0-59 without carry", () => {
