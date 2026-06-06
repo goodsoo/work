@@ -16,8 +16,13 @@ import type {
   Tombstone,
 } from "./types";
 
-function fields(title: string, date: string | null, time: string | null = null): ScheduleFields {
-  return { title, date, time };
+function fields(
+  title: string,
+  date: string | null,
+  time: string | null = null,
+  endDate: string | null = null,
+): ScheduleFields {
+  return { title, date, endDate, time };
 }
 
 function local(eventId: string, f: ScheduleFields, updatedAt = "2026-05-29T10:00:00Z"): LocalSchedule {
@@ -56,6 +61,23 @@ describe("scheduleHash", () => {
 
   it("title 앞뒤 공백 무시 (trim)", () => {
     expect(scheduleHash(fields("회의 ", "2026-05-29"))).toBe(scheduleHash(fields("회의", "2026-05-29")));
+  });
+
+  it("단일 일정 해시는 endDate 도입 전과 byte-identical (스냅샷 무효화·대량 재push 방지)", () => {
+    // NUL(\x00) 구분자 포맷 `title\0date\0time` 의 고정 base36 값. 이 값이 바뀌면
+    // 기존 vault 의 모든 #gcal 스냅샷이 무효화되어 첫 sync 가 전체 push-update 를
+    // 일으킨다(대량 가드 발동). endDate 는 있을 때만 `\0endDate` 로 append 되어야 한다.
+    expect(scheduleHash(fields("회의", "2026-05-29", "14:00"))).toBe("81z24m");
+    expect(scheduleHash(fields("출장", "2026-06-10", null))).toBe("1v8pr7");
+  });
+
+  it("#7 종료일 변경을 감지 (endDate 만 달라도 해시 다름)", () => {
+    const single = fields("출장", "2026-06-10", null, null);
+    const multi = fields("출장", "2026-06-10", null, "2026-06-12");
+    expect(scheduleHash(single)).not.toBe(scheduleHash(multi));
+    // 종료일만 더 늘려도 또 다름.
+    const longer = fields("출장", "2026-06-10", null, "2026-06-13");
+    expect(scheduleHash(multi)).not.toBe(scheduleHash(longer));
   });
 });
 

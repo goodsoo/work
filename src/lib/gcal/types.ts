@@ -7,8 +7,11 @@
 // 일정의 동기화 대상 필드. 로컬 task 와 원격 event 를 같은 모양으로 정규화한다.
 export interface ScheduleFields {
   title: string;
-  date: string | null; // YYYY-MM-DD
-  time: string | null; // HH:MM. null = 종일(all-day) 이벤트.
+  date: string | null; // YYYY-MM-DD (다일이면 시작일)
+  // 다일 일정의 종료일(포함, YYYY-MM-DD). null = 단일. Google 종일 end 는 exclusive
+  // 라 mapping 이 ±1 변환한다 (push 시 +1, pull 시 −1).
+  endDate: string | null;
+  time: string | null; // HH:MM. null = 종일(all-day) 이벤트. 다일은 종일 취급.
 }
 
 // Google events.list 가 돌려준 이벤트 (정규화 후).

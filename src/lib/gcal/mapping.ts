@@ -48,20 +48,27 @@ export function gcalEventToRemote(ev: GcalApiEvent): RemoteEvent {
   const cancelled = ev.status === "cancelled";
   const updated = ev.updated ?? "";
   if (cancelled) {
-    return { eventId: ev.id, cancelled: true, fields: { title: "", date: null, time: null }, updated };
+    return { eventId: ev.id, cancelled: true, fields: { title: "", date: null, endDate: null, time: null }, updated };
   }
   const title = ev.summary ?? "";
   let date: string | null = null;
+  let endDate: string | null = null;
   let time: string | null = null;
   if (ev.start?.date) {
-    // 종일 이벤트.
+    // 종일 이벤트. Google end.date 는 exclusive(다음날) 라 −1 해서 포함 종료일로.
+    // 단일 종일(end = start+1)이면 endDate = start → 다일 아님이므로 null 로 둔다.
     date = ev.start.date;
+    if (ev.end?.date) {
+      const endInclusive = addDays(ev.end.date, -1);
+      if (endInclusive > date) endDate = endInclusive;
+    }
   } else if (ev.start?.dateTime) {
+    // 시점 이벤트. 다일 시점은 미지원(종일로만) → endDate null, 시작 시각만 보존.
     const split = splitDateTime(ev.start.dateTime);
     date = split.date;
     time = split.time;
   }
-  return { eventId: ev.id, cancelled: false, fields: { title, date, time }, updated };
+  return { eventId: ev.id, cancelled: false, fields: { title, date, endDate, time }, updated };
 }
 
 // YYYY-MM-DD 에 일수 더하기 (UTC 산술 — tz 영향 0).
@@ -98,6 +105,14 @@ export const DEFAULT_DURATION_MIN = 30;
 export function fieldsToGcalEvent(fields: ScheduleFields, timeZone?: string): GcalEventBody {
   if (!fields.date) {
     throw new Error("fieldsToGcalEvent: date 없는 일정은 Google 이벤트로 못 만듭니다");
+  }
+  // 다일 일정 → 종일 이벤트로 push (시각 무시). end.date 는 exclusive 라 종료일 + 1.
+  if (fields.endDate && fields.endDate > fields.date) {
+    return {
+      summary: fields.title,
+      start: { date: fields.date },
+      end: { date: addDays(fields.endDate, 1) },
+    };
   }
   if (fields.time) {
     const end = addMinutes(fields.date, fields.time, DEFAULT_DURATION_MIN);

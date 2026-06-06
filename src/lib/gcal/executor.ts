@@ -56,7 +56,7 @@ function nowIso(): string {
 }
 
 function taskToFields(t: Task): ScheduleFields {
-  return { title: t.title, date: t.due_date, time: t.due_time };
+  return { title: t.title, date: t.due_date, endDate: t.end_date, time: t.due_time };
 }
 
 // events.delete 는 이미 삭제된 이벤트에 410/404 를 줄 수 있다 — 멱등 삭제이므로 무시.
@@ -157,6 +157,7 @@ async function applyAction(ctx: ApplyCtx, action: ReconcileAction): Promise<void
         title: action.fields.title,
         category: "schedule",
         due_date: action.fields.date,
+        end_date: action.fields.endDate,
         due_time: action.fields.time,
         gcal_event_id: action.eventId,
       });
@@ -177,6 +178,7 @@ async function applyAction(ctx: ApplyCtx, action: ReconcileAction): Promise<void
         const updated = await updateTask(adapter, task.id, {
           title: action.fields.title,
           due_date: action.fields.date,
+          end_date: action.fields.endDate,
           due_time: action.fields.time,
         });
         markSelfWrite?.(updated._source.file);
