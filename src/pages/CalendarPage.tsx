@@ -22,6 +22,7 @@ import {
   WEEKDAYS,
   type DayItems,
 } from "../components/timeline/MonthGrid";
+import type { MultiDayEvent } from "../lib/calendar/spans";
 
 type Props = {
   targetDate?: string | null;
@@ -151,6 +152,8 @@ export function CalendarPage({ targetDate, onSelectedDateChange }: Props) {
     for (const t of todosQ.data ?? []) {
       // 휴지통(soft-delete)·취소된 태스크는 캘린더에서 제외.
       if (t.deleted || t.cancelled) continue;
+      // 다일 일정은 chip 대신 스팬 바로 그린다(아래 multiDayEvents). chip 경로 제외.
+      if (t.end_date && t.due_date && t.end_date > t.due_date) continue;
       let d: string | null = null;
       if (t.done) {
         if (t.done_at) d = timestampToLocalIsoDate(t.done_at);
@@ -182,6 +185,24 @@ export function CalendarPage({ targetDate, onSelectedDateChange }: Props) {
     }
     return map;
   }, [meetingsQ.data, journalsQ.data, todosQ.data]);
+
+  // 다일 일정(end_date > due_date) → 스팬 바 입력. 단일 일정은 byDate chip 경로.
+  const multiDayEvents = useMemo<MultiDayEvent[]>(() => {
+    const list: MultiDayEvent[] = [];
+    for (const t of todosQ.data ?? []) {
+      if (t.deleted || t.cancelled) continue;
+      if (!t.due_date || !t.end_date || t.end_date <= t.due_date) continue;
+      list.push({
+        id: t.id,
+        title: t.title,
+        start: t.due_date,
+        end: t.end_date,
+        category: t.category,
+        done: t.done,
+      });
+    }
+    return list;
+  }, [todosQ.data]);
 
   // External target date (from side panel). cache 가 있으면 같은 값을 복원 — page
   // 전환 후 돌아왔을 때 같은 targetDate 가 들어와도 "외부 트리거" 로 오인해서 스크롤이
@@ -491,6 +512,7 @@ export function CalendarPage({ targetDate, onSelectedDateChange }: Props) {
         <MonthGrid
           weeks={weeks}
           byDate={byDate}
+          multiDayEvents={multiDayEvents}
           onDayClick={handleDayClick}
           selectedDate={selectedDate}
           currentYear={currentMonthYM.year}

@@ -1,13 +1,30 @@
 import { useMemo } from "react";
 import { addDays } from "date-fns";
-import { BookOpen, FileText } from "lucide-react";
+import { BookOpen, ChevronLeft, ChevronRight, FileText } from "lucide-react";
 import { todayIso, isToday } from "../../lib/dates";
 import { categoryColor } from "../../lib/taskCategory";
+import {
+  computeWeekSegments,
+  type MultiDayEvent,
+  type WeekSegment,
+} from "../../lib/calendar/spans";
 import { Button } from "../common/Button";
 import { Text } from "../common/Text";
 import type { Meeting } from "../../api/meetings";
 import type { Journal } from "../../api/journals";
 import type { Task, TaskCategory } from "../../api/tasks";
+
+// 셀/오버레이 행 높이 — 두 그리드(day cell + span overlay)가 동일해야 정확히 겹친다.
+const GRID_AUTO_ROWS = "clamp(100px, 18svh, 180px)";
+// 셀 안 task chip 이 시작하는 y: paddingTop(2) + 날짜 row(h-5=20) + Button base gap-1.5(6)
+// + chip 컨테이너 mt-0.5(2) = 30px. 셀 Button 이 flex-col 이라 base className 의 gap-1.5 가
+// 날짜 row 와 chip 컨테이너 사이에 6px 간격으로 들어간다 — 이걸 빼먹으면 스팬 바가 단일
+// chip 보다 6px 위로 떠 어긋난다. 스팬 바를 같은 줄에 맞춰 chip 과 연속돼 보이게.
+// 레인당 높이 = chip 높이(16) + 간격(1).
+const SPAN_TOP_OFFSET = 30;
+const SPAN_LANE_HEIGHT = 17;
+// 셀 좌우 padding(4px) — 바를 chip 과 같은 안쪽 들여쓰기에 맞춤.
+const CELL_PAD = 4;
 
 // 셀 chip 시간 표시 — 가능한 짧게.
 // - 정각 (mm=00) → "h시" / "H시"
@@ -46,6 +63,8 @@ const MAX_CELL_EVENTS = 3;
 type Props = {
   weeks: Date[]; // 각 주의 일요일 (week start)
   byDate: Map<string, DayItems>;
+  // 다일 일정(가로 스팬 바). 단일 일정은 byDate 의 chip 경로로 그려진다.
+  multiDayEvents?: MultiDayEvent[];
   onDayClick: (date: string) => void;
   selectedDate?: string | null;
   currentYear: number;
@@ -55,11 +74,18 @@ type Props = {
 export function MonthGrid({
   weeks,
   byDate,
+  multiDayEvents,
   onDayClick,
   selectedDate,
   currentYear,
   currentMonth,
 }: Props) {
+  // 주별 스팬 세그먼트 — weeks 인덱스 = overlay 그리드의 row.
+  const segmentsByWeek = useMemo(() => {
+    const events = multiDayEvents ?? [];
+    if (events.length === 0) return weeks.map(() => []);
+    return weeks.map((ws) => computeWeekSegments(todayIso(ws), events));
+  }, [weeks, multiDayEvents]);
   const cells = useMemo(() => {
     const list: Array<{
       date: string;
@@ -85,10 +111,12 @@ export function MonthGrid({
     return list;
   }, [weeks]);
 
+  const hasSpans = segmentsByWeek.some((segs) => segs.length > 0);
+
   return (
     <div
       className="grid grid-cols-7"
-      style={{ gridAutoRows: "clamp(100px, 18svh, 180px)" }}
+      style={{ gridAutoRows: GRID_AUTO_ROWS, position: "relative" }}
     >
       {cells.map(({ date, dayNum, year, month, weekday, snapHere }) => {
         const items = byDate.get(date);
@@ -243,6 +271,67 @@ export function MonthGrid({
           </Button>
         );
       })}
+
+      {/* 다일 일정 스팬 바 오버레이. day-cell 그리드와 동일한 열/행 트랙으로 정확히
+          포개진다(absolute inset-0). pointer-events-none 라 셀 클릭(날짜 선택)은 통과. */}
+      {hasSpans ? (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 grid grid-cols-7"
+          style={{ gridAutoRows: GRID_AUTO_ROWS }}
+        >
+          {segmentsByWeek.flatMap((segs, weekIdx) =>
+            segs.map((seg) => (
+              <SpanBar key={`${weekIdx}-${seg.id}`} seg={seg} weekIdx={weekIdx} />
+            )),
+          )}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+// 한 주 안의 다일 일정 가로 바. grid-column 으로 시작~종료 열을 가로지른다.
+function SpanBar({
+  seg,
+  weekIdx,
+}: {
+  seg: WeekSegment;
+  weekIdx: number;
+}) {
+  // 셀 안 task chip 과 동일한 시각 언어: 카테고리 색 18% tint 배경, 좌측 accent
+  // border 없음, rounded-sm, text-[11px]. done 은 tint 없이 line-through + muted.
+  const swatch = seg.done ? "var(--text-muted)" : categoryColor(seg.category);
+  return (
+    <div
+      style={{
+        gridColumn: `${seg.startCol + 1} / ${seg.endCol + 2}`,
+        gridRow: weekIdx + 1,
+        marginTop: SPAN_TOP_OFFSET + seg.lane * SPAN_LANE_HEIGHT,
+        // chip 과 같은 안쪽 들여쓰기. clip 된(이어지는) 끝은 셀 경계까지 붙여
+        // "다음/이전 주로 계속" 을 시각화 + 그 끝만 각지게.
+        marginLeft: seg.leftClipped ? 0 : CELL_PAD,
+        marginRight: seg.rightClipped ? 0 : CELL_PAD,
+        borderTopLeftRadius: seg.leftClipped ? 0 : undefined,
+        borderBottomLeftRadius: seg.leftClipped ? 0 : undefined,
+        borderTopRightRadius: seg.rightClipped ? 0 : undefined,
+        borderBottomRightRadius: seg.rightClipped ? 0 : undefined,
+        backgroundColor: seg.done
+          ? undefined
+          : `color-mix(in srgb, ${swatch} 18%, transparent)`,
+        color: seg.done ? "var(--text-muted)" : "var(--text-primary)",
+      }}
+      className={`flex h-4 items-center gap-0.5 self-start overflow-hidden rounded-sm px-1 text-[11px] leading-tight ${
+        seg.done ? "line-through" : ""
+      }`}
+    >
+      {seg.leftClipped ? (
+        <ChevronLeft className="h-3 w-3 shrink-0 opacity-60" aria-label="이전 주에서 이어짐" />
+      ) : null}
+      <span className="min-w-0 flex-1 truncate">{seg.title}</span>
+      {seg.rightClipped ? (
+        <ChevronRight className="h-3 w-3 shrink-0 opacity-60" aria-label="다음 주로 이어짐" />
+      ) : null}
     </div>
   );
 }

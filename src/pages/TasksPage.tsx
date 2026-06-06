@@ -163,6 +163,7 @@ export function TasksPage({
       title?: string;
       priority?: TaskPriority;
       due_date?: string | null;
+      end_date?: string | null;
       due_time?: string | null;
       category?: TaskCategory | null;
       source_meeting_uid?: string | null;
