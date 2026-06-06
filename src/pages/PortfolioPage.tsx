@@ -177,18 +177,21 @@ export function PortfolioPage({
   const allWorks = worksQuery.data ?? [];
 
   return (
-    <>
-      <PortfolioHeader />
-      {allWorks.length > 0 ? (
-        <CategoryChipRow
-          selected={selectedCategory}
-          counts={categoryCounts}
-          categories={categories}
-          onChange={onCategoryChange}
-          sortKey={sortKey}
-          onSortKeyChange={onSortKeyChange}
-        />
-      ) : null}
+    <div className="flex h-[calc(100svh-var(--app-header-h)-72px)] flex-col lg:h-full lg:min-h-0">
+      <div className="shrink-0">
+        <PortfolioHeader />
+        {allWorks.length > 0 ? (
+          <CategoryChipRow
+            selected={selectedCategory}
+            counts={categoryCounts}
+            categories={categories}
+            onChange={onCategoryChange}
+            sortKey={sortKey}
+            onSortKeyChange={onSortKeyChange}
+          />
+        ) : null}
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto">
       {worksQuery.isLoading ? (
         <SkeletonGrid count={6} />
       ) : allWorks.length === 0 ? (
@@ -207,7 +210,8 @@ export function PortfolioPage({
           </div>
         </div>
       )}
-    </>
+      </div>
+    </div>
   );
 }
 
@@ -231,9 +235,8 @@ function CategoryChipRow({
 }) {
   return (
     <div
-      className="sticky z-10 shrink-0 px-6 py-2 backdrop-blur"
+      className="shrink-0 px-6 py-2 backdrop-blur"
       style={{
-        top: "var(--page-header-h)",
         borderBottom: "1px solid var(--border-subtle)",
         backgroundColor: "var(--bg-overlay)",
       }}
@@ -273,6 +276,7 @@ function CategoryChipRow({
 function PortfolioHeader() {
   return (
     <PageHeaderBar
+      sticky={false}
       center={
         <Text variant="h4" as="h1">
           포트폴리오
@@ -310,7 +314,7 @@ function EmptyVault({
 }) {
   return (
     <EmptyState
-      className="flex h-[calc(100svh-3rem)] flex-col items-center justify-center gap-3 px-6 text-center"
+      className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center"
       icon={
         <LayoutGrid
           className="h-12 w-12"
@@ -353,7 +357,7 @@ function EmptyFilter({
     : "카드가 없습니다";
   return (
     <EmptyState
-      className="flex h-[calc(100svh-3rem)] flex-col items-center justify-center gap-3 px-6"
+      className="flex h-full flex-col items-center justify-center gap-3 px-6"
       description={message}
     />
   );

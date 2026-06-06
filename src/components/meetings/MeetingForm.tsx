@@ -1145,6 +1145,83 @@ export function MeetingForm({
         </div>
       ) : null}
 
+      {/* Tab nav — 헤더 바로 아래 고정 bar. scroll 컨테이너 *밖* 의 shrink-0 형제 —
+          이전엔 scroll 안 sticky 였으나 스크롤바 트랙이 탭 row 까지 덮어 분리. 내부
+          max-w-3xl 로 본문 탭 콘텐츠와 좌우 정렬 유지 (border/bg 도 column 폭). */}
+      <div className="shrink-0">
+        <div className="mx-auto w-full max-w-3xl px-6">
+          <div
+            className="flex items-center justify-between backdrop-blur"
+            style={{
+              borderBottom: "1px solid var(--border-subtle)",
+              backgroundColor: "var(--bg-overlay)",
+            }}
+          >
+            <div className="flex gap-1">
+              <TabBtn
+                label="메모"
+                active={activeTab === "body"}
+                accentColor={tabAccentColor}
+                onClick={() => setActiveTab("body")}
+              />
+              <TabBtn
+                label="음성 기록"
+                active={activeTab === "transcript"}
+                accentColor={tabAccentColor}
+                onClick={() => setActiveTab("transcript")}
+              />
+              <TabBtn
+                label="요약"
+                active={activeTab === "summary"}
+                accentColor={tabAccentColor}
+                onClick={() => setActiveTab("summary")}
+              />
+            </div>
+            <div className="flex items-center gap-1.5 pb-1">
+              {/* 탭별 액션 — 편집 토글 왼쪽. 음성 기록 업로드(편집 모드만) /
+                  요약 자동요약·붙여넣기(항상). */}
+              {showUploadAction ? (
+                <TranscriptUploadButton
+                  transcript={transcript}
+                  onChange={(v) => {
+                    const prevLines = doc.transcript.match(/\n/g)?.length ?? 0;
+                    const newLines = v.match(/\n/g)?.length ?? 0;
+                    if (newLines > prevLines) docHistory.flush();
+                    setDoc("transcript", { ...doc, transcript: v });
+                  }}
+                  onError={setActionError}
+                />
+              ) : null}
+              {showSummaryActions ? (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleSummaryClick}
+                  aria-disabled={summaryDisabled}
+                  aria-label="요약하기"
+                  title="요약하기 (자동 요약 / 직접 붙여넣기)"
+                  leftIcon={<Sparkles className="h-4 w-4" />}
+                  className={`px-2 py-1 ${summaryDisabled ? "opacity-40" : ""}`}
+                />
+              ) : null}
+              {hasTabActions ? (
+                <div
+                  className="mx-0.5 h-4 w-px"
+                  style={{ backgroundColor: "var(--border-default)" }}
+                />
+              ) : null}
+              {/* 세 탭 모두 편집/보기 토글 (음성 기록 보기 = 읽기 전용 + 참석자 하이라이트). */}
+              <ModeChip
+                viewMode={viewMode}
+                onToggle={() =>
+                  setViewMode(viewMode === "edit" ? "view" : "edit")
+                }
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Full-page editor — desktop 에선 자체 scroll container (header 옆 scrollbar 회피).
           outer = full-width scroll, inner = max-w content.
           flex-col chain (scroll → content wrapper → tab content → mode div → editor) 으로
@@ -1196,81 +1273,6 @@ export function MeetingForm({
               />
             ))
           : null}
-        {/* Tab nav — 헤더 바로 아래에 sticky. 헤더 (3.5rem) 와 시각적으로 연결.
-            position: sticky 인라인 — Tailwind v4 의 utility 충돌 또는 hot reload
-            누락 회피 (시맨틱 토큰 작업 중 발견된 회기 케이스). */}
-        <div
-          className="z-10 flex items-center justify-between backdrop-blur"
-          style={{
-            position: "sticky",
-            top: 0,
-            borderBottom: "1px solid var(--border-subtle)",
-            backgroundColor: "var(--bg-overlay)",
-          }}
-        >
-          <div className="flex gap-1">
-            <TabBtn
-              label="메모"
-              active={activeTab === "body"}
-              accentColor={tabAccentColor}
-              onClick={() => setActiveTab("body")}
-            />
-            <TabBtn
-              label="음성 기록"
-              active={activeTab === "transcript"}
-              accentColor={tabAccentColor}
-              onClick={() => setActiveTab("transcript")}
-            />
-            <TabBtn
-              label="요약"
-              active={activeTab === "summary"}
-              accentColor={tabAccentColor}
-              onClick={() => setActiveTab("summary")}
-            />
-          </div>
-          <div className="flex items-center gap-1.5 pb-1">
-            {/* 탭별 액션 — 편집 토글 왼쪽. 음성 기록 업로드(편집 모드만) /
-                요약 자동요약·붙여넣기(항상). */}
-            {showUploadAction ? (
-              <TranscriptUploadButton
-                transcript={transcript}
-                onChange={(v) => {
-                  const prevLines = doc.transcript.match(/\n/g)?.length ?? 0;
-                  const newLines = v.match(/\n/g)?.length ?? 0;
-                  if (newLines > prevLines) docHistory.flush();
-                  setDoc("transcript", { ...doc, transcript: v });
-                }}
-                onError={setActionError}
-              />
-            ) : null}
-            {showSummaryActions ? (
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={handleSummaryClick}
-                aria-disabled={summaryDisabled}
-                aria-label="요약하기"
-                title="요약하기 (자동 요약 / 직접 붙여넣기)"
-                leftIcon={<Sparkles className="h-4 w-4" />}
-                className={`px-2 py-1 ${summaryDisabled ? "opacity-40" : ""}`}
-              />
-            ) : null}
-            {hasTabActions ? (
-              <div
-                className="mx-0.5 h-4 w-px"
-                style={{ backgroundColor: "var(--border-default)" }}
-              />
-            ) : null}
-            {/* 세 탭 모두 편집/보기 토글 (음성 기록 보기 = 읽기 전용 + 참석자 하이라이트). */}
-            <ModeChip
-              viewMode={viewMode}
-              onToggle={() =>
-                setViewMode(viewMode === "edit" ? "view" : "edit")
-              }
-            />
-          </div>
-        </div>
-
         {/* Tab content wrapper — 빈 메모일 땐 스크롤 없음, 내용 늘면 자연 scroll.
             lg:flex-1 chain 으로 자식 (editor) 가 남은 높이 채움. */}
         <div className="mt-4 lg:flex lg:flex-1 lg:flex-col">

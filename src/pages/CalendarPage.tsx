@@ -401,7 +401,7 @@ export function CalendarPage({ targetDate, onSelectedDateChange }: Props) {
   }
 
   return (
-    <div className="relative flex h-[calc(100svh-var(--app-header-h)-72px)] flex-col lg:h-[calc(100svh-1.5rem)]">
+    <div className="relative flex h-[calc(100svh-var(--app-header-h)-72px)] flex-col lg:h-full lg:min-h-0">
       {/* Sticky 헤더: 월 라벨 + 요일 row */}
       <div
         className="shrink-0"
