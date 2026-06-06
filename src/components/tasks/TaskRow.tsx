@@ -36,6 +36,7 @@ type Props = {
       title?: string;
       priority?: TaskPriority;
       due_date?: string | null;
+      end_date?: string | null;
       due_time?: string | null;
       category?: TaskCategory | null;
       source_meeting_uid?: string | null;
@@ -50,6 +51,7 @@ type Props = {
 type Draft = {
   title: string;
   due_date: string;
+  end_date: string;
   due_time: string;
   category: TaskCategory | null;
   source_meeting_uid: string | null;
@@ -61,6 +63,7 @@ function draftFromTask(task: Task): Draft {
   return {
     title: task.title,
     due_date: task.due_date ?? "",
+    end_date: task.end_date ?? "",
     due_time: task.due_time ?? "",
     category: task.category,
     source_meeting_uid: task.source_meeting_uid,
@@ -168,6 +171,10 @@ export function TaskRow({ task, onToggle, onUpdate, onDelete }: Props) {
     }
     const nextDate = d.due_date || null;
     if (nextDate !== task.due_date) patch.due_date = nextDate;
+    // 종료일은 시작일 이후일 때만 다일로 유효. 같거나 앞·시작일 없음 = 단일(null).
+    const nextEnd =
+      d.end_date && nextDate && d.end_date > nextDate ? d.end_date : null;
+    if (nextEnd !== task.end_date) patch.end_date = nextEnd;
     const nextTime = d.due_time || null;
     if (nextTime !== task.due_time) patch.due_time = nextTime;
     if (d.category !== task.category) patch.category = d.category;
@@ -270,6 +277,15 @@ export function TaskRow({ task, onToggle, onUpdate, onDelete }: Props) {
                 <LooseDateInput
                   value={draft.due_date}
                   onCommit={(next) => updateDraft({ due_date: next })}
+                  compact
+                />
+              </span>
+              {/* 종료일 (선택) — 비우면 단일 일정. 시작일 이후일 때만 다일로 저장. */}
+              <span className="inline-flex shrink-0 items-center gap-1">
+                <span aria-hidden className="opacity-60">~</span>
+                <LooseDateInput
+                  value={draft.end_date}
+                  onCommit={(next) => updateDraft({ end_date: next })}
                   compact
                 />
               </span>
@@ -460,7 +476,12 @@ function ReadOnlyMeta({ task }: { task: Task }) {
       className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs"
       style={{ color: "var(--text-secondary)" }}
     >
-      {hasDate ? <span>{formatDisplayDate(task.due_date)}</span> : null}
+      {hasDate ? (
+        <span>
+          {formatDisplayDate(task.due_date)}
+          {task.end_date ? ` ~ ${formatDisplayDate(task.end_date)}` : null}
+        </span>
+      ) : null}
       {hasTime ? <span>{task.due_time}</span> : null}
       {categoryLabel ? (
         <span className="inline-flex items-center gap-0.5">

@@ -103,35 +103,52 @@ function TaskForm({
   const createMutation = useCreateTask();
   const [title, setTitle] = useState("");
   const [date, setDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [time, setTime] = useState("");
   const [category, setCategory] = useState<TaskCategory | null>(null);
   const [done, setDone] = useState(false);
   const [sourceMeetingUid, setSourceMeetingUid] = useState<string | null>(null);
+  const [endError, setEndError] = useState<string | null>(null);
   const titleRef = useRef<HTMLInputElement>(null);
 
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     setTitle(prefill?.title ?? "");
     setDate(prefill?.due_date ?? "");
+    setEndDate(prefill?.end_date ?? "");
     setTime(prefill?.due_time ?? "");
     setCategory(prefill?.category ?? null);
     setDone(prefill?.done ?? false);
     setSourceMeetingUid(prefill?.source_meeting_uid ?? null);
+    setEndError(null);
     requestAnimationFrame(() => titleRef.current?.focus());
   }, [prefill]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  const canSubmit = title.trim().length > 0;
+  // 종료일은 시작일이 있어야 의미 있고, 시작일 이후여야 한다. 비우면 단일 일정.
+  const endValid = !endDate || (!!date && endDate >= date);
+  const canSubmit = title.trim().length > 0 && endValid;
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!canSubmit) return;
+    if (title.trim().length === 0) return;
+    if (!endValid) {
+      setEndError(
+        date
+          ? "종료일은 시작일과 같거나 이후여야 합니다."
+          : "종료일을 쓰려면 시작 날짜를 먼저 입력하세요.",
+      );
+      return;
+    }
+    // 다일 일정은 종일 취급 — 시각은 단일 일정일 때만 저장 (plan: 다일=종일).
+    const isMultiDay = !!endDate && !!date && endDate > date;
     createMutation.mutate(
       {
         title: title.trim(),
         done,
         due_date: date || null,
-        due_time: date && time ? time : null,
+        end_date: isMultiDay ? endDate : null,
+        due_time: date && time && !isMultiDay ? time : null,
         category,
         source_meeting_uid: sourceMeetingUid,
       },
@@ -187,7 +204,23 @@ function TaskForm({
               border: "1px solid var(--border-default)",
             }}
           >
-            <LooseDateInput value={date} onCommit={setDate} fullWidth />
+            <LooseDateInput
+              value={date}
+              onCommit={(next) => {
+                setDate(next);
+                // 시작일 변경 시 종료일 에러 재평가.
+                if (endDate) {
+                  if (!next) {
+                    setEndError("종료일을 쓰려면 시작 날짜를 먼저 입력하세요.");
+                  } else if (endDate < next) {
+                    setEndError("종료일은 시작일과 같거나 이후여야 합니다.");
+                  } else {
+                    setEndError(null);
+                  }
+                }
+              }}
+              fullWidth
+            />
           </div>
         </label>
         <label className="block">
@@ -210,6 +243,44 @@ function TaskForm({
           </div>
         </label>
       </div>
+
+      <label className="mt-3 block">
+        <Text variant="caption" color="secondary" as="span" weight="medium">
+          종료일 (선택)
+        </Text>
+        <div
+          className="mt-1 rounded-md px-2 py-1.5"
+          style={{
+            backgroundColor: "var(--bg-surface)",
+            border: `1px solid ${endError ? "var(--accent-red)" : "var(--border-default)"}`,
+          }}
+        >
+          <LooseDateInput
+            value={endDate}
+            onCommit={(next) => {
+              setEndDate(next);
+              if (next && date && next < date) {
+                setEndError("종료일은 시작일과 같거나 이후여야 합니다.");
+              } else if (next && !date) {
+                setEndError("종료일을 쓰려면 시작 날짜를 먼저 입력하세요.");
+              } else {
+                setEndError(null);
+              }
+            }}
+            fullWidth
+          />
+        </div>
+        {endError ? (
+          <Text
+            variant="caption"
+            as="p"
+            className="mt-1"
+            style={{ color: "var(--accent-red)" }}
+          >
+            {endError}
+          </Text>
+        ) : null}
+      </label>
 
       <div className="mt-3">
         <Text
