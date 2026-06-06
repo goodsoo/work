@@ -43,6 +43,60 @@ describe("gcal_event_id surface (todoFromItem)", () => {
   });
 });
 
+describe("buildTodoLine — 다일 일정 end_date 직렬화 (#5)", () => {
+  it("end_date > due_date 면 `<start>..<end>` 범위 토큰", () => {
+    const line = buildTodoLine({
+      title: "워크샵",
+      due_date: "2026-06-10",
+      end_date: "2026-06-12",
+    });
+    expect(line).toContain("--- 2026-06-10..2026-06-12");
+  });
+
+  it("end_date 없거나 시작일과 같으면 단일 날짜 (회귀 없음)", () => {
+    expect(buildTodoLine({ title: "x", due_date: "2026-06-10" })).toContain(
+      "--- 2026-06-10",
+    );
+    expect(
+      buildTodoLine({ title: "x", due_date: "2026-06-10" }),
+    ).not.toContain("..");
+    expect(
+      buildTodoLine({ title: "x", due_date: "2026-06-10", end_date: "2026-06-10" }),
+    ).not.toContain("..");
+  });
+
+  it("라인 → extractTasks 라운드트립으로 end_date 보존", () => {
+    const line = buildTodoLine({
+      title: "출장",
+      due_date: "2026-06-10",
+      end_date: "2026-06-12",
+    });
+    const items = extractTasks("inbox.md", `${line}\n`);
+    expect(items[0].text).toBe("출장");
+    expect(items[0].due).toBe("2026-06-10");
+    expect(items[0].end).toBe("2026-06-12");
+  });
+
+  it("updateTask 로 end_date 추가/제거가 디스크에 반영 (#5)", async () => {
+    const a = makeAdapter();
+    await a.write("inbox.md", "# Inbox\n- [ ] 출장 --- 2026-06-10 #schedule\n");
+    let tasks = await listTodos(a);
+    const id = tasks.find((t) => t.title === "출장")!.id;
+
+    const after = await updateTask(a, id, { end_date: "2026-06-12" });
+    expect(after.end_date).toBe("2026-06-12");
+    expect(after.due_date).toBe("2026-06-10");
+
+    // 다시 읽어도 보존.
+    tasks = await listTodos(a);
+    expect(tasks.find((t) => t.title === "출장")!.end_date).toBe("2026-06-12");
+
+    // 제거.
+    const cleared = await updateTask(a, after.id, { end_date: null });
+    expect(cleared.end_date).toBeNull();
+  });
+});
+
 describe("buildTodoLine — gcal_event_id 직렬화", () => {
   it("gcal_event_id 가 있으면 #gcal-<id> 태그를 박는다", () => {
     const line = buildTodoLine({ title: "발표", category: "schedule", gcal_event_id: "evt99" });

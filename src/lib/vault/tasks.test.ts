@@ -108,4 +108,42 @@ describe("extractTasks", () => {
     expect(items).toHaveLength(1);
     expect(items[0].text).toBe("진짜");
   });
+
+  it("다일 범위 `<start>..<end>` → due=시작, end=종료 (#5)", () => {
+    const raw = "- [ ] 워크샵 --- 2026-06-10..2026-06-12\n";
+    const items = extractTasks("inbox.md", raw);
+    expect(items[0].text).toBe("워크샵");
+    expect(items[0].due).toBe("2026-06-10");
+    expect(items[0].end).toBe("2026-06-12");
+  });
+
+  it("다일 범위 + 시각 → due/end/time 모두 분리", () => {
+    const raw = "- [ ] 출장 --- 2026-06-10..2026-06-12 14:00\n";
+    const items = extractTasks("inbox.md", raw);
+    expect(items[0].text).toBe("출장");
+    expect(items[0].due).toBe("2026-06-10");
+    expect(items[0].end).toBe("2026-06-12");
+    expect(items[0].time).toBe("14:00");
+  });
+
+  it("`..` 없는 기존 단일-날짜 라인은 end 없이 단일로 (회귀 없음, #5)", () => {
+    const raw = "- [ ] 회의 --- 2026-06-10\n";
+    const items = extractTasks("inbox.md", raw);
+    expect(items[0].due).toBe("2026-06-10");
+    expect(items[0].end).toBeUndefined();
+  });
+
+  it("end == start 범위는 단일 취급 (end undefined)", () => {
+    const raw = "- [ ] 단일 --- 2026-06-10..2026-06-10\n";
+    const items = extractTasks("inbox.md", raw);
+    expect(items[0].due).toBe("2026-06-10");
+    expect(items[0].end).toBeUndefined();
+  });
+
+  it("역전 범위(end < start)는 start 만 살림", () => {
+    const raw = "- [ ] 역전 --- 2026-06-12..2026-06-10\n";
+    const items = extractTasks("inbox.md", raw);
+    expect(items[0].due).toBe("2026-06-12");
+    expect(items[0].end).toBeUndefined();
+  });
 });

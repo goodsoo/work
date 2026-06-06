@@ -36,6 +36,7 @@ export function recordTaskUpdate(task: Task, patch: TodoUpdate) {
   if (patch.title !== undefined) before.title = task.title;
   if (patch.priority !== undefined) before.priority = task.priority;
   if (patch.due_date !== undefined) before.due_date = task.due_date;
+  if (patch.end_date !== undefined) before.end_date = task.end_date;
   if (patch.due_time !== undefined) before.due_time = task.due_time;
   if (patch.category !== undefined) before.category = task.category;
   if (patch.source_meeting_uid !== undefined)

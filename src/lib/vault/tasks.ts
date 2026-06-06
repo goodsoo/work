@@ -6,7 +6,8 @@ export interface TaskItem {
   done: boolean;
   cancelled: boolean; // 옵시디안 Tasks plugin convention `- [-]`. done/deleted 와 mutually exclusive.
   deleted: boolean;   // 삭제됨 — soft-delete. custom char `- [D]`. 휴지통 view 에서만 보임.
-  due?: string; // ISO YYYY-MM-DD
+  due?: string; // ISO YYYY-MM-DD (다일 일정이면 시작일)
+  end?: string; // ISO YYYY-MM-DD. 다일 일정의 종료일 (포함). 단일 일정은 undefined.
   time?: string; // HH:MM
   tags: string[];
   source: { file: string; line: number }; // line은 0-based
@@ -20,6 +21,10 @@ const TAG_RE = /(?:^|\s)#([\p{L}\p{N}_-]+)/gu;
 // 채택 X. macOS 스마트 dash 자동 치환은 SourceBodyEditor 가 차단.
 const DUE_SPLIT_RE = / (?:—|---) (.+)$/;
 const ISO_DATE_RE = /(\d{4})-(\d{2})-(\d{2})/;
+// 다일 일정 범위 토큰 `<start>..<end>` (Dataview 날짜범위 관례). `..` 는 마크다운
+// 문법이 아니라 단일-일정 파싱과 충돌하지 않는다 (start 는 ISO_DATE_RE 가 먼저 잡고,
+// 콜론 없는 `..end` 는 TIME_RE 에 안 걸림). 종료 추출은 이 정규식 하나만 신규.
+const DATE_RANGE_RE = /(\d{4}-\d{2}-\d{2})\.\.(\d{4}-\d{2}-\d{2})/;
 const MD_DATE_RE = /(?:^|\s)(\d{1,2})\/(\d{1,2})(?=\s|$)/;
 const TIME_RE = /(?:^|\s)(\d{1,2}):(\d{2})(?=\s|$)/;
 
@@ -59,6 +64,7 @@ export function extractTasks(filePath: string, raw: string): TaskItem[] {
       cancelled,
       deleted,
       due: parsed.due,
+      end: parsed.end,
       time: parsed.time,
       tags: parsed.tags,
       source: { file: filePath, line: i },
@@ -71,6 +77,7 @@ export function extractTasks(filePath: string, raw: string): TaskItem[] {
 interface ParsedContent {
   text: string;
   due?: string;
+  end?: string;
   time?: string;
   tags: string[];
 }
@@ -78,6 +85,7 @@ interface ParsedContent {
 function parseTaskContent(content: string): ParsedContent {
   let remaining = content;
   let due: string | undefined;
+  let end: string | undefined;
   let time: string | undefined;
 
   // 1. tags 추출
@@ -91,11 +99,18 @@ function parseTaskContent(content: string): ParsedContent {
   const dueSplit = remaining.match(DUE_SPLIT_RE);
   if (dueSplit) {
     const duePart = dueSplit[1];
+    // 다일 범위 `<start>..<end>` 우선 — start 는 ISO_DATE_RE 도 첫 날짜로 잡지만,
+    // 명시적 range 매칭으로 end 를 함께 추출. end < start (역전) 는 무효 — start 만 살림.
+    const range = duePart.match(DATE_RANGE_RE);
+    if (range && range[2] >= range[1]) {
+      due = range[1];
+      if (range[2] > range[1]) end = range[2];
+    }
     // ISO date 우선
     const iso = duePart.match(ISO_DATE_RE);
-    if (iso) {
+    if (!due && iso) {
       due = `${iso[1]}-${iso[2]}-${iso[3]}`;
-    } else {
+    } else if (!due) {
       const md = duePart.match(MD_DATE_RE);
       if (md) {
         const year = new Date().getFullYear();
@@ -154,6 +169,7 @@ function parseTaskContent(content: string): ParsedContent {
   return {
     text: remaining.trim(),
     due,
+    end,
     time,
     tags,
   };

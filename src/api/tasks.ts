@@ -23,6 +23,8 @@ export interface Task {
   priority: TaskPriority;
   category: TaskCategory | null;
   due_date: string | null;
+  // 다일 일정의 종료일(포함). null = 단일 일정. due_date 없이는 의미 없음.
+  end_date: string | null;
   due_time: string | null;
   // 메모 → 태스크 ⌘⏎ 로 만든 태스크면 원본 메모 uid. vault 라인엔
   // `#from-<uid>` tag 로 직렬화. uid 영구라 메모 rename 후에도 안 깨짐.
@@ -45,6 +47,7 @@ export interface TaskInsert {
   deleted?: boolean;
   category?: TaskCategory | null;
   due_date?: string | null;
+  end_date?: string | null;
   due_time?: string | null;
   priority?: TaskPriority;
   source_meeting_uid?: string | null;
@@ -65,6 +68,7 @@ export interface TodoUpdate {
   done_at?: string | null;
   category?: TaskCategory | null;
   due_date?: string | null;
+  end_date?: string | null;
   due_time?: string | null;
   priority?: TaskPriority;
   source_meeting_uid?: string | null;
@@ -109,6 +113,7 @@ function todoFromItem(item: TaskItem, mtimeIso?: string): Task {
     priority: priorityTag ?? "medium",
     category: categoryTag ?? null,
     due_date: item.due ?? null,
+    end_date: item.end ?? null,
     due_time: item.time ?? null,
     source_meeting_uid: fromTag ? fromTag.slice(FROM_TAG_PREFIX.length) : null,
     gcal_event_id: gcalTag ? gcalTag.slice(GCAL_TAG_PREFIX.length) : null,
@@ -133,6 +138,7 @@ export function buildTodoLine(input: {
   deleted?: boolean;
   category?: TaskCategory | null;
   due_date?: string | null;
+  end_date?: string | null;
   due_time?: string | null;
   priority?: TaskPriority;
   source_meeting_uid?: string | null;
@@ -153,7 +159,14 @@ export function buildTodoLine(input: {
   let line = `- [${check}] ${sanitizeTaskTitle(input.title)}`;
   if (input.due_date || input.due_time) {
     line += " ---";
-    if (input.due_date) line += ` ${input.due_date}`;
+    if (input.due_date) {
+      // 종료일이 시작일보다 뒤면 `<start>..<end>` 범위로 직렬화 (다일 일정).
+      // 같거나 비었으면 단일 날짜 그대로 (회귀 없음).
+      const hasRange = !!input.end_date && input.end_date > input.due_date;
+      line += hasRange
+        ? ` ${input.due_date}..${input.end_date}`
+        : ` ${input.due_date}`;
+    }
     if (input.due_time) line += ` ${input.due_time}`;
   }
   if (input.category) line += ` #${input.category}`;
@@ -219,6 +232,7 @@ export async function createTodo(
     priority: input.priority ?? "medium",
     category: input.category ?? null,
     due_date: input.due_date ?? null,
+    end_date: input.end_date ?? null,
     due_time: input.due_time ?? null,
     source_meeting_uid: input.source_meeting_uid ?? null,
     gcal_event_id: input.gcal_event_id ?? null,
@@ -266,6 +280,7 @@ export async function updateTask(
           ? patch.category
           : (existing.tags.find(isCategory) ?? null),
       due_date: patch.due_date !== undefined ? patch.due_date : existing.due ?? null,
+      end_date: patch.end_date !== undefined ? patch.end_date : existing.end ?? null,
       due_time: patch.due_time !== undefined ? patch.due_time : existing.time ?? null,
       priority:
         patch.priority ??
