@@ -69,8 +69,16 @@ describe("buildClaudePrompt", () => {
     expect(out).toContain("## 음성 기록");
   });
 
+  it("general 템플릿 — 빠짐없이 자세히 정리 규칙 + 상세 정리 섹션", () => {
+    const out = buildClaudePrompt({ content: "긴 노트" }, "general");
+    expect(out).toContain("다음 내용을 정리해주세요");
+    expect(out).toContain("### 상세 정리");
+    expect(out).toContain("빠짐없이 자세히");
+    expect(out).not.toContain("### 논의 사항"); // 회의록 섹션 안 섞임
+  });
+
   it("모든 템플릿에 '기타' 섹션 + 규칙 문구 포함", () => {
-    for (const id of ["meeting", "work", "lecture"]) {
+    for (const id of ["meeting", "work", "lecture", "general"]) {
       const out = buildClaudePrompt({ content: "x" }, id);
       expect(out).toContain("### 기타");
       expect(out).toContain("'기타' 에 모읍니다");
