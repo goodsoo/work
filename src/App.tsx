@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { VaultGate } from "./components/vault/VaultGate";
+import { VaultImageIndexProvider } from "./lib/markdown/VaultImageIndexProvider";
 import { AppShell } from "./components/nav/AppShell";
 import { GlobalTooltip } from "./components/Tooltip";
 import { ToastProvider, useToast } from "./components/Toast";
@@ -105,14 +106,16 @@ export default function App() {
 
   return (
     <VaultGate>
-      <GlobalTooltip />
-      <ToastProvider>
-        <GcalSyncProvider>
-          <DrawerProvider>
-            <AppContent />
-          </DrawerProvider>
-        </GcalSyncProvider>
-      </ToastProvider>
+      <VaultImageIndexProvider>
+        <GlobalTooltip />
+        <ToastProvider>
+          <GcalSyncProvider>
+            <DrawerProvider>
+              <AppContent />
+            </DrawerProvider>
+          </GcalSyncProvider>
+        </ToastProvider>
+      </VaultImageIndexProvider>
     </VaultGate>
   );
 }

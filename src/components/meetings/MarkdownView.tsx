@@ -1,9 +1,11 @@
-import { cloneElement, createContext, isValidElement, useContext, type ReactNode } from "react";
+import { cloneElement, createContext, isValidElement, useContext, useMemo, type ReactNode } from "react";
 import { Plus } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 import { toggleTaskCheckboxAt } from "../../lib/markdownTask";
+import { expandObsidianEmbeds, makeEmbedResolver } from "../../lib/markdown/obsidianEmbed";
+import { VaultImageIndexContext } from "../../lib/markdown/VaultImageIndexProvider";
 import { vaultAssetSrc } from "../../lib/portfolio/assetUrl";
 import { VaultContext } from "../../lib/vault/VaultProvider";
 
@@ -85,6 +87,13 @@ export function MarkdownView({ content, onChange, onAddTaskFromLine }: Props) {
   // VaultContext 는 provider 밖에서도 null 로 안전 — 테스트 환경 (jsdom) 호환.
   const vaultCtx = useContext(VaultContext);
   const vaultRoot = vaultCtx?.vaultRoot ?? null;
+  // Obsidian `![[파일]]` 임베드 → 표준 이미지 마크다운. 인덱스 없으면(provider 밖/로딩 중)
+  // 원본 그대로 — 미해석 임베드는 텍스트로 보일 뿐 깨지지 않음.
+  const imageIndex = useContext(VaultImageIndexContext);
+  const rendered = useMemo(
+    () => (imageIndex ? expandObsidianEmbeds(content, makeEmbedResolver(imageIndex)) : content),
+    [content, imageIndex],
+  );
   return (
     <div
       // font-size 는 wrapper 에서 inherit — 메모장은 default 1rem, 일기는 15px.
@@ -396,7 +405,7 @@ export function MarkdownView({ content, onChange, onAddTaskFromLine }: Props) {
           ),
         }}
       >
-        {content}
+        {rendered}
       </ReactMarkdown>
     </div>
   );
