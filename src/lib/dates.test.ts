@@ -78,18 +78,18 @@ describe("dates", () => {
     expect(parseLooseDate("그제", ref)).toBe("2026-05-04");
   });
 
-  it("parseLooseDate accepts weekday shortcut → 최근 과거 방향", () => {
+  it("parseLooseDate accepts weekday shortcut → 가까운 미래 방향", () => {
     // 2026-05-06 = 수요일 (Wed)
     expect(parseLooseDate("수", ref)).toBe("2026-05-06"); // 오늘
-    expect(parseLooseDate("화", ref)).toBe("2026-05-05"); // 어제
-    expect(parseLooseDate("월", ref)).toBe("2026-05-04");
-    expect(parseLooseDate("일", ref)).toBe("2026-05-03");
-    expect(parseLooseDate("토", ref)).toBe("2026-05-02");
-    expect(parseLooseDate("금", ref)).toBe("2026-05-01");
-    expect(parseLooseDate("목", ref)).toBe("2026-04-30"); // 저번주 목
+    expect(parseLooseDate("목", ref)).toBe("2026-05-07"); // 내일
+    expect(parseLooseDate("금", ref)).toBe("2026-05-08");
+    expect(parseLooseDate("토", ref)).toBe("2026-05-09");
+    expect(parseLooseDate("일", ref)).toBe("2026-05-10");
+    expect(parseLooseDate("월", ref)).toBe("2026-05-11");
+    expect(parseLooseDate("화", ref)).toBe("2026-05-12"); // 다음주 화
     // 풀 한글
     expect(parseLooseDate("수요일", ref)).toBe("2026-05-06");
-    expect(parseLooseDate("목요일", ref)).toBe("2026-04-30");
+    expect(parseLooseDate("화요일", ref)).toBe("2026-05-12");
   });
 
   it("parseLooseDate accepts varied separators with year omitted", () => {
