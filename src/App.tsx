@@ -533,6 +533,8 @@ function AppContent() {
     // 필터 reset 후 scroll. 사용자는 "그 task 로 이동" 의도가 명확.
     setTaskStatus("all");
     setTaskCategory("all");
+    // 루틴 상세를 보던 중이면 일반 태스크 목록으로 빠져나와야 클릭한 task 가 보임.
+    setSelectedRoutineName(null);
     setScrollToTaskId(id);
     if (window.location.hash !== "#todos") {
       window.history.pushState({ tab: "todos" }, "", "#todos");
