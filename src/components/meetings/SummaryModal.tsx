@@ -160,10 +160,18 @@ export function SummaryModal({ open, onClose, promptInput, onApply }: Props) {
       const msg = res.stderr || (res.errored ? res.text : "");
       if (res.code !== 0 || res.errored || !res.text) {
         if (/not found|command not found/i.test(msg)) {
-          throw new Error("claude CLI 가 안 보입니다. 설치 후 `claude` 로그인을 먼저 하세요.");
+          throw new Error(
+            "자동 요약은 이 컴퓨터에 설치된 Claude(Claude Code)로 실행됩니다.\n" +
+              "Claude 를 찾지 못했습니다. 터미널에서 Claude Code 를 설치하고 `claude` 로 로그인한 뒤 다시 시도하세요.\n" +
+              "지금 바로 요약하려면 위 [직접 붙여넣기] 탭을 사용하세요.",
+          );
         }
         if (/auth|login|unauthor/i.test(msg)) {
-          throw new Error("claude 로그인이 필요합니다. 터미널에서 `claude` 실행 후 인증하세요.");
+          throw new Error(
+            "Claude 로그인이 필요합니다.\n" +
+              "터미널에서 `claude` 를 실행해 로그인한 뒤 다시 시도하세요.\n" +
+              "지금 바로 요약하려면 위 [직접 붙여넣기] 탭을 사용하세요.",
+          );
         }
         if (!res.text) {
           throw new Error(msg.trim() || "응답이 비어있습니다.");
@@ -332,7 +340,7 @@ export function SummaryModal({ open, onClose, promptInput, onApply }: Props) {
                 <Text
                   variant="caption"
                   as="div"
-                  className="rounded-md px-2.5 py-1.5 text-[12px]"
+                  className="rounded-md px-2.5 py-1.5 text-[12px] leading-relaxed whitespace-pre-line"
                   style={{
                     backgroundColor: "var(--accent-red-bg)",
                     color: "var(--accent-red-text)",
