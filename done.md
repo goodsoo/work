@@ -4,6 +4,15 @@
 
 ---
 
+## 2026-06-13
+
+### PR #76 — 앱 확대/축소 (Cmd +/−/0)
+
+- **한 줄 임팩트**: 글자가 작아 안 보일 때 앱 전체를 키웁니다
+- 글자가 작아 잘 안 보일 때가 있다는 dogfood 통증. 브라우저처럼 화면 배율을 조절하는 수단이 없었다.
+- Tauri 네이티브 webview zoom(`setZoom`) 사용 — CSS `zoom` 은 모달 `vh`·툴팁/popover 의 `getBoundingClientRect` 좌표가 비-100% 에서 어긋날 위험이 있어 버림. 네이티브 줌은 브라우저 Cmd+/− 와 동일한 진짜 줌이라 그 quirk 0.
+- `useZoom`(useSyncExternalStore 단일 store) + Cmd+=/+/−/_/0 단축키 + 설정 → 화면 섹션(−/+/기본값 + 현재 %). 80~180% 10% step, localStorage persist 로 재시작 후 유지.
+
 ## 2026-06-07
 
 ### PR #75 — 다일(2일 이상) 일정 — 가로 스팬 바 + gcal 양방향
