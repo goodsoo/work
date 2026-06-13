@@ -33,6 +33,14 @@ const GROUPS: Group[] = [
     ],
   },
   {
+    title: "화면",
+    items: [
+      { keys: ["⌘", "+"], label: "확대", note: "입력 중에도 동작" },
+      { keys: ["⌘", "−"], label: "축소" },
+      { keys: ["⌘", "0"], label: "100% 로 복귀" },
+    ],
+  },
+  {
     title: "메모 sub-tab",
     items: [
       { keys: ["⌥", "Tab"], label: "다음 sub-tab", note: "본문→음성기록→요약, 입력 안에서도" },
