@@ -33,7 +33,10 @@ function vaultAbsPath(adapter: VaultAdapter, relPath: string): string {
   const root = adapter.getRoot();
   if (!root) throw new Error("vault root not set");
   if (relPath.startsWith("/")) throw new Error("expected relative path");
-  if (relPath.includes("..")) throw new Error("path traversal blocked");
+  // 세그먼트 단위 traversal 차단 — substring `..` 는 정상 파일명(`a..b`) 을 오탐.
+  if (relPath.split("/").some((seg) => seg === "..")) {
+    throw new Error("path traversal blocked");
+  }
   const r = root.endsWith("/") ? root.slice(0, -1) : root;
   return `${r}/${relPath}`;
 }

@@ -70,9 +70,16 @@ export interface VaultAdapter {
   watch(callback: (event: VaultWatchEvent) => void): Promise<() => void>;
 }
 
-function joinAbs(root: string, rel: string): string {
+// export 는 테스트용 — 경로 traversal 가드가 정상 파일명을 오탐하지 않는지 회귀 검증.
+export function joinAbs(root: string, rel: string): string {
   if (rel.startsWith("/")) throw new Error(`expected relative path: ${rel}`);
-  if (rel.includes("..")) throw new Error(`path traversal blocked: ${rel}`);
+  // path traversal 차단은 경로 "세그먼트" 단위로 — substring `..` 검사는 제목이
+  // 마침표로 끝나는 노트(`있다.` → `있다..md`)나 `2,3년차.. (커뮤글).md` 같은 정상
+  // 파일명을 오탐해 read 가 throw → scanMeetings 가 그 노트를 통째 skip(사이드바에서
+  // 사라짐) 시키던 버그. `../` 등 진짜 traversal 세그먼트만 차단한다.
+  if (rel.split("/").some((seg) => seg === "..")) {
+    throw new Error(`path traversal blocked: ${rel}`);
+  }
   const r = root.endsWith("/") ? root.slice(0, -1) : root;
   const p = rel.startsWith("./") ? rel.slice(2) : rel;
   return p === "" ? r : `${r}/${p}`;
