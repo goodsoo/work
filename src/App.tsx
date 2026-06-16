@@ -29,6 +29,8 @@ import { TodosTrashModal } from "./components/tasks/TodosTrashModal";
 import { Text } from "./components/common/Text";
 import { EmptyState } from "./components/common/EmptyState";
 import { PageHeaderBar } from "./components/common/PageHeaderBar";
+import { TodayPage } from "./pages/TodayPage";
+import { TodayAgendaPanel } from "./components/today/TodayAgendaPanel";
 import { CalendarPage } from "./pages/CalendarPage";
 import { TasksPage } from "./pages/TasksPage";
 import { PortfolioPage } from "./pages/PortfolioPage";
@@ -62,11 +64,12 @@ import { isTauri } from "./lib/isTauri";
 function readTabFromHash(): Tab {
   const h = window.location.hash;
   if (h.startsWith("#meeting-")) return "meetings";
+  if (h === "#today") return "today";
   if (h === "#calendar") return "calendar";
   if (h === "#meetings") return "meetings";
   if (h === "#todos") return "todos";
   if (h === "#portfolio") return "portfolio";
-  // 빈 hash = 첫 탭 (캘린더). nav-restructure 후 캘린더가 default landing.
+  // 빈 hash = 첫 탭 ("오늘"). SIMPLIFY: "오늘" 대시보드가 default landing.
   return TABS[0].id;
 }
 
@@ -368,7 +371,7 @@ function AppContent() {
         setQuickSwitcherOpen((v) => !v);
         return;
       }
-      const idx = "1234".indexOf(e.key);
+      const idx = "123456789".indexOf(e.key);
       if (idx === -1) return;
       const target = TABS[idx];
       if (!target) return;
@@ -549,6 +552,36 @@ function AppContent() {
     window.history.pushState({ meetingId: id }, "", `#meeting-${id}`);
   }
 
+  // "오늘" 대시보드의 "새 노트" — root 폴더에 생성 후 메모장 탭으로 이동.
+  async function createNoteFromToday() {
+    if (createMeetingMutation.isPending) return;
+    try {
+      const created = await createMeetingMutation.mutateAsync({
+        title: null,
+        date: todayIso(),
+        time: null,
+        attendees: null,
+        content: "",
+        summary: null,
+        folder: "",
+      });
+      requestMeetingReveal("");
+      openMeeting(created.uid);
+    } catch {
+      toast.show("노트 생성에 실패했습니다. 잠시 후 다시 시도하세요.");
+    }
+  }
+
+  // "오늘" 아젠다의 날짜 헤더 클릭 — 캘린더 탭으로 이동해 그 날짜 선택 (깊게 보기).
+  function openCalendarDate(date: string) {
+    drawer.close();
+    setCalendarDate(date);
+    setTab("calendar");
+    if (window.location.hash !== "#calendar") {
+      window.history.pushState({ tab: "calendar" }, "", "#calendar");
+    }
+  }
+
   function openTask(id: string) {
     drawer.close();
     setTab("todos");
@@ -651,7 +684,15 @@ function AppContent() {
 
   // Side panel per tab (모바일에선 drawer, 데스크탑에선 3-pane 왼쪽 컬럼).
   const sidePanel =
-    tab === "meetings" ? (
+    tab === "today" ? (
+      // "오늘" 사이드바 = 다가오는 일정 아젠다 (캘린더 그리드의 "날짜 훑기" 역할 대체).
+      // 메인 대시보드는 오늘 고정 — 날짜 헤더 클릭 시 캘린더 탭에서 그 날짜 상세.
+      <TodayAgendaPanel
+        onOpenMeeting={openMeeting}
+        onOpenTask={openTask}
+        onOpenDate={openCalendarDate}
+      />
+    ) : tab === "meetings" ? (
       <MeetingsSidePanel
         selectedId={selectedMeetingId}
         onSelect={openMeeting}
@@ -717,7 +758,14 @@ function AppContent() {
       onOpenSearch={() => setQuickSwitcherOpen(true)}
     >
       <PrefetchWarmup />
-      {tab === "meetings" ? (
+      {tab === "today" ? (
+        <TodayPage
+          onOpenMeeting={openMeeting}
+          onOpenTask={openTask}
+          onOpenRoutine={openRoutine}
+          onCreateNote={() => void createNoteFromToday()}
+        />
+      ) : tab === "meetings" ? (
         selectedMeetingId ? (
           <MeetingForm
             // 메모 전환 시 강제 remount — titleDraft 등 useState 가 reconcile 로 옛
