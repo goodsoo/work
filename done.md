@@ -4,6 +4,15 @@
 
 ---
 
+## 2026-06-16
+
+### PR #77 — 제목이 마침표로 끝나는 노트가 사이드바에서 사라지던 버그
+
+- **한 줄 임팩트**: 마침표로 끝나는 제목의 노트가 다시 보입니다
+- path traversal 가드가 substring `..` 로 검사해 `있다.` → 파일명 `있다..md` 같은 정상 파일명을 오탐 → read 가 throw → scanMeetings 가 그 노트를 통째 skip → 사이드바·캘린더·검색 어디에도 안 나타남 (데이터는 디스크에 멀쩡한데 표시만 누락되는 silent data loss).
+- 세그먼트 단위 검사(`split("/").some(seg => seg === "..")`)로 교체 — 진짜 `../` 만 차단하고 정상 파일명은 통과. adapter.ts(노트 read 경로) + imageDownload.ts(포트폴리오 첨부)의 동일 가드 둘 다 수정.
+- joinAbs export + adapter.test.ts 회귀 테스트 (오탐 통과 + 진짜 traversal 차단 양쪽 검증).
+
 ## 2026-06-13
 
 ### PR #76 — 앱 확대/축소 (Cmd +/−/0)
