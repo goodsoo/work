@@ -1,6 +1,6 @@
 import type { TaskCategory } from "../api/tasks";
 
-// 할 일 카테고리별 시맨틱 색 단일 lookup. MonthGrid dot / SidePanel 체크박스 /
+// 할 일 카테고리별 시맨틱 색 단일 lookup. 오늘 사이드바 dot / SidePanel 체크박스 /
 // TaskRow 체크박스 모두 이 함수만 거침. 카테고리 추가 시 여기 + index.css 토큰만
 // 늘리면 됨.
 //

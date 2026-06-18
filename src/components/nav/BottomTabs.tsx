@@ -1,7 +1,7 @@
-import { Sun, Calendar, FileText, CheckSquare, LayoutGrid } from "lucide-react";
+import { Sun, FileText, CheckSquare, LayoutGrid } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
-export type Tab = "today" | "meetings" | "calendar" | "todos" | "portfolio";
+export type Tab = "today" | "meetings" | "todos" | "portfolio";
 
 type Props = {
   activeTab: Tab;
@@ -11,12 +11,12 @@ type Props = {
 // SidePanel / ActivityBar / 단축키 분기에서 공유. 함수/상수도 같은 파일에서 export.
 // eslint-disable-next-line react-refresh/only-export-components
 // 순서 = 사용 빈도 + Cmd+1.. 의미 (App.tsx 단축키가 TABS index 기반).
-// "오늘" 이 기본 진입 (SIMPLIFY: 매일 처음 보는 화면). 캘린더는 특정 날짜 훑기용으로 강등.
+// "오늘" 이 기본 진입 (SIMPLIFY: 매일 처음 보는 화면). 캘린더 탭은 폐기 —
+// 날짜 훑기·일기 진입은 "오늘" 탭 사이드바(세로 날짜 리스트)가 흡수.
 export const TABS: Array<{ id: Tab; label: string; icon: LucideIcon }> = [
   { id: "today", label: "오늘", icon: Sun },
   { id: "meetings", label: "메모장", icon: FileText },
   { id: "todos", label: "할 일", icon: CheckSquare },
-  { id: "calendar", label: "캘린더", icon: Calendar },
   { id: "portfolio", label: "포트폴리오", icon: LayoutGrid },
 ];
 

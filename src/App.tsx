@@ -15,7 +15,6 @@ import {
   MeetingsSidePanel,
   MeetingsSidePanelFooter,
   PortfolioSidePanelFooter,
-  CalendarDayPanel,
   TodosSidePanel,
   TodosSidePanelFooter,
   type TaskStatusFilter,
@@ -31,7 +30,7 @@ import { EmptyState } from "./components/common/EmptyState";
 import { PageHeaderBar } from "./components/common/PageHeaderBar";
 import { TodayPage } from "./pages/TodayPage";
 import { TodayAgendaPanel } from "./components/today/TodayAgendaPanel";
-import { CalendarPage } from "./pages/CalendarPage";
+import { JournalOverlay } from "./components/calendar/JournalOverlay";
 import { TasksPage } from "./pages/TasksPage";
 import { PortfolioPage } from "./pages/PortfolioPage";
 import { StyleguidePage } from "./pages/StyleguidePage";
@@ -65,7 +64,6 @@ function readTabFromHash(): Tab {
   const h = window.location.hash;
   if (h.startsWith("#meeting-")) return "meetings";
   if (h === "#today") return "today";
-  if (h === "#calendar") return "calendar";
   if (h === "#meetings") return "meetings";
   if (h === "#todos") return "todos";
   if (h === "#portfolio") return "portfolio";
@@ -130,7 +128,9 @@ function AppContent() {
   const [selectedMeetingId, setSelectedMeetingId] = useState<string | null>(() =>
     readMeetingFromHash(),
   );
-  const [calendarDate, setCalendarDate] = useState<string>(todayIso());
+  // 일기 오버레이 — null = 닫힘. 메인 "오늘 일기" 블록 + 사이드바 날짜 헤더 클릭이
+  // 모두 이 한 오버레이를 연다 (캘린더 탭 폐기 후 유일한 일기 진입점).
+  const [journalDate, setJournalDate] = useState<string | null>(null);
   const [taskStatus, setTaskStatus] = useState<TaskStatusFilter>("all");
   const [taskCategory, setTaskCategory] = useState<TaskCategoryFilter>("all");
   const [taskSortKey, setTaskSortKey] = useTaskSort();
@@ -159,7 +159,7 @@ function AppContent() {
     window.addEventListener("todos:add-request", handler);
     return () => window.removeEventListener("todos:add-request", handler);
   }, []);
-  // 캘린더 사이드바의 task 클릭으로 진입 시 TasksPage 가 한 번 scroll 후 clear.
+  // 오늘 대시보드/사이드바의 task 클릭으로 진입 시 TasksPage 가 한 번 scroll 후 clear.
   const [scrollToTaskId, setScrollToTaskId] = useState<string | null>(null);
   const [portfolioSortKey, setPortfolioSortKey] = usePortfolioSort();
   const portfolioCategoryFilter = usePortfolioCategoryFilter();
@@ -353,7 +353,7 @@ function AppContent() {
   }, []);
 
   // Desktop (Tauri) 전용 단축키: Cmd+1/2/3/4 (TABS index 기반), Cmd+\ (사이드바 토글).
-  // 탭 순서 바뀌면 단축키 의미도 자동 swap (캘린더 첫번째 → Cmd+1=캘린더).
+  // 탭 순서 바뀌면 단축키 의미도 자동 swap (오늘 첫번째 → Cmd+1=오늘).
   useEffect(() => {
     if (!isTauri) return;
     function onKeyDown(e: KeyboardEvent) {
@@ -572,14 +572,9 @@ function AppContent() {
     }
   }
 
-  // "오늘" 아젠다의 날짜 헤더 클릭 — 캘린더 탭으로 이동해 그 날짜 선택 (깊게 보기).
-  function openCalendarDate(date: string) {
-    drawer.close();
-    setCalendarDate(date);
-    setTab("calendar");
-    if (window.location.hash !== "#calendar") {
-      window.history.pushState({ tab: "calendar" }, "", "#calendar");
-    }
+  // 일기 오버레이 열기 — 메인 "오늘 일기" (date=오늘) + 사이드바 날짜 헤더 (그날).
+  function openJournal(date: string) {
+    setJournalDate(date);
   }
 
   function openTask(id: string) {
@@ -685,13 +680,9 @@ function AppContent() {
   // Side panel per tab (모바일에선 drawer, 데스크탑에선 3-pane 왼쪽 컬럼).
   const sidePanel =
     tab === "today" ? (
-      // "오늘" 사이드바 = 다가오는 일정 아젠다 (캘린더 그리드의 "날짜 훑기" 역할 대체).
-      // 메인 대시보드는 오늘 고정 — 날짜 헤더 클릭 시 캘린더 탭에서 그 날짜 상세.
-      <TodayAgendaPanel
-        onOpenMeeting={openMeeting}
-        onOpenTask={openTask}
-        onOpenDate={openCalendarDate}
-      />
+      // "오늘" 사이드바 = 세로 날짜 리스트 (폐기된 캘린더 탭의 날짜 훑기·일기 진입 흡수).
+      // 메인 대시보드는 오늘 고정 — 날짜 헤더 클릭 시 그날 일기 오버레이.
+      <TodayAgendaPanel onOpenTask={openTask} onOpenJournal={openJournal} />
     ) : tab === "meetings" ? (
       <MeetingsSidePanel
         selectedId={selectedMeetingId}
@@ -702,13 +693,6 @@ function AppContent() {
         onRevealFolder={requestMeetingReveal}
         markdownHelpOpen={markdownHelpOpen}
         onMarkdownHelpClose={() => setMarkdownHelpOpen(false)}
-      />
-    ) : tab === "calendar" ? (
-      <CalendarDayPanel
-        selectedDate={calendarDate}
-        onOpenMeeting={openMeeting}
-        onOpenTask={openTask}
-        onOpenRoutine={openRoutine}
       />
     ) : tab === "todos" ? (
       <TodosSidePanel
@@ -764,6 +748,7 @@ function AppContent() {
           onOpenTask={openTask}
           onOpenRoutine={openRoutine}
           onCreateNote={() => void createNoteFromToday()}
+          onOpenJournal={() => openJournal(todayIso())}
         />
       ) : tab === "meetings" ? (
         selectedMeetingId ? (
@@ -784,11 +769,6 @@ function AppContent() {
         ) : (
           <MeetingsEmpty count={meetings.data?.length ?? 0} loading={meetings.isLoading} />
         )
-      ) : tab === "calendar" ? (
-        <CalendarPage
-          targetDate={calendarDate}
-          onSelectedDateChange={setCalendarDate}
-        />
       ) : tab === "portfolio" ? (
         <PortfolioPage
           activeFilter={portfolioFilter}
@@ -865,15 +845,9 @@ function AppContent() {
               openTask(entry.id);
               return;
             case "journal":
-              // 일기 = 캘린더 탭의 그 날짜로 이동. 사이드 panel 의 "일기 보기" 가
-              // 1-click — detail 모달 자동 open 은 follow-up (selectedDate prop
-              // 만 갱신해도 충분히 빠른 라우팅).
+              // 일기 = 그 날짜 일기 오버레이 바로 열기 (캘린더 탭 폐기 후 단일 진입점).
               drawer.close();
-              setCalendarDate(entry.id);
-              setTab("calendar");
-              if (window.location.hash !== "#calendar") {
-                window.history.pushState({ tab: "calendar" }, "", "#calendar");
-              }
+              openJournal(entry.id);
               return;
             case "portfolio":
               // 포트폴리오 탭으로 이동. 카드 정확 위치 scroll 은 follow-up (PortfolioPage
@@ -892,6 +866,11 @@ function AppContent() {
         onClose={() => setTaskAddOpen(false)}
         defaultType={taskAddType}
         prefill={taskAddPrefill}
+      />
+      <JournalOverlay
+        open={journalDate !== null}
+        date={journalDate ?? todayIso()}
+        onClose={() => setJournalDate(null)}
       />
     </AppShell>
   );

@@ -1,11 +1,19 @@
 import { useMemo, useState, type ReactNode } from "react";
-import { CalendarDays, CheckSquare, Repeat, FileText, Plus } from "lucide-react";
+import {
+  CalendarDays,
+  CheckSquare,
+  Repeat,
+  FileText,
+  Plus,
+  BookOpen,
+} from "lucide-react";
 import { Button } from "../components/common/Button";
 import { Text } from "../components/common/Text";
 import { PageHeaderBar } from "../components/common/PageHeaderBar";
 import { CheckboxButton } from "../components/tasks/CheckboxButton";
 import { useMeetings } from "../hooks/useMeetings";
 import { useTasks, useUpdateTask, useCreateTask } from "../hooks/useTasks";
+import { useJournals } from "../hooks/useJournals";
 import { useActiveRoutines, useToggleRoutineDay } from "../hooks/useRoutines";
 import type { Task } from "../api/tasks";
 import {
@@ -21,7 +29,19 @@ type Props = {
   onOpenRoutine: (name: string) => void;
   // 새 노트 생성 + 자동 선택. App 이 root 폴더에 만들고 메모장 탭으로 이동.
   onCreateNote: () => void;
+  // 오늘 일기 오버레이 열기 (App 이 소유 — 사이드바 과거 날짜 일기와 같은 오버레이).
+  onOpenJournal: () => void;
 };
+
+// 일기 미리보기용 — 첫 non-empty 줄을 제목처럼. ATX heading prefix 만 strip
+// (사이드바 일기 미리보기와 동일 규칙).
+function journalPreview(content: string | undefined): string {
+  const first = content
+    ?.split("\n")
+    .map((l) => l.trim())
+    .find((l) => l.length > 0);
+  return first?.replace(/^#+\s+/, "") || "(내용 없음)";
+}
 
 // 최근 수정 노트 표시 개수 — "이어서 쓸 노트" 동선용으로 4-5개면 충분.
 const RECENT_NOTES = 5;
@@ -42,10 +62,12 @@ export function TodayPage({
   onOpenTask,
   onOpenRoutine,
   onCreateNote,
+  onOpenJournal,
 }: Props) {
   const today = todayIso();
   const meetingsQ = useMeetings();
   const tasksQ = useTasks();
+  const journalsQ = useJournals();
   const routines = useActiveRoutines(today);
   const updateTask = useUpdateTask();
   const createTask = useCreateTask();
@@ -94,6 +116,10 @@ export function TodayPage({
       .sort((a, b) => b.mtime - a.mtime)
       .slice(0, RECENT_NOTES);
   }, [meetingsQ.data]);
+
+  // 오늘 일기 — 있으면 첫 줄 미리보기, 없으면 쓰기 CTA.
+  const todayJournal =
+    (journalsQ.data ?? []).find((j) => j.date === today) ?? null;
 
   function handleToggleTask(t: Task) {
     updateTask.mutate({ id: t.id, patch: { done: !t.done } });
@@ -305,6 +331,27 @@ export function TodayPage({
                 </Row>
               ))
             )}
+          </Section>
+
+          {/* 5. 오늘 일기 — 하루를 닫는 회고. 클릭 = 일기 오버레이 (사이드바 과거
+              날짜 일기와 같은 오버레이). 없으면 쓰기 CTA, 있으면 첫 줄 미리보기. */}
+          <Section icon={<BookOpen className="h-4 w-4" />} title="오늘 일기">
+            <Row onClick={onOpenJournal}>
+              <BookOpen
+                className="h-3.5 w-3.5 shrink-0"
+                style={{ color: "var(--text-muted)" }}
+              />
+              <span
+                className="min-w-0 flex-1 truncate"
+                style={{
+                  color: todayJournal
+                    ? "var(--text-primary)"
+                    : "var(--text-muted)",
+                }}
+              >
+                {todayJournal ? journalPreview(todayJournal.content) : "일기 쓰기"}
+              </span>
+            </Row>
           </Section>
         </div>
       </div>
