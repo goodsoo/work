@@ -50,5 +50,14 @@ if ! win_id="$(swift "$script_dir/find-window.swift" 2>/dev/null)"; then
   exit 1
 fi
 
-screencapture -l"$win_id" -o "$out"
+# screencapture 는 호출 프로세스에 화면 기록 권한이 필요. tmux 안에서 돌리면 권한
+# 책임이 tmux 서버로 잡혀 막히는 경우가 많다(빈 파일/실패). 그 땐 권한 불필요한
+# 네이티브 캡쳐 + import-screenshot.sh 경로로 안내.
+if ! screencapture -l"$win_id" -o "$out" 2>/dev/null || [[ ! -s "$out" ]]; then
+  rm -f "$out"
+  echo "✗ 창 캡쳐 실패 — 화면 기록 권한 문제일 수 있습니다 (tmux 안이면 흔함)." >&2
+  echo "  권한 없이 찍는 법: Cmd+Shift+4 → Space → 창 클릭 으로 찍은 뒤" >&2
+  echo "    scripts/import-screenshot.sh $phase ${n:+$n}" >&2
+  exit 1
+fi
 echo "$out"
