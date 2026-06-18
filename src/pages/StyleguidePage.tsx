@@ -462,7 +462,7 @@ export function StyleguidePage() {
               size="sm"
               leftIcon={<ArrowLeft className="h-4 w-4" />}
               onClick={() => {
-                window.location.hash = "#calendar";
+                window.location.hash = "#today";
               }}
             >
               앱으로

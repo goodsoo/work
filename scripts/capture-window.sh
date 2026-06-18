@@ -41,14 +41,12 @@ if [[ -z "$n" ]]; then
 fi
 out="$dir/$slug-$phase-$n.png"
 
-# 창 제목 = 앱이 부팅 시 setTitle 한 값 (applyDevWindowTitle). 못 찾으면 finder 가
-# 앱 창 1개 fallback 으로 처리하고, 여러 개 + 제목 매칭 실패면 비어 나온다.
-title="짱수 · $branch"
-if ! win_id="$(swift "$script_dir/find-window.swift" "$title" 2>/dev/null)"; then
-  echo "✗ 창을 찾지 못했습니다." >&2
+# 제목에 의존하지 않고 "화면 앞에 있는 앱 창" 을 잡는다 (dev 창 제목이 "app" 으로
+# 남는 환경 때문). 캡쳐할 창을 앞으로 가져온 뒤(클릭) 실행하면 그 창이 잡힌다.
+if ! win_id="$(swift "$script_dir/find-window.swift" 2>/dev/null)"; then
+  echo "✗ 앱 창을 찾지 못했습니다." >&2
   echo "  · dev 앱이 떠있는지 확인하세요 (bun run tauri:dev)." >&2
-  echo "  · 세션 창이 여러 개면 각 창 제목이 '짱수 · {브랜치}' 여야 구분됩니다" >&2
-  echo "    (최신 코드로 dev 를 다시 띄우면 제목이 자동으로 박힙니다)." >&2
+  echo "  · 캡쳐할 창을 화면 앞으로 가져온 뒤(클릭) 다시 실행하세요." >&2
   exit 1
 fi
 
