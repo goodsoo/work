@@ -56,7 +56,9 @@ function nowIso(): string {
 }
 
 function taskToFields(t: Task): ScheduleFields {
-  return { title: t.title, date: t.due_date, endDate: t.end_date, time: t.due_time };
+  // 着수 2: task 에서 end_date(다일) 제거 — 다일은 일정(schedule.md) 전용. gcal
+  // 재연결(着수 4)에서 schedule.md 이벤트의 범위를 직접 매핑한다.
+  return { title: t.title, date: t.due_date, endDate: null, time: t.due_time };
 }
 
 // events.delete 는 이미 삭제된 이벤트에 410/404 를 줄 수 있다 — 멱등 삭제이므로 무시.
@@ -155,9 +157,7 @@ async function applyAction(ctx: ApplyCtx, action: ReconcileAction): Promise<void
       // 폰/웹에서 직접 추가된 원격 이벤트 → 로컬 일정 task 생성 + 앵커.
       const created = await createTodo(adapter, {
         title: action.fields.title,
-        category: "schedule",
         due_date: action.fields.date,
-        end_date: action.fields.endDate,
         due_time: action.fields.time,
         gcal_event_id: action.eventId,
       });
@@ -178,7 +178,6 @@ async function applyAction(ctx: ApplyCtx, action: ReconcileAction): Promise<void
         const updated = await updateTask(adapter, task.id, {
           title: action.fields.title,
           due_date: action.fields.date,
-          end_date: action.fields.endDate,
           due_time: action.fields.time,
         });
         markSelfWrite?.(updated._source.file);

@@ -13,9 +13,11 @@ import { PageHeaderBar } from "../components/common/PageHeaderBar";
 import { CheckboxButton } from "../components/tasks/CheckboxButton";
 import { useMeetings } from "../hooks/useMeetings";
 import { useTasks, useUpdateTask, useCreateTask } from "../hooks/useTasks";
+import { useSchedule } from "../hooks/useSchedule";
 import { useJournals } from "../hooks/useJournals";
 import { useActiveRoutines, useToggleRoutineDay } from "../hooks/useRoutines";
 import type { Task } from "../api/tasks";
+import type { ScheduleEvent } from "../api/schedule";
 import {
   todayIso,
   formatDateLong,
@@ -31,6 +33,8 @@ type Props = {
   onCreateNote: () => void;
   // 오늘 일기 오버레이 열기 (App 이 소유 — 사이드바 과거 날짜 일기와 같은 오버레이).
   onOpenJournal: () => void;
+  // 날짜 상세 모달 열기 (일정 보기/편집 + 일기 + 그 날 노트). App 이 소유.
+  onOpenDay: (date: string) => void;
 };
 
 // 일기 미리보기용 — 첫 non-empty 줄을 제목처럼. ATX heading prefix 만 strip
@@ -63,10 +67,12 @@ export function TodayPage({
   onOpenRoutine,
   onCreateNote,
   onOpenJournal,
+  onOpenDay,
 }: Props) {
   const today = todayIso();
   const meetingsQ = useMeetings();
   const tasksQ = useTasks();
+  const scheduleQ = useSchedule();
   const journalsQ = useJournals();
   const routines = useActiveRoutines(today);
   const updateTask = useUpdateTask();
@@ -74,29 +80,23 @@ export function TodayPage({
   const toggleRoutineDay = useToggleRoutineDay();
   const [quickTask, setQuickTask] = useState("");
 
-  // 오늘 일정 (category="schedule") — 오늘 날짜를 포함하는 이벤트. 다일 일정도 포함.
-  // 이벤트는 "완료" 개념이 없어 체크박스 없이 시각 + 제목만. 클릭 = 할 일 탭에서 편집.
-  const events = useMemo<Task[]>(() => {
-    const list = (tasksQ.data ?? []).filter((t) => {
-      if (t.deleted || t.cancelled) return false;
-      if (t.category !== "schedule") return false;
-      if (!t.due_date) return false;
-      if (t.end_date && t.end_date > t.due_date) {
-        return t.due_date <= today && today <= t.end_date;
-      }
-      return t.due_date === today;
+  // 오늘 일정 — schedule.md 이벤트 중 오늘 날짜를 포함하는 것. 다일 일정도 포함.
+  // 이벤트는 "완료" 개념이 없어 체크박스 없이 시각 + 제목만. 클릭 = 날짜 상세 모달.
+  const events = useMemo<ScheduleEvent[]>(() => {
+    const list = (scheduleQ.data ?? []).filter((e) => {
+      if (e.end && e.end > e.start) return e.start <= today && today <= e.end;
+      return e.start === today;
     });
     return list.sort(
-      (a, b) => byTime(a.due_time, b.due_time) || (a.title < b.title ? -1 : 1),
+      (a, b) => byTime(a.time, b.time) || (a.text < b.text ? -1 : 1),
     );
-  }, [tasksQ.data, today]);
+  }, [scheduleQ.data, today]);
 
-  // 오늘·밀린 할 일 (일정 제외) — 오늘 마감 + 지난 미완료. 날짜 없는 inbox 는 제외.
+  // 오늘·밀린 할 일 — 오늘 마감 + 지난 미완료. 날짜 없는 inbox 는 제외.
   // 밀린(지난 날짜 미완료) 은 빨강. 오늘 완료한 것도 노출 (체크 해제 가능).
   const tasks = useMemo<Task[]>(() => {
     const list = (tasksQ.data ?? []).filter((t) => {
       if (t.deleted || t.cancelled) return false;
-      if (t.category === "schedule") return false;
       if (!t.due_date) return false;
       if (t.done) return t.due_date === today;
       // 미완료: 오늘 이전(밀린) 또는 오늘.
@@ -128,7 +128,7 @@ export function TodayPage({
   function handleQuickAdd() {
     const title = quickTask.trim();
     if (!title) return;
-    createTask.mutate({ title, due_date: today, category: null });
+    createTask.mutate({ title, due_date: today });
     setQuickTask("");
   }
 
@@ -176,19 +176,19 @@ export function TodayPage({
             {events.length === 0 ? (
               <EmptyLine>오늘 일정이 없습니다.</EmptyLine>
             ) : (
-              events.map((t) => (
-                <Row key={t.id} onClick={() => onOpenTask(t.id)}>
+              events.map((e) => (
+                <Row key={e.id} onClick={() => onOpenDay(today)}>
                   <span
                     className="w-12 shrink-0 text-[12px] tabular-nums"
                     style={{ color: "var(--text-muted)" }}
                   >
-                    {t.due_time ?? "종일"}
+                    {e.time ?? "종일"}
                   </span>
                   <span
                     className="min-w-0 flex-1 truncate"
                     style={{ color: "var(--text-primary)" }}
                   >
-                    {t.title}
+                    {e.text}
                   </span>
                 </Row>
               ))
@@ -210,7 +210,6 @@ export function TodayPage({
                   <Row key={t.id} onClick={() => onOpenTask(t.id)}>
                     <CheckboxButton
                       status={t.done ? "done" : "pending"}
-                      category={t.category}
                       onClick={() => handleToggleTask(t)}
                     />
                     <span
@@ -259,7 +258,6 @@ export function TodayPage({
                   <Row key={r.name} onClick={() => onOpenRoutine(r.name)}>
                     <CheckboxButton
                       status={done ? "done" : "pending"}
-                      category={null}
                       shape="circle"
                       onClick={() =>
                         toggleRoutineDay.mutate({

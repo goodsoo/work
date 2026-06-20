@@ -11,30 +11,23 @@ import {
   useTaskUndoShortcut,
 } from "../hooks/useTaskHistory";
 import {
-  TASK_CATEGORIES,
   type Task,
   type TaskPriority,
-  type TaskCategory,
 } from "../api/tasks";
-import { categoryColor } from "../lib/taskCategory";
 import { TaskRow } from "../components/tasks/TaskRow";
 import { SyncStatusChip } from "../components/tasks/SyncStatusChip";
 import { PageHeaderBar } from "../components/common/PageHeaderBar";
 import { Button } from "../components/common/Button";
 import { Text } from "../components/common/Text";
-import { SelectableChip } from "../components/common/SelectableChip";
 import { EmptyState } from "../components/common/EmptyState";
-import type {
-  TaskCategoryFilter,
-  TaskStatusFilter,
-} from "../components/nav/SidePanel";
+import type { TaskStatusFilter } from "../components/nav/SidePanel";
 import { type TaskSortKey } from "../hooks/useTaskSort";
 import { TaskSortMenu } from "../components/tasks/TaskSortMenu";
 
 type Props = {
   statusFilter?: TaskStatusFilter;
-  categoryFilter?: TaskCategoryFilter;
-  onCategoryChange?: (next: TaskCategoryFilter) => void;
+  // 선택된 프로젝트 파일(`tasks/{이름}.md`). null = 전체(모든 프로젝트 가로질러).
+  projectFilter?: string | null;
   sortKey?: TaskSortKey;
   onSortKeyChange?: (next: TaskSortKey) => void;
   // 캘린더 사이드바 task 클릭으로 진입 시 해당 row 로 scroll. 한 번 처리 후 clear.
@@ -44,8 +37,7 @@ type Props = {
 
 export function TasksPage({
   statusFilter = "all",
-  categoryFilter = "all",
-  onCategoryChange,
+  projectFilter = null,
   sortKey = "date_asc",
   onSortKeyChange,
   scrollToTaskId = null,
@@ -54,19 +46,6 @@ export function TasksPage({
   const { data, isLoading, error, refetch } = useTasks();
   const updateMutation = useUpdateTask();
   const deleteMutation = useDeleteTask();
-
-  // 카테고리별 카운트 — cancelled/deleted 제외. 카테고리 chip 의 dim 처리에 사용.
-  const categoryCounts = useMemo(() => {
-    const map = new Map<TaskCategory | "uncategorized", number>();
-    let uncategorized = 0;
-    for (const t of data ?? []) {
-      if (t.deleted || t.cancelled) continue;
-      if (!t.category) uncategorized++;
-      else map.set(t.category, (map.get(t.category) ?? 0) + 1);
-    }
-    map.set("uncategorized", uncategorized);
-    return map;
-  }, [data]);
 
   const { canUndo, canRedo, undo, redo } = useTaskUndo();
 
@@ -78,6 +57,10 @@ export function TasksPage({
     // deleted 는 항상 list 에서 제외 (휴지통 modal 에서만 보임). cancelled 는
     // 별도 view — cancelled view 에선 카테고리 필터 무시.
     let filtered = all.filter((t) => !t.deleted);
+    // 프로젝트 필터 — 선택된 프로젝트 파일이면 그 파일 task 만. null = 전체.
+    if (projectFilter) {
+      filtered = filtered.filter((t) => t._source.file === projectFilter);
+    }
     if (statusFilter === "cancelled") {
       filtered = filtered.filter((t) => t.cancelled);
     } else {
@@ -86,10 +69,6 @@ export function TasksPage({
         filtered = filtered.filter((t) => !t.done);
       else if (statusFilter === "done")
         filtered = filtered.filter((t) => t.done);
-      if (categoryFilter === "uncategorized")
-        filtered = filtered.filter((t) => !t.category);
-      else if (categoryFilter !== "all")
-        filtered = filtered.filter((t) => t.category === categoryFilter);
     }
     const copy = filtered.slice();
     // 정렬 기준은 due_date + due_time. **null first** — 날짜 미적용 task 는 최상단
@@ -121,7 +100,7 @@ export function TasksPage({
       copy.sort((a, b) => cmpDate(a, b, false));
     }
     return copy;
-  }, [data, statusFilter, categoryFilter, sortKey]);
+  }, [data, statusFilter, projectFilter, sortKey]);
 
   // 캘린더 사이드바에서 태스크 클릭 → 할 일 탭 진입 시 해당 row 로 부드럽게 scroll 후
   // 편집모드 자동 진입 (el.click() 이 TaskRow li 의 onClick → setEditing(true) 트리거).
@@ -163,9 +142,7 @@ export function TasksPage({
       title?: string;
       priority?: TaskPriority;
       due_date?: string | null;
-      end_date?: string | null;
       due_time?: string | null;
-      category?: TaskCategory | null;
       source_meeting_uid?: string | null;
       done?: boolean;
       cancelled?: boolean;
@@ -229,14 +206,8 @@ export function TasksPage({
         }
         right={<SyncStatusChip />}
       />
-      {onCategoryChange ? (
-        <CategoryChipRow
-          selected={categoryFilter}
-          counts={categoryCounts}
-          onChange={onCategoryChange}
-          sortKey={sortKey}
-          onSortKeyChange={onSortKeyChange}
-        />
+      {onSortKeyChange ? (
+        <TasksToolbar sortKey={sortKey} onSortKeyChange={onSortKeyChange} />
       ) : null}
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto">
@@ -273,7 +244,7 @@ export function TasksPage({
         <TasksEmptyState />
       ) : (
         <ul
-          key={`${statusFilter}-${categoryFilter}-${sortKey}`}
+          key={`${statusFilter}-${projectFilter ?? "all"}-${sortKey}`}
           className="mt-2 space-y-2"
         >
           {tasks.map((t) => (
@@ -283,6 +254,8 @@ export function TasksPage({
               onToggle={handleToggle}
               onUpdate={handleUpdate}
               onDelete={handleDelete}
+              // 전체 뷰에서만 프로젝트(파일) 칩 — 특정 프로젝트 선택 시엔 자명해 생략.
+              showProjectChip={projectFilter === null}
             />
           ))}
         </ul>
@@ -293,20 +266,14 @@ export function TasksPage({
   );
 }
 
-// 페이지 헤더 아래 sub-header — 카테고리 chip group (single radio). 작업 페이지의
-// 같은 자리와 동일 패턴. "전체 / 미분류 / 업무 / 일정 / 기타" 5개 chip 가로 wrap.
-function CategoryChipRow({
-  selected,
-  counts,
-  onChange,
+// 페이지 헤더 아래 sub-header — 정렬 메뉴만. (카테고리 축은 모델 분리로 폐기,
+// 프로젝트 선택은 사이드바가 담당.)
+function TasksToolbar({
   sortKey,
   onSortKeyChange,
 }: {
-  selected: TaskCategoryFilter;
-  counts: Map<TaskCategory | "uncategorized", number>;
-  onChange: (next: TaskCategoryFilter) => void;
   sortKey: TaskSortKey;
-  onSortKeyChange?: (next: TaskSortKey) => void;
+  onSortKeyChange: (next: TaskSortKey) => void;
 }) {
   return (
     <div
@@ -317,42 +284,9 @@ function CategoryChipRow({
       }}
     >
       <div className="flex flex-wrap items-center gap-1">
-        <SelectableChip
-          active={selected === "all"}
-          onToggle={() => onChange("all")}
-          title="전체 카테고리"
-        >
-          전체
-        </SelectableChip>
-        <SelectableChip
-          active={selected === "uncategorized"}
-          color="var(--text-muted)"
-          onToggle={() => onChange("uncategorized")}
-          title="미분류"
-        >
-          미분류
-        </SelectableChip>
-        {TASK_CATEGORIES.map((c) => {
-          const active = selected === c.id;
-          const count = counts.get(c.id) ?? 0;
-          const color = categoryColor(c.id);
-          return (
-            <SelectableChip
-              key={c.id}
-              active={active}
-              color={color}
-              onToggle={() => onChange(c.id)}
-              title={`${c.label} ${count > 0 ? `(${count})` : ""}`.trim()}
-            >
-              {c.label}
-            </SelectableChip>
-          );
-        })}
-        {onSortKeyChange ? (
-          <div className="ml-auto">
-            <TaskSortMenu value={sortKey} onChange={onSortKeyChange} />
-          </div>
-        ) : null}
+        <div className="ml-auto">
+          <TaskSortMenu value={sortKey} onChange={onSortKeyChange} />
+        </div>
       </div>
     </div>
   );
@@ -375,7 +309,7 @@ function SkeletonList() {
 function TasksEmptyState() {
   return (
     <EmptyState
-      title="태스크가 비어있어요"
+      title="할 일이 비어있어요"
       description="오늘 가장 먼저 끝낼 한 가지를 적어보세요."
     />
   );

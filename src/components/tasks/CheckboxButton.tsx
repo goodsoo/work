@@ -1,33 +1,22 @@
-import type { TaskCategory } from "../../api/tasks";
-import { categoryColor } from "../../lib/taskCategory";
-
-// 체크박스 button — pending / done / cancelled 3 state. pending 일 때 카테고리 색을
-// border 로, 미분류는 회색 (--text-muted). done/cancelled 는 카테고리 무관 (완료/취소가
-// 의미 우선). e.stopPropagation 내장 — 부모 행의 click navigate 와 충돌 없음.
+// 체크박스 button — pending / done / cancelled 3 state. pending 은 회색 테두리
+// (--text-muted). done/cancelled 는 완료/취소가 의미 우선. e.stopPropagation 내장
+// — 부모 행의 click navigate 와 충돌 없음.
 // hit zone: 시각은 18x18 이지만 button 자체는 p-1.5 + -m-1.5 로 30x30 클릭 영역.
 // negative margin 으로 layout footprint 는 18x18 유지 → 행 높이/간격 변동 0,
 // 부모 click (행 edit/navigate) 보다 먼저 catch 되어 오작동 차단.
 export function CheckboxButton({
   status,
-  category,
   shape = "square",
   onClick,
 }: {
   status: "pending" | "done" | "cancelled";
-  category: TaskCategory | null;
   // 루틴 row 에서는 "circle" — 원형 체크박스. 태스크는 default "square".
   // 같은 사이드바에 두 종류가 섞일 때 시각으로만 type 구분 가능 (라벨 X).
   shape?: "square" | "circle";
   onClick: () => void;
 }) {
-  const catColor = status === "pending" ? categoryColor(category) : "";
-  const pendingBorder = catColor || "var(--text-muted)";
-  // 내부 배경 — 카테고리 색을 4% alpha 로 매우 연하게 tint. 미분류
-  // (catColor 빈문자) 는 칠 안 함. color-mix 가 다크모드에서도 var(--cat-*) 자동
-  // 따라감.
-  const pendingFill = catColor
-    ? `color-mix(in srgb, ${catColor} 4%, transparent)`
-    : "transparent";
+  const pendingBorder = "var(--text-muted)";
+  const pendingFill = "transparent";
   return (
     <button
       type="button"

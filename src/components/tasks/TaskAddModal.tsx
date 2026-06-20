@@ -1,11 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { useCreateTask } from "../../hooks/useTasks";
 import { useCreateRoutine } from "../../hooks/useRoutines";
-import {
-  TASK_CATEGORIES,
-  type TaskCategory,
-  type TaskInsert,
-} from "../../api/tasks";
+import { useTaskProjects } from "../../hooks/useTaskProjects";
+import { INBOX_FILE } from "../../api/taskProjects";
+import { type TaskInsert } from "../../api/tasks";
 import { todayIso } from "../../lib/dates";
 import { LooseDateInput } from "../common/LooseDateInput";
 import { LooseTimeInput } from "../common/LooseTimeInput";
@@ -21,8 +19,8 @@ type Props = {
   open: boolean;
   onClose: () => void;
   prefill?: Partial<TaskInsert>;
-  // 모달 default 탭. 미지정 = "task". 사이드바 polish 단계에서 사용자가 routine
-  // 폴더 활성 상태에서 + 눌렀을 때 "routine" 직접 지정 가능.
+  // 추가할 종류. 할 일 탭의 + 는 "task", 루틴 탭의 + 는 "routine" 으로 고정 —
+  // 모달은 그 종류만 만든다 (탭 전환 없음). 미지정 = "task".
   defaultType?: AddType;
 };
 
@@ -32,56 +30,14 @@ export function TaskAddModal({
   prefill,
   defaultType = "task",
 }: Props) {
-  const [type, setType] = useState<AddType>(defaultType);
-
-  /* eslint-disable react-hooks/set-state-in-effect */
-  useEffect(() => {
-    if (!open) return;
-    setType(defaultType);
-  }, [open, defaultType]);
-  /* eslint-enable react-hooks/set-state-in-effect */
-
   return (
     <Modal open={open} onClose={onClose} size="sm" ariaLabelledBy="task-add-title">
-      {/* min-height 로 탭 (태스크/루틴) 컨텐츠 길이 차이에 모달이 흔들리지 않도록 고정. */}
       <div className="flex flex-col p-5" style={{ minHeight: "24rem" }}>
         <Text id="task-add-title" variant="h4" as="h2">
-          {type === "routine" ? "루틴 추가" : "태스크 추가"}
+          {defaultType === "routine" ? "루틴 추가" : "할 일 추가"}
         </Text>
 
-        {/* 탭 segmented control */}
-        <div
-          className="mt-4 inline-flex w-full overflow-hidden rounded-md"
-          role="tablist"
-          aria-label="추가 종류"
-          style={{ border: "1px solid var(--border-default)" }}
-        >
-          {(["task", "routine"] as const).map((t) => {
-            const active = t === type;
-            return (
-              <button
-                key={t}
-                type="button"
-                role="tab"
-                aria-selected={active}
-                onClick={() => setType(t)}
-                className="flex-1 py-1.5 text-xs transition"
-                style={{
-                  backgroundColor: active
-                    ? "var(--btn-primary)"
-                    : "transparent",
-                  color: active
-                    ? "var(--btn-primary-text)"
-                    : "var(--text-secondary)",
-                }}
-              >
-                {t === "task" ? "태스크" : "루틴"}
-              </button>
-            );
-          })}
-        </div>
-
-        {type === "task" ? (
+        {defaultType === "task" ? (
           <TaskForm prefill={prefill} onDone={onClose} />
         ) : (
           <RoutineForm onDone={onClose} />
@@ -101,56 +57,40 @@ function TaskForm({
   onDone: () => void;
 }) {
   const createMutation = useCreateTask();
+  const projectsQ = useTaskProjects();
   const [title, setTitle] = useState("");
   const [date, setDate] = useState("");
-  const [endDate, setEndDate] = useState("");
   const [time, setTime] = useState("");
-  const [category, setCategory] = useState<TaskCategory | null>(null);
+  const [targetFile, setTargetFile] = useState<string>(INBOX_FILE);
   const [done, setDone] = useState(false);
   const [sourceMeetingUid, setSourceMeetingUid] = useState<string | null>(null);
-  const [endError, setEndError] = useState<string | null>(null);
   const titleRef = useRef<HTMLInputElement>(null);
 
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     setTitle(prefill?.title ?? "");
     setDate(prefill?.due_date ?? "");
-    setEndDate(prefill?.end_date ?? "");
     setTime(prefill?.due_time ?? "");
-    setCategory(prefill?.category ?? null);
+    setTargetFile(prefill?.target_file ?? INBOX_FILE);
     setDone(prefill?.done ?? false);
     setSourceMeetingUid(prefill?.source_meeting_uid ?? null);
-    setEndError(null);
     requestAnimationFrame(() => titleRef.current?.focus());
   }, [prefill]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  // 종료일은 시작일이 있어야 의미 있고, 시작일 이후여야 한다. 비우면 단일 일정.
-  const endValid = !endDate || (!!date && endDate >= date);
-  const canSubmit = title.trim().length > 0 && endValid;
+  const canSubmit = title.trim().length > 0;
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (title.trim().length === 0) return;
-    if (!endValid) {
-      setEndError(
-        date
-          ? "종료일은 시작일과 같거나 이후여야 합니다."
-          : "종료일을 쓰려면 시작 날짜를 먼저 입력하세요.",
-      );
-      return;
-    }
-    // 다일 일정은 종일 취급 — 시각은 단일 일정일 때만 저장 (plan: 다일=종일).
-    const isMultiDay = !!endDate && !!date && endDate > date;
     createMutation.mutate(
       {
         title: title.trim(),
         done,
         due_date: date || null,
-        end_date: isMultiDay ? endDate : null,
-        due_time: date && time && !isMultiDay ? time : null,
-        category,
+        due_time: date && time ? time : null,
         source_meeting_uid: sourceMeetingUid,
+        target_file: targetFile,
       },
       { onSuccess: () => onDone() },
     );
@@ -204,23 +144,7 @@ function TaskForm({
               border: "1px solid var(--border-default)",
             }}
           >
-            <LooseDateInput
-              value={date}
-              onCommit={(next) => {
-                setDate(next);
-                // 시작일 변경 시 종료일 에러 재평가.
-                if (endDate) {
-                  if (!next) {
-                    setEndError("종료일을 쓰려면 시작 날짜를 먼저 입력하세요.");
-                  } else if (endDate < next) {
-                    setEndError("종료일은 시작일과 같거나 이후여야 합니다.");
-                  } else {
-                    setEndError(null);
-                  }
-                }
-              }}
-              fullWidth
-            />
+            <LooseDateInput value={date} onCommit={setDate} fullWidth />
           </div>
         </label>
         <label className="block">
@@ -244,44 +168,6 @@ function TaskForm({
         </label>
       </div>
 
-      <label className="mt-3 block">
-        <Text variant="caption" color="secondary" as="span" weight="medium">
-          종료일 (선택)
-        </Text>
-        <div
-          className="mt-1 rounded-md px-2 py-1.5"
-          style={{
-            backgroundColor: "var(--bg-surface)",
-            border: `1px solid ${endError ? "var(--accent-red)" : "var(--border-default)"}`,
-          }}
-        >
-          <LooseDateInput
-            value={endDate}
-            onCommit={(next) => {
-              setEndDate(next);
-              if (next && date && next < date) {
-                setEndError("종료일은 시작일과 같거나 이후여야 합니다.");
-              } else if (next && !date) {
-                setEndError("종료일을 쓰려면 시작 날짜를 먼저 입력하세요.");
-              } else {
-                setEndError(null);
-              }
-            }}
-            fullWidth
-          />
-        </div>
-        {endError ? (
-          <Text
-            variant="caption"
-            as="p"
-            className="mt-1"
-            style={{ color: "var(--accent-red)" }}
-          >
-            {endError}
-          </Text>
-        ) : null}
-      </label>
-
       <div className="mt-3">
         <Text
           variant="caption"
@@ -289,20 +175,15 @@ function TaskForm({
           as="span"
           weight="medium"
         >
-          카테고리
+          프로젝트
         </Text>
         <div className="mt-1 flex flex-wrap gap-1.5">
-          <CategoryChip
-            label="미분류"
-            active={category === null}
-            onClick={() => setCategory(null)}
-          />
-          {TASK_CATEGORIES.map((c) => (
+          {(projectsQ.data ?? []).map((p) => (
             <CategoryChip
-              key={c.id}
-              label={c.label}
-              active={category === c.id}
-              onClick={() => setCategory(c.id)}
+              key={p.file}
+              label={p.name}
+              active={targetFile === p.file}
+              onClick={() => setTargetFile(p.file)}
             />
           ))}
         </div>

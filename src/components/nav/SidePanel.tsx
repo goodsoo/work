@@ -8,6 +8,7 @@ import {
   Check,
   Pencil,
   XCircle,
+  Folder,
   FolderPlus,
   ChevronDown,
   ChevronRight,
@@ -39,13 +40,18 @@ import { useMeetingSort, type MeetingSortKey } from "../../hooks/useMeetingSort"
 import { buildMeetingSortComparator } from "../../lib/meetingSort";
 import { useTasks } from "../../hooks/useTasks";
 import {
+  useTaskProjects,
+  useCreateProject,
+  useDeleteProject,
+} from "../../hooks/useTaskProjects";
+import type { TaskProject } from "../../api/taskProjects";
+import {
   useActiveRoutines,
   useArchivedRoutines,
   useToggleRoutineDay,
 } from "../../hooks/useRoutines";
 import type { Meeting } from "../../api/meetings";
 import type { Routine } from "../../api/routines";
-import type { TaskCategory } from "../../api/tasks";
 import { todayIso } from "../../lib/dates";
 import { formatError } from "../../lib/errors";
 import { CheckboxButton } from "../tasks/CheckboxButton";
@@ -1060,90 +1066,98 @@ function SidePanelSectionHeader({
   collapsed,
   onToggle,
   count,
+  action,
 }: {
   label: string;
   collapsed: boolean;
   onToggle: () => void;
   count?: number;
+  // 헤더 우측 액션 (예: 프로젝트 추가 +). 토글 button 과 형제로 둠 (nested button 회피).
+  action?: ReactNode;
 }) {
   return (
-    <Button
-      variant="ghost"
-      onClick={onToggle}
-      className="w-full justify-between gap-1.5 rounded-none py-1 pr-2 text-[13px] font-normal"
-      style={{ paddingLeft: "8px", color: "var(--text-secondary)" }}
-    >
-      <span className="inline-flex items-center gap-1.5">
-        {collapsed ? (
-          <ChevronRight className="h-3 w-3 shrink-0" />
-        ) : (
-          <ChevronDown className="h-3 w-3 shrink-0" />
-        )}
-        <span>{label}</span>
-      </span>
-      {typeof count === "number" ? (
-        <span
-          className="text-[11px] tabular-nums"
-          style={{ color: "var(--text-muted)" }}
-        >
-          {count}
+    <div className="flex items-center">
+      <Button
+        variant="ghost"
+        onClick={onToggle}
+        className="flex-1 justify-between gap-1.5 rounded-none py-1 pr-2 text-[13px] font-normal"
+        style={{ paddingLeft: "8px", color: "var(--text-secondary)" }}
+      >
+        <span className="inline-flex items-center gap-1.5">
+          {collapsed ? (
+            <ChevronRight className="h-3 w-3 shrink-0" />
+          ) : (
+            <ChevronDown className="h-3 w-3 shrink-0" />
+          )}
+          <span>{label}</span>
         </span>
-      ) : null}
-    </Button>
+        {typeof count === "number" ? (
+          <span
+            className="text-[11px] tabular-nums"
+            style={{ color: "var(--text-muted)" }}
+          >
+            {count}
+          </span>
+        ) : null}
+      </Button>
+      {action ? <span className="shrink-0 pr-1">{action}</span> : null}
+    </div>
   );
 }
 
-/* ── Todos Side Panel — 상태 필터 + 카테고리 필터 (독립 차원, AND 결합) ── */
+/* ── Todos Side Panel — 상태 필터 + 프로젝트(파일) 리스팅 ── */
 
 export type TaskStatusFilter = "all" | "pending" | "done" | "cancelled";
-export type TaskCategoryFilter =
-  | "all"
-  | "uncategorized"
-  | TaskCategory;
 
 type TodosPanelProps = {
   statusFilter: TaskStatusFilter;
   onStatusChange: (next: TaskStatusFilter) => void;
-  // 사이드바 루틴 폴더의 selected entry 와 onSelect.
-  // null = 루틴 미선택 (= 태스크 필터 활성). routine 선택 시 본문이 RoutineDetail 로
-  // 전환되고 태스크 필터는 시각 비활성 (회색).
-  selectedRoutineName: string | null;
-  onSelectRoutine: (name: string | null) => void;
+  // 선택된 프로젝트 파일(`tasks/{이름}.md`). null = 전체(모든 프로젝트).
+  selectedProject: string | null;
+  onSelectProject: (file: string | null) => void;
 };
 
 export function TodosSidePanel({
   statusFilter,
   onStatusChange,
-  selectedRoutineName,
-  onSelectRoutine,
+  selectedProject,
+  onSelectProject,
 }: TodosPanelProps) {
   const { data } = useTasks();
   const tasks = data ?? [];
-  const activeRoutines = useActiveRoutines(todayIso());
-  const archivedRoutines = useArchivedRoutines(todayIso());
-  const toggleRoutineDayMutation = useToggleRoutineDay();
-  const today = todayIso();
-  const [collapsedRoutines, setCollapsedRoutines] = useState(false);
-  // "지난 루틴"은 default collapsed — 보관 의도, 평소엔 시야에서 빠져 있어야 함.
-  const [collapsedArchive, setCollapsedArchive] = useState(true);
+  const projectsQ = useTaskProjects();
+  const createProject = useCreateProject();
+  const deleteProject = useDeleteProject();
+  const [collapsedProjects, setCollapsedProjects] = useState(false);
+  // 프로젝트 추가 인라인 입력 + 삭제 확인.
+  const [addingProject, setAddingProject] = useState(false);
+  const [newProjectName, setNewProjectName] = useState("");
+  const [projectToDelete, setProjectToDelete] = useState<TaskProject | null>(null);
 
-  // 루틴 폴더 row 의 오늘 체크박스. CheckboxButton 이 e.stopPropagation 내장 — row click 안 trigger.
-  function handleToggleRoutineToday(name: string) {
-    const r = activeRoutines.find((x) => x.name === name);
-    if (!r) return;
-    const done = !r.log.has(today);
-    toggleRoutineDayMutation.mutate({ name, date: today, done });
+  // 프로젝트(파일)별 활성 task 카운트 — 삭제/취소 제외.
+  const projectCounts = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const t of tasks) {
+      if (t.deleted || t.cancelled) continue;
+      map.set(t._source.file, (map.get(t._source.file) ?? 0) + 1);
+    }
+    return map;
+  }, [tasks]);
+
+  function handleCreateProject() {
+    const name = newProjectName.trim();
+    if (!name) {
+      setAddingProject(false);
+      return;
+    }
+    createProject.mutate(name, {
+      onSuccess: (p) => onSelectProject(p.file),
+    });
+    setNewProjectName("");
+    setAddingProject(false);
   }
 
-  // 태스크 필터 클릭 = 루틴 미선택으로 (선택된 게 있었으면 자동 해제).
-  function selectTaskFilter(fn: () => void) {
-    if (selectedRoutineName !== null) onSelectRoutine(null);
-    fn();
-  }
-
-  // status 별 count. 카테고리 필터는 페이지 헤더 chip 으로 이동했으니 사이드바
-  // count 는 status 만 — 카테고리와 AND 결합 없음. deleted 는 휴지통 modal 전용
-  // 으로 격리.
+  // status 별 count. deleted 는 휴지통 modal 전용으로 격리.
   const counts = useMemo(() => {
     const status: Record<TaskStatusFilter, number> = {
       all: 0,
@@ -1197,9 +1211,12 @@ export function TodosSidePanel({
             onClick={() =>
               window.dispatchEvent(
                 new CustomEvent("todos:add-request", {
-                  // 루틴 폴더 active 상태면 모달 default 탭 = routine.
                   detail: {
-                    type: selectedRoutineName !== null ? "routine" : "task",
+                    type: "task",
+                    // 특정 프로젝트 선택 중이면 그 파일에 바로 추가.
+                    prefill: selectedProject
+                      ? { target_file: selectedProject }
+                      : undefined,
                   },
                 }),
               )
@@ -1216,80 +1233,84 @@ export function TodosSidePanel({
         aria-label="필터"
       >
         <div className="min-h-0 flex-1 overflow-y-auto py-1">
-          {/* status 필터 — 사이드바 최상단 flat. 카테고리 차원은 페이지 헤더 chip 으로
-              이동 — 사이드바는 단일 차원 (status). 폴더 outer 없이 메모장 트리의 nav p-1 패턴. */}
+          {/* status 필터 — 사이드바 최상단 flat. 폴더 outer 없이 메모장 트리의 nav p-1 패턴. */}
           <div className="p-1">
             {statusItems.map((item) => (
               <FilterItem
                 key={item.id}
                 label={item.label}
                 count={item.count}
-                active={
-                  selectedRoutineName === null && item.id === statusFilter
-                }
-                onClick={() =>
-                  selectTaskFilter(() => onStatusChange(item.id))
-                }
+                active={item.id === statusFilter}
+                onClick={() => onStatusChange(item.id)}
               />
             ))}
           </div>
 
-          {/* 루틴 폴더 — status 아래에 별도 도메인. SectionHeader (outer) + 안 항목들은
-              SectionChildren wrapper 로 들여쓰기. */}
+          {/* 프로젝트 — `tasks/` 폴더 리스팅. "전체" + 파일별 항목. + 로 새 파일 추가. */}
           <SidePanelSectionHeader
-            label="루틴"
-            collapsed={collapsedRoutines}
-            onToggle={() => setCollapsedRoutines((v) => !v)}
+            label="프로젝트"
+            collapsed={collapsedProjects}
+            onToggle={() => setCollapsedProjects((v) => !v)}
+            action={
+              <Button
+                variant="icon"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setCollapsedProjects(false);
+                  setAddingProject(true);
+                }}
+                title="새 프로젝트"
+                aria-label="새 프로젝트"
+                style={{ color: "var(--text-secondary)" }}
+              >
+                <FolderPlus className="h-3.5 w-3.5" />
+              </Button>
+            }
           />
-          {!collapsedRoutines ? (
+          {!collapsedProjects ? (
             <SectionChildren>
-              {activeRoutines.length === 0 ? (
-                <Text
-                  variant="caption"
-                  color="muted"
-                  as="div"
-                  className="px-2 py-1 text-[13px]"
-                >
-                  아직 루틴이 없어요
-                </Text>
-              ) : (
-                activeRoutines.map((r) => (
-                  <RoutineSidebarItem
-                    key={r.name}
-                    routine={r}
-                    today={today}
-                    active={r.name === selectedRoutineName}
-                    onSelect={() => onSelectRoutine(r.name)}
-                    onToggleToday={() => handleToggleRoutineToday(r.name)}
-                  />
-                ))
-              )}
-            </SectionChildren>
-          ) : null}
-
-          {/* 지난 루틴 — ends < today. 활성 list 와 분리하여 보관 영역에 별도 노출.
-              0개면 섹션 자체 숨김 — 평소엔 시야 안 침범. count chip 으로 갯수 안내. */}
-          {archivedRoutines.length > 0 ? (
-            <>
-              <SidePanelSectionHeader
-                label="지난 루틴"
-                collapsed={collapsedArchive}
-                onToggle={() => setCollapsedArchive((v) => !v)}
-                count={archivedRoutines.length}
+              <FilterItem
+                label="전체"
+                active={selectedProject === null}
+                onClick={() => onSelectProject(null)}
               />
-              {!collapsedArchive ? (
-                <SectionChildren>
-                  {archivedRoutines.map((r) => (
-                    <ArchivedRoutineSidebarItem
-                      key={r.name}
-                      routine={r}
-                      active={r.name === selectedRoutineName}
-                      onSelect={() => onSelectRoutine(r.name)}
-                    />
-                  ))}
-                </SectionChildren>
+              {(projectsQ.data ?? []).map((p) => (
+                <ProjectItem
+                  key={p.file}
+                  project={p}
+                  count={projectCounts.get(p.file) ?? 0}
+                  active={selectedProject === p.file}
+                  onSelect={() => onSelectProject(p.file)}
+                  onDelete={
+                    p.isInbox ? undefined : () => setProjectToDelete(p)
+                  }
+                />
+              ))}
+              {addingProject ? (
+                <input
+                  autoFocus
+                  value={newProjectName}
+                  onChange={(e) => setNewProjectName(e.target.value)}
+                  onBlur={handleCreateProject}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleCreateProject();
+                    } else if (e.key === "Escape") {
+                      setNewProjectName("");
+                      setAddingProject(false);
+                    }
+                  }}
+                  placeholder="프로젝트 이름"
+                  className="mx-2 my-1 w-[calc(100%-1rem)] rounded-md px-2 py-1 text-[13px] outline-none"
+                  style={{
+                    backgroundColor: "var(--bg-surface)",
+                    border: "1px solid var(--border-default)",
+                    color: "var(--text-primary)",
+                  }}
+                />
               ) : null}
-            </>
+            </SectionChildren>
           ) : null}
         </div>
         {/* 취소됨 — 사이드바 하단 별도 entry. 폴더 밖이라 들여쓰기 없이 outer level
@@ -1308,11 +1329,85 @@ export function TodosSidePanel({
                 style={{ color: "var(--text-secondary)" }}
               />
             }
-            active={selectedRoutineName === null && statusFilter === "cancelled"}
-            onClick={() => selectTaskFilter(() => onStatusChange("cancelled"))}
+            active={statusFilter === "cancelled"}
+            onClick={() => onStatusChange("cancelled")}
           />
         </div>
       </nav>
+      {projectToDelete ? (
+        <ConfirmDialog
+          open
+          title="프로젝트 삭제"
+          message={`"${projectToDelete.name}" 프로젝트 파일을 휴지통으로 보냅니다. 안의 할 일도 함께 사라집니다.`}
+          confirmLabel="삭제"
+          danger
+          onConfirm={() => {
+            const target = projectToDelete;
+            deleteProject.mutate(target, {
+              onSuccess: () => {
+                if (selectedProject === target.file) onSelectProject(null);
+              },
+            });
+            setProjectToDelete(null);
+          }}
+          onCancel={() => setProjectToDelete(null)}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+// 프로젝트(파일) 사이드바 row — FilterItem 룩 + hover 시 삭제 버튼. inbox 는 삭제 불가.
+function ProjectItem({
+  project,
+  count,
+  active,
+  onSelect,
+  onDelete,
+}: {
+  project: TaskProject;
+  count: number;
+  active: boolean;
+  onSelect: () => void;
+  onDelete?: () => void;
+}) {
+  return (
+    <div
+      className="group flex items-center rounded-md transition hover:bg-[var(--bg-surface-hover)]"
+      style={{ backgroundColor: active ? "var(--bg-surface-active)" : undefined }}
+    >
+      <button
+        type="button"
+        onClick={onSelect}
+        className="flex min-w-0 flex-1 items-center gap-1.5 px-2 py-1 text-left text-[13px]"
+        style={{ color: "var(--text-primary)" }}
+      >
+        <Folder className="h-3 w-3 shrink-0 opacity-70" aria-hidden />
+        <span className="min-w-0 flex-1 truncate">{project.name}</span>
+        {count > 0 ? (
+          <span
+            className="shrink-0 text-[11px] tabular-nums"
+            style={{ color: "var(--text-muted)" }}
+          >
+            {count}
+          </span>
+        ) : null}
+      </button>
+      {onDelete ? (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete();
+          }}
+          title="프로젝트 삭제"
+          aria-label={`${project.name} 삭제`}
+          className="shrink-0 px-1.5 opacity-0 transition group-hover:opacity-100"
+          style={{ color: "var(--text-muted)" }}
+        >
+          <Trash2 className="h-3 w-3" />
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -1352,7 +1447,6 @@ function RoutineSidebarItem({
     >
       <CheckboxButton
         status={done ? "done" : "pending"}
-        category={null}
         shape="circle"
         onClick={onToggleToday}
       />
@@ -1426,6 +1520,132 @@ function ArchivedRoutineSidebarItem({
 // AppShell.sidePanelFooter slot 으로 주입. 할 일 탭의 휴지통 entry —
 // 메모/포트폴리오와 동일 패턴 (탭별 1 trash). 모달은 태스크/루틴 chip 으로 구분한 단일 리스트.
 export function TodosSidePanelFooter({
+  onTrashOpen,
+}: {
+  onTrashOpen: () => void;
+}) {
+  return (
+    <div className="flex items-center gap-1">
+      <Button
+        variant="icon"
+        onClick={onTrashOpen}
+        title="휴지통"
+        aria-label="휴지통"
+        style={{ color: "var(--text-muted)" }}
+      >
+        <Trash2 className="h-3.5 w-3.5" />
+      </Button>
+    </div>
+  );
+}
+
+/* ── Routines Side Panel — 루틴 탭. 활성 + 지난 루틴 목록 (오늘 체크 + 상세 진입). ── */
+
+type RoutinesPanelProps = {
+  selectedRoutineName: string | null;
+  onSelectRoutine: (name: string | null) => void;
+};
+
+export function RoutinesSidePanel({
+  selectedRoutineName,
+  onSelectRoutine,
+}: RoutinesPanelProps) {
+  const today = todayIso();
+  const activeRoutines = useActiveRoutines(today);
+  const archivedRoutines = useArchivedRoutines(today);
+  const toggleRoutineDayMutation = useToggleRoutineDay();
+  const [collapsedArchive, setCollapsedArchive] = useState(true);
+
+  function handleToggleRoutineToday(name: string) {
+    const r = activeRoutines.find((x) => x.name === name);
+    if (!r) return;
+    toggleRoutineDayMutation.mutate({ name, date: today, done: !r.log.has(today) });
+  }
+
+  return (
+    <div className="flex h-full flex-col">
+      <div
+        className="flex shrink-0 items-center justify-between px-4"
+        style={{
+          height: "var(--page-header-h)",
+          borderBottom: "1px solid var(--border-default)",
+        }}
+      >
+        <h2
+          className="font-serif text-sm font-medium"
+          style={{ color: "var(--text-primary)" }}
+        >
+          루틴
+        </h2>
+        <Button
+          variant="icon"
+          onClick={() =>
+            window.dispatchEvent(
+              new CustomEvent("todos:add-request", { detail: { type: "routine" } }),
+            )
+          }
+          title="새 루틴"
+          aria-label="새 루틴"
+          style={{ color: "var(--text-secondary)" }}
+        >
+          <Plus className="h-4 w-4" />
+        </Button>
+      </div>
+      <nav className="flex min-h-0 flex-1 flex-col" aria-label="루틴">
+        <div className="min-h-0 flex-1 overflow-y-auto py-1">
+          <div className="p-1">
+            {activeRoutines.length === 0 ? (
+              <Text
+                variant="caption"
+                color="muted"
+                as="div"
+                className="px-2 py-1 text-[13px]"
+              >
+                아직 루틴이 없어요
+              </Text>
+            ) : (
+              activeRoutines.map((r) => (
+                <RoutineSidebarItem
+                  key={r.name}
+                  routine={r}
+                  today={today}
+                  active={r.name === selectedRoutineName}
+                  onSelect={() => onSelectRoutine(r.name)}
+                  onToggleToday={() => handleToggleRoutineToday(r.name)}
+                />
+              ))
+            )}
+          </div>
+
+          {archivedRoutines.length > 0 ? (
+            <>
+              <SidePanelSectionHeader
+                label="지난 루틴"
+                collapsed={collapsedArchive}
+                onToggle={() => setCollapsedArchive((v) => !v)}
+                count={archivedRoutines.length}
+              />
+              {!collapsedArchive ? (
+                <SectionChildren>
+                  {archivedRoutines.map((r) => (
+                    <ArchivedRoutineSidebarItem
+                      key={r.name}
+                      routine={r}
+                      active={r.name === selectedRoutineName}
+                      onSelect={() => onSelectRoutine(r.name)}
+                    />
+                  ))}
+                </SectionChildren>
+              ) : null}
+            </>
+          ) : null}
+        </div>
+      </nav>
+    </div>
+  );
+}
+
+export function RoutinesSidePanelFooter({
   onTrashOpen,
 }: {
   onTrashOpen: () => void;
