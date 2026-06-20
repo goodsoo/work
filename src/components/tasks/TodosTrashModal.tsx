@@ -12,7 +12,7 @@ import {
   useTrashedRoutines,
 } from "../../hooks/useRoutines";
 import { formatDisplayDate } from "../../lib/dates";
-import { TASK_CATEGORIES, type Task } from "../../api/tasks";
+import type { Task } from "../../api/tasks";
 import type { TrashedRoutine } from "../../api/routines";
 import { formatError } from "../../lib/errors";
 import { ConfirmDialog } from "../ConfirmDialog";
@@ -306,7 +306,7 @@ function TaskRow({
       <TypeIcon kind="task" />
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <div className="flex items-center gap-2">
-          <Chip size="sm">태스크</Chip>
+          <Chip size="sm">할 일</Chip>
           <Text
             variant="body"
             as="span"
@@ -438,12 +438,11 @@ function RowActions({
 function TaskMeta({
   task,
 }: {
-  task: { due_date: string | null; due_time: string | null; category: string | null };
+  task: { due_date: string | null; due_time: string | null };
 }) {
   const hasDate = !!task.due_date;
   const hasTime = !!task.due_time;
-  const categoryLabel = TASK_CATEGORIES.find((c) => c.id === task.category)?.label;
-  if (!hasDate && !hasTime && !categoryLabel) return null;
+  if (!hasDate && !hasTime) return null;
   return (
     <div
       className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px]"
@@ -451,7 +450,6 @@ function TaskMeta({
     >
       {hasDate ? <span>{formatDisplayDate(task.due_date)}</span> : null}
       {hasTime ? <span>{task.due_time}</span> : null}
-      {categoryLabel ? <span>#{categoryLabel}</span> : null}
     </div>
   );
 }

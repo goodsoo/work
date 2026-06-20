@@ -10,8 +10,10 @@ import { FileText, BookOpen, CheckSquare, ChevronLeft, ChevronRight } from "luci
 import { Button } from "../common/Button";
 import { useMeetings } from "../../hooks/useMeetings";
 import { useTasks } from "../../hooks/useTasks";
+import { useSchedule } from "../../hooks/useSchedule";
 import { useJournals } from "../../hooks/useJournals";
 import type { Task } from "../../api/tasks";
+import type { ScheduleEvent } from "../../api/schedule";
 import type { Meeting } from "../../api/meetings";
 import {
   todayIso,
@@ -40,15 +42,14 @@ function monthLabel(iso: string): string {
 // 아이콘+숫자 배지로만 (그 날 뭐가 있는지 신호만, 클릭=그날 일기). 자세한 할 일·
 // 노트는 "오늘" 메인 대시보드 / 할일·메모장 탭이 전담.
 type Props = {
-  onOpenTask: (id: string) => void;
-  // 날짜 헤더 클릭 — 그날 일기 오버레이 (App 이 소유).
-  onOpenJournal: (date: string) => void;
+  // 날짜 헤더·일정 행 클릭 — 그 날 상세 모달 (일정·일기·노트). App 이 소유.
+  onOpenDay: (date: string) => void;
 };
 
 type DayGroup = {
   date: string;
-  events: Task[]; // category=schedule
-  tasks: Task[]; // 그 외 카테고리 (미완료만)
+  events: ScheduleEvent[]; // schedule.md 이벤트
+  tasks: Task[]; // 미완료 할 일 (배지 카운트용)
   notes: Meeting[];
   hasJournal: boolean;
 };
@@ -62,9 +63,10 @@ function byTime(a: string | null, b: string | null): number {
   return ta < tb ? -1 : 1;
 }
 
-export function TodayAgendaPanel({ onOpenTask, onOpenJournal }: Props) {
+export function TodayAgendaPanel({ onOpenDay }: Props) {
   const meetingsQ = useMeetings();
   const tasksQ = useTasks();
+  const scheduleQ = useSchedule();
   const journalsQ = useJournals();
   const today = todayIso();
   const currentYear = Number(today.slice(0, 4));
@@ -83,10 +85,13 @@ export function TodayAgendaPanel({ onOpenTask, onOpenJournal }: Props) {
       d != null && d >= from && d <= to;
 
     for (const t of tasksQ.data ?? []) {
-      if (t.deleted || t.cancelled) continue;
+      if (t.deleted || t.cancelled || t.done) continue;
       if (!inRange(t.due_date)) continue;
-      if (t.category === "schedule") map.get(t.due_date)!.events.push(t);
-      else if (!t.done) map.get(t.due_date)!.tasks.push(t);
+      map.get(t.due_date)!.tasks.push(t);
+    }
+    for (const e of scheduleQ.data ?? []) {
+      // 다일 일정은 시작일에 한 줄 (기존 동작 유지).
+      if (inRange(e.start)) map.get(e.start)!.events.push(e);
     }
     for (const m of meetingsQ.data ?? []) {
       if (inRange(m.date)) map.get(m.date!)!.notes.push(m);
@@ -97,7 +102,7 @@ export function TodayAgendaPanel({ onOpenTask, onOpenJournal }: Props) {
 
     for (const g of map.values()) {
       g.events.sort(
-        (a, b) => byTime(a.due_time, b.due_time) || (a.title < b.title ? -1 : 1),
+        (a, b) => byTime(a.time, b.time) || (a.text < b.text ? -1 : 1),
       );
       g.tasks.sort((a, b) => byTime(a.due_time, b.due_time));
       g.notes.sort((a, b) => {
@@ -108,7 +113,7 @@ export function TodayAgendaPanel({ onOpenTask, onOpenJournal }: Props) {
       });
     }
     return [...map.values()].sort((a, b) => (a.date < b.date ? -1 : 1));
-  }, [meetingsQ.data, tasksQ.data, journalsQ.data, viewYear]);
+  }, [meetingsQ.data, tasksQ.data, scheduleQ.data, journalsQ.data, viewYear]);
 
   // 월 단위 섹션으로 묶음 — sticky 월 헤더가 그 달 내내 상단에 붙어 있으려면 그 달의
   // 모든 날이 한 부모(섹션) 안에 있어야 함. (sticky 는 부모 박스 안에서만 유지.)
@@ -253,9 +258,9 @@ export function TodayAgendaPanel({ onOpenTask, onOpenJournal }: Props) {
                       요약 배지 (개수만, 클릭은 헤더와 동일 = 일기). */}
                   <button
                     type="button"
-                    onClick={() => onOpenJournal(g.date)}
-                    title={g.hasJournal ? "일기 보기" : "일기 쓰기"}
-                    aria-label={`${formatDisplayDate(g.date)} 일기`}
+                    onClick={() => onOpenDay(g.date)}
+                    title="날짜 상세 (일정·일기·노트)"
+                    aria-label={`${formatDisplayDate(g.date)} 상세`}
                     className="group flex w-full items-center gap-1.5 px-2 py-1 text-left text-[13px] transition hover:bg-[var(--bg-surface-hover)]"
                   >
                     <span
@@ -310,22 +315,22 @@ export function TodayAgendaPanel({ onOpenTask, onOpenJournal }: Props) {
                   {/* 본문 = 일정만 풀 행. 할일·노트·일기는 위 배지로 갈음. */}
                   {g.events.length > 0 ? (
                     <div>
-                      {g.events.map((t) => (
+                      {g.events.map((e) => (
                         <AgendaRow
-                          key={`e:${t.id}`}
-                          onClick={() => onOpenTask(t.id)}
+                          key={`e:${e.id}`}
+                          onClick={() => onOpenDay(g.date)}
                         >
                           <span
                             className={`${GUTTER} shrink-0 text-[11px] tabular-nums`}
                             style={{ color: "var(--text-muted)" }}
                           >
-                            {t.due_time ?? "종일"}
+                            {e.time ?? "종일"}
                           </span>
                           <span
                             className="min-w-0 flex-1 truncate"
                             style={{ color: "var(--text-primary)" }}
                           >
-                            {t.title}
+                            {e.text}
                           </span>
                         </AgendaRow>
                       ))}

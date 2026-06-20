@@ -3,12 +3,6 @@ import { extractTasks, toggleTask, type TaskItem } from "../lib/vault/tasks";
 import { scanAllTasks } from "../lib/vault/scan";
 
 export type TaskPriority = "high" | "medium" | "low";
-export type TaskCategory = "work" | "schedule" | "other";
-export const TASK_CATEGORIES: Array<{ id: TaskCategory; label: string }> = [
-  { id: "work", label: "업무" },
-  { id: "schedule", label: "일정" },
-  { id: "other", label: "기타" },
-];
 
 export interface Task {
   id: string; // `${file}#L${line}`
@@ -21,10 +15,7 @@ export interface Task {
   deleted: boolean;
   done_at: string | null;
   priority: TaskPriority;
-  category: TaskCategory | null;
   due_date: string | null;
-  // 다일 일정의 종료일(포함). null = 단일 일정. due_date 없이는 의미 없음.
-  end_date: string | null;
   due_time: string | null;
   // 메모 → 태스크 ⌘⏎ 로 만든 태스크면 원본 메모 uid. vault 라인엔
   // `#from-<uid>` tag 로 직렬화. uid 영구라 메모 rename 후에도 안 깨짐.
@@ -45,13 +36,13 @@ export interface TaskInsert {
   done?: boolean;
   cancelled?: boolean;
   deleted?: boolean;
-  category?: TaskCategory | null;
   due_date?: string | null;
-  end_date?: string | null;
   due_time?: string | null;
   priority?: TaskPriority;
   source_meeting_uid?: string | null;
   gcal_event_id?: string | null;
+  // 새 할 일을 넣을 프로젝트 파일 (`tasks/{이름}.md`). 생략 = 미분류(inbox).
+  target_file?: string;
 }
 
 // vault 라인의 `#from-<uid>` tag prefix. uid = uuid (`-` 포함) 도 tag 정규식 매칭.
@@ -66,9 +57,7 @@ export interface TodoUpdate {
   cancelled?: boolean;
   deleted?: boolean;
   done_at?: string | null;
-  category?: TaskCategory | null;
   due_date?: string | null;
-  end_date?: string | null;
   due_time?: string | null;
   priority?: TaskPriority;
   source_meeting_uid?: string | null;
@@ -89,16 +78,14 @@ export function parseTodoId(id: string): { file: string; line: number } {
 
 // ─── TaskItem (vault parser 결과) → Task (API 노출) ─────────────────────────
 
-function isCategory(t: string): t is TaskCategory {
-  return t === "work" || t === "schedule" || t === "other";
-}
-
 function isPriority(t: string): t is TaskPriority {
   return t === "high" || t === "medium" || t === "low";
 }
 
+// 모델 분리 전 카테고리 태그 — update 시 라인에서 제거(보존 안 함).
+const LEGACY_CATEGORY_TAGS = new Set(["work", "schedule", "other"]);
+
 function todoFromItem(item: TaskItem, mtimeIso?: string): Task {
-  const categoryTag = item.tags.find(isCategory);
   const priorityTag = item.tags.find(isPriority);
   const fromTag = item.tags.find((t) => t.startsWith(FROM_TAG_PREFIX));
   const gcalTag = item.tags.find((t) => t.startsWith(GCAL_TAG_PREFIX));
@@ -111,9 +98,7 @@ function todoFromItem(item: TaskItem, mtimeIso?: string): Task {
     deleted: item.deleted,
     done_at: null, // vault md 에선 추적 안 함. UI 표시용으론 done flag 면 충분.
     priority: priorityTag ?? "medium",
-    category: categoryTag ?? null,
     due_date: item.due ?? null,
-    end_date: item.end ?? null,
     due_time: item.time ?? null,
     source_meeting_uid: fromTag ? fromTag.slice(FROM_TAG_PREFIX.length) : null,
     gcal_event_id: gcalTag ? gcalTag.slice(GCAL_TAG_PREFIX.length) : null,
@@ -136,9 +121,7 @@ export function buildTodoLine(input: {
   done?: boolean;
   cancelled?: boolean;
   deleted?: boolean;
-  category?: TaskCategory | null;
   due_date?: string | null;
-  end_date?: string | null;
   due_time?: string | null;
   priority?: TaskPriority;
   source_meeting_uid?: string | null;
@@ -156,20 +139,13 @@ export function buildTodoLine(input: {
   // 시스템 생성 라인은 항상 ` --- ` + ISO 날짜. 옛 vault 의 ` — ` + M/D 도
   // parser 가 호환 매칭. ISO 박는 이유: M/D 만 박으면 연도가 read 시점 따라 점프
   // (2026 에 박은 5/22 가 2027 에 read 시 2027-05-22 로 해석되는 footgun).
+  // 할 일은 단일 날짜만 — 다일 범위는 일정(schedule.md) 전용.
   let line = `- [${check}] ${sanitizeTaskTitle(input.title)}`;
   if (input.due_date || input.due_time) {
     line += " ---";
-    if (input.due_date) {
-      // 종료일이 시작일보다 뒤면 `<start>..<end>` 범위로 직렬화 (다일 일정).
-      // 같거나 비었으면 단일 날짜 그대로 (회귀 없음).
-      const hasRange = !!input.end_date && input.end_date > input.due_date;
-      line += hasRange
-        ? ` ${input.due_date}..${input.end_date}`
-        : ` ${input.due_date}`;
-    }
+    if (input.due_date) line += ` ${input.due_date}`;
     if (input.due_time) line += ` ${input.due_time}`;
   }
-  if (input.category) line += ` #${input.category}`;
   if (input.priority && input.priority !== "medium") {
     line += ` #${input.priority}`;
   }
@@ -204,41 +180,41 @@ export async function listTodos(adapter: VaultAdapter): Promise<Task[]> {
   return tasks;
 }
 
-const INBOX_PATH = "inbox.md";
+// 미분류 할 일의 기본 집. 프로젝트 분리 후 tasks/ 폴더 안.
+const INBOX_PATH = "tasks/inbox.md";
 
 export async function createTodo(
   adapter: VaultAdapter,
   input: TaskInsert,
 ): Promise<Task> {
+  const file = input.target_file ?? INBOX_PATH;
   const line = buildTodoLine(input);
-  const raw = (await adapter.exists(INBOX_PATH))
-    ? await adapter.read(INBOX_PATH)
-    : "# Inbox\n";
-  // inbox 끝에 append (마지막 라인 후)
+  const raw = (await adapter.exists(file))
+    ? await adapter.read(file)
+    : "# 미분류\n";
+  // 파일 끝에 append (마지막 라인 후)
   const trimmed = raw.replace(/\n+$/, "");
   const updated = `${trimmed}\n${line}\n`;
-  const meta = await adapter.write(INBOX_PATH, updated);
+  const meta = await adapter.write(file, updated);
 
   // 새 라인 번호 계산
   const lineNum = updated.split("\n").length - 2; // 마지막 \n 의 직전 라인
   const iso = new Date(meta.mtime).toISOString();
   return {
-    id: makeTodoId(INBOX_PATH, lineNum),
+    id: makeTodoId(file, lineNum),
     title: input.title,
     done: input.done ?? false,
     cancelled: input.cancelled ?? false,
     deleted: input.deleted ?? false,
     done_at: null,
     priority: input.priority ?? "medium",
-    category: input.category ?? null,
     due_date: input.due_date ?? null,
-    end_date: input.end_date ?? null,
     due_time: input.due_time ?? null,
     source_meeting_uid: input.source_meeting_uid ?? null,
     gcal_event_id: input.gcal_event_id ?? null,
     created_at: iso,
     updated_at: iso,
-    _source: { file: INBOX_PATH, line: lineNum },
+    _source: { file, line: lineNum },
   };
 }
 
@@ -275,12 +251,7 @@ export async function updateTask(
       done: patch.done ?? existing.done,
       cancelled: patch.cancelled ?? existing.cancelled,
       deleted: patch.deleted ?? existing.deleted,
-      category:
-        patch.category !== undefined
-          ? patch.category
-          : (existing.tags.find(isCategory) ?? null),
       due_date: patch.due_date !== undefined ? patch.due_date : existing.due ?? null,
-      end_date: patch.end_date !== undefined ? patch.end_date : existing.end ?? null,
       due_time: patch.due_time !== undefined ? patch.due_time : existing.time ?? null,
       priority:
         patch.priority ??
@@ -297,9 +268,10 @@ export async function updateTask(
           : existingGcalTag
             ? existingGcalTag.slice(GCAL_TAG_PREFIX.length)
             : null,
+      // 옛 카테고리 태그(work/schedule/other)는 모델 분리로 폐기 — 보존 안 함.
       extra_tags: existing.tags.filter(
         (t) =>
-          !isCategory(t) &&
+          !LEGACY_CATEGORY_TAGS.has(t) &&
           !isPriority(t) &&
           !t.startsWith(FROM_TAG_PREFIX) &&
           !t.startsWith(GCAL_TAG_PREFIX),

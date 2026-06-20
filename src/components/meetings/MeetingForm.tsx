@@ -48,7 +48,7 @@ import { MarkdownView } from "./MarkdownView";
 import { TaskAddModal } from "../tasks/TaskAddModal";
 import { MoveFolderModal } from "./MoveFolderModal";
 import { MeetingExportModal } from "./MeetingExportModal";
-import type { TaskCategory, TaskInsert, TaskPriority } from "../../api/tasks";
+import type { TaskInsert, TaskPriority } from "../../api/tasks";
 import { extractTasks } from "../../lib/vault/tasks";
 import { useViewMode } from "../../hooks/useViewMode";
 import { isTauri } from "../../lib/isTauri";
@@ -1543,8 +1543,6 @@ function lineToTaskPrefill(
   };
   if (item.due) prefill.due_date = item.due;
   if (item.time) prefill.due_time = item.time;
-  const cat = item.tags.find((t): t is TaskCategory => t === "work" || t === "schedule" || t === "other");
-  if (cat) prefill.category = cat;
   const pri = item.tags.find((t): t is TaskPriority =>
     t === "high" || t === "medium" || t === "low",
   );

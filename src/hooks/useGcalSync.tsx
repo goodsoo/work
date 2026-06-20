@@ -17,6 +17,14 @@ const todosKey = ["todos"] as const;
 // 포커스 연타 디바운스 — 창 왕복마다 매번 sync 돌지 않게.
 const AUTO_MIN_INTERVAL_MS = 15_000;
 
+// 着수 2(모델 분리): 일정이 schedule.md 로 빠지면서 gcal 동기화의 task 기반 앵커
+// (#gcal-<id> 인라인 태그)가 끊겼다. 이대로 sync 가 돌면 앵커 잃은 로컬을 "삭제됨"
+// 으로 오판해 실제 Google 캘린더 이벤트를 push-delete 할 위험이 있어, 자동·수동
+// 동기화를 잠정 비활성화한다. executor 코드는 보존 — 着수 4(Gcal 정리)에서
+// schedule.md 이벤트 기반 앵커로 재연결한다. (boolean 타입 지정으로 executor 참조가
+// "도달 불가"로 좁혀지지 않게 해 lint/typecheck 통과.)
+const GCAL_SYNC_DISABLED: boolean = true;
+
 export type GcalSyncStatus = "idle" | "syncing" | "error";
 
 interface GcalSyncContextValue {
@@ -68,6 +76,11 @@ export function GcalSyncProvider({ children }: { children: ReactNode }) {
 
   const doSync = useCallback(
     async (manual: boolean) => {
+      // 着수 2: gcal 동기화 잠정 비활성화 (위 GCAL_SYNC_DISABLED 주석 참조).
+      if (GCAL_SYNC_DISABLED) {
+        setStatus("idle");
+        return;
+      }
       if (runningRef.current) return;
       const now = Date.now();
       if (!manual && now - lastRunRef.current < AUTO_MIN_INTERVAL_MS) return;

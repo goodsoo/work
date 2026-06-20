@@ -6,6 +6,7 @@ import {
   patchBody,
 } from "./parser";
 import { extractTasks, type TaskItem } from "./tasks";
+import { buildEventLine, SCHEDULE_PATH } from "./schedule";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types — UI/hooks 가 다루는 형태
@@ -626,17 +627,30 @@ export async function scanJournals(adapter: VaultAdapter): Promise<JournalMeta[]
   return results;
 }
 
-// inbox.md 안 태스크만 수집. 메모/일기 안 - [ ] 는 할 일 페이지 등장 X
-// (단순 체크박스 / 시각 element). 메모 → inbox 는 명시적 "태스크로 보내기" 액션.
+// 할 일 = `tasks/` 폴더의 프로젝트별 md 파일들. `tasks/inbox.md` = 미분류.
+// 폴더 전체를 가로질러 스캔 — 각 TaskItem 의 source.file 이 프로젝트(파일)를 가리킴.
+// (옛 모델: 루트 inbox.md 단일 파일. lazy migration 으로 tasks/ 로 이관됨.)
+export const TASKS_DIR = "tasks";
+
 export async function scanAllTasks(adapter: VaultAdapter): Promise<TaskItem[]> {
-  const path = "inbox.md";
-  if (!(await adapter.exists(path))) return [];
+  let files: string[];
   try {
-    const raw = await adapter.read(path);
-    return extractTasks(path, raw);
+    files = await adapter.list(TASKS_DIR);
   } catch {
     return [];
   }
+  const items: TaskItem[] = [];
+  for (const path of files) {
+    if (!path.endsWith(".md")) continue;
+    if (isSyncNoiseFile(path)) continue;
+    try {
+      const raw = await adapter.read(path);
+      items.push(...extractTasks(path, raw));
+    } catch (err) {
+      console.warn(`[scanAllTasks] skip ${path}:`, err);
+    }
+  }
+  return items;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -734,10 +748,91 @@ export async function ensureVaultStructure(
   await adapter.mkdir("notes");
   await adapter.mkdir("journals");
   await adapter.mkdir("portfolio"); // V0.7
-  if (!(await adapter.exists("inbox.md"))) {
+  await adapter.mkdir(TASKS_DIR); // V0.8 — 할 일 프로젝트 파일들의 집
+  // V0.8 lazy migration — 옛 루트 inbox.md 를 tasks/ + schedule.md 로 가른다.
+  // (idempotent: 루트 inbox.md 가 없으면 즉시 반환.)
+  await migrateRootInbox(adapter);
+  if (!(await adapter.exists(`${TASKS_DIR}/inbox.md`))) {
+    await adapter.write(`${TASKS_DIR}/inbox.md`, "# 미분류\n");
+  }
+}
+
+// V0.8 모델 분리 마이그레이션 — 첫 read 시 1회. 옛 루트 `inbox.md` 한 파일에
+// 섞여 있던 할 일 + 일정을 가른다 (V0.7.1 date-prefix→uid 같은 lazy 패턴):
+//   - `#schedule` + 날짜 라인 → `schedule.md` 로 이동 (체크박스 제거, 날짜-우선
+//     이벤트 포맷으로 재직렬화).
+//   - 그 외 모든 라인 → `tasks/inbox.md` 로 이동 (할 일 라인은 카테고리 태그
+//     `#work`/`#schedule`/`#other` 만 제거, 체크박스·텍스트·날짜·기타 태그 보존.
+//     헤더·빈 메모 등 비-태스크 라인은 그대로 보존 — 데이터 손실 방지).
+// 끝에 루트 inbox.md 삭제 = 마이그레이션 완료 표식 (재실행 시 early-return).
+//
+// 동시성 가드: React StrictMode 는 dev 에서 init effect 를 이중 마운트해
+// ensureVaultStructure → migrateRootInbox 를 동시 2회 호출한다. 락이 없으면 두 run 이
+// 같은 루트 inbox.md 를 읽고 둘 다 tasks/inbox.md 에 써(두 번째가 append) 내용이
+// 중복된다. root 경로별 in-flight promise 로 동시 호출이 단일 실행을 공유하게 한다.
+const migrateInFlight = new Map<string, Promise<void>>();
+
+export function migrateRootInbox(adapter: VaultAdapter): Promise<void> {
+  const root = adapter.getRoot() ?? "";
+  let p = migrateInFlight.get(root);
+  if (!p) {
+    p = doMigrateRootInbox(adapter).finally(() => migrateInFlight.delete(root));
+    migrateInFlight.set(root, p);
+  }
+  return p;
+}
+
+async function doMigrateRootInbox(adapter: VaultAdapter): Promise<void> {
+  const ROOT = "inbox.md";
+  if (!(await adapter.exists(ROOT))) return;
+  const raw = await adapter.read(ROOT);
+  const lines = raw.split("\n");
+
+  // 라인별 파싱 결과 — task 라인의 line→TaskItem 매핑.
+  const items = extractTasks(ROOT, raw);
+  const byLine = new Map(items.map((it) => [it.source.line, it]));
+
+  const eventLines: string[] = [];
+  const keptLines: string[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const item = byLine.get(i);
+    if (item && item.tags.includes("schedule") && item.due) {
+      // 일정 → schedule.md 이벤트 (체크박스 없음, 날짜-우선).
+      eventLines.push(
+        buildEventLine({
+          start: item.due,
+          end: item.end ?? null,
+          time: item.time ?? null,
+          text: item.text,
+        }),
+      );
+      continue;
+    }
+    // 그 외 — 카테고리 태그만 제거하고 라인 보존 (task 든 비-task 든).
+    keptLines.push(lines[i].replace(/\s#(?:work|schedule|other)\b/g, ""));
+  }
+
+  // schedule.md 에 추출 이벤트 append (기존 내용 보존).
+  if (eventLines.length) {
+    const existing = (await adapter.exists(SCHEDULE_PATH))
+      ? await adapter.read(SCHEDULE_PATH)
+      : "# 일정\n";
     await adapter.write(
-      "inbox.md",
-      "# Inbox\n\n## 할 일\n\n## 일정\n\n## 빠른 메모\n",
+      SCHEDULE_PATH,
+      `${existing.replace(/\n+$/, "")}\n${eventLines.join("\n")}\n`,
     );
   }
+
+  // tasks/inbox.md 작성 (이미 있으면 append — 부분 실패 재실행 안전).
+  const target = `${TASKS_DIR}/inbox.md`;
+  const keptContent = keptLines.join("\n").replace(/\n+$/, "") + "\n";
+  if (await adapter.exists(target)) {
+    const existing = await adapter.read(target);
+    await adapter.write(target, `${existing.replace(/\n+$/, "")}\n${keptContent}`);
+  } else {
+    await adapter.write(target, keptContent);
+  }
+
+  // 루트 inbox.md 제거 — 마이그레이션 완료.
+  await adapter.delete(ROOT);
 }

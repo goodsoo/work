@@ -17,19 +17,21 @@ import {
   PortfolioSidePanelFooter,
   TodosSidePanel,
   TodosSidePanelFooter,
+  RoutinesSidePanel,
+  RoutinesSidePanelFooter,
   type TaskStatusFilter,
-  type TaskCategoryFilter,
 } from "./components/nav/SidePanel";
 import { useTaskSort } from "./hooks/useTaskSort";
 import { usePortfolioSort } from "./hooks/usePortfolioSort";
 import { usePortfolioCategoryFilter } from "./hooks/usePortfolioCategoryFilter";
-import type { TaskCategory, TaskInsert } from "./api/tasks";
+import type { TaskInsert } from "./api/tasks";
 import { TodosTrashModal } from "./components/tasks/TodosTrashModal";
 import { Text } from "./components/common/Text";
 import { EmptyState } from "./components/common/EmptyState";
 import { PageHeaderBar } from "./components/common/PageHeaderBar";
 import { TodayPage } from "./pages/TodayPage";
 import { TodayAgendaPanel } from "./components/today/TodayAgendaPanel";
+import { DayDetailModal } from "./components/today/DayDetailModal";
 import { JournalOverlay } from "./components/calendar/JournalOverlay";
 import { TasksPage } from "./pages/TasksPage";
 import { PortfolioPage } from "./pages/PortfolioPage";
@@ -66,6 +68,7 @@ function readTabFromHash(): Tab {
   if (h === "#today") return "today";
   if (h === "#meetings") return "meetings";
   if (h === "#todos") return "todos";
+  if (h === "#routines") return "routines";
   if (h === "#portfolio") return "portfolio";
   // 빈 hash = 첫 탭 ("오늘"). SIMPLIFY: "오늘" 대시보드가 default landing.
   return TABS[0].id;
@@ -131,8 +134,11 @@ function AppContent() {
   // 일기 오버레이 — null = 닫힘. 메인 "오늘 일기" 블록 + 사이드바 날짜 헤더 클릭이
   // 모두 이 한 오버레이를 연다 (캘린더 탭 폐기 후 유일한 일기 진입점).
   const [journalDate, setJournalDate] = useState<string | null>(null);
+  // 날짜 상세 모달 — null = 닫힘. "오늘" 사이드바 날짜·일정 클릭이 연다.
+  const [dayDate, setDayDate] = useState<string | null>(null);
   const [taskStatus, setTaskStatus] = useState<TaskStatusFilter>("all");
-  const [taskCategory, setTaskCategory] = useState<TaskCategoryFilter>("all");
+  // 선택된 할 일 프로젝트 파일(`tasks/{이름}.md`). null = 전체.
+  const [selectedProject, setSelectedProject] = useState<string | null>(null);
   const [taskSortKey, setTaskSortKey] = useTaskSort();
   const [portfolioFilter, setPortfolioFilter] = useState<SourceFilter>({
     kind: "all",
@@ -148,12 +154,10 @@ function AppContent() {
   useEffect(() => {
     function handler(e: Event) {
       const detail = (e as CustomEvent).detail as
-        | { type?: "task" | "routine"; category?: TaskCategory | null; prefill?: Partial<TaskInsert> }
+        | { type?: "task" | "routine"; prefill?: Partial<TaskInsert> }
         | undefined;
       setTaskAddType(detail?.type ?? "task");
-      const prefill = detail?.prefill ?? {};
-      if (detail?.category !== undefined) prefill.category = detail.category;
-      setTaskAddPrefill(prefill);
+      setTaskAddPrefill(detail?.prefill ?? {});
       setTaskAddOpen(true);
     }
     window.addEventListener("todos:add-request", handler);
@@ -572,9 +576,14 @@ function AppContent() {
     }
   }
 
-  // 일기 오버레이 열기 — 메인 "오늘 일기" (date=오늘) + 사이드바 날짜 헤더 (그날).
+  // 일기 오버레이 열기 — 메인 "오늘 일기" (date=오늘) + 날짜 상세 모달의 일기 진입.
   function openJournal(date: string) {
     setJournalDate(date);
+  }
+
+  // 날짜 상세 모달 열기 — "오늘" 사이드바 날짜·일정 클릭 (일정·일기·노트 한 곳).
+  function openDay(date: string) {
+    setDayDate(date);
   }
 
   function openTask(id: string) {
@@ -583,7 +592,7 @@ function AppContent() {
     // 클릭한 task 가 현재 필터(cancelled view, 특정 카테고리 등) 밖이면 안 보임 →
     // 필터 reset 후 scroll. 사용자는 "그 task 로 이동" 의도가 명확.
     setTaskStatus("all");
-    setTaskCategory("all");
+    setSelectedProject(null);
     // 루틴 상세를 보던 중이면 일반 태스크 목록으로 빠져나와야 클릭한 task 가 보임.
     setSelectedRoutineName(null);
     setScrollToTaskId(id);
@@ -594,10 +603,10 @@ function AppContent() {
 
   function openRoutine(name: string) {
     drawer.close();
-    setTab("todos");
+    setTab("routines");
     setSelectedRoutineName(name);
-    if (window.location.hash !== "#todos") {
-      window.history.pushState({ tab: "todos" }, "", "#todos");
+    if (window.location.hash !== "#routines") {
+      window.history.pushState({ tab: "routines" }, "", "#routines");
     }
   }
 
@@ -682,7 +691,7 @@ function AppContent() {
     tab === "today" ? (
       // "오늘" 사이드바 = 세로 날짜 리스트 (폐기된 캘린더 탭의 날짜 훑기·일기 진입 흡수).
       // 메인 대시보드는 오늘 고정 — 날짜 헤더 클릭 시 그날 일기 오버레이.
-      <TodayAgendaPanel onOpenTask={openTask} onOpenJournal={openJournal} />
+      <TodayAgendaPanel onOpenDay={openDay} />
     ) : tab === "meetings" ? (
       <MeetingsSidePanel
         selectedId={selectedMeetingId}
@@ -698,6 +707,11 @@ function AppContent() {
       <TodosSidePanel
         statusFilter={taskStatus}
         onStatusChange={setTaskStatus}
+        selectedProject={selectedProject}
+        onSelectProject={setSelectedProject}
+      />
+    ) : tab === "routines" ? (
+      <RoutinesSidePanel
         selectedRoutineName={selectedRoutineName}
         onSelectRoutine={setSelectedRoutineName}
       />
@@ -724,6 +738,8 @@ function AppContent() {
       />
     ) : tab === "todos" ? (
       <TodosSidePanelFooter onTrashOpen={() => setTodosTrashOpen(true)} />
+    ) : tab === "routines" ? (
+      <RoutinesSidePanelFooter onTrashOpen={() => setTodosTrashOpen(true)} />
     ) : tab === "portfolio" ? (
       <PortfolioSidePanelFooter
         onTrashOpen={() => setPortfolioTrashOpen(true)}
@@ -749,6 +765,7 @@ function AppContent() {
           onOpenRoutine={openRoutine}
           onCreateNote={() => void createNoteFromToday()}
           onOpenJournal={() => openJournal(todayIso())}
+          onOpenDay={openDay}
         />
       ) : tab === "meetings" ? (
         selectedMeetingId ? (
@@ -779,16 +796,19 @@ function AppContent() {
           onSync={portfolioRunFullSync}
           syncRunning={portfolioSync.state.running}
         />
-      ) : selectedRoutineName ? (
-        <RoutineDetail
-          name={selectedRoutineName}
-          onClose={() => setSelectedRoutineName(null)}
-        />
+      ) : tab === "routines" ? (
+        selectedRoutineName ? (
+          <RoutineDetail
+            name={selectedRoutineName}
+            onClose={() => setSelectedRoutineName(null)}
+          />
+        ) : (
+          <RoutinesEmpty />
+        )
       ) : (
         <TasksPage
           statusFilter={taskStatus}
-          categoryFilter={taskCategory}
-          onCategoryChange={setTaskCategory}
+          projectFilter={selectedProject}
           sortKey={taskSortKey}
           onSortKeyChange={setTaskSortKey}
           scrollToTaskId={scrollToTaskId}
@@ -872,7 +892,26 @@ function AppContent() {
         date={journalDate ?? todayIso()}
         onClose={() => setJournalDate(null)}
       />
+      <DayDetailModal
+        open={dayDate !== null}
+        date={dayDate ?? todayIso()}
+        onClose={() => setDayDate(null)}
+        onOpenMeeting={openMeeting}
+        onOpenJournal={openJournal}
+      />
     </AppShell>
+  );
+}
+
+// 루틴 탭 본문 — 선택된 루틴이 없을 때. 사이드바에서 루틴을 고르거나 새로 추가.
+function RoutinesEmpty() {
+  return (
+    <div className="flex h-full items-center justify-center p-6">
+      <EmptyState
+        title="루틴"
+        description="왼쪽에서 루틴을 선택하거나 + 로 새 루틴을 추가하세요."
+      />
+    </div>
   );
 }
 

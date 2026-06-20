@@ -5,10 +5,10 @@ import {
   Check,
   Clock,
   FileText,
-  Hash,
+  Folder,
 } from "lucide-react";
-import type { Task, TaskPriority, TaskCategory } from "../../api/tasks";
-import { TASK_CATEGORIES } from "../../api/tasks";
+import type { Task, TaskPriority } from "../../api/tasks";
+import { projectLabel } from "../../api/taskProjects";
 import { useMeetings } from "../../hooks/useMeetings";
 import { useUpdateTask } from "../../hooks/useTasks";
 import { useGcalSync } from "../../hooks/useGcalSync";
@@ -24,7 +24,6 @@ import { Button } from "../common/Button";
 import { Text } from "../common/Text";
 import { Popover } from "../common/Popover";
 import { MeetingPicker } from "../common/MeetingPicker";
-import { CategoryPicker } from "../common/CategoryPicker";
 import { CheckboxButton } from "./CheckboxButton";
 
 type Props = {
@@ -36,9 +35,7 @@ type Props = {
       title?: string;
       priority?: TaskPriority;
       due_date?: string | null;
-      end_date?: string | null;
       due_time?: string | null;
-      category?: TaskCategory | null;
       source_meeting_uid?: string | null;
       done?: boolean;
       cancelled?: boolean;
@@ -46,14 +43,14 @@ type Props = {
     },
   ) => void;
   onDelete: (task: Task) => void;
+  // 전체(모든 프로젝트) 뷰에서만 true — 어느 프로젝트 task 인지 칩으로 구분.
+  showProjectChip?: boolean;
 };
 
 type Draft = {
   title: string;
   due_date: string;
-  end_date: string;
   due_time: string;
-  category: TaskCategory | null;
   source_meeting_uid: string | null;
   cancelled: boolean;
   done: boolean;
@@ -63,16 +60,20 @@ function draftFromTask(task: Task): Draft {
   return {
     title: task.title,
     due_date: task.due_date ?? "",
-    end_date: task.end_date ?? "",
     due_time: task.due_time ?? "",
-    category: task.category,
     source_meeting_uid: task.source_meeting_uid,
     cancelled: task.cancelled,
     done: task.done,
   };
 }
 
-export function TaskRow({ task, onToggle, onUpdate, onDelete }: Props) {
+export function TaskRow({
+  task,
+  onToggle,
+  onUpdate,
+  onDelete,
+  showProjectChip = false,
+}: Props) {
   const [editing, setEditing] = useState(false);
   const flashing = useTaskFlash(task.id);
   // edit 모드 진입 시 task 의 모든 편집 가능한 값을 draft 로 복사. 사용자가
@@ -171,13 +172,8 @@ export function TaskRow({ task, onToggle, onUpdate, onDelete }: Props) {
     }
     const nextDate = d.due_date || null;
     if (nextDate !== task.due_date) patch.due_date = nextDate;
-    // 종료일은 시작일 이후일 때만 다일로 유효. 같거나 앞·시작일 없음 = 단일(null).
-    const nextEnd =
-      d.end_date && nextDate && d.end_date > nextDate ? d.end_date : null;
-    if (nextEnd !== task.end_date) patch.end_date = nextEnd;
     const nextTime = d.due_time || null;
     if (nextTime !== task.due_time) patch.due_time = nextTime;
-    if (d.category !== task.category) patch.category = d.category;
     if (d.source_meeting_uid !== task.source_meeting_uid)
       patch.source_meeting_uid = d.source_meeting_uid;
     if (d.cancelled !== task.cancelled) patch.cancelled = d.cancelled;
@@ -231,7 +227,6 @@ export function TaskRow({ task, onToggle, onUpdate, onDelete }: Props) {
               status={
                 draft.cancelled ? "cancelled" : draft.done ? "done" : "pending"
               }
-              category={draft.category}
               onClick={() => {
                 if (draft.cancelled) {
                   updateDraft({ cancelled: false });
@@ -280,15 +275,6 @@ export function TaskRow({ task, onToggle, onUpdate, onDelete }: Props) {
                   compact
                 />
               </span>
-              {/* 종료일 (선택) — 비우면 단일 일정. 시작일 이후일 때만 다일로 저장. */}
-              <span className="inline-flex shrink-0 items-center gap-1">
-                <span aria-hidden className="opacity-60">~</span>
-                <LooseDateInput
-                  value={draft.end_date}
-                  onCommit={(next) => updateDraft({ end_date: next })}
-                  compact
-                />
-              </span>
               <span className="inline-flex shrink-0 items-center gap-1">
                 <Clock className="h-3 w-3 shrink-0 opacity-60" aria-hidden />
                 <LooseTimeInput
@@ -297,10 +283,6 @@ export function TaskRow({ task, onToggle, onUpdate, onDelete }: Props) {
                   compact
                 />
               </span>
-              <CategoryPicker
-                value={draft.category}
-                onChange={(cat) => updateDraft({ category: cat })}
-              />
               <MeetingPicker
                 value={draft.source_meeting_uid}
                 onChange={(uid) => updateDraft({ source_meeting_uid: uid })}
@@ -317,7 +299,7 @@ export function TaskRow({ task, onToggle, onUpdate, onDelete }: Props) {
                     ...(!draft.cancelled && draft.done ? { done: false } : {}),
                   })
                 }
-                title={draft.cancelled ? "취소 해제" : "태스크 취소"}
+                title={draft.cancelled ? "취소 해제" : "할 일 취소"}
                 style={{
                   color: draft.cancelled
                     ? "var(--text-primary)"
@@ -331,7 +313,7 @@ export function TaskRow({ task, onToggle, onUpdate, onDelete }: Props) {
                 variant="ghost"
                 size="sm"
                 onClick={handleDeleteWithFade}
-                title="태스크 삭제"
+                title="할 일 삭제"
                 style={{
                   color: "var(--text-secondary)",
                   border: "1px solid var(--border-subtle)",
@@ -357,7 +339,6 @@ export function TaskRow({ task, onToggle, onUpdate, onDelete }: Props) {
             status={
               task.cancelled ? "cancelled" : task.done ? "done" : "pending"
             }
-            category={task.category}
             onClick={() => onToggle(task)}
           />
           <div className="min-w-0 flex-1">
@@ -379,7 +360,7 @@ export function TaskRow({ task, onToggle, onUpdate, onDelete }: Props) {
                 </Text>
               )}
             </Text>
-            <ReadOnlyMeta task={task} />
+            <ReadOnlyMeta task={task} showProjectChip={showProjectChip} />
           </div>
           {/* 일정 → Google 캘린더 push / 동기화 상태. DueChip 앞. */}
           <GcalAction task={task} />
@@ -465,28 +446,28 @@ function DueChip({ task }: { task: Task }) {
 }
 
 // read-only: 값이 있는 메타만 chip 으로 표시. 모두 비어있으면 아무것도 렌더 X.
-function ReadOnlyMeta({ task }: { task: Task }) {
+function ReadOnlyMeta({
+  task,
+  showProjectChip,
+}: {
+  task: Task;
+  showProjectChip: boolean;
+}) {
   const hasDate = !!task.due_date;
   const hasTime = !!task.due_time;
-  const categoryLabel = TASK_CATEGORIES.find((c) => c.id === task.category)?.label;
   const hasSource = !!task.source_meeting_uid;
-  if (!hasDate && !hasTime && !categoryLabel && !hasSource) return null;
+  if (!hasDate && !hasTime && !showProjectChip && !hasSource) return null;
   return (
     <div
       className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs"
       style={{ color: "var(--text-secondary)" }}
     >
-      {hasDate ? (
-        <span>
-          {formatDisplayDate(task.due_date)}
-          {task.end_date ? ` ~ ${formatDisplayDate(task.end_date)}` : null}
-        </span>
-      ) : null}
+      {hasDate ? <span>{formatDisplayDate(task.due_date)}</span> : null}
       {hasTime ? <span>{task.due_time}</span> : null}
-      {categoryLabel ? (
+      {showProjectChip ? (
         <span className="inline-flex items-center gap-0.5">
-          <Hash className="h-3 w-3 shrink-0 opacity-70" aria-hidden />
-          {categoryLabel}
+          <Folder className="h-3 w-3 shrink-0 opacity-70" aria-hidden />
+          {projectLabel(task._source.file)}
         </span>
       ) : null}
       {hasSource ? (
