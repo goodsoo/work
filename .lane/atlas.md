@@ -11,15 +11,17 @@
 - style: Tailwind v4 + 디자인 토큰 (DS 연결: **yes** — `src/index.css` 의 `goodsoob-design-system` 관리 sentinel 블록)
 
 ## Backbone
-- routes: `src/App.tsx:60` (`readTabFromHash` — `#calendar`(default)/`#meetings`/`#todos`/`#portfolio`/`#styleguide`). meeting 상세는 `selectedMeetingId`(uid) state + `#meeting-{uid}` hash
+- routes: `src/App.tsx:60` (`readTabFromHash` — `#today`(default)/`#meetings`/`#todos`/`#routines`/`#portfolio`/`#styleguide`). meeting 상세는 `selectedMeetingId`(uid) state + `#meeting-{uid}` hash. 날짜 상세 모달(`DayDetailModal`)·일기 오버레이는 App 이 open state 소유
 - state stores: `src/hooks/use*.ts` (query/mutation 훅), 전역 모달/선택 state 는 `src/App.tsx` 가 owner
-- data layer: `src/api/{meetings,journals,tasks,routines,portfolio}.ts` (vault 캡슐화) → `src/lib/vault/adapter.ts` (per-path mutex + atomic write)
-- vault 코어: `src/lib/vault/{adapter,parser,scan,watcher,registry,tasks}.ts`
+- data layer: `src/api/{meetings,journals,tasks,taskProjects,schedule,routines,portfolio}.ts` (vault 캡슐화) → `src/lib/vault/adapter.ts` (per-path mutex + atomic write)
+- vault 코어: `src/lib/vault/{adapter,parser,scan,watcher,registry,tasks,schedule}.ts`. 저장: 할 일=`tasks/{프로젝트}.md`(inbox.md=미분류), 일정=`schedule.md`(체크박스 없는 날짜-우선 이벤트), 노트=`notes/`, 일기=`journals/`, 루틴=`routines/{name}.md`
 
 ## Flows            <!-- 현존 사용자 흐름. 쓰면서 누적. -->
 - 메모장: 진입 `#meetings` → 사이드바 메모 목록(정렬 popover) → 선택 시 `App.tsx` 인라인 상세 (제목 → 메타 → 본문/음성기록/요약 3-탭, 편집↔보기 토글) → 요약은 `SummaryModal`
-- 캘린더: 진입 `#calendar`(default landing) → 주 단위 연속 스크롤 → day 클릭 → 사이드 패널 상세 + gcal 동기화
-- 할 일: 진입 `#todos` → 카테고리 필터(전체/업무/미팅/미분류) + routine → task/schedule 통합 표시
+- 오늘(기본 진입): `#today` → 메인 = 오늘 고정 블록(오늘 일정/오늘·밀린 할 일/오늘의 루틴/이어서 쓸 노트/일기) + 사이드바 `TodayAgendaPanel`(날짜 리스트) → 날짜·일정 클릭 = `DayDetailModal`(일정 보기·추가·편집·삭제 + 그 날 노트 + 일기 진입). ※ 사이드바 개편 예정([[today-sidebar-redesign]])
+- 일정: `schedule.md` 이벤트(체크박스 없음, 날짜-우선·다일 `..` 범위). 오늘 블록/사이드바/날짜 모달에서 표시·편집. gcal 자동 sync 는 잠정 off(着수 4 재연결)
+- 할 일: 진입 `#todos` → 상태 필터(전체/미완료/완료/취소) + `tasks/` 프로젝트 사이드바(파일=프로젝트, 생성/삭제) → 할 일만(일정·루틴 분리). 카테고리 축 폐기
+- 루틴: 진입 `#routines`(2군 네비) → 사이드바 루틴 목록(활성/지난) → 본문 `RoutineDetail`(정의·연속기록). 오늘 체크는 오늘 블록/사이드바
 - 내 작업(포트폴리오): 진입 `#portfolio` → gh PR 자동 sync → 카드 그리드 + 사이드바 + 스크린샷 lightbox
 - 스타일가이드: `#styleguide` (VaultGate 우회, 컴포넌트/voice 시각 카탈로그 — dev/검토용)
 
@@ -31,9 +33,9 @@
 - 패키지 매니저: **bun**
 
 ## Components       <!-- 이 앱이 가진 DS 컴포넌트 + 갭 이력 -->
-- 보유: `src/components/common/*` (variant+size+color prop 패턴), 도메인별 `calendar/`/`meetings/`/`tasks/`/`portfolio/`/`routines/`/`timeline/`/`nav/`/`settings/`/`vault/` + 전역 `ConfirmDialog`/`Toast`/`Tooltip`(GlobalTooltip)
+- 보유: `src/components/common/*` (variant+size+color prop 패턴 — `Modal` 은 horizontal/xl orientation 지원), 도메인별 `today/`(`TodayAgendaPanel`·`DayDetailModal`)/`meetings/`/`tasks/`/`portfolio/`/`routines/`/`timeline/`/`nav/`/`settings/`/`vault/` + 전역 `ConfirmDialog`/`Toast`/`Tooltip`(GlobalTooltip). 사이드바 폴더 CRUD 패턴은 메모장↔할 일 프로젝트가 공유
 - DS: canonical `goodsoob-design-system` 연결 (`index.css` sentinel). 토큰 정의는 `src/index.css` 만 (`:root`+`.dark`, semantic 단일 layer)
-- 과거 갭/결정: 색은 전부 `var(--*)` 토큰 (hex 직접 금지, 예외 `useTheme.ts` radial-wipe JS 상수). Tailwind `dark:` 색상 접두사 금지
+- 과거 갭/결정: 색은 전부 `var(--*)` 토큰 (hex 직접 금지, 예외 `useTheme.ts` radial-wipe JS 상수). Tailwind `dark:` 색상 접두사 금지. **모델 분리(2026-06)**: 할 일 카테고리 축 폐기(`CategoryPicker`/`taskCategory.ts` 제거), 일정은 task 가 아닌 `schedule.md` 이벤트 모델. dead `--cat-*` 토큰은 styleguide 에만 잔존(정리 후보)
 
 ## Deploy
 - target: Tauri 데스크탑 `.app` (웹 deploy 비활성 — `vercel.json` 으로 main deploy 차단)
