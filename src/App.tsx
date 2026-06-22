@@ -31,7 +31,6 @@ import { EmptyState } from "./components/common/EmptyState";
 import { PageHeaderBar } from "./components/common/PageHeaderBar";
 import { TodayPage } from "./pages/TodayPage";
 import { TodayAgendaPanel } from "./components/today/TodayAgendaPanel";
-import { DayDetailModal } from "./components/today/DayDetailModal";
 import { JournalOverlay } from "./components/calendar/JournalOverlay";
 import { TasksPage } from "./pages/TasksPage";
 import { PortfolioPage } from "./pages/PortfolioPage";
@@ -135,7 +134,9 @@ function AppContent() {
   // 모두 이 한 오버레이를 연다 (캘린더 탭 폐기 후 유일한 일기 진입점).
   const [journalDate, setJournalDate] = useState<string | null>(null);
   // 날짜 상세 모달 — null = 닫힘. "오늘" 사이드바 날짜·일정 클릭이 연다.
-  const [dayDate, setDayDate] = useState<string | null>(null);
+  // "오늘" 탭 메인창이 보여줄 날짜. 기본=오늘, 사이드바 날짜 선택 시 갱신.
+  // 탭을 떠났다 돌아오면 오늘로 리셋(탭 정체성 유지) — 아래 effect.
+  const [selectedDay, setSelectedDay] = useState<string>(() => todayIso());
   const [taskStatus, setTaskStatus] = useState<TaskStatusFilter>("all");
   // 선택된 할 일 프로젝트 파일(`tasks/{이름}.md`). null = 전체.
   const [selectedProject, setSelectedProject] = useState<string | null>(null);
@@ -581,10 +582,16 @@ function AppContent() {
     setJournalDate(date);
   }
 
-  // 날짜 상세 모달 열기 — "오늘" 사이드바 날짜·일정 클릭 (일정·일기·노트 한 곳).
+  // "오늘" 탭에서 날짜 선택 — 메인창을 그 날 day-view 로 전환 (모달 아님).
   function openDay(date: string) {
-    setDayDate(date);
+    setSelectedDay(date);
   }
+
+  // "오늘" 탭에 (재)진입하면 selectedDay 를 오늘로 리셋 — 다른 날을 보던 채로 탭을
+  // 떠났다 돌아왔을 때 탭이 늘 "오늘"에서 시작하도록. 탭 안에서의 날짜 선택은 유지.
+  useEffect(() => {
+    if (tab === "today") setSelectedDay(todayIso());
+  }, [tab]);
 
   function openTask(id: string) {
     drawer.close();
@@ -598,15 +605,6 @@ function AppContent() {
     setScrollToTaskId(id);
     if (window.location.hash !== "#todos") {
       window.history.pushState({ tab: "todos" }, "", "#todos");
-    }
-  }
-
-  function openRoutine(name: string) {
-    drawer.close();
-    setTab("routines");
-    setSelectedRoutineName(name);
-    if (window.location.hash !== "#routines") {
-      window.history.pushState({ tab: "routines" }, "", "#routines");
     }
   }
 
@@ -689,9 +687,9 @@ function AppContent() {
   // Side panel per tab (모바일에선 drawer, 데스크탑에선 3-pane 왼쪽 컬럼).
   const sidePanel =
     tab === "today" ? (
-      // "오늘" 사이드바 = 세로 날짜 리스트 (폐기된 캘린더 탭의 날짜 훑기·일기 진입 흡수).
-      // 메인 대시보드는 오늘 고정 — 날짜 헤더 클릭 시 그날 일기 오버레이.
-      <TodayAgendaPanel onOpenDay={openDay} />
+      // "오늘" 사이드바 = 미니 월 그리드 + 다가오는 일정. 날짜 선택 시 메인창이
+      // 그 날 day-view 로 전환(openDay → selectedDay). 다른 탭과 동일한 사이드바→메인.
+      <TodayAgendaPanel onOpenDay={openDay} selectedDay={selectedDay} />
     ) : tab === "meetings" ? (
       <MeetingsSidePanel
         selectedId={selectedMeetingId}
@@ -760,12 +758,11 @@ function AppContent() {
       <PrefetchWarmup />
       {tab === "today" ? (
         <TodayPage
+          selectedDay={selectedDay}
+          onReturnToday={() => setSelectedDay(todayIso())}
           onOpenMeeting={openMeeting}
           onOpenTask={openTask}
-          onOpenRoutine={openRoutine}
           onCreateNote={() => void createNoteFromToday()}
-          onOpenJournal={() => openJournal(todayIso())}
-          onOpenDay={openDay}
         />
       ) : tab === "meetings" ? (
         selectedMeetingId ? (
@@ -891,13 +888,6 @@ function AppContent() {
         open={journalDate !== null}
         date={journalDate ?? todayIso()}
         onClose={() => setJournalDate(null)}
-      />
-      <DayDetailModal
-        open={dayDate !== null}
-        date={dayDate ?? todayIso()}
-        onClose={() => setDayDate(null)}
-        onOpenMeeting={openMeeting}
-        onOpenJournal={openJournal}
       />
     </AppShell>
   );

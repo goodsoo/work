@@ -14,6 +14,7 @@ import {
   type Task,
   type TaskPriority,
 } from "../api/tasks";
+import { compareTaskDate } from "../lib/taskSort";
 import { TaskRow } from "../components/tasks/TaskRow";
 import { SyncStatusChip } from "../components/tasks/SyncStatusChip";
 import { PageHeaderBar } from "../components/common/PageHeaderBar";
@@ -71,33 +72,20 @@ export function TasksPage({
         filtered = filtered.filter((t) => t.done);
     }
     const copy = filtered.slice();
-    // 정렬 기준은 due_date + due_time. **null first** — 날짜 미적용 task 는 최상단
-    // 으로 올려서 "기한 정해야 함" 보채는 시각 신호. tie-break 은 라인 위치.
-    function cmpDate(a: Task, b: Task, asc: boolean): number {
-      const ad = a.due_date;
-      const bd = b.due_date;
-      if (!ad && bd) return -1; // null first
-      if (ad && !bd) return 1;
-      if (ad && bd && ad !== bd) return asc ? ad.localeCompare(bd) : bd.localeCompare(ad);
-      const at = a.due_time;
-      const bt = b.due_time;
-      if (!at && bt) return -1;
-      if (at && !bt) return 1;
-      if (at && bt && at !== bt) return asc ? at.localeCompare(bt) : bt.localeCompare(at);
-      return b._source.line - a._source.line; // 같은 시각이면 최근 추가가 위로
-    }
+    // 정렬은 compareTaskDate (due_date+due_time, null first, 라인 tie-break) 공유 —
+    // "오늘" 탭 할일 블록과 동일 순서. (taskSort.ts)
     if (sortKey === "name") {
       copy.sort((a, b) => a.title.localeCompare(b.title, "ko"));
     } else if (sortKey === "date_asc") {
-      copy.sort((a, b) => cmpDate(a, b, true));
+      copy.sort((a, b) => compareTaskDate(a, b, true));
     } else if (sortKey === "date_asc_undone") {
       // 미완료 먼저 → 그 안에서 오래된순. 끝낸 일은 아래로 내려보냄.
       copy.sort((a, b) => {
         if (a.done !== b.done) return a.done ? 1 : -1;
-        return cmpDate(a, b, true);
+        return compareTaskDate(a, b, true);
       });
     } else {
-      copy.sort((a, b) => cmpDate(a, b, false));
+      copy.sort((a, b) => compareTaskDate(a, b, false));
     }
     return copy;
   }, [data, statusFilter, projectFilter, sortKey]);
