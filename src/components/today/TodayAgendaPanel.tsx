@@ -6,6 +6,7 @@ import { useSchedule } from "../../hooks/useSchedule";
 import type { ScheduleEvent } from "../../api/schedule";
 import { todayIso, isToday, formatDisplayDate } from "../../lib/dates";
 import { eventDaysInMonth, monthGridCells, upcomingEvents } from "./monthGrid";
+import { QuickCapturePanel } from "./QuickCapturePanel";
 
 // "오늘" 탭 사이드바 — 메인 대시보드가 "오늘"을 다 보여주므로, 사이드바는 오늘 화면이
 // 못 하는 것만 맡는다: (a) 다른 날짜 이동, (b) 앞으로의 일정 미리보기. 그래서 위는
@@ -217,6 +218,9 @@ export function TodayAgendaPanel({ onOpenDay, selectedDay }: Props) {
           ))
         )}
       </div>
+
+      {/* 빠른 캡처 — 아젠다 스크롤 밖, 사이드바 하단에 항상 고정. */}
+      <QuickCapturePanel />
     </div>
   );
 }
