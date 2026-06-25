@@ -1,5 +1,6 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
+  Calendar as CalendarIcon,
   CalendarDays,
   CheckSquare,
   FileText,
@@ -10,9 +11,12 @@ import {
 import { Button } from "../components/common/Button";
 import { Text } from "../components/common/Text";
 import { PageHeaderBar } from "../components/common/PageHeaderBar";
+import { SaveIndicator } from "../components/common/SaveIndicator";
 import { CheckboxButton } from "../components/tasks/CheckboxButton";
+import { LooseDateInput } from "../components/common/LooseDateInput";
 import { DayEvents } from "../components/today/DayEvents";
 import { JournalEditor } from "../components/calendar/JournalEditor";
+import type { SaveStatus } from "../hooks/useDebouncedSave";
 import { eventsOnDay, tasksDueOn, notesOnDay } from "../components/today/dayView";
 import { compareTaskDate } from "../lib/taskSort";
 import { useMeetings } from "../hooks/useMeetings";
@@ -63,6 +67,18 @@ export function TodayPage({
   const updateTask = useUpdateTask();
   const createTask = useCreateTask();
   const [quickTask, setQuickTask] = useState("");
+  // 일기 저장 상태 — 인라인 에디터가 올려줌. 표시는 일기 섹션 타이틀 옆.
+  const [journalStatus, setJournalStatus] = useState<SaveStatus>("idle");
+  // 빠른 추가 시 미리 적는 마감일. 오늘 뷰면 비움(날짜 없는 할 일, 클릭 시 오늘로 시드),
+  // 다른 날 뷰면 그 날짜로 미리 채움.
+  const defaultQuickDate = isTodayView ? "" : day;
+  const [quickDate, setQuickDate] = useState(defaultQuickDate);
+
+  // 보고 있는 날짜가 바뀌면 빠른 추가 마감일도 기본값으로 리셋.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setQuickDate(defaultQuickDate);
+  }, [defaultQuickDate]);
 
   // 그 날 일정 (count 용 — 본문은 DayEvents 가 추가/편집까지 렌더).
   const dayEvents = useMemo(
@@ -71,15 +87,21 @@ export function TodayPage({
   );
 
   // 할 일 — 오늘 모드: 오늘 날짜와 무관하게 할일 탭과 같은 순서(compareTaskDate date_asc)
-  // 로 미완료(미삭제·미취소·미완료) 상위 TODO_LIMIT 개. 완료는 숨김. 다른 날: 그 날 마감만.
+  // 로 미완료(미삭제·미취소·미완료) 전체. 완료는 숨김. 다른 날: 그 날 마감만.
+  // 카운트는 이 전체 길이를 쓰고, 리스트는 아래 visibleTasks 로 상위 TODO_LIMIT 개만 노출.
   const tasks = useMemo<Task[]>(() => {
     const all = tasksQ.data ?? [];
     if (!isTodayView) return tasksDueOn(all, day);
     return all
       .filter((t) => !t.deleted && !t.cancelled && !t.done)
-      .sort((a, b) => compareTaskDate(a, b, true))
-      .slice(0, TODO_LIMIT);
+      .sort((a, b) => compareTaskDate(a, b, true));
   }, [tasksQ.data, day, isTodayView]);
+
+  // 실제 렌더하는 건 상위 TODO_LIMIT 개까지만 — 카운트(tasks.length)는 전체 남은 개수.
+  const visibleTasks = useMemo(
+    () => tasks.slice(0, TODO_LIMIT),
+    [tasks],
+  );
 
   // 노트 — 오늘 모드: 이어서 쓸 노트(최근 수정 N). 다른 날: 그 날 노트.
   const notes = useMemo(() => {
@@ -95,38 +117,46 @@ export function TodayPage({
   function handleQuickAdd() {
     const title = quickTask.trim();
     if (!title) return;
-    createTask.mutate({ title, due_date: day });
+    // 미리 적은 마감일이 있으면 그 날짜로, 비웠으면 날짜 없는 할 일.
+    createTask.mutate({ title, due_date: quickDate.trim() || null });
     setQuickTask("");
+    setQuickDate(defaultQuickDate);
   }
 
   return (
     <div className="flex min-h-svh flex-col lg:h-full lg:min-h-0">
       <PageHeaderBar
         center={
-          <Text variant="h4" as="h2">
-            {isTodayView ? "오늘" : formatDateLong(day)}
-          </Text>
+          isTodayView ? (
+            <Text variant="h4" as="h2">
+              오늘
+            </Text>
+          ) : (
+            // 다른 날 보기일 때 — 날짜 타이틀 자체가 '오늘로' 복귀 버튼. 날짜 텍스트
+            // 까지 클릭존(되돌리기 아이콘 + 날짜 한 덩어리).
+            <button
+              type="button"
+              onClick={onReturnToday}
+              title="오늘로"
+              className="flex items-center gap-1.5 rounded-md px-2 py-1 transition hover:bg-[var(--bg-surface-hover)]"
+              style={{ color: "var(--text-primary)" }}
+            >
+              <CornerUpLeft
+                className="h-4 w-4 shrink-0"
+                style={{ color: "var(--text-secondary)" }}
+                aria-hidden
+              />
+              <Text variant="h4" as="span">
+                {formatDateLong(day)}
+              </Text>
+            </button>
+          )
         }
       />
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto w-full max-w-2xl px-5 py-6">
-          {/* 제목(날짜)은 헤더가 표시 — 다른 날일 때만 '오늘로' 복귀 버튼. */}
-          {!isTodayView ? (
-            <div className="mb-5">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={onReturnToday}
-                title="오늘로"
-                leftIcon={<CornerUpLeft className="h-3 w-3" />}
-                style={{ color: "var(--text-secondary)" }}
-              >
-                오늘로
-              </Button>
-            </div>
-          ) : null}
-
+          {/* 제목(날짜)은 헤더가 표시 — 다른 날이면 헤더의 날짜가 곧 '오늘로' 복귀 버튼. */}
           <div className="space-y-7">
             {/* 할 일 | 일정 */}
             <div className="grid grid-cols-1 gap-x-6 gap-y-7 sm:grid-cols-2">
@@ -135,7 +165,13 @@ export function TodayPage({
                 title={isTodayView ? "할 일" : "마감 할 일"}
                 count={tasks.length}
               >
-                <div className="mb-2 flex items-center gap-2">
+                <div
+                  className="mb-2 rounded-md px-2 py-2"
+                  style={{
+                    backgroundColor: "var(--bg-surface)",
+                    border: "1px solid var(--border-default)",
+                  }}
+                >
                   <input
                     value={quickTask}
                     onChange={(e) => setQuickTask(e.target.value)}
@@ -146,30 +182,41 @@ export function TodayPage({
                       }
                     }}
                     placeholder={isTodayView ? "오늘 할 일 추가" : "이 날 할 일 추가"}
-                    className="min-w-0 flex-1 rounded-md px-2 py-1.5 text-sm outline-none"
-                    style={{
-                      backgroundColor: "var(--bg-surface)",
-                      border: "1px solid var(--border-default)",
-                      color: "var(--text-primary)",
-                    }}
+                    className="mb-2 w-full bg-transparent text-sm outline-none"
+                    style={{ color: "var(--text-primary)" }}
                   />
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleQuickAdd}
-                    title="할 일 추가"
-                    style={{ color: "var(--text-secondary)", border: "1px solid var(--border-subtle)" }}
-                    leftIcon={<Plus className="h-3 w-3" />}
+                  <div
+                    className="flex items-center gap-x-3 text-xs"
+                    style={{ color: "var(--text-secondary)" }}
                   >
-                    추가
-                  </Button>
+                    <span className="inline-flex items-center gap-1">
+                      <CalendarIcon className="h-3 w-3 shrink-0 opacity-60" aria-hidden />
+                      <LooseDateInput
+                        value={quickDate}
+                        onCommit={setQuickDate}
+                        seedTodayOnFocus
+                        compact
+                      />
+                    </span>
+                    <Button
+                      className="ml-auto"
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleQuickAdd}
+                      title="할 일 추가"
+                      style={{ color: "var(--text-secondary)", border: "1px solid var(--border-subtle)" }}
+                      leftIcon={<Plus className="h-3 w-3" />}
+                    >
+                      추가
+                    </Button>
+                  </div>
                 </div>
                 {tasks.length === 0 ? (
                   <EmptyLine>
                     {isTodayView ? "오늘 할 일이 없습니다." : "이 날 마감 할 일이 없습니다."}
                   </EmptyLine>
                 ) : (
-                  tasks.map((t) => {
+                  visibleTasks.map((t) => {
                     const overdue =
                       isTodayView && !t.done && t.due_date != null && isPast(t.due_date);
                     return (
@@ -272,8 +319,22 @@ export function TodayPage({
               <Section
                 icon={<BookOpen className="h-4 w-4" />}
                 title={isTodayView ? "오늘 일기" : "일기"}
+                action={
+                  journalStatus !== "idle" ? (
+                    <SaveIndicator
+                      isPending={
+                        journalStatus === "pending" || journalStatus === "saving"
+                      }
+                      isError={journalStatus === "error"}
+                    />
+                  ) : undefined
+                }
               >
-                <JournalEditor key={day} date={day} />
+                <JournalEditor
+                  key={day}
+                  date={day}
+                  onStatusChange={setJournalStatus}
+                />
               </Section>
             </div>
           </div>
