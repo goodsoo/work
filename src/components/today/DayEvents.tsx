@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { Trash2, Plus, Check } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Trash2, Plus, Check, Calendar, Clock } from "lucide-react";
 import { Button } from "../common/Button";
 import { Text } from "../common/Text";
 import { LooseDateInput } from "../common/LooseDateInput";
@@ -134,22 +134,36 @@ function EventRow({ event }: { event: ScheduleEvent }) {
   );
 }
 
-// 일정 추가 폼 — 그 날(date) 시작. 텍스트 + (선택) 시각.
+// 일정 추가 폼 — 시작일(기본 = 보고 있는 날) + 텍스트 + (선택) 시각.
 function AddEventForm({ date }: { date: string }) {
   const createEvent = useCreateEvent();
   const [text, setText] = useState("");
+  const [start, setStart] = useState(date);
   const [time, setTime] = useState("");
+
+  // 보고 있는 날짜가 바뀌면 시작일도 그 날짜로 리셋(기본값 = 그 날).
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setStart(date);
+  }, [date]);
 
   function add() {
     const t = text.trim();
     if (!t) return;
-    createEvent.mutate({ text: t, start: date, end: null, time: time || null });
+    createEvent.mutate({ text: t, start: start || date, end: null, time: time || null });
     setText("");
+    setStart(date);
     setTime("");
   }
 
   return (
-    <div className="mb-2 flex items-center gap-2">
+    <div
+      className="mb-2 rounded-md px-2 py-2"
+      style={{
+        backgroundColor: "var(--bg-surface)",
+        border: "1px solid var(--border-default)",
+      }}
+    >
       <input
         value={text}
         onChange={(e) => setText(e.target.value)}
@@ -160,24 +174,33 @@ function AddEventForm({ date }: { date: string }) {
           }
         }}
         placeholder="일정 추가"
-        className="min-w-0 flex-1 rounded-md px-2 py-1.5 text-sm outline-none"
-        style={{
-          backgroundColor: "var(--bg-surface)",
-          border: "1px solid var(--border-default)",
-          color: "var(--text-primary)",
-        }}
+        className="mb-2 w-full bg-transparent text-sm outline-none"
+        style={{ color: "var(--text-primary)" }}
       />
-      <LooseTimeInput value={time} onCommit={setTime} compact />
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={add}
-        title="일정 추가"
-        style={{ color: "var(--text-secondary)", border: "1px solid var(--border-subtle)" }}
-        leftIcon={<Plus className="h-3 w-3" />}
+      <div
+        className="flex items-center gap-x-3 text-xs"
+        style={{ color: "var(--text-secondary)" }}
       >
-        추가
-      </Button>
+        <span className="inline-flex items-center gap-1">
+          <Calendar className="h-3 w-3 shrink-0 opacity-60" aria-hidden />
+          <LooseDateInput value={start} onCommit={setStart} compact />
+        </span>
+        <span className="inline-flex items-center gap-1">
+          <Clock className="h-3 w-3 shrink-0 opacity-60" aria-hidden />
+          <LooseTimeInput value={time} onCommit={setTime} compact />
+        </span>
+        <Button
+          className="ml-auto"
+          variant="ghost"
+          size="sm"
+          onClick={add}
+          title="일정 추가"
+          style={{ color: "var(--text-secondary)", border: "1px solid var(--border-subtle)" }}
+          leftIcon={<Plus className="h-3 w-3" />}
+        >
+          추가
+        </Button>
+      </div>
     </div>
   );
 }

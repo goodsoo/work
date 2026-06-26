@@ -20,6 +20,9 @@ type Props = {
   fullWidth?: boolean;
   // task 카드 같은 좁은 메타 row 용 — text-xs.
   compact?: boolean;
+  // 비어있을 때 포커스하면 오늘 날짜로 시드. 빈 채로 두면 "날짜 없음", 클릭하면
+  // 오늘부터 편집 시작하게 하는 빠른 추가 입력용(opt-in — 종료일 등엔 영향 없음).
+  seedTodayOnFocus?: boolean;
 };
 
 // 너그러운 날짜 input. blur/Enter 시 parseLooseDate → ISO 정규화. 파싱 실패 시
@@ -30,6 +33,7 @@ export function LooseDateInput({
   onCommit,
   fullWidth = false,
   compact = false,
+  seedTodayOnFocus = false,
 }: Props) {
   const [draft, setDraft] = useState(value);
   const [focused, setFocused] = useState(false);
@@ -73,7 +77,16 @@ export function LooseDateInput({
       type="text"
       value={display}
       onChange={(e) => setDraft(e.target.value)}
-      onFocus={() => setFocused(true)}
+      onFocus={() => {
+        setFocused(true);
+        // 비어있을 때 클릭하면 오늘 날짜로 시드 — 거기서부터 편집. 안 건드리면
+        // 빈 채로 남아 "날짜 없음".
+        if (seedTodayOnFocus && draft.trim() === "") {
+          const today = todayIso();
+          setDraft(today);
+          if (today !== value) onCommit(today);
+        }
+      }}
       onBlur={() => {
         setFocused(false);
         commit();

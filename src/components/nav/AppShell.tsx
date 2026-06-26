@@ -122,26 +122,43 @@ export function AppShell({
           inset 0 환경 (Windows/Linux/web) 에선 height 0 으로 자연 invisible. */}
       <header
         data-tauri-drag-region
-        className="hidden lg:flex lg:items-stretch"
+        className="flex items-stretch"
         style={{
           position: "fixed",
           top: 0,
           left: 0,
           right: 0,
           height: "var(--titlebar-inset)",
-          // sidebar visible 일 때 vault column 이 traffic lights 영역 포함 (column 안 padding 처리).
-          // collapse 시 vault column 사라지므로 header 가 직접 traffic lights padding.
-          paddingLeft: desktopSidePanelVisible ? 0 : "var(--titlebar-traffic-inset)",
           backgroundColor: "var(--border-default)",
           borderBottom: "1px solid var(--border-default)",
           zIndex: 50,
           gap: "0.5rem",
         }}
       >
+        {/* 좌측 traffic-light inset — VaultBadge 컬럼이 없을 때(좁은 창·사이드바 접힘)
+            신호등 영역 확보 + 드래그. 컬럼이 있을 땐(lg + 사이드바) 컬럼이 inset 담당. */}
+        <div
+          data-tauri-drag-region
+          className={`shrink-0 ${desktopSidePanelVisible ? "lg:hidden" : ""}`}
+          style={{ paddingLeft: "var(--titlebar-traffic-inset)" }}
+        />
+        {/* 좁은 창: 사이드바 드로어 토글 (데스크탑은 사이드바 상시 노출이라 lg 에선 숨김). */}
+        {hasSidePanel ? (
+          <Button
+            variant="icon"
+            onClick={drawer.toggle}
+            aria-label="메뉴 열기"
+            aria-expanded={drawer.isOpen}
+            className="shrink-0 self-center lg:hidden"
+            style={{ color: "var(--text-secondary)" }}
+          >
+            <Menu className="h-4 w-4" />
+          </Button>
+        ) : null}
         {desktopSidePanelVisible ? (
           <div
             data-tauri-drag-region
-            className="flex shrink-0 items-center"
+            className="hidden shrink-0 items-center lg:flex"
             style={{
               width: `${width}px`,
               paddingLeft: "var(--titlebar-traffic-inset)",
@@ -154,13 +171,15 @@ export function AppShell({
         <div data-tauri-drag-region className="flex h-full items-stretch">
           <HeaderTabs activeTab={activeTab} onTabChange={onTabChange} />
         </div>
-        {/* 가운데 flex-1 = drag region — live 시계를 중앙에 둠 */}
+        {/* 가운데 flex-1 = drag region — live 시계(날짜·시간)는 좁은 창에선 숨김. */}
         <div
           data-tauri-drag-region
-          className="flex flex-1 items-center justify-center"
+          className="hidden flex-1 items-center justify-center lg:flex"
         >
           <TitlebarClock />
         </div>
+        {/* 좁은 창에선 시계가 빠지므로 우측 버튼이 끝으로 가게 flex-1 스페이서(드래그). */}
+        <div data-tauri-drag-region className="flex-1 lg:hidden" />
         {/* 우측: search + settings + theme. button 자체는 click, 사이 gap 은 drag region. */}
         <div data-tauri-drag-region className="flex items-center gap-0.5 pr-2">
           {onOpenSearch ? (
@@ -224,67 +243,6 @@ export function AppShell({
         ) : null}
       </div>
 
-      {/* Mobile header */}
-      <header
-        className="sticky top-0 z-10 backdrop-blur lg:hidden"
-        style={{ backgroundColor: "var(--bg-overlay)", borderBottom: "1px solid var(--border-default)" }}
-      >
-        <div className="mx-auto flex w-full max-w-2xl items-center justify-between px-4 py-2.5">
-          <div className="flex items-center gap-1">
-            {hasSidePanel ? (
-              <Button
-                variant="icon"
-                onClick={drawer.toggle}
-                aria-label="메뉴 열기"
-                aria-expanded={drawer.isOpen}
-                className="h-8 w-8"
-                style={{ color: "var(--text-secondary)" }}
-              >
-                <Menu className="h-4 w-4" />
-              </Button>
-            ) : null}
-            <Text
-              variant="body"
-              weight="semibold"
-              as="h1"
-              className="tracking-tight"
-            >
-              짱수
-            </Text>
-          </div>
-          <div className="flex items-center gap-0.5">
-            {onOpenSearch ? (
-              <Button
-                variant="icon"
-                onClick={() => onOpenSearch()}
-                aria-label="검색"
-                className="h-8 w-8"
-                style={{ color: "var(--text-muted)" }}
-              >
-                <Search className="h-4 w-4" />
-              </Button>
-            ) : null}
-            <Button
-              variant="icon"
-              onClick={() => setSettingsOpen(true)}
-              aria-label="설정"
-              className="h-8 w-8"
-              style={{ color: "var(--text-muted)" }}
-            >
-              <Settings className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="icon"
-              onClick={(e) => toggle({ origin: { x: e.clientX, y: e.clientY } })}
-              className="h-8 w-8"
-              style={{ color: "var(--text-muted)" }}
-            >
-              <ThemeIcon className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      </header>
-
       {/* Mobile drawer: dim overlay + sliding aside */}
       {hasSidePanel ? (
         <>
@@ -307,7 +265,8 @@ export function AppShell({
               width: `${MOBILE_DRAWER_WIDTH}px`,
               backgroundColor: "var(--bg-surface)",
               borderRight: "1px solid var(--border-default)",
-              paddingTop: "var(--safe-top)",
+              // 항상 떠있는 타이틀바 아래로 드로어 내용이 시작하게 inset 확보.
+              paddingTop: "calc(var(--safe-top) + var(--titlebar-inset))",
             }}
             aria-hidden={!drawer.isOpen}
           >
@@ -322,12 +281,13 @@ export function AppShell({
         key={activeTab}
         style={
           {
-            paddingBottom: "calc(var(--safe-bottom) + 72px)",
+            // 하단 탭을 숨겨 더는 72px 여백이 필요 없음 — safe-area 만.
+            paddingBottom: "var(--safe-bottom)",
             ["--gs-main-pl" as string]: mainPaddingLeft,
             ["--gs-main-pt" as string]: "var(--titlebar-inset)",
           } as React.CSSProperties
         }
-        className="lg:!pb-0 lg:h-screen lg:overflow-y-auto lg:overscroll-none lg:[padding-left:var(--gs-main-pl)] lg:[padding-top:var(--gs-main-pt)]"
+        className="[padding-top:var(--gs-main-pt)] lg:!pb-0 lg:h-screen lg:overflow-y-auto lg:overscroll-none lg:[padding-left:var(--gs-main-pl)]"
       >
         <SidebarToggleProvider
           value={
@@ -340,8 +300,10 @@ export function AppShell({
         </SidebarToggleProvider>
       </main>
 
-      {/* Mobile bottom tabs */}
-      <BottomTabs activeTab={activeTab} onTabChange={handleTabChange} />
+      {/* 하단 탭 — 좁은 창에서도 타이틀바 탭이 그대로 보이므로 중복 제거(숨김). */}
+      <div className="hidden">
+        <BottomTabs activeTab={activeTab} onTabChange={handleTabChange} />
+      </div>
 
       <SettingsModal
         open={settingsOpen}

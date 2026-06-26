@@ -1,14 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { useUpsertJournal, useDeleteJournal, useJournals } from "../../hooks/useJournals";
-import { useDebouncedSave, type SaveStatus } from "../../hooks/useDebouncedSave";
+import { useDebouncedSave } from "../../hooks/useDebouncedSave";
 import { formatDateLong } from "../../lib/dates";
-import { MarkdownView } from "../meetings/MarkdownView";
-import { SourceBodyEditor } from "../meetings/SourceBodyEditor";
+import { JournalTextArea } from "./JournalTextArea";
 import { Modal } from "../common/Modal";
 import { Button } from "../common/Button";
-import { ModeChip } from "../common/ModeChip";
-import { Text } from "../common/Text";
+import { SaveIndicator } from "../common/SaveIndicator";
 
 type Props = {
   open: boolean;
@@ -30,9 +28,6 @@ export function JournalOverlay({ open, date, onClose }: Props) {
   // 초기값: 서버 데이터 > draft cache > 빈 문자열. open 될 때 한 번 결정.
   // open 중에 외부 데이터 바뀌어도 사용자 입력 덮어쓰지 않게 open 분리.
   const [content, setContent] = useState<string>("");
-  // view/edit 토글 — 일기는 매번 편집 모드로 시작 (방금 쓴 거 이어 쓰기 자연스러움).
-  // 회의록 useViewMode 와 의도적으로 분리: persist 안 함, 오버레이 닫으면 reset.
-  const [viewMode, setViewMode] = useState<"edit" | "view">("edit");
   const taRef = useRef<HTMLTextAreaElement>(null);
 
   const save = useCallback(
@@ -51,7 +46,7 @@ export function JournalOverlay({ open, date, onClose }: Props) {
     [date, existing, upsertMutation, deleteMutation],
   );
 
-  const { schedule, flush, status, error } = useDebouncedSave<string>({ save });
+  const { schedule, flush, status } = useDebouncedSave<string>({ save });
 
   // open 시 초기값 세팅 + draft cache 비움 + 편집 모드로 리셋. 이미 열려있는 채로
   // date prop 만 바뀌면 동일.
@@ -62,7 +57,6 @@ export function JournalOverlay({ open, date, onClose }: Props) {
     const initial = DRAFT_CACHE.get(date) ?? existing?.content ?? "";
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setContent(initial);
-    setViewMode("edit");
     DRAFT_CACHE.delete(date);
     // existing 이 늦게 도착해도 placeholder 가 유지되도록 open + date 만 dep.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -75,10 +69,9 @@ export function JournalOverlay({ open, date, onClose }: Props) {
     };
   }, [flush]);
 
-  // open 시 자동 focus + 끝으로 caret. view 모드 진입 시엔 focus 안 함.
+  // open 시 자동 focus + 끝으로 caret.
   useEffect(() => {
     if (!open) return;
-    if (viewMode !== "edit") return;
     const id = requestAnimationFrame(() => {
       const el = taRef.current;
       if (!el) return;
@@ -87,33 +80,24 @@ export function JournalOverlay({ open, date, onClose }: Props) {
       el.setSelectionRange(end, end);
     });
     return () => cancelAnimationFrame(id);
-  }, [open, viewMode]);
+  }, [open]);
 
   // 모달 단축키 (Escape 는 Modal 컴포넌트가 onClose=handleClose 로 처리):
   //   Cmd/Ctrl+Enter — 저장&닫기
-  //   Cmd/Ctrl+Shift+E — 편집/보기 토글 (content 비어있으면 무효). 메모장 단축키와 통일.
   useEffect(() => {
     if (!open) return;
     function onKey(e: KeyboardEvent) {
       const cmd = e.metaKey || e.ctrlKey;
-      if (!cmd || e.altKey) return;
-      if (!e.shiftKey && e.key === "Enter") {
+      if (!cmd || e.altKey || e.shiftKey) return;
+      if (e.key === "Enter") {
         e.preventDefault();
         handleClose();
-        return;
-      }
-      // e.code 사용해서 한글 IME 무관 (KeyE 매칭).
-      if (e.shiftKey && e.code === "KeyE") {
-        if (content.trim().length === 0) return;
-        e.preventDefault();
-        setViewMode((m) => (m === "edit" ? "view" : "edit"));
-        return;
       }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, content]);
+  }, [open]);
 
   function handleChange(next: string) {
     setContent(next);
@@ -141,13 +125,10 @@ export function JournalOverlay({ open, date, onClose }: Props) {
             {formatDateLong(date)} 일기
           </h2>
           <div className="flex items-center gap-2">
-            <SaveBadge status={status} error={error} />
-            {content.trim().length > 0 ? (
-              <ModeChip
-                viewMode={viewMode}
-                onToggle={() =>
-                  setViewMode((m) => (m === "edit" ? "view" : "edit"))
-                }
+            {status !== "idle" ? (
+              <SaveIndicator
+                isPending={status === "pending" || status === "saving"}
+                isError={status === "error"}
               />
             ) : null}
             <Button
@@ -161,56 +142,16 @@ export function JournalOverlay({ open, date, onClose }: Props) {
             </Button>
           </div>
         </header>
-        {/* edit: SourceBodyEditor 가 outer scroll 발생시키므로 wrapper 가 min-h-0 + overflow-y-auto.
-            view: 컨테이너 스크롤. 둘 다 px-6 py-5 + font-serif 로 일기 느낌 유지. */}
-        {viewMode === "edit" ? (
-          // flex flex-col 로 SourceBodyEditor (flex:1 0 auto) 가 남은 높이까지 grow
-          // → textarea 아래 빈 영역 클릭도 에디터 focus 핸들러에 닿음 (메모장과 동일).
-          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-6 py-5 font-serif text-[15px]">
-            <SourceBodyEditor
-              content={content}
-              onChange={handleChange}
-              placeholder="오늘 어땠어요?"
-              textareaRef={taRef}
-              onBlur={() => void flush()}
-            />
-          </div>
-        ) : (
-          <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5 font-serif text-[15px]">
-            <MarkdownView content={content} />
-          </div>
-        )}
+        {/* 평문 일기 — 컨테이너 높이를 채우는 textarea(자체 스크롤). px-6 py-5 + font-serif 로 일기 느낌. */}
+        <div className="flex min-h-0 flex-1 flex-col px-6 py-5 font-serif text-[15px]">
+          <JournalTextArea
+            content={content}
+            onChange={handleChange}
+            placeholder="오늘 어땠어요?"
+            textareaRef={taRef}
+            onBlur={() => void flush()}
+          />
+        </div>
     </Modal>
   );
-}
-
-function SaveBadge({ status, error }: { status: SaveStatus; error: Error | null }) {
-  if (status === "saving" || status === "pending") {
-    return (
-      <Text variant="caption" color="muted" as="span" className="text-[11px]">
-        저장 중…
-      </Text>
-    );
-  }
-  if (status === "saved") {
-    return (
-      <Text variant="caption" color="muted" as="span" className="text-[11px]">
-        저장됨
-      </Text>
-    );
-  }
-  if (status === "error") {
-    return (
-      <Text
-        variant="caption"
-        as="span"
-        className="text-[11px]"
-        style={{ color: "var(--accent-red)" }}
-        title={error?.message ?? undefined}
-      >
-        저장 실패
-      </Text>
-    );
-  }
-  return null;
 }
