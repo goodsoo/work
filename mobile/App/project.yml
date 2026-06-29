@@ -1,0 +1,51 @@
+name: GoodsoobWork
+options:
+  bundleIdPrefix: com.goodsoob
+  deploymentTarget:
+    iOS: "16.0"
+  createIntermediateGroups: true
+
+packages:
+  VaultKit:
+    path: ../VaultKit
+
+targets:
+  GoodsoobWork:
+    type: application
+    platform: iOS
+    sources:
+      - path: Sources
+    dependencies:
+      - package: VaultKit
+        product: VaultKit
+    info:
+      path: Sources/Info.plist
+      properties:
+        CFBundleDisplayName: 오늘
+        CFBundleShortVersionString: "0.1.0"
+        CFBundleVersion: "1"
+        UILaunchScreen:
+          UIColorName: ""
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        # 사용자가 Files/iCloud Drive 폴더를 직접 고르므로 별도 iCloud 컨테이너
+        # 엔타이틀먼트 불필요. 보안 스코프 북마크로 영구 접근.
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.goodsoob.work
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        # Swift 5 language 모드 — SwiftUI 앱의 strict-concurrency 에러 표면 축소.
+        # VaultKit 패키지는 Swift 6 모드라도 혼용 정상.
+        SWIFT_VERSION: "5.0"
+        TARGETED_DEVICE_FAMILY: "1,2"
+        GENERATE_INFOPLIST_FILE: NO
+        # ⚠️ 실기기 설치 시 본인 Apple ID 팀으로 설정 (Xcode Signing & Capabilities
+        # 에서 자동 채워짐). 무료 계정도 7일 서명으로 본인 기기 설치 가능.
+        # DEVELOPMENT_TEAM: XXXXXXXXXX
+        CODE_SIGN_STYLE: Automatic

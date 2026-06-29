@@ -1,0 +1,16 @@
+# Swift Package Manager 빌드 산출물 (iCloud churn 방지 — 절대 커밋 X)
+.build/
+VaultKit/.build/
+
+# Xcode
+*.xcodeproj/
+*.xcworkspace/
+xcuserdata/
+DerivedData/
+*.xcuserstate
+
+# xcodegen 이 생성하는 산출물 (project.yml 이 source of truth)
+App/GoodsoobWork.xcodeproj/
+App/Sources/Info.plist
+
+.DS_Store
