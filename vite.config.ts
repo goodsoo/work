@@ -19,7 +19,7 @@ function currentBranch(): string {
 
 export default defineConfig({
   server: {
-    port: Number(process.env.VITE_PORT) || 1420,
+    port: Number(process.env.VITE_PORT) || 7030,
     strictPort: true,
   },
   define: {
